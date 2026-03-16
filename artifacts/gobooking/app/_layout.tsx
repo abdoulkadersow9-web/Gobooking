@@ -45,6 +45,7 @@ function RootLayoutNav() {
       <Stack.Screen name="parcel/payment" options={{ headerShown: false }} />
       <Stack.Screen name="parcel/confirmation/[parcelId]" options={{ headerShown: false }} />
       <Stack.Screen name="parcel/tracking/[parcelId]" options={{ headerShown: false }} />
+      <Stack.Screen name="parcel/track" options={{ headerShown: false }} />
     </Stack>
   );
 }

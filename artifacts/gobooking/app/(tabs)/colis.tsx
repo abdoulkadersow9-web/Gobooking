@@ -141,6 +141,23 @@ export default function ColisScreen() {
         </Pressable>
       </LinearGradient>
 
+      {/* Track a parcel shortcut */}
+      <Pressable
+        style={({ pressed }) => [styles.trackBanner, pressed && { opacity: 0.9 }]}
+        onPress={() => router.push("/parcel/track")}
+      >
+        <View style={styles.trackBannerLeft}>
+          <View style={styles.trackBannerIcon}>
+            <Feather name="search" size={17} color={Colors.light.primary} />
+          </View>
+          <View>
+            <Text style={styles.trackBannerTitle}>Suivre un colis</Text>
+            <Text style={styles.trackBannerSub}>Entrez un numéro de suivi (ex: GBX-XXXX-XXXX)</Text>
+          </View>
+        </View>
+        <Feather name="chevron-right" size={18} color={Colors.light.primary} />
+      </Pressable>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
@@ -215,4 +232,41 @@ const styles = StyleSheet.create({
   amountText: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primary },
   trackRow: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   trackText: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+
+  trackBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    gap: 12,
+  },
+  trackBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  trackBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trackBannerTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
+  },
+  trackBannerSub: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#94A3B8",
+    marginTop: 1,
+  },
 });
