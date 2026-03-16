@@ -48,6 +48,25 @@ const STATUS: Record<string, { label: string; color: string; bg: string; strip: 
 
 const IN_PROGRESS = ["en_attente", "pris_en_charge", "en_transit", "en_livraison"];
 
+const DEMO_PARCELS: Parcel[] = [
+  { id: "d1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké",
+    senderName: "Kouamé Yao", receiverName: "Adjoua Koné", parcelType: "electronique",
+    weight: 2.5, deliveryType: "retrait_agence", amount: 4700, status: "en_transit",
+    createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: "d2", trackingRef: "GBX-B9C3-PL44", fromCity: "San Pédro", toCity: "Abidjan",
+    senderName: "Traoré Ahmed", receiverName: "Bamba Salif", parcelType: "vetements",
+    weight: 5.0, deliveryType: "livraison_domicile", amount: 5900, status: "livre",
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+  { id: "d3", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan", toCity: "Yamoussoukro",
+    senderName: "Gbané Marie", receiverName: "Koné Francis", parcelType: "documents",
+    weight: 0.3, deliveryType: "retrait_agence", amount: 2200, status: "en_attente",
+    createdAt: new Date().toISOString() },
+  { id: "d4", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan", toCity: "Korhogo",
+    senderName: "Ouattara Paul", receiverName: "Diomandé Cissé", parcelType: "alimentaire",
+    weight: 8.0, deliveryType: "retrait_agence", amount: 8200, status: "pris_en_charge",
+    createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+];
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString("fr-FR", {
@@ -122,16 +141,19 @@ export default function ColisScreen() {
   useEffect(() => { load(); }, [load]);
   const onRefresh = () => { setRefreshing(true); load(); };
 
-  const filtered = parcels.filter((p) => {
+  // Use real data when logged in, demo data when not
+  const source = token ? parcels : DEMO_PARCELS;
+
+  const filtered = source.filter((p) => {
     if (filter === "en_cours") return IN_PROGRESS.includes(p.status);
     if (filter === "livres")   return p.status === "livre";
     return true;
   });
 
   const counts = {
-    tous:     parcels.length,
-    en_cours: parcels.filter((p) => IN_PROGRESS.includes(p.status)).length,
-    livres:   parcels.filter((p) => p.status === "livre").length,
+    tous:     source.length,
+    en_cours: source.filter((p) => IN_PROGRESS.includes(p.status)).length,
+    livres:   source.filter((p) => p.status === "livre").length,
   };
 
   const FILTERS: { key: Filter; label: string }[] = [
@@ -200,21 +222,7 @@ export default function ColisScreen() {
       </View>
 
       {/* Body */}
-      {!token ? (
-        <View style={styles.center}>
-          <View style={styles.emptyIcon}>
-            <Feather name="lock" size={34} color={Colors.light.primary} />
-          </View>
-          <Text style={styles.emptyTitle}>Connexion requise</Text>
-          <Text style={styles.emptyDesc}>Connectez-vous pour voir vos colis</Text>
-          <TouchableOpacity
-            style={styles.loginBtn}
-            onPress={() => router.push("/(auth)/login")}
-          >
-            <Text style={styles.loginBtnText}>Se connecter</Text>
-          </TouchableOpacity>
-        </View>
-      ) : loading ? (
+      {loading && token ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
           <Text style={styles.loadingText}>Chargement…</Text>
@@ -226,42 +234,42 @@ export default function ColisScreen() {
           renderItem={({ item }) => (
             <ParcelRow item={item} onPress={() => openSuivi(item)} />
           )}
-          contentContainerStyle={[styles.list, filtered.length === 0 && styles.listEmpty]}
+          contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
+            token
+              ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
+              : undefined
           }
           ListEmptyComponent={
             <View style={styles.center}>
               <View style={styles.emptyIcon}>
                 <Feather name="package" size={34} color={Colors.light.primary} />
               </View>
-              <Text style={styles.emptyTitle}>
-                {parcels.length === 0 ? "Aucun colis" : "Aucun résultat"}
-              </Text>
-              <Text style={styles.emptyDesc}>
-                {parcels.length === 0
-                  ? "Vos envois apparaîtront ici"
-                  : "Aucun colis dans cette catégorie"}
-              </Text>
-              {parcels.length === 0 ? (
-                <TouchableOpacity
-                  style={styles.ctaBtn}
-                  onPress={() => router.push("/parcel/send")}
-                >
-                  <Feather name="plus" size={15} color="white" />
-                  <Text style={styles.ctaBtnText}>Envoyer un colis</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={styles.resetBtn}
-                  onPress={() => setFilter("tous")}
-                >
-                  <Text style={styles.resetBtnText}>Voir tous les colis</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.emptyTitle}>Aucun résultat</Text>
+              <Text style={styles.emptyDesc}>Aucun colis dans cette catégorie</Text>
+              <TouchableOpacity style={styles.resetBtn} onPress={() => setFilter("tous")}>
+                <Text style={styles.resetBtnText}>Voir tous les colis</Text>
+              </TouchableOpacity>
             </View>
+          }
+          ListFooterComponent={
+            !token ? (
+              <TouchableOpacity
+                style={styles.loginBanner}
+                activeOpacity={0.85}
+                onPress={() => router.push("/(auth)/login")}
+              >
+                <Feather name="lock" size={15} color={Colors.light.primary} />
+                <Text style={styles.loginBannerText}>
+                  Connectez-vous pour voir vos vrais colis
+                </Text>
+                <View style={styles.loginBannerBtn}>
+                  <Text style={styles.loginBannerBtnText}>Se connecter →</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null
           }
         />
       )}
@@ -402,4 +410,19 @@ const styles = StyleSheet.create({
     borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 4,
   },
   resetBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+
+  loginBanner: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#EEF2FF", borderRadius: 16,
+    padding: 14, marginTop: 12,
+    borderWidth: 1, borderColor: "#C7D2FE",
+  },
+  loginBannerText: {
+    flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#1E40AF",
+  },
+  loginBannerBtn: {
+    backgroundColor: Colors.light.primary, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  loginBannerBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
 });
