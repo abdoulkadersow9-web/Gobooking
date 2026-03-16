@@ -24,8 +24,9 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: "#E2E8F0",
           elevation: 0,
-          height: isWeb ? 72 : 60,
-          paddingBottom: isWeb ? 12 : 6,
+          height: isWeb ? 72 : 62,
+          paddingBottom: isWeb ? 12 : 8,
+          paddingTop: 4,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -40,6 +41,7 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
           fontSize: 10,
+          marginTop: 1,
         },
       }}
     >
@@ -47,35 +49,52 @@ export default function TabLayout() {
         name="index"
         options={{
           title: "Accueil",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name="home" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: "Trajets",
-          tabBarIcon: ({ color }) => <Feather name="bookmark" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="bookmark" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="colis"
         options={{
           title: "Colis",
-          tabBarIcon: ({ color }) => <Feather name="package" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="package" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="suivi"
         options={{
-          title: "Alertes",
-          tabBarIcon: ({ color }) => <Feather name="bell" size={22} color={color} />,
+          title: "Suivi",
+          tabBarIcon: ({ color }) => (
+            <Feather name="map-pin" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Feather name="user" size={22} color={color} />
+          ),
+        }}
+      />
+      {/* Keep notifications screen registered but hidden from tab bar */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
