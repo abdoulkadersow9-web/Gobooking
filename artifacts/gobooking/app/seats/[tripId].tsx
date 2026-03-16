@@ -1,9 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -27,14 +29,30 @@ interface Seat {
   price: number;
 }
 
+const SEAT_AVAILABLE = "#D1FAE5";
+const SEAT_AVAILABLE_BORDER = "#10B981";
+const SEAT_AVAILABLE_TEXT = "#065F46";
+
+const SEAT_BOOKED = "#FEE2E2";
+const SEAT_BOOKED_BORDER = "#EF4444";
+const SEAT_BOOKED_TEXT = "#B91C1C";
+
+const SEAT_SELECTED = "#1A56DB";
+const SEAT_SELECTED_BORDER = "#0F3BA0";
+const SEAT_SELECTED_TEXT = "#FFFFFF";
+
 export default function SeatSelectionScreen() {
   const insets = useSafeAreaInsets();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const { booking, updateBooking } = useBooking();
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [lastTapped, setLastTapped] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const popAnim = useRef(new Animated.Value(0)).current;
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   useEffect(() => {
     const load = async () => {
@@ -53,6 +71,12 @@ export default function SeatSelectionScreen() {
   const toggleSeat = (seat: Seat) => {
     if (seat.status === "booked") return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLastTapped(seat.id);
+    Animated.sequence([
+      Animated.spring(popAnim, { toValue: 1, useNativeDriver: true, speed: 40, bounciness: 12 }),
+      Animated.delay(800),
+      Animated.spring(popAnim, { toValue: 0, useNativeDriver: true, speed: 30, bounciness: 0 }),
+    ]).start();
     setSelected((prev) =>
       prev.includes(seat.id)
         ? prev.filter((s) => s !== seat.id)
@@ -60,12 +84,10 @@ export default function SeatSelectionScreen() {
     );
   };
 
-  const selectedSeats = seats.filter((s) => selected.includes(s.id));
-  const totalPrice = selectedSeats.reduce((sum, s) => sum + s.price, 0);
-
   const handleContinue = () => {
     if (!selected.length) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const selectedSeats = seats.filter((s) => selected.includes(s.id));
     const seatNumbers = selectedSeats.map((s) => s.number);
     updateBooking({
       selectedSeats: selected,
@@ -83,127 +105,247 @@ export default function SeatSelectionScreen() {
     router.push("/passengers");
   };
 
+  const selectedSeatObjs = seats.filter((s) => selected.includes(s.id));
+  const totalPrice = selectedSeatObjs.reduce((sum, s) => sum + s.price, 0);
   const rows = Array.from(new Set(seats.map((s) => s.row))).sort((a, b) => a - b);
+  const tappedSeat = seats.find((s) => s.id === lastTapped);
 
-  const getSeatColor = (seat: Seat) => {
-    if (seat.status === "booked") return "#E2E8F0";
-    if (selected.includes(seat.id)) return Colors.light.primary;
-    return "#F1F5F9";
-  };
-
-  const getSeatTextColor = (seat: Seat) => {
-    if (seat.status === "booked") return Colors.light.textMuted;
-    if (selected.includes(seat.id)) return "white";
-    return Colors.light.text;
+  const getSeatStyle = (seat: Seat) => {
+    const isSelected = selected.includes(seat.id);
+    if (isSelected) {
+      return {
+        bg: SEAT_SELECTED,
+        border: SEAT_SELECTED_BORDER,
+        text: SEAT_SELECTED_TEXT,
+      };
+    }
+    if (seat.status === "booked") {
+      return {
+        bg: SEAT_BOOKED,
+        border: SEAT_BOOKED_BORDER,
+        text: SEAT_BOOKED_TEXT,
+      };
+    }
+    return {
+      bg: SEAT_AVAILABLE,
+      border: SEAT_AVAILABLE_BORDER,
+      text: SEAT_AVAILABLE_TEXT,
+    };
   };
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={styles.header}>
+      {/* Header */}
+      <LinearGradient
+        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        style={styles.header}
+      >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+          <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>Select Seats</Text>
-        <Text style={styles.headerSub}>{selected.length} selected</Text>
-      </View>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Choisir un siège</Text>
+          <Text style={styles.headerSub}>
+            {selected.length > 0
+              ? `${selected.length} siège${selected.length > 1 ? "s" : ""} sélectionné${selected.length > 1 ? "s" : ""}`
+              : "Appuyez sur un siège disponible"}
+          </Text>
+        </View>
+        <View style={styles.seatCountBadge}>
+          <Text style={styles.seatCountText}>{selected.length}</Text>
+        </View>
+      </LinearGradient>
 
+      {/* Legend */}
       <View style={styles.legend}>
-        {[
-          { color: "#F1F5F9", label: "Available" },
-          { color: Colors.light.primary, label: "Selected" },
-          { color: "#E2E8F0", label: "Booked" },
-        ].map((l) => (
-          <View key={l.label} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: l.color, borderWidth: l.color === "#F1F5F9" ? 1 : 0, borderColor: Colors.light.border }]} />
-            <Text style={styles.legendText}>{l.label}</Text>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSeat, { backgroundColor: SEAT_AVAILABLE, borderColor: SEAT_AVAILABLE_BORDER }]}>
+            <Feather name="check" size={10} color={SEAT_AVAILABLE_TEXT} />
           </View>
-        ))}
+          <Text style={styles.legendText}>Disponible</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSeat, { backgroundColor: SEAT_SELECTED, borderColor: SEAT_SELECTED_BORDER }]}>
+            <Feather name="user" size={10} color="white" />
+          </View>
+          <Text style={styles.legendText}>Sélectionné</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendSeat, { backgroundColor: SEAT_BOOKED, borderColor: SEAT_BOOKED_BORDER }]}>
+            <Feather name="x" size={10} color={SEAT_BOOKED_TEXT} />
+          </View>
+          <Text style={styles.legendText}>Réservé</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={styles.aisleIndicator}>
+            <Text style={styles.aisleIndicatorText}>|</Text>
+          </View>
+          <Text style={styles.legendText}>Allée</Text>
+        </View>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
+          <Text style={styles.loadingText}>Chargement des sièges...</Text>
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={styles.busLayout}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: selected.length > 0 ? 140 : 40 },
+          ]}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.busContainer}>
-            <View style={styles.busTop}>
-              <Feather name="navigation" size={20} color={Colors.light.primary} />
-              <Text style={styles.busTopText}>Driver</Text>
+          {/* Column header */}
+          <View style={styles.colHeader}>
+            <View style={styles.rowLabelSpace} />
+            <View style={styles.colLabels}>
+              <Text style={styles.colLabelText}>A</Text>
+              <Text style={styles.colLabelText}>B</Text>
             </View>
-
-            {rows.map((row) => {
-              const rowSeats = seats.filter((s) => s.row === row);
-              const left = rowSeats.filter((s) => s.column <= 2);
-              const right = rowSeats.filter((s) => s.column > 2);
-
-              return (
-                <View key={row} style={styles.seatRow}>
-                  <Text style={styles.rowLabel}>{row}</Text>
-                  <View style={styles.leftSeats}>
-                    {left.map((seat) => (
-                      <Pressable
-                        key={seat.id}
-                        style={[
-                          styles.seat,
-                          {
-                            backgroundColor: getSeatColor(seat),
-                            opacity: seat.status === "booked" ? 0.5 : 1,
-                          },
-                        ]}
-                        onPress={() => toggleSeat(seat)}
-                        disabled={seat.status === "booked"}
-                      >
-                        <Text style={[styles.seatText, { color: getSeatTextColor(seat) }]}>
-                          {seat.number}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={styles.aisle} />
-                  <View style={styles.rightSeats}>
-                    {right.map((seat) => (
-                      <Pressable
-                        key={seat.id}
-                        style={[
-                          styles.seat,
-                          {
-                            backgroundColor: getSeatColor(seat),
-                            opacity: seat.status === "booked" ? 0.5 : 1,
-                          },
-                        ]}
-                        onPress={() => toggleSeat(seat)}
-                        disabled={seat.status === "booked"}
-                      >
-                        <Text style={[styles.seatText, { color: getSeatTextColor(seat) }]}>
-                          {seat.number}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </View>
-              );
-            })}
+            <View style={styles.aisleGap} />
+            <View style={styles.colLabels}>
+              <Text style={styles.colLabelText}>C</Text>
+              <Text style={styles.colLabelText}>D</Text>
+            </View>
           </View>
+
+          {/* Bus front */}
+          <View style={styles.busFront}>
+            <View style={styles.steeringWheel}>
+              <Feather name="circle" size={22} color={Colors.light.primary} />
+              <Feather name="navigation" size={12} color={Colors.light.primary} style={StyleSheet.absoluteFill as any} />
+            </View>
+            <Text style={styles.busFrontText}>Conducteur</Text>
+          </View>
+          <View style={styles.busDivider} />
+
+          {/* Seat grid */}
+          {rows.map((row) => {
+            const rowSeats = seats
+              .filter((s) => s.row === row)
+              .sort((a, b) => a.column - b.column);
+            const left = rowSeats.filter((s) => s.column <= 2);
+            const right = rowSeats.filter((s) => s.column > 2);
+
+            return (
+              <View key={row} style={styles.seatRow}>
+                <Text style={styles.rowLabel}>{row}</Text>
+                <View style={styles.seatPair}>
+                  {left.map((seat) => {
+                    const s = getSeatStyle(seat);
+                    const isLast = lastTapped === seat.id;
+                    return (
+                      <Pressable
+                        key={seat.id}
+                        onPress={() => toggleSeat(seat)}
+                        disabled={seat.status === "booked"}
+                        style={({ pressed }) => [
+                          styles.seat,
+                          {
+                            backgroundColor: s.bg,
+                            borderColor: s.border,
+                            transform: pressed && seat.status !== "booked"
+                              ? [{ scale: 0.92 }]
+                              : [],
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name={seat.status === "booked" ? "x" : selected.includes(seat.id) ? "user" : "check"}
+                          size={11}
+                          color={s.text}
+                        />
+                        <Text style={[styles.seatNum, { color: s.text }]}>{seat.number}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={styles.aisle}>
+                  <Text style={styles.aisleText}>│</Text>
+                </View>
+                <View style={styles.seatPair}>
+                  {right.map((seat) => {
+                    const s = getSeatStyle(seat);
+                    return (
+                      <Pressable
+                        key={seat.id}
+                        onPress={() => toggleSeat(seat)}
+                        disabled={seat.status === "booked"}
+                        style={({ pressed }) => [
+                          styles.seat,
+                          {
+                            backgroundColor: s.bg,
+                            borderColor: s.border,
+                            transform: pressed && seat.status !== "booked"
+                              ? [{ scale: 0.92 }]
+                              : [],
+                          },
+                        ]}
+                      >
+                        <Feather
+                          name={seat.status === "booked" ? "x" : selected.includes(seat.id) ? "user" : "check"}
+                          size={11}
+                          color={s.text}
+                        />
+                        <Text style={[styles.seatNum, { color: s.text }]}>{seat.number}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Seat pop tooltip */}
+          {tappedSeat && (
+            <Animated.View
+              style={[
+                styles.tooltip,
+                {
+                  opacity: popAnim,
+                  transform: [{ scale: popAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <Text style={styles.tooltipTitle}>
+                {selected.includes(tappedSeat.id) ? "✓ Siège sélectionné" : "Siège désélectionné"}
+              </Text>
+              <Text style={styles.tooltipSeat}>{tappedSeat.number}</Text>
+              <Text style={styles.tooltipPrice}>{tappedSeat.price.toLocaleString()} FCFA</Text>
+            </Animated.View>
+          )}
         </ScrollView>
       )}
 
+      {/* Bottom bar */}
       {selected.length > 0 && (
-        <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
-          <View>
-            <Text style={styles.selectedInfo}>
-              Seats: {selectedSeats.map((s) => s.number).join(", ")}
-            </Text>
-            <Text style={styles.totalPrice}>${totalPrice}</Text>
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad + 12 }]}>
+          <View style={styles.bottomInfo}>
+            <View style={styles.selectedPills}>
+              {selectedSeatObjs.slice(0, 4).map((s) => (
+                <View key={s.id} style={styles.seatPill}>
+                  <Text style={styles.seatPillText}>{s.number}</Text>
+                </View>
+              ))}
+              {selectedSeatObjs.length > 4 && (
+                <View style={[styles.seatPill, styles.seatPillMore]}>
+                  <Text style={styles.seatPillText}>+{selectedSeatObjs.length - 4}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Total</Text>
+              <Text style={styles.priceValue}>{totalPrice.toLocaleString()} FCFA</Text>
+            </View>
           </View>
           <Pressable
             style={({ pressed }) => [styles.continueBtn, pressed && styles.continueBtnPressed]}
             onPress={handleContinue}
           >
-            <Text style={styles.continueBtnText}>Continue</Text>
+            <Text style={styles.continueBtnText}>Continuer vers paiement</Text>
             <Feather name="arrow-right" size={18} color="white" />
           </Pressable>
         </View>
@@ -213,161 +355,326 @@ export default function SeatSelectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.light.background },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F1F5F9",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+  },
+
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.background,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
+  },
+  headerCenter: {
+    flex: 1,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "white",
   },
   headerSub: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.primary,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 2,
   },
+  seatCountBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  seatCountText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "white",
+  },
+
+  // Legend
   legend: {
     flexDirection: "row",
-    gap: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: Colors.light.card,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "white",
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: "#E2E8F0",
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
   },
-  legendDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 4,
+  legendSeat: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    alignItems: "center",
   },
   legendText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
     color: Colors.light.textSecondary,
   },
-  busLayout: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 120,
+  aisleIndicator: {
+    width: 20,
     alignItems: "center",
   },
-  busContainer: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: Colors.light.border,
-    width: "100%",
-    maxWidth: 300,
+  aisleIndicatorText: {
+    fontSize: 16,
+    color: "#CBD5E1",
   },
-  busTop: {
+
+  // Scroll
+  scrollContent: {
+    alignItems: "center",
+    paddingTop: 16,
+    paddingHorizontal: 20,
+  },
+
+  // Column header
+  colHeader: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 6,
+    width: "100%",
+    maxWidth: 280,
+  },
+  rowLabelSpace: {
+    width: 24,
+  },
+  colLabels: {
+    flexDirection: "row",
     gap: 8,
-    justifyContent: "center",
-    paddingVertical: 12,
-    marginBottom: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.light.border,
-    borderStyle: "dashed",
   },
-  busTopText: {
+  colLabelText: {
+    width: 44,
+    textAlign: "center",
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.primary,
   },
+  aisleGap: {
+    width: 28,
+  },
+
+  // Bus front
+  busFront: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 12,
+    marginBottom: 4,
+    width: "100%",
+    maxWidth: 280,
+  },
+  steeringWheel: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  busFrontText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.primary,
+  },
+  busDivider: {
+    width: "100%",
+    maxWidth: 280,
+    height: 2,
+    backgroundColor: "#CBD5E1",
+    borderRadius: 1,
+    marginBottom: 10,
+    borderStyle: "dashed" as const,
+  },
+
+  // Seat row
   seatRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginBottom: 8,
+    width: "100%",
+    maxWidth: 280,
   },
   rowLabel: {
     width: 20,
     fontSize: 11,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_600SemiBold",
     color: Colors.light.textMuted,
     textAlign: "center",
   },
-  leftSeats: {
+  seatPair: {
     flexDirection: "row",
-    gap: 4,
-  },
-  rightSeats: {
-    flexDirection: "row",
-    gap: 4,
+    gap: 8,
   },
   aisle: {
-    flex: 1,
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  aisleText: {
+    fontSize: 18,
+    color: "#CBD5E1",
+    lineHeight: 18,
+  },
+
+  // Seat
   seat: {
     width: 44,
     height: 44,
     borderRadius: 10,
+    borderWidth: 1.5,
     justifyContent: "center",
     alignItems: "center",
+    gap: 2,
   },
-  seatText: {
+  seatNum: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 12,
+  },
+
+  // Tooltip
+  tooltip: {
+    position: "absolute",
+    alignSelf: "center",
+    top: "45%",
+    backgroundColor: "white",
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    alignItems: "center",
+    shadowColor: "#1A56DB",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1.5,
+    borderColor: "#EEF2FF",
+    zIndex: 100,
+  },
+  tooltipTitle: {
     fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+    marginBottom: 4,
   },
+  tooltipSeat: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.primary,
+    lineHeight: 32,
+  },
+  tooltipPrice: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
+    marginTop: 2,
+  },
+
+  // Bottom bar
   bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "white",
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  bottomInfo: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: Colors.light.card,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  selectedInfo: {
+  selectedPills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    flex: 1,
+  },
+  seatPill: {
+    backgroundColor: "#EEF2FF",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  seatPillMore: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  seatPillText: {
     fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.primary,
+  },
+  priceRow: {
+    alignItems: "flex-end",
+  },
+  priceLabel: {
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
   },
-  totalPrice: {
-    fontSize: 22,
+  priceValue: {
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
   },
   continueBtn: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingVertical: 15,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -376,7 +683,7 @@ const styles = StyleSheet.create({
   },
   continueBtnPressed: {
     opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+    transform: [{ scale: 0.98 }],
   },
   continueBtnText: {
     fontSize: 15,
