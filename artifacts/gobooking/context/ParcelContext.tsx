@@ -13,6 +13,7 @@ export interface ParcelData {
   deliveryType: string;
   paymentMethod: string;
   amount: number;
+  trackingRef: string;
 }
 
 interface ParcelContextType {
