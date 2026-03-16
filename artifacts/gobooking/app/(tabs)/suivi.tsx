@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useRef, useState } from "react";
+import { useLocalSearchParams } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -105,6 +106,7 @@ function getCurrentStep(status: string): number {
 export default function SuiviScreen() {
   const insets = useSafeAreaInsets();
   const { parcel: contextParcel } = useParcel();
+  const { ref: refParam } = useLocalSearchParams<{ ref?: string }>();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -117,6 +119,20 @@ export default function SuiviScreen() {
   const inputRef = useRef<TextInput>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
+
+  // Auto-search when navigated from confirmation screen with a ref param
+  useEffect(() => {
+    if (refParam && refParam.trim()) {
+      const ref = refParam.trim().toUpperCase();
+      setQuery(ref);
+      // Small delay so the component is fully mounted
+      const timer = setTimeout(() => {
+        triggerSearch(ref);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refParam]);
 
   const animateIn = () => {
     fadeAnim.setValue(0);
@@ -134,8 +150,7 @@ export default function SuiviScreen() {
     setSearched(false);
   };
 
-  const handleSearch = async () => {
-    const ref = query.trim().toUpperCase();
+  const triggerSearch = async (ref: string) => {
     if (!ref) return;
     Keyboard.dismiss();
     setLoading(true);
@@ -186,6 +201,11 @@ export default function SuiviScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = () => {
+    const ref = query.trim().toUpperCase();
+    if (ref) triggerSearch(ref);
   };
 
   const currentStep = result ? getCurrentStep(result.status) : 0;

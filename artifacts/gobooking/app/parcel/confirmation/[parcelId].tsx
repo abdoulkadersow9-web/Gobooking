@@ -318,7 +318,12 @@ export default function ParcelConfirmationScreen() {
         <View style={styles.actions}>
           <Pressable
             style={({ pressed }) => [styles.trackBtn, pressed && { opacity: 0.85 }]}
-            onPress={() => router.push("/(tabs)/colis")}
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/suivi",
+                params: { ref: trackingRef },
+              })
+            }
           >
             <Feather name="map-pin" size={17} color="white" />
             <Text style={styles.trackBtnText}>Suivre mon colis</Text>
