@@ -153,7 +153,7 @@ export default function ConfirmationScreen() {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Amount</Text>
               <Text style={[styles.detailValue, { color: Colors.light.primary }]}>
-                ${booking.totalAmount}
+                {booking.totalAmount.toLocaleString()} FCFA
               </Text>
             </View>
           </View>

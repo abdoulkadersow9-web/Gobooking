@@ -127,7 +127,7 @@ export default function PaymentScreen() {
           </View>
           <View style={[styles.summaryRow, styles.summaryTotal]}>
             <Text style={styles.summaryTotalLabel}>Total</Text>
-            <Text style={styles.summaryTotalValue}>${booking?.totalAmount}</Text>
+            <Text style={styles.summaryTotalValue}>{booking?.totalAmount?.toLocaleString()} FCFA</Text>
           </View>
         </View>
 
@@ -245,7 +245,7 @@ export default function PaymentScreen() {
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
           <Text style={styles.totalLabel}>Amount to Pay</Text>
-          <Text style={styles.totalAmount}>${booking?.totalAmount}</Text>
+          <Text style={styles.totalAmount}>{booking?.totalAmount?.toLocaleString()} FCFA</Text>
         </View>
         <Pressable
           style={({ pressed }) => [

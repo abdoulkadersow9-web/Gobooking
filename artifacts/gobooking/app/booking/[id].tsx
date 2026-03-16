@@ -220,7 +220,7 @@ export default function BookingDetailScreen() {
             </View>
             <View style={[styles.payRow, { borderBottomWidth: 0 }]}>
               <Text style={styles.payTotalLabel}>Total Amount</Text>
-              <Text style={styles.payTotalValue}>${booking.totalAmount}</Text>
+              <Text style={styles.payTotalValue}>{booking.totalAmount.toLocaleString()} FCFA</Text>
             </View>
           </View>
         </View>

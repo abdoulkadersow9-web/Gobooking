@@ -90,8 +90,8 @@ export default function SearchResultsScreen() {
           </View>
         </View>
         <View style={styles.priceBlock}>
-          <Text style={styles.priceText}>${item.price}</Text>
-          <Text style={styles.pricePerPax}>per seat</Text>
+          <Text style={styles.priceText}>{item.price.toLocaleString()} F</Text>
+          <Text style={styles.pricePerPax}>par siège</Text>
         </View>
       </View>
 

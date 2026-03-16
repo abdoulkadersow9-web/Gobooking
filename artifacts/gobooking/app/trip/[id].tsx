@@ -146,7 +146,7 @@ export default function TripDetailScreen() {
         <View style={styles.priceRow}>
           <View>
             <Text style={styles.priceLabel}>Price per seat</Text>
-            <Text style={styles.price}>${trip.price}</Text>
+            <Text style={styles.price}>{trip.price.toLocaleString()} FCFA</Text>
           </View>
           <View style={[
             styles.seatsBadge,
@@ -235,7 +235,7 @@ export default function TripDetailScreen() {
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
           <Text style={styles.totalLabel}>Total Price</Text>
-          <Text style={styles.totalPrice}>${trip.price} <Text style={styles.totalSub}>/seat</Text></Text>
+          <Text style={styles.totalPrice}>{trip.price.toLocaleString()} <Text style={styles.totalSub}>FCFA/siège</Text></Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.bookBtn, pressed && styles.bookBtnPressed]}

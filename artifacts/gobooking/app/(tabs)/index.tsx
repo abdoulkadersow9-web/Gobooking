@@ -18,16 +18,19 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 
 const POPULAR_ROUTES = [
-  { from: "New York", to: "Boston", duration: "4h 30m", price: 35 },
-  { from: "Los Angeles", to: "San Francisco", duration: "6h", price: 28 },
-  { from: "Chicago", to: "Detroit", duration: "4h", price: 22 },
-  { from: "Miami", to: "Orlando", duration: "3h 30m", price: 18 },
+  { from: "Abidjan", to: "Bouaké", duration: "5h 30m", price: 3500 },
+  { from: "Abidjan", to: "Yamoussoukro", duration: "2h 30m", price: 2000 },
+  { from: "Abidjan", to: "Korhogo", duration: "9h", price: 6000 },
+  { from: "Bouaké", to: "Korhogo", duration: "3h 30m", price: 2500 },
+  { from: "Yamoussoukro", to: "Abidjan", duration: "2h 30m", price: 2000 },
+  { from: "Abidjan", to: "San Pedro", duration: "4h", price: 3000 },
+  { from: "Abidjan", to: "Daloa", duration: "5h", price: 3500 },
 ];
 
 const CITIES = [
-  "New York", "Boston", "Los Angeles", "San Francisco",
-  "Chicago", "Detroit", "Miami", "Orlando", "Seattle",
-  "Denver", "Dallas", "Houston", "Atlanta", "Philadelphia",
+  "Abidjan", "Bouaké", "Yamoussoukro", "Korhogo",
+  "San Pedro", "Daloa", "Man", "Gagnoa",
+  "Divo", "Abengourou", "Soubré", "Bondoukou",
 ];
 
 export default function HomeScreen() {
@@ -188,7 +191,7 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.routeCardRight}>
-              <Text style={styles.routePrice}>${route.price}</Text>
+              <Text style={styles.routePrice}>{route.price.toLocaleString()} F</Text>
               <Text style={styles.routeDuration}>{route.duration}</Text>
               <View style={styles.routeArrow}>
                 <Feather name="arrow-right" size={14} color={Colors.light.primary} />
