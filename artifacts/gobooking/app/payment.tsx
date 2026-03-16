@@ -1,10 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -25,25 +27,85 @@ interface BookingResponse {
   bookingRef: string;
 }
 
-const PAYMENT_METHODS = [
-  { id: "card", icon: "credit-card", label: "Credit / Debit Card" },
-  { id: "upi", icon: "smartphone", label: "UPI Payment" },
-  { id: "wallet", icon: "pocket", label: "Digital Wallet" },
-  { id: "netbanking", icon: "briefcase", label: "Net Banking" },
-] as const;
+interface TripDetail {
+  id: string;
+  from: string;
+  to: string;
+  departureTime: string;
+  arrivalTime: string;
+  date: string;
+  busName: string;
+  busType: string;
+  price: number;
+  duration: string;
+}
+
+type PayMethod = "orange" | "mtn" | "wave" | "card";
+
+const PAYMENT_METHODS: {
+  id: PayMethod;
+  label: string;
+  sub: string;
+  color: string;
+  dark: string;
+  icon: string;
+}[] = [
+  {
+    id: "orange",
+    label: "Orange Money",
+    sub: "Paiement mobile Orange",
+    color: "#FF6B00",
+    dark: "#E05A00",
+    icon: "smartphone",
+  },
+  {
+    id: "mtn",
+    label: "MTN MoMo",
+    sub: "Mobile Money MTN",
+    color: "#FFCB00",
+    dark: "#E6B800",
+    icon: "smartphone",
+  },
+  {
+    id: "wave",
+    label: "Wave",
+    sub: "Paiement Wave CI",
+    color: "#1BA5E0",
+    dark: "#1591C7",
+    icon: "zap",
+  },
+  {
+    id: "card",
+    label: "Visa / Mastercard",
+    sub: "Carte bancaire internationale",
+    color: "#1A56DB",
+    dark: "#0F3BA0",
+    icon: "credit-card",
+  },
+];
 
 export default function PaymentScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const { booking, updateBooking } = useBooking();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const [method, setMethod] = useState<"card" | "upi" | "wallet" | "netbanking">("card");
+  const [trip, setTrip] = useState<TripDetail | null>(null);
+  const [method, setMethod] = useState<PayMethod>("orange");
+  const [phone, setPhone] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvv, setCvv] = useState("");
   const [cardName, setCardName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!booking?.tripId) return;
+    apiFetch<TripDetail>(`/trips/${booking.tripId}`)
+      .then(setTrip)
+      .catch(() => null);
+  }, [booking?.tripId]);
 
   const formatCard = (text: string) => {
     const digits = text.replace(/\D/g, "").slice(0, 16);
@@ -56,12 +118,23 @@ export default function PaymentScreen() {
     return digits;
   };
 
+  const formatPhone = (text: string) => {
+    const digits = text.replace(/\D/g, "").slice(0, 10);
+    if (digits.length > 4) return `${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 6)} ${digits.slice(6)}`.trim();
+    return digits;
+  };
+
   const handlePay = async () => {
     if (!booking || !token) return;
 
     if (method === "card") {
       if (!cardNumber || !expiry || !cvv || !cardName) {
-        Alert.alert("Error", "Please fill in all card details");
+        Alert.alert("Champs requis", "Veuillez remplir tous les champs de la carte.");
+        return;
+      }
+    } else {
+      if (!phone || phone.replace(/\D/g, "").length < 8) {
+        Alert.alert("Numéro requis", "Veuillez entrer un numéro de téléphone valide.");
         return;
       }
     }
@@ -75,16 +148,16 @@ export default function PaymentScreen() {
           tripId: booking.tripId,
           seatIds: booking.selectedSeats,
           passengers: booking.passengers.map((p) => ({
-            name: p.name,
-            age: parseInt(p.age) || 0,
+            name: p.name || "Passager",
+            age: parseInt(p.age) || 25,
             gender: p.gender,
-            idType: p.idType,
-            idNumber: p.idNumber,
+            idType: p.idType || "cni",
+            idNumber: p.idNumber || "CI-000000",
             seatNumber: p.seatNumber,
           })),
           paymentMethod: method,
-          contactEmail: booking.contactEmail,
-          contactPhone: booking.contactPhone,
+          contactEmail: booking.contactEmail || "user@gobooking.ci",
+          contactPhone: booking.contactPhone || phone,
         }),
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -94,301 +167,505 @@ export default function PaymentScreen() {
         params: { bookingId: res.id },
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Payment failed";
-      Alert.alert("Payment Failed", msg);
+      const msg = err instanceof Error ? err.message : "Échec du paiement";
+      Alert.alert("Paiement échoué", msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const selectedMethod = PAYMENT_METHODS.find((m) => m.id === method)!;
+
   return (
-    <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Payment</Text>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={[styles.container, { paddingTop: topPad }]}>
+        {/* Header */}
+        <LinearGradient
+          colors={[Colors.light.primary, Colors.light.primaryDark]}
+          style={styles.header}
+        >
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Feather name="arrow-left" size={20} color="white" />
+          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Paiement</Text>
+            <Text style={styles.headerSub}>Sécurisé · Chiffré SSL</Text>
+          </View>
+          <View style={styles.lockBadge}>
+            <Feather name="lock" size={16} color="white" />
+          </View>
+        </LinearGradient>
 
-      <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Order Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Seats</Text>
-            <Text style={styles.summaryValue}>{booking?.selectedSeatNumbers?.join(", ")}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Passengers</Text>
-            <Text style={styles.summaryValue}>{booking?.passengers?.length}</Text>
-          </View>
-          <View style={[styles.summaryRow, styles.summaryTotal]}>
-            <Text style={styles.summaryTotalLabel}>Total</Text>
-            <Text style={styles.summaryTotalValue}>{booking?.totalAmount?.toLocaleString()} FCFA</Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Payment Method</Text>
-        <View style={styles.methodsGrid}>
-          {PAYMENT_METHODS.map((m) => (
-            <Pressable
-              key={m.id}
-              style={[styles.methodCard, method === m.id && styles.methodCardActive]}
-              onPress={() => setMethod(m.id)}
-            >
-              <View style={[styles.methodIcon, method === m.id && styles.methodIconActive]}>
-                <Feather name={m.icon as never} size={20} color={method === m.id ? "white" : Colors.light.primary} />
-              </View>
-              <Text style={[styles.methodLabel, method === m.id && styles.methodLabelActive]}>
-                {m.label}
-              </Text>
-              {method === m.id && (
-                <View style={styles.methodCheck}>
-                  <Feather name="check" size={12} color="white" />
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 120 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Trip summary card */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryTop}>
+              <Text style={styles.summaryLabel}>Récapitulatif du voyage</Text>
+              {trip && (
+                <View style={styles.companyBadge}>
+                  <Text style={styles.companyBadgeText}>{trip.busName}</Text>
                 </View>
               )}
-            </Pressable>
-          ))}
-        </View>
+            </View>
 
-        {method === "card" && (
-          <View style={styles.cardForm}>
-            <Text style={styles.sectionTitle}>Card Details</Text>
-            <View style={styles.cardPreview}>
-              <View style={styles.cardChip}>
-                <Feather name="cpu" size={16} color="rgba(255,255,255,0.8)" />
+            {trip ? (
+              <View style={styles.routeRow}>
+                <View style={styles.cityBlock}>
+                  <Text style={styles.routeTime}>{trip.departureTime}</Text>
+                  <Text style={styles.routeCity}>{trip.from}</Text>
+                </View>
+                <View style={styles.routeMid}>
+                  <View style={styles.routeDotGreen} />
+                  <View style={styles.routeLine} />
+                  <Feather name="arrow-right" size={14} color={Colors.light.primary} />
+                  <View style={styles.routeLine} />
+                  <View style={styles.routeDotRed} />
+                </View>
+                <View style={[styles.cityBlock, { alignItems: "flex-end" }]}>
+                  <Text style={styles.routeTime}>{trip.arrivalTime}</Text>
+                  <Text style={styles.routeCity}>{trip.to}</Text>
+                </View>
               </View>
-              <Text style={styles.cardPreviewNumber}>
-                {cardNumber || "•••• •••• •••• ••••"}
+            ) : (
+              <ActivityIndicator color={Colors.light.primary} style={{ marginVertical: 16 }} />
+            )}
+
+            <View style={styles.summaryDetails}>
+              <View style={styles.summaryDetail}>
+                <Feather name="grid" size={13} color={Colors.light.textSecondary} />
+                <Text style={styles.summaryDetailText}>
+                  Siège{(booking?.selectedSeatNumbers?.length ?? 0) > 1 ? "s" : ""}{" "}
+                  <Text style={styles.summaryDetailValue}>
+                    {booking?.selectedSeatNumbers?.join(", ") || "—"}
+                  </Text>
+                </Text>
+              </View>
+              <View style={styles.summaryDetail}>
+                <Feather name="calendar" size={13} color={Colors.light.textSecondary} />
+                <Text style={styles.summaryDetailText}>
+                  <Text style={styles.summaryDetailValue}>{trip?.date || "—"}</Text>
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.summaryDivider} />
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Montant total</Text>
+              <Text style={styles.totalAmount}>
+                {booking?.totalAmount?.toLocaleString() ?? "0"} FCFA
               </Text>
-              <View style={styles.cardPreviewBottom}>
-                <Text style={styles.cardPreviewLabel}>
-                  {cardName || "CARDHOLDER NAME"}
-                </Text>
-                <Text style={styles.cardPreviewExpiry}>
-                  {expiry || "MM/YY"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Card Number</Text>
-              <TextInput
-                style={styles.fieldInput}
-                placeholder="1234 5678 9012 3456"
-                placeholderTextColor={Colors.light.textMuted}
-                value={cardNumber}
-                onChangeText={(t) => setCardNumber(formatCard(t))}
-                keyboardType="number-pad"
-                maxLength={19}
-              />
-            </View>
-            <View style={styles.cardRow}>
-              <View style={[styles.field, { flex: 1 }]}>
-                <Text style={styles.fieldLabel}>Expiry</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  placeholder="MM/YY"
-                  placeholderTextColor={Colors.light.textMuted}
-                  value={expiry}
-                  onChangeText={(t) => setExpiry(formatExpiry(t))}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                />
-              </View>
-              <View style={[styles.field, { flex: 1 }]}>
-                <Text style={styles.fieldLabel}>CVV</Text>
-                <TextInput
-                  style={styles.fieldInput}
-                  placeholder="123"
-                  placeholderTextColor={Colors.light.textMuted}
-                  value={cvv}
-                  onChangeText={(t) => setCvv(t.replace(/\D/g, "").slice(0, 3))}
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  maxLength={3}
-                />
-              </View>
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Name on Card</Text>
-              <TextInput
-                style={styles.fieldInput}
-                placeholder="John Smith"
-                placeholderTextColor={Colors.light.textMuted}
-                value={cardName}
-                onChangeText={(t) => setCardName(t.toUpperCase())}
-                autoCapitalize="characters"
-              />
             </View>
           </View>
-        )}
 
-        {method !== "card" && (
-          <View style={styles.altMethodInfo}>
-            <Feather name="info" size={16} color={Colors.light.primary} />
-            <Text style={styles.altMethodText}>
-              You'll be redirected to complete payment after placing the order.
+          {/* Payment methods */}
+          <Text style={styles.sectionTitle}>Mode de paiement</Text>
+          <View style={styles.methodsGrid}>
+            {PAYMENT_METHODS.map((m) => (
+              <Pressable
+                key={m.id}
+                style={[styles.methodCard, method === m.id && { borderColor: m.color, borderWidth: 2 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setMethod(m.id);
+                }}
+              >
+                <LinearGradient
+                  colors={[m.color, m.dark]}
+                  style={[styles.methodIcon, method !== m.id && styles.methodIconInactive]}
+                >
+                  <Feather name={m.icon as never} size={18} color="white" />
+                </LinearGradient>
+                <Text style={[styles.methodLabel, method === m.id && { color: m.color }]}>
+                  {m.label}
+                </Text>
+                <Text style={styles.methodSub}>{m.sub}</Text>
+                {method === m.id && (
+                  <View style={[styles.methodCheck, { backgroundColor: m.color }]}>
+                    <Feather name="check" size={10} color="white" />
+                  </View>
+                )}
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Mobile money phone input */}
+          {method !== "card" && (
+            <View style={styles.formCard}>
+              <View style={styles.formHeader}>
+                <LinearGradient
+                  colors={[selectedMethod.color, selectedMethod.dark]}
+                  style={styles.formMethodDot}
+                >
+                  <Feather name={selectedMethod.icon as never} size={14} color="white" />
+                </LinearGradient>
+                <Text style={styles.formTitle}>
+                  Numéro {selectedMethod.label}
+                </Text>
+              </View>
+              <View style={styles.phoneInputRow}>
+                <View style={styles.countryCode}>
+                  <Text style={styles.countryCodeText}>🇨🇮 +225</Text>
+                </View>
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="07 00 00 00 00"
+                  placeholderTextColor={Colors.light.textMuted}
+                  value={phone}
+                  onChangeText={(t) => setPhone(formatPhone(t))}
+                  keyboardType="phone-pad"
+                  maxLength={14}
+                />
+              </View>
+              <View style={styles.phoneHint}>
+                <Feather name="info" size={12} color={selectedMethod.color} />
+                <Text style={[styles.phoneHintText, { color: selectedMethod.color }]}>
+                  {method === "orange" && "Numéro Orange CI (07/08 XX XX XX XX)"}
+                  {method === "mtn" && "Numéro MTN CI (05/06 XX XX XX XX)"}
+                  {method === "wave" && "Votre numéro Wave enregistré"}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Card form */}
+          {method === "card" && (
+            <View style={styles.formCard}>
+              <LinearGradient
+                colors={[Colors.light.primary, Colors.light.primaryDark]}
+                style={styles.cardPreview}
+              >
+                <View style={styles.cardPreviewTop}>
+                  <View style={styles.cardChip}>
+                    <Feather name="cpu" size={14} color="rgba(255,255,255,0.8)" />
+                  </View>
+                  <Text style={styles.cardPreviewBrand}>VISA</Text>
+                </View>
+                <Text style={styles.cardPreviewNumber}>
+                  {cardNumber || "•••• •••• •••• ••••"}
+                </Text>
+                <View style={styles.cardPreviewBottom}>
+                  <Text style={styles.cardPreviewLabel}>
+                    {cardName || "NOM PRÉNOM"}
+                  </Text>
+                  <Text style={styles.cardPreviewExpiry}>{expiry || "MM/AA"}</Text>
+                </View>
+              </LinearGradient>
+
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Numéro de carte</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="1234 5678 9012 3456"
+                  placeholderTextColor={Colors.light.textMuted}
+                  value={cardNumber}
+                  onChangeText={(t) => setCardNumber(formatCard(t))}
+                  keyboardType="number-pad"
+                  maxLength={19}
+                />
+              </View>
+              <View style={styles.cardRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.fieldLabel}>Expiration</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    placeholder="MM/AA"
+                    placeholderTextColor={Colors.light.textMuted}
+                    value={expiry}
+                    onChangeText={(t) => setExpiry(formatExpiry(t))}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                  />
+                </View>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.fieldLabel}>CVV</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    placeholder="123"
+                    placeholderTextColor={Colors.light.textMuted}
+                    value={cvv}
+                    onChangeText={(t) => setCvv(t.replace(/\D/g, "").slice(0, 3))}
+                    keyboardType="number-pad"
+                    secureTextEntry
+                    maxLength={3}
+                  />
+                </View>
+              </View>
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Nom sur la carte</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="KOFFI JEAN-PAUL"
+                  placeholderTextColor={Colors.light.textMuted}
+                  value={cardName}
+                  onChangeText={(t) => setCardName(t.toUpperCase())}
+                  autoCapitalize="characters"
+                />
+              </View>
+            </View>
+          )}
+
+          <View style={styles.secureRow}>
+            <Feather name="shield" size={14} color="#059669" />
+            <Text style={styles.secureText}>
+              Paiement sécurisé · Données chiffrées 256-bit SSL
             </Text>
           </View>
-        )}
+        </ScrollView>
 
-        <View style={styles.secureNote}>
-          <Feather name="lock" size={14} color={Colors.light.success} />
-          <Text style={styles.secureText}>256-bit SSL encryption · Secure payment</Text>
+        {/* Bottom pay button */}
+        <View style={[styles.bottomBar, { paddingBottom: bottomPad + 8 }]}>
+          <View style={styles.bottomAmount}>
+            <Text style={styles.bottomAmountLabel}>À payer</Text>
+            <Text style={styles.bottomAmountValue}>
+              {booking?.totalAmount?.toLocaleString() ?? "0"} FCFA
+            </Text>
+          </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.payBtn,
+              pressed && styles.payBtnPressed,
+              loading && { opacity: 0.7 },
+            ]}
+            onPress={handlePay}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Feather name="check-circle" size={18} color="white" />
+                <Text style={styles.payBtnText}>Confirmer le paiement</Text>
+              </>
+            )}
+          </Pressable>
         </View>
-      </ScrollView>
-
-      <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
-        <View>
-          <Text style={styles.totalLabel}>Amount to Pay</Text>
-          <Text style={styles.totalAmount}>{booking?.totalAmount?.toLocaleString()} FCFA</Text>
-        </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.payBtn,
-            pressed && styles.payBtnPressed,
-            loading && styles.payBtnDisabled,
-          ]}
-          onPress={handlePay}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <>
-              <Feather name="lock" size={16} color="white" />
-              <Text style={styles.payBtnText}>Pay Now</Text>
-            </>
-          )}
-        </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.light.background },
+  container: {
+    flex: 1,
+    backgroundColor: "#F1F5F9",
+  },
+
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingTop: 12,
+    paddingBottom: 16,
     gap: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.background,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
+  headerCenter: { flex: 1 },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "white",
   },
-  summaryCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
+  headerSub: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 1,
+  },
+  lockBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  scroll: {
     padding: 16,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    gap: 16,
   },
-  summaryTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-    marginBottom: 12,
+
+  // Summary card
+  summaryCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: "#1A56DB",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  summaryRow: {
+  summaryTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    alignItems: "center",
+    marginBottom: 14,
   },
   summaryLabel: {
     fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_600SemiBold",
     color: Colors.light.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  summaryValue: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.text,
+  companyBadge: {
+    backgroundColor: "#EEF2FF",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  summaryTotal: {
-    borderBottomWidth: 0,
-    marginTop: 4,
-  },
-  summaryTotalLabel: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  summaryTotalValue: {
-    fontSize: 20,
+  companyBadgeText: {
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
   },
-  sectionTitle: {
-    fontSize: 16,
+  routeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  cityBlock: { flex: 1 },
+  routeTime: {
+    fontSize: 22,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "#0F172A",
+  },
+  routeCity: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  routeMid: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  routeDotGreen: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#10B981",
+  },
+  routeDotRed: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+  },
+  routeLine: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: "#E2E8F0",
+  },
+  summaryDetails: {
+    flexDirection: "row",
+    gap: 16,
     marginBottom: 12,
   },
+  summaryDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  summaryDetailText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+  },
+  summaryDetailValue: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#0F172A",
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginBottom: 12,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.text,
+  },
+  totalAmount: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.primary,
+  },
+
+  // Section
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
+    marginBottom: 2,
+    marginTop: 4,
+  },
+
+  // Methods grid
   methodsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 20,
   },
   methodCard: {
     width: "47%",
-    backgroundColor: Colors.light.card,
-    borderRadius: 14,
+    backgroundColor: "white",
+    borderRadius: 16,
     padding: 14,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
-    alignItems: "flex-start",
-    gap: 8,
+    borderColor: "#E2E8F0",
+    gap: 6,
     position: "relative",
-  },
-  methodCardActive: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.primaryLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   methodIcon: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: Colors.light.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  methodIconActive: {
-    backgroundColor: Colors.light.primary,
+  methodIconInactive: {
+    opacity: 0.6,
   },
   methodLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
   },
-  methodLabelActive: {
-    color: Colors.light.primary,
+  methodSub: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textMuted,
+    lineHeight: 14,
   },
   methodCheck: {
     position: "absolute",
@@ -397,32 +674,110 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
   },
-  cardForm: {
-    marginBottom: 16,
+
+  // Form card
+  formCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
+  formHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+  },
+  formMethodDot: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  formTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
+  },
+  phoneInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  countryCode: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+  },
+  countryCodeText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#0F172A",
+  },
+  phoneInput: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: "#0F172A",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+  },
+  phoneHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  phoneHintText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+  },
+
+  // Card form
   cardPreview: {
-    backgroundColor: Colors.light.primary,
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 4,
     shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 6,
   },
+  cardPreviewTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   cardChip: {
-    width: 40,
-    height: 30,
+    width: 36,
+    height: 28,
     borderRadius: 6,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+  },
+  cardPreviewBrand: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "rgba(255,255,255,0.9)",
+    letterSpacing: 2,
   },
   cardPreviewNumber: {
     fontSize: 18,
@@ -445,93 +800,83 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: "rgba(255,255,255,0.8)",
-    letterSpacing: 1,
   },
-  field: {
-    marginBottom: 14,
-  },
+  field: { gap: 6 },
   fieldLabel: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.light.text,
-    marginBottom: 6,
   },
   fieldInput: {
-    backgroundColor: Colors.light.background,
-    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.light.text,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: "#E2E8F0",
   },
   cardRow: {
     flexDirection: "row",
     gap: 12,
   },
-  altMethodInfo: {
-    flexDirection: "row",
-    gap: 10,
-    backgroundColor: Colors.light.primaryLight,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    alignItems: "flex-start",
-  },
-  altMethodText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.primary,
-    lineHeight: 20,
-  },
-  secureNote: {
+
+  secureRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   secureText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
   },
+
+  // Bottom bar
   bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "white",
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  bottomAmount: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: Colors.light.card,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
   },
-  totalLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
+  bottomAmountLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
     color: Colors.light.textSecondary,
   },
-  totalAmount: {
-    fontSize: 22,
+  bottomAmountValue: {
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
   },
   payBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    gap: 10,
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
+    paddingVertical: 15,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -540,9 +885,8 @@ const styles = StyleSheet.create({
   },
   payBtnPressed: {
     opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+    transform: [{ scale: 0.98 }],
   },
-  payBtnDisabled: { opacity: 0.7 },
   payBtnText: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
