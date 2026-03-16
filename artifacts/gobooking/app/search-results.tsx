@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -14,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
 interface Trip {
@@ -32,23 +34,55 @@ interface Trip {
   amenities: string[];
 }
 
-const AMENITY_ICONS: Record<string, string> = {
-  wifi: "wifi",
-  ac: "wind",
-  charging: "zap",
-  snacks: "coffee",
-  "recliner seat": "sun",
+const COMPANY_COLORS: Record<string, string[]> = {
+  utb: ["#1A56DB", "#0F3BA0"],
+  stc: ["#059669", "#047857"],
+  sotra: ["#D97706", "#B45309"],
+  air: ["#7C3AED", "#6D28D9"],
+  ctн: ["#DC2626", "#B91C1C"],
+  stif: ["#0891B2", "#0E7490"],
+  tcv: ["#16A34A", "#15803D"],
+  default: ["#1A56DB", "#0F3BA0"],
 };
+
+function getCompanyColor(busName: string): string[] {
+  const lower = busName.toLowerCase();
+  for (const key of Object.keys(COMPANY_COLORS)) {
+    if (lower.includes(key)) return COMPANY_COLORS[key];
+  }
+  return COMPANY_COLORS.default;
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+type SortKey = "price" | "departure" | "duration";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "price", label: "Prix" },
+  { key: "departure", label: "Départ" },
+  { key: "duration", label: "Durée" },
+];
 
 export default function SearchResultsScreen() {
   const insets = useSafeAreaInsets();
   const { from, to, date, passengers } = useLocalSearchParams<{
-    from: string; to: string; date: string; passengers: string;
+    from: string;
+    to: string;
+    date: string;
+    passengers: string;
   }>();
+  const { updateBooking } = useBooking();
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<"price" | "duration" | "departure">("price");
+  const [sortBy, setSortBy] = useState<SortKey>("price");
 
   useEffect(() => {
     const load = async () => {
@@ -74,118 +108,166 @@ export default function SearchResultsScreen() {
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const renderTrip = ({ item }: { item: Trip }) => (
-    <Pressable
-      style={({ pressed }) => [styles.tripCard, pressed && styles.tripCardPressed]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push({ pathname: "/trip/[id]", params: { id: item.id } });
-      }}
-    >
-      <View style={styles.tripHeader}>
-        <View>
-          <Text style={styles.busName}>{item.busName}</Text>
-          <View style={styles.busTypeBadge}>
-            <Text style={styles.busTypeText}>{item.busType}</Text>
+  const handleSelectSeat = (item: Trip) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    updateBooking({
+      tripId: item.id,
+      selectedSeats: [],
+      selectedSeatNumbers: [],
+      passengers: [],
+      paymentMethod: "card",
+      contactEmail: "",
+      contactPhone: "",
+      totalAmount: item.price,
+    });
+    router.push({ pathname: "/seats/[tripId]", params: { tripId: item.id } });
+  };
+
+  const renderTrip = ({ item, index }: { item: Trip; index: number }) => {
+    const colors = getCompanyColor(item.busName);
+    const isLowSeat = item.availableSeats <= 5;
+
+    return (
+      <View style={styles.card}>
+        {/* Company Header */}
+        <View style={styles.cardHeader}>
+          <View style={styles.companyRow}>
+            <LinearGradient
+              colors={colors as [string, string]}
+              style={styles.companyBadge}
+            >
+              <Text style={styles.companyInitials}>{getInitials(item.busName)}</Text>
+            </LinearGradient>
+            <View style={styles.companyInfo}>
+              <Text style={styles.companyName}>{item.busName}</Text>
+              <View style={[
+                styles.typePill,
+                item.busType === "Premium" && styles.typePillPremium,
+              ]}>
+                <Text style={[
+                  styles.typeText,
+                  item.busType === "Premium" && styles.typeTextPremium,
+                ]}>
+                  {item.busType}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.pricePill}>
+            <Text style={styles.priceAmount}>{item.price.toLocaleString()}</Text>
+            <Text style={styles.priceCurrency}>FCFA</Text>
           </View>
         </View>
-        <View style={styles.priceBlock}>
-          <Text style={styles.priceText}>{item.price.toLocaleString()} F</Text>
-          <Text style={styles.pricePerPax}>par siège</Text>
-        </View>
-      </View>
 
-      <View style={styles.timeRow}>
-        <View style={styles.timeBlock}>
-          <Text style={styles.time}>{item.departureTime}</Text>
-          <Text style={styles.city}>{item.from}</Text>
-        </View>
-        <View style={styles.durationBlock}>
-          <Text style={styles.duration}>{item.duration}</Text>
-          <View style={styles.durationLine}>
-            <View style={styles.dot} />
-            <View style={styles.line} />
-            <View style={[styles.dot, { backgroundColor: Colors.light.error }]} />
+        {/* Time Route */}
+        <View style={styles.routeRow}>
+          <View style={styles.timeBlock}>
+            <Text style={styles.timeText}>{item.departureTime}</Text>
+            <Text style={styles.cityText}>{item.from}</Text>
           </View>
-          <Text style={styles.durationSub}>Direct</Text>
-        </View>
-        <View style={[styles.timeBlock, { alignItems: "flex-end" }]}>
-          <Text style={styles.time}>{item.arrivalTime}</Text>
-          <Text style={styles.city}>{item.to}</Text>
-        </View>
-      </View>
 
-      <View style={styles.amenitiesRow}>
-        {item.amenities.slice(0, 3).map((a) => (
-          <View key={a} style={styles.amenityChip}>
+          <View style={styles.routeMid}>
+            <Text style={styles.durationText}>{item.duration}</Text>
+            <View style={styles.routeLine}>
+              <View style={styles.routeDotLeft} />
+              <View style={styles.routeDash} />
+              <Feather name="arrow-right" size={14} color={Colors.light.primary} />
+              <View style={styles.routeDash} />
+              <View style={styles.routeDotRight} />
+            </View>
+            <Text style={styles.directText}>Direct</Text>
+          </View>
+
+          <View style={[styles.timeBlock, { alignItems: "flex-end" }]}>
+            <Text style={styles.timeText}>{item.arrivalTime}</Text>
+            <Text style={styles.cityText}>{item.to}</Text>
+          </View>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Footer: seats + amenities */}
+        <View style={styles.cardFooter}>
+          <View style={[styles.seatsPill, isLowSeat && styles.seatsPillLow]}>
             <Feather
-              name={(AMENITY_ICONS[a.toLowerCase()] || "check") as never}
-              size={11}
-              color={Colors.light.primary}
+              name="users"
+              size={12}
+              color={isLowSeat ? Colors.light.error : Colors.light.success}
             />
-            <Text style={styles.amenityText}>{a}</Text>
+            <Text style={[styles.seatsCount, isLowSeat && { color: Colors.light.error }]}>
+              {item.availableSeats} sièges
+            </Text>
           </View>
-        ))}
-      </View>
 
-      <View style={styles.tripFooter}>
-        <View style={styles.seatsInfo}>
-          <Feather
-            name="users"
-            size={13}
-            color={item.availableSeats < 5 ? Colors.light.error : Colors.light.success}
-          />
-          <Text style={[
-            styles.seatsText,
-            item.availableSeats < 5 && { color: Colors.light.error }
-          ]}>
-            {item.availableSeats} seats left
-          </Text>
+          <View style={styles.amenityRow}>
+            {item.amenities.slice(0, 2).map((a) => (
+              <View key={a} style={styles.amenityDot}>
+                <Text style={styles.amenityLabel}>{a}</Text>
+              </View>
+            ))}
+          </View>
         </View>
+
+        {/* Select Seat Button */}
         <Pressable
-          style={({ pressed }) => [styles.detailsBtn, pressed && { opacity: 0.85 }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push({ pathname: "/trip/[id]", params: { id: item.id } });
-          }}
+          style={({ pressed }) => [styles.selectBtn, pressed && styles.selectBtnPressed]}
+          onPress={() => handleSelectSeat(item)}
         >
-          <Text style={styles.detailsBtnText}>View Details</Text>
-          <Feather name="arrow-right" size={14} color="white" />
+          <Feather name="grid" size={16} color="white" />
+          <Text style={styles.selectBtnText}>Choisir un siège</Text>
+          <Feather name="arrow-right" size={16} color="white" />
         </Pressable>
       </View>
-    </Pressable>
-  );
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={styles.header}>
+      {/* Header */}
+      <LinearGradient
+        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        style={styles.header}
+      >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+          <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
-        <View style={styles.headerInfo}>
-          <Text style={styles.routeTitle}>{from} → {to}</Text>
-          <Text style={styles.routeSub}>{date} · {passengers} passenger{parseInt(passengers) > 1 ? "s" : ""}</Text>
+        <View style={styles.headerCenter}>
+          <View style={styles.routeHeader}>
+            <Text style={styles.routeFrom}>{from}</Text>
+            <View style={styles.routeArrow}>
+              <Feather name="arrow-right" size={14} color="rgba(255,255,255,0.7)" />
+            </View>
+            <Text style={styles.routeTo}>{to}</Text>
+          </View>
+          <Text style={styles.routeDate}>
+            {date} · {passengers} passager{parseInt(passengers) > 1 ? "s" : ""}
+          </Text>
         </View>
-      </View>
+      </LinearGradient>
 
+      {/* Sort Bar */}
       <View style={styles.sortBar}>
-        {(["price", "duration", "departure"] as const).map((s) => (
-          <Pressable
-            key={s}
-            style={[styles.sortChip, sortBy === s && styles.sortChipActive]}
-            onPress={() => setSortBy(s)}
-          >
-            <Text style={[styles.sortText, sortBy === s && styles.sortTextActive]}>
-              {s.charAt(0).toUpperCase() + s.slice(1)}
-            </Text>
-          </Pressable>
-        ))}
+        <Text style={styles.sortLabel}>Trier par :</Text>
+        <View style={styles.sortChips}>
+          {SORT_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
+              onPress={() => setSortBy(opt.key)}
+            >
+              <Text style={[styles.sortText, sortBy === opt.key && styles.sortTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={styles.loadingText}>Finding buses...</Text>
+          <Text style={styles.loadingText}>Recherche des bus...</Text>
         </View>
       ) : (
         <FlatList
@@ -194,14 +276,26 @@ export default function SearchResultsScreen() {
           renderItem={renderTrip}
           contentContainerStyle={{
             padding: 16,
-            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20,
+            gap: 12,
+            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 24,
           }}
-          scrollEnabled={!!sorted.length}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            sorted.length > 0 ? (
+              <Text style={styles.resultsCount}>
+                {sorted.length} bus disponible{sorted.length > 1 ? "s" : ""}
+              </Text>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Feather name="map" size={48} color={Colors.light.textMuted} />
-              <Text style={styles.emptyTitle}>No buses found</Text>
-              <Text style={styles.emptySubtitle}>Try a different date or route</Text>
+              <View style={styles.emptyIcon}>
+                <Feather name="search" size={32} color={Colors.light.primary} />
+              </View>
+              <Text style={styles.emptyTitle}>Aucun bus trouvé</Text>
+              <Text style={styles.emptySubtitle}>
+                Essayez une autre date ou un autre itinéraire
+              </Text>
             </View>
           }
         />
@@ -213,63 +307,100 @@ export default function SearchResultsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#F1F5F9",
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingTop: 12,
+    paddingBottom: 16,
     gap: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.background,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
   },
-  headerInfo: { flex: 1 },
-  routeTitle: {
+  headerCenter: {
+    flex: 1,
+  },
+  routeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  routeFrom: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "white",
   },
-  routeSub: {
+  routeArrow: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  routeTo: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "white",
+  },
+  routeDate: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 1,
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 3,
   },
   sortBar: {
     flexDirection: "row",
-    gap: 8,
-    padding: 12,
-    backgroundColor: Colors.light.card,
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    gap: 10,
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  sortChips: {
+    flexDirection: "row",
+    gap: 6,
   },
   sortChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: "#CBD5E1",
+    backgroundColor: "white",
   },
   sortChipActive: {
     backgroundColor: Colors.light.primary,
     borderColor: Colors.light.primary,
   },
   sortText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.light.textSecondary,
   },
   sortTextActive: {
     color: "white",
+  },
+  resultsCount: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+    marginBottom: 4,
   },
   center: {
     flex: 1,
@@ -282,171 +413,250 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
   },
-  tripCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
+
+  // Card
+  card: {
+    backgroundColor: "white",
+    borderRadius: 20,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: "#1A56DB",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  tripCardPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  tripHeader: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  busName: {
+  companyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  companyBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  companyInitials: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "white",
+    letterSpacing: 0.5,
+  },
+  companyInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  companyName: {
     fontSize: 15,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "#0F172A",
   },
-  busTypeBadge: {
-    backgroundColor: Colors.light.primaryLight,
+  typePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#F1F5F9",
     borderRadius: 6,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: "flex-start",
-    marginTop: 4,
+    paddingVertical: 2,
   },
-  busTypeText: {
+  typePillPremium: {
+    backgroundColor: "#EEF2FF",
+  },
+  typeText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+    color: Colors.light.textSecondary,
+  },
+  typeTextPremium: {
     color: Colors.light.primary,
   },
-  priceBlock: {
+  pricePill: {
     alignItems: "flex-end",
+    backgroundColor: "#EEF2FF",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  priceText: {
-    fontSize: 22,
+  priceAmount: {
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
+    lineHeight: 24,
   },
-  pricePerPax: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textMuted,
+  priceCurrency: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.light.primary,
+    opacity: 0.7,
+    textAlign: "right",
   },
-  timeRow: {
+
+  // Route
+  routeRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 14,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
-  timeBlock: { flex: 1 },
-  time: {
-    fontSize: 20,
+  timeBlock: {
+    flex: 1,
+  },
+  timeText: {
+    fontSize: 22,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "#0F172A",
   },
-  city: {
-    fontSize: 12,
+  cityText: {
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
     marginTop: 2,
   },
-  durationBlock: {
-    alignItems: "center",
+  routeMid: {
     flex: 1,
+    alignItems: "center",
+    paddingHorizontal: 4,
   },
-  duration: {
-    fontSize: 12,
+  durationText: {
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
-    marginBottom: 4,
+    color: Colors.light.primary,
+    marginBottom: 5,
   },
-  durationLine: {
+  routeLine: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.light.success,
+  routeDotLeft: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#10B981",
   },
-  line: {
-    width: 40,
+  routeDash: {
+    width: 14,
     height: 1.5,
-    backgroundColor: Colors.light.border,
+    backgroundColor: "#CBD5E1",
   },
-  durationSub: {
+  routeDotRight: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#EF4444",
+  },
+  directText: {
     fontSize: 10,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textMuted,
     marginTop: 4,
   },
-  amenitiesRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
     marginBottom: 12,
   },
-  tripFooter: {
+
+  // Footer
+  cardFooter: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
+    marginBottom: 14,
   },
-  detailsBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  detailsBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "white",
-  },
-  amenityChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: Colors.light.primaryLight,
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  amenityText: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.primary,
-  },
-  seatsInfo: {
+  seatsPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
+    backgroundColor: "#ECFDF5",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  seatsText: {
+  seatsPillLow: {
+    backgroundColor: "#FEF2F2",
+  },
+  seatsCount: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.success,
+    color: "#059669",
   },
+  amenityRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  amenityDot: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  amenityLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+  },
+
+  // Button
+  selectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  selectBtnPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  selectBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "white",
+    flex: 1,
+    textAlign: "center",
+  },
+
+  // Empty
   empty: {
     alignItems: "center",
-    paddingTop: 80,
+    paddingTop: 60,
     gap: 12,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.light.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
   },
   emptyTitle: {
     fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
   },
   emptySubtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 32,
   },
 });
