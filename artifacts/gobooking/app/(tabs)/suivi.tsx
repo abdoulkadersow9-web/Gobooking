@@ -45,30 +45,35 @@ const STATUS_STEPS = [
   {
     id: "en_attente",
     label: "Colis enregistré",
+    shortLabel: "Enregistré",
     desc: "Votre colis a été pris en compte dans notre système",
     icon: "check-circle",
   },
   {
     id: "pris_en_charge",
     label: "Colis reçu en agence",
+    shortLabel: "En agence",
     desc: "Le colis a été réceptionné dans notre agence de départ",
     icon: "home",
   },
   {
     id: "en_transit",
     label: "Colis en transit",
+    shortLabel: "En transit",
     desc: "Votre colis est en cours de transport vers la destination",
     icon: "truck",
   },
   {
     id: "en_livraison",
     label: "Colis arrivé à destination",
+    shortLabel: "Arrivé",
     desc: "Le colis est arrivé à l'agence de la ville de destination",
     icon: "map-pin",
   },
   {
     id: "livre",
-    label: "Colis prêt pour retrait ou livraison",
+    label: "Colis prêt pour retrait",
+    shortLabel: "Prêt",
     desc: "Votre colis peut être retiré ou sera livré prochainement",
     icon: "gift",
   },
@@ -465,84 +470,132 @@ export default function SuiviScreen() {
               {/* Timeline */}
               {!isCancelled && (
                 <View style={styles.timelineCard}>
-                  <View style={styles.timelineHeader}>
-                    <Feather name="activity" size={15} color={Colors.light.primary} />
-                    <Text style={styles.timelineTitle}>Suivi de progression</Text>
-                    <View style={styles.timelineProgress}>
-                      <Text style={styles.timelineProgressText}>
-                        {currentStep + 1}/{STATUS_STEPS.length}
-                      </Text>
+                  {/* Card title */}
+                  <View style={styles.tlHeader}>
+                    <Feather name="map-pin" size={15} color={Colors.light.primary} />
+                    <Text style={styles.tlTitle}>Suivi de livraison</Text>
+                    <View style={styles.tlBadge}>
+                      <Text style={styles.tlBadgeText}>{currentStep + 1} / {STATUS_STEPS.length}</Text>
                     </View>
                   </View>
 
-                  {/* Progress bar */}
-                  <View style={styles.progressBarBg}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${((currentStep + 1) / STATUS_STEPS.length) * 100}%` },
-                      ]}
-                    />
+                  {/* ── Horizontal step icons row ── */}
+                  <View style={styles.hRow}>
+                    {STATUS_STEPS.map((step, i) => {
+                      const done = i <= currentStep;
+                      const current = i === currentStep;
+                      const isLast = i === STATUS_STEPS.length - 1;
+                      return (
+                        <React.Fragment key={step.id}>
+                          {/* Circle */}
+                          <View style={styles.hStepCol}>
+                            <View
+                              style={[
+                                styles.hCircle,
+                                done && !current && styles.hCircleDone,
+                                current && styles.hCircleCurrent,
+                                !done && styles.hCirclePending,
+                              ]}
+                            >
+                              {done && !current
+                                ? <Feather name="check" size={13} color="white" />
+                                : current
+                                  ? <Feather name={step.icon as never} size={14} color="white" />
+                                  : <Text style={styles.hCircleNum}>{i + 1}</Text>
+                              }
+                            </View>
+                            {current && (
+                              <View style={styles.hCurrentDot} />
+                            )}
+                          </View>
+                          {/* Connector line between circles */}
+                          {!isLast && (
+                            <View style={styles.hConnectorWrap}>
+                              <View style={[styles.hConnector, i < currentStep && styles.hConnectorDone]} />
+                            </View>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </View>
 
-                  {/* Steps */}
+                  {/* Step short labels row */}
+                  <View style={styles.hLabelRow}>
+                    {STATUS_STEPS.map((step, i) => {
+                      const done = i <= currentStep;
+                      const current = i === currentStep;
+                      return (
+                        <Text
+                          key={step.id}
+                          style={[
+                            styles.hLabel,
+                            done && !current && styles.hLabelDone,
+                            current && styles.hLabelCurrent,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {step.shortLabel}
+                        </Text>
+                      );
+                    })}
+                  </View>
+
+                  {/* Current step highlight card */}
+                  <View style={styles.currentStepCard}>
+                    <View style={styles.currentStepLeft}>
+                      <View style={styles.currentStepIconBox}>
+                        <Feather name={STATUS_STEPS[currentStep].icon as never} size={20} color={Colors.light.primary} />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.currentStepBadgeRow}>
+                        <View style={styles.nowBadge}>
+                          <View style={styles.nowDot} />
+                          <Text style={styles.nowText}>Statut actuel</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.currentStepLabel}>{STATUS_STEPS[currentStep].label}</Text>
+                      <Text style={styles.currentStepDesc}>{STATUS_STEPS[currentStep].desc}</Text>
+                    </View>
+                  </View>
+
+                  {/* ── Vertical step list ── */}
                   {STATUS_STEPS.map((step, i) => {
                     const done = i <= currentStep;
                     const current = i === currentStep;
                     const isLast = i === STATUS_STEPS.length - 1;
-
                     return (
-                      <View key={step.id} style={styles.timelineStep}>
-                        {/* Left: icon + line */}
-                        <View style={styles.timelineLeft}>
-                          <View
-                            style={[
-                              styles.timelineCircle,
-                              done
-                                ? current
-                                  ? styles.timelineCircleCurrent
-                                  : styles.timelineCircleDone
-                                : styles.timelineCirclePending,
-                            ]}
-                          >
-                            {done ? (
-                              current ? (
-                                <Feather name={step.icon as never} size={15} color="white" />
-                              ) : (
-                                <Feather name="check" size={13} color="white" />
-                              )
-                            ) : (
-                              <Text style={styles.timelineNum}>{i + 1}</Text>
-                            )}
+                      <View key={step.id} style={styles.vStep}>
+                        {/* Left column: icon + vertical connector */}
+                        <View style={styles.vStepLeft}>
+                          <View style={[
+                            styles.vCircle,
+                            done && !current && styles.vCircleDone,
+                            current && styles.vCircleCurrent,
+                            !done && styles.vCirclePending,
+                          ]}>
+                            {done && !current
+                              ? <Feather name="check" size={11} color="white" />
+                              : current
+                                ? <Feather name={step.icon as never} size={12} color="white" />
+                                : <Text style={styles.vCircleNum}>{i + 1}</Text>
+                            }
                           </View>
                           {!isLast && (
-                            <View
-                              style={[
-                                styles.timelineLine,
-                                done && i < currentStep && styles.timelineLineDone,
-                              ]}
-                            />
+                            <View style={[styles.vLine, i < currentStep && styles.vLineDone]} />
                           )}
                         </View>
-
-                        {/* Right: text */}
-                        <View style={[styles.timelineBody, !isLast && { paddingBottom: 22 }]}>
-                          <Text
-                            style={[
-                              styles.timelineStepLabel,
-                              done && !current && styles.timelineStepLabelDone,
-                              current && styles.timelineStepLabelCurrent,
-                            ]}
-                          >
+                        {/* Right column: text */}
+                        <View style={[styles.vBody, !isLast && { paddingBottom: 18 }]}>
+                          <Text style={[
+                            styles.vLabel,
+                            done && !current && styles.vLabelDone,
+                            current && styles.vLabelCurrent,
+                            !done && styles.vLabelPending,
+                          ]}>
                             {step.label}
                           </Text>
-                          <Text style={styles.timelineStepDesc}>{step.desc}</Text>
-                          {current && (
-                            <View style={styles.activeBadge}>
-                              <View style={styles.activeBadgeDot} />
-                              <Text style={styles.activeBadgeText}>Statut actuel</Text>
-                            </View>
-                          )}
+                          <Text style={styles.vDesc}>{step.desc}</Text>
                         </View>
                       </View>
                     );
@@ -984,148 +1037,263 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Timeline
+  // ── Timeline card ──
   timelineCard: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    gap: 0,
   },
-  timelineHeader: {
+
+  // Card header row
+  tlHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 20,
   },
-  timelineTitle: {
-    fontSize: 14,
+  tlTitle: {
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: "#0F172A",
     flex: 1,
   },
-  timelineProgress: {
+  tlBadge: {
     backgroundColor: "#EEF2FF",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
   },
-  timelineProgressText: {
+  tlBadgeText: {
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
   },
 
-  // Progress bar
-  progressBarBg: {
-    height: 4,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 2,
-    marginBottom: 22,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: Colors.light.primary,
-    borderRadius: 2,
-  },
-
-  // Timeline steps
-  timelineStep: {
+  // ── Horizontal tracker ──
+  hRow: {
     flexDirection: "row",
-    gap: 14,
-  },
-  timelineLeft: {
     alignItems: "center",
-    width: 42,
+    marginBottom: 6,
   },
-  timelineCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  hStepCol: {
+    alignItems: "center",
+    gap: 4,
+  },
+  hCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  timelineCircleDone: {
+  hCircleDone: {
     backgroundColor: Colors.light.primary,
   },
-  timelineCirclePending: {
+  hCircleCurrent: {
+    backgroundColor: Colors.light.primary,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  hCirclePending: {
     backgroundColor: "#F1F5F9",
     borderWidth: 2,
     borderColor: "#E2E8F0",
   },
-  timelineCircleCurrent: {
-    backgroundColor: Colors.light.primary,
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  timelineNum: {
+  hCircleNum: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
     color: "#CBD5E1",
   },
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: "#E2E8F0",
-    marginTop: 4,
-    minHeight: 16,
-  },
-  timelineLineDone: {
-    backgroundColor: Colors.light.primary,
-  },
-  timelineBody: {
-    flex: 1,
-    paddingTop: 9,
-    gap: 3,
-  },
-  timelineStepLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: "#94A3B8",
-  },
-  timelineStepLabelDone: {
-    color: "#0F172A",
-    fontFamily: "Inter_600SemiBold",
-  },
-  timelineStepLabelCurrent: {
-    color: Colors.light.primary,
-    fontFamily: "Inter_700Bold",
-  },
-  timelineStepDesc: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: "#94A3B8",
-    lineHeight: 18,
-  },
-  activeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#EEF2FF",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    alignSelf: "flex-start",
-    marginTop: 5,
-  },
-  activeBadgeDot: {
+  hCurrentDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: Colors.light.primary,
+    marginTop: 2,
   },
-  activeBadgeText: {
+  hConnectorWrap: {
+    flex: 1,
+    paddingBottom: 10,
+  },
+  hConnector: {
+    height: 3,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 2,
+  },
+  hConnectorDone: {
+    backgroundColor: Colors.light.primary,
+  },
+
+  // Short label row
+  hLabelRow: {
+    flexDirection: "row",
+    marginBottom: 18,
+  },
+  hLabel: {
+    flex: 1,
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+    color: "#CBD5E1",
+    textAlign: "center",
+    lineHeight: 13,
+  },
+  hLabelDone: {
+    color: Colors.light.primary,
+    fontFamily: "Inter_600SemiBold",
+  },
+  hLabelCurrent: {
+    color: Colors.light.primary,
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+  },
+
+  // Current step highlight
+  currentStepCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: "#C7D2FE",
+  },
+  currentStepLeft: {
+    flexShrink: 0,
+  },
+  currentStepIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 13,
+    backgroundColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  currentStepBadgeRow: {
+    flexDirection: "row",
+    marginBottom: 5,
+  },
+  nowBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  nowDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.75)",
+  },
+  nowText: {
     fontSize: 10,
     fontFamily: "Inter_700Bold",
+    color: "white",
+  },
+  currentStepLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
+    marginBottom: 3,
+  },
+  currentStepDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#475569",
+    lineHeight: 18,
+  },
+
+  // ── Vertical step list ──
+  vStep: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  vStepLeft: {
+    alignItems: "center",
+    width: 30,
+  },
+  vCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  vCircleDone: {
+    backgroundColor: Colors.light.primary,
+  },
+  vCircleCurrent: {
+    backgroundColor: Colors.light.primary,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  vCirclePending: {
+    backgroundColor: "#F1F5F9",
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+  },
+  vCircleNum: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#CBD5E1",
+  },
+  vLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: "#E2E8F0",
+    marginTop: 3,
+    minHeight: 14,
+  },
+  vLineDone: {
+    backgroundColor: Colors.light.primary,
+  },
+  vBody: {
+    flex: 1,
+    paddingTop: 5,
+    gap: 2,
+  },
+  vLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+  },
+  vLabelDone: {
+    color: "#0F172A",
+    fontFamily: "Inter_600SemiBold",
+  },
+  vLabelCurrent: {
     color: Colors.light.primary,
+    fontFamily: "Inter_700Bold",
+  },
+  vLabelPending: {
+    color: "#94A3B8",
+  },
+  vDesc: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#94A3B8",
+    lineHeight: 17,
   },
 
   // Cancelled
