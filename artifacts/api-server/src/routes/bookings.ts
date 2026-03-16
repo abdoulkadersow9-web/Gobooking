@@ -128,18 +128,11 @@ router.get("/", async (req, res) => {
 
 router.get("/:bookingId", async (req, res) => {
   try {
-    const userId = getUserIdFromToken(req.headers.authorization);
-    if (!userId) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
     const full = await getFullBooking(req.params.bookingId);
     if (!full) {
       res.status(404).json({ error: "Booking not found" });
       return;
     }
-
     res.json(full);
   } catch (err) {
     console.error("Get booking error:", err);

@@ -5,10 +5,12 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -42,33 +44,27 @@ interface Booking {
   contactPhone: string;
 }
 
-// Deterministic QR-like matrix from a string
+// --- Deterministic QR-like matrix ---
 function makeQrMatrix(seed: string, size = 21): boolean[][] {
   const matrix: boolean[][] = Array.from({ length: size }, () =>
     Array(size).fill(false)
   );
-
-  // Finder pattern (top-left corner)
   const drawFinder = (r: number, c: number) => {
     for (let i = 0; i < 7; i++) {
       for (let j = 0; j < 7; j++) {
         const onBorder = i === 0 || i === 6 || j === 0 || j === 6;
         const inInner = i >= 2 && i <= 4 && j >= 2 && j <= 4;
-        if (r + i < size && c + j < size) {
+        if (r + i < size && c + j < size)
           matrix[r + i][c + j] = onBorder || inInner;
-        }
       }
     }
   };
   drawFinder(0, 0);
   drawFinder(0, size - 7);
   drawFinder(size - 7, 0);
-
-  // Fill data area with hash of seed
   let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
+  for (let i = 0; i < seed.length; i++)
     hash = (hash * 31 + seed.charCodeAt(i)) & 0xffffffff;
-  }
   for (let r = 8; r < size - 8; r++) {
     for (let c = 8; c < size - 8; c++) {
       hash = (hash * 1664525 + 1013904223) & 0xffffffff;
@@ -78,29 +74,21 @@ function makeQrMatrix(seed: string, size = 21): boolean[][] {
   return matrix;
 }
 
-function QRCode({ value, size = 160 }: { value: string; size?: number }) {
+function QRCode({ value, size = 164 }: { value: string; size?: number }) {
   const matrix = makeQrMatrix(value, 21);
-  const cellSize = size / 21;
+  const cell = size / 21;
   return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: "white",
-        padding: cellSize,
-        borderRadius: 12,
-      }}
-    >
+    <View style={{ width: size, height: size, backgroundColor: "white", padding: cell, borderRadius: 12 }}>
       {matrix.map((row, r) => (
         <View key={r} style={{ flexDirection: "row" }}>
           {row.map((on, c) => (
             <View
               key={c}
               style={{
-                width: cellSize,
-                height: cellSize,
+                width: cell,
+                height: cell,
                 backgroundColor: on ? "#0F172A" : "transparent",
-                borderRadius: on ? 1 : 0,
+                borderRadius: on ? 1.2 : 0,
               }}
             />
           ))}
@@ -110,12 +98,52 @@ function QRCode({ value, size = 160 }: { value: string; size?: number }) {
   );
 }
 
+// --- Helpers ---
 const METHOD_LABELS: Record<string, string> = {
   orange: "Orange Money",
   mtn: "MTN MoMo",
   wave: "Wave",
   card: "Carte bancaire",
 };
+
+function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={rowStyles.row}>
+      <Text style={rowStyles.label}>{label}</Text>
+      <Text style={[rowStyles.value, accent && rowStyles.accentValue]}>{value}</Text>
+    </View>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  label: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#64748B",
+  },
+  value: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#0F172A",
+    maxWidth: "58%",
+    textAlign: "right",
+  },
+  accentValue: {
+    color: Colors.light.primary,
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+});
+
+// ---
 
 export default function ConfirmationScreen() {
   const insets = useSafeAreaInsets();
@@ -132,31 +160,51 @@ export default function ConfirmationScreen() {
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Animated.sequence([
-      Animated.delay(200),
+      Animated.delay(150),
       Animated.parallel([
         Animated.spring(scaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          speed: 14,
-          bounciness: 14,
+          speed: 12,
+          bounciness: 16,
         }),
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 400,
+          duration: 380,
           useNativeDriver: true,
         }),
       ]),
     ]).start();
 
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    apiFetch<Booking>(`/bookings/${bookingId}`, { token })
+    apiFetch<Booking>(`/bookings/${bookingId}`, token ? { token } : {})
       .then(setBooking)
       .catch(() => null)
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  const handleDownload = async () => {
+    if (!booking) return;
+    try {
+      await Share.share({
+        title: `Billet GoBooking — ${booking.bookingRef}`,
+        message: [
+          `🎫 BILLET GOBOOKING`,
+          `Référence : ${booking.bookingRef}`,
+          `Trajet    : ${booking.trip.from} → ${booking.trip.to}`,
+          `Compagnie : ${booking.trip.busName}`,
+          `Date      : ${booking.trip.date}`,
+          `Départ    : ${booking.trip.departureTime}`,
+          `Arrivée   : ${booking.trip.arrivalTime}`,
+          `Siège(s)  : ${booking.seatNumbers.join(", ")}`,
+          `Passager  : ${booking.passengers.map((p) => p.name).join(", ")}`,
+          `Montant   : ${booking.totalAmount.toLocaleString()} FCFA`,
+          `Paiement  : ${METHOD_LABELS[booking.paymentMethod] || booking.paymentMethod}`,
+        ].join("\n"),
+      });
+    } catch {
+      Alert.alert("Partage", "Impossible de partager le billet pour le moment.");
+    }
+  };
 
   if (loading) {
     return (
@@ -169,10 +217,13 @@ export default function ConfirmationScreen() {
   if (!booking) {
     return (
       <View style={[styles.center, { paddingTop: topPad }]}>
+        <Feather name="alert-circle" size={48} color="#CBD5E1" />
         <Text style={styles.errorText}>Réservation introuvable</Text>
       </View>
     );
   }
+
+  const passengerNames = booking.passengers.map((p) => p.name || "—").join(", ");
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
@@ -180,147 +231,122 @@ export default function ConfirmationScreen() {
         contentContainerStyle={{ paddingBottom: bottomPad + 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Success banner */}
-        <LinearGradient
-          colors={["#059669", "#047857"]}
-          style={styles.successBanner}
-        >
+        {/* ── Success banner ── */}
+        <LinearGradient colors={["#059669", "#047857"]} style={styles.banner}>
           <Animated.View
-            style={[
-              styles.checkCircle,
-              { transform: [{ scale: scaleAnim }], opacity: fadeAnim },
-            ]}
+            style={[styles.checkCircle, { transform: [{ scale: scaleAnim }], opacity: fadeAnim }]}
           >
-            <Feather name="check" size={38} color="white" />
+            <Feather name="check" size={40} color="white" />
           </Animated.View>
+
           <Animated.View style={{ opacity: fadeAnim, alignItems: "center", gap: 6 }}>
-            <Text style={styles.successTitle}>Billet confirmé !</Text>
-            <Text style={styles.successSubtitle}>
-              Votre réservation a bien été enregistrée
-            </Text>
+            <Text style={styles.bannerTitle}>Billet confirmé</Text>
+            <Text style={styles.bannerSub}>Votre réservation a bien été enregistrée</Text>
+
             <View style={styles.refBadge}>
-              <Text style={styles.refLabel}>Référence de réservation</Text>
+              <Text style={styles.refLabel}>RÉFÉRENCE DE RÉSERVATION</Text>
               <Text style={styles.refValue}>#{booking.bookingRef}</Text>
             </View>
           </Animated.View>
         </LinearGradient>
 
-        {/* Ticket card with QR */}
+        {/* ── Ticket card ── */}
         <View style={styles.ticketCard}>
-          {/* Ticket top — route + company */}
+
+          {/* Company header */}
           <LinearGradient
             colors={[Colors.light.primary, Colors.light.primaryDark]}
-            style={styles.ticketTop}
+            style={styles.ticketHeader}
           >
-            <Text style={styles.ticketBusName}>{booking.trip.busName}</Text>
-            <View style={styles.ticketTypeBadge}>
-              <Text style={styles.ticketTypeBadgeText}>{booking.trip.busType}</Text>
+            <View>
+              <Text style={styles.ticketCompany}>{booking.trip.busName}</Text>
+              <Text style={styles.ticketType}>{booking.trip.busType}</Text>
+            </View>
+            <View style={styles.confirmedBadge}>
+              <Feather name="check-circle" size={12} color="#059669" />
+              <Text style={styles.confirmedText}>Confirmé</Text>
             </View>
           </LinearGradient>
 
-          {/* Route section */}
-          <View style={styles.ticketRoute}>
-            <View style={styles.ticketCity}>
-              <Text style={styles.ticketTime}>{booking.trip.departureTime}</Text>
-              <Text style={styles.ticketCityName}>{booking.trip.from}</Text>
+          {/* Route hero */}
+          <View style={styles.routeHero}>
+            <View style={styles.heroCity}>
+              <Text style={styles.heroTime}>{booking.trip.departureTime}</Text>
+              <Text style={styles.heroCityName}>{booking.trip.from}</Text>
+              <Text style={styles.heroLabel}>Départ</Text>
             </View>
-            <View style={styles.ticketMid}>
-              <View style={styles.dotGreen} />
-              <View style={styles.ticketLine} />
-              <Feather name="arrow-right" size={14} color={Colors.light.primary} />
-              <View style={styles.ticketLine} />
-              <View style={styles.dotRed} />
+
+            <View style={styles.heroMid}>
+              <View style={styles.midDotGreen} />
+              <View style={styles.midLine} />
+              <View style={styles.busIconBox}>
+                <Feather name="arrow-right" size={16} color={Colors.light.primary} />
+              </View>
+              <View style={styles.midLine} />
+              <View style={styles.midDotRed} />
             </View>
-            <View style={[styles.ticketCity, { alignItems: "flex-end" }]}>
-              <Text style={styles.ticketTime}>{booking.trip.arrivalTime}</Text>
-              <Text style={styles.ticketCityName}>{booking.trip.to}</Text>
+
+            <View style={[styles.heroCity, { alignItems: "flex-end" }]}>
+              <Text style={styles.heroTime}>{booking.trip.arrivalTime}</Text>
+              <Text style={styles.heroCityName}>{booking.trip.to}</Text>
+              <Text style={[styles.heroLabel, { textAlign: "right" }]}>Arrivée</Text>
             </View>
           </View>
-          <Text style={styles.ticketDate}>{booking.trip.date}</Text>
 
-          {/* Details grid */}
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>SIÈGE(S)</Text>
-              <Text style={styles.detailValue}>{booking.seatNumbers.join(", ")}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>PASSAGERS</Text>
-              <Text style={styles.detailValue}>{booking.passengers.length}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>PAIEMENT</Text>
-              <Text style={styles.detailValue}>
-                {METHOD_LABELS[booking.paymentMethod] || booking.paymentMethod.toUpperCase()}
+          {/* Detail rows */}
+          <View style={styles.detailsSection}>
+            <Row label="Route" value={`${booking.trip.from} → ${booking.trip.to}`} />
+            <Row label="Compagnie" value={booking.trip.busName} />
+            <Row label="Date" value={booking.trip.date} />
+            <Row label="Départ" value={booking.trip.departureTime} />
+            <Row label="Arrivée" value={booking.trip.arrivalTime} />
+            <Row
+              label={`Siège${booking.seatNumbers.length > 1 ? "s" : ""}`}
+              value={booking.seatNumbers.join(", ")}
+            />
+            <Row
+              label={`Passager${booking.passengers.length > 1 ? "s" : ""}`}
+              value={passengerNames}
+            />
+            <Row
+              label="Mode de paiement"
+              value={METHOD_LABELS[booking.paymentMethod] || booking.paymentMethod}
+            />
+            <View style={[rowStyles.row, { borderBottomWidth: 0 }]}>
+              <Text style={[rowStyles.label, { fontFamily: "Inter_600SemiBold", color: "#0F172A" }]}>
+                Montant payé
               </Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>MONTANT</Text>
-              <Text style={[styles.detailValue, { color: Colors.light.primary }]}>
+              <Text style={rowStyles.accentValue}>
                 {booking.totalAmount.toLocaleString()} FCFA
               </Text>
             </View>
           </View>
 
-          {/* Perforation divider */}
-          <View style={styles.perforationRow}>
-            <View style={styles.perfCircleLeft} />
-            <View style={styles.perforationDash} />
-            <View style={styles.perfCircleRight} />
+          {/* Perforation */}
+          <View style={styles.perf}>
+            <View style={styles.perfCircleL} />
+            <View style={styles.perfDash} />
+            <View style={styles.perfCircleR} />
           </View>
 
-          {/* QR code section */}
+          {/* QR code */}
           <View style={styles.qrSection}>
-            <Text style={styles.qrLabel}>Scanner pour valider</Text>
-            <View style={styles.qrWrapper}>
-              <QRCode value={booking.bookingRef} size={148} />
-              <View style={styles.qrOverlay}>
-                <View style={styles.qrLogo}>
+            <Text style={styles.qrHint}>Scanner pour valider à l'embarquement</Text>
+            <View style={styles.qrFrame}>
+              <QRCode value={booking.bookingRef} size={160} />
+              <View style={styles.qrLogoBox}>
+                <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.qrLogo}>
                   <Text style={styles.qrLogoText}>GB</Text>
-                </View>
+                </LinearGradient>
               </View>
             </View>
             <Text style={styles.qrRef}>{booking.bookingRef}</Text>
-            <View style={[
-              styles.statusPill,
-              booking.status === "confirmed" ? styles.statusConfirmed : styles.statusPending,
-            ]}>
-              <View style={[
-                styles.statusDot,
-                { backgroundColor: booking.status === "confirmed" ? "#059669" : "#D97706" },
-              ]} />
-              <Text style={[
-                styles.statusText,
-                { color: booking.status === "confirmed" ? "#059669" : "#D97706" },
-              ]}>
-                {booking.status === "confirmed" ? "Confirmé" : "En attente"}
-              </Text>
-            </View>
           </View>
         </View>
 
-        {/* Passengers card */}
-        {booking.passengers.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Passagers</Text>
-            {booking.passengers.map((p, i) => (
-              <View key={i} style={styles.paxRow}>
-                <View style={styles.paxNum}>
-                  <Text style={styles.paxNumText}>{i + 1}</Text>
-                </View>
-                <Text style={styles.paxName}>{p.name || "Passager " + (i + 1)}</Text>
-                <View style={styles.seatChip}>
-                  <Feather name="grid" size={11} color={Colors.light.primary} />
-                  <Text style={styles.seatChipText}>Siège {p.seatNumber}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Info card */}
-        <View style={[styles.card, styles.infoCard]}>
-          <Feather name="info" size={16} color="#1A56DB" />
+        {/* ── Info notice ── */}
+        <View style={styles.infoBox}>
+          <Feather name="mail" size={15} color={Colors.light.primary} />
           <Text style={styles.infoText}>
             Votre billet a été envoyé à{" "}
             <Text style={styles.infoBold}>{booking.contactEmail || "votre adresse email"}</Text>.
@@ -328,21 +354,25 @@ export default function ConfirmationScreen() {
           </Text>
         </View>
 
-        {/* Actions */}
-        <View style={styles.actionsRow}>
+        {/* ── Actions ── */}
+        <View style={styles.actions}>
           <Pressable
             style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.7 }]}
-            onPress={() => router.push({ pathname: "/booking/[id]", params: { id: booking.id } })}
+            onPress={handleDownload}
           >
-            <Feather name="file-text" size={16} color={Colors.light.primary} />
-            <Text style={styles.outlineBtnText}>Voir le billet</Text>
+            <Feather name="download" size={17} color={Colors.light.primary} />
+            <Text style={styles.outlineBtnText}>Télécharger le billet</Text>
           </Pressable>
+
           <Pressable
-            style={({ pressed }) => [styles.solidBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] }]}
+            style={({ pressed }) => [
+              styles.solidBtn,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+            ]}
             onPress={() => router.replace("/(tabs)")}
           >
-            <Feather name="home" size={16} color="white" />
-            <Text style={styles.solidBtnText}>Accueil</Text>
+            <Feather name="home" size={17} color="white" />
+            <Text style={styles.solidBtnText}>Retour à l'accueil</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -351,354 +381,257 @@ export default function ConfirmationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   errorText: {
     fontSize: 16,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
+    color: "#94A3B8",
+    marginTop: 8,
   },
 
-  // Success banner
-  successBanner: {
+  // Banner
+  banner: {
     alignItems: "center",
-    paddingTop: 40,
-    paddingBottom: 52,
+    paddingTop: 44,
+    paddingBottom: 56,
     paddingHorizontal: 24,
     gap: 10,
   },
   checkCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: "rgba(255,255,255,0.22)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 6,
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.4)",
+    borderColor: "rgba(255,255,255,0.35)",
   },
-  successTitle: {
-    fontSize: 28,
+  bannerTitle: {
+    fontSize: 30,
     fontFamily: "Inter_700Bold",
     color: "white",
     textAlign: "center",
   },
-  successSubtitle: {
+  bannerSub: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(255,255,255,0.82)",
     textAlign: "center",
   },
   refBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: "rgba(255,255,255,0.18)",
     borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
   refLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.8)",
-    textTransform: "uppercase",
-    letterSpacing: 1,
+    fontSize: 9,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.75)",
+    letterSpacing: 1.2,
   },
   refValue: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: "white",
-    marginTop: 2,
+    marginTop: 3,
+    letterSpacing: 1,
   },
 
   // Ticket card
   ticketCard: {
     backgroundColor: "white",
     marginHorizontal: 16,
-    marginTop: -24,
+    marginTop: -26,
     borderRadius: 24,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowRadius: 24,
+    elevation: 7,
     marginBottom: 12,
   },
-  ticketTop: {
+
+  // Ticket header
+  ticketHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 16,
     paddingBottom: 14,
   },
-  ticketBusName: {
-    fontSize: 16,
+  ticketCompany: {
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: "white",
   },
-  ticketTypeBadge: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  ticketTypeBadgeText: {
+  ticketType: {
     fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    color: "white",
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.75)",
+    marginTop: 1,
   },
-  ticketRoute: {
+  confirmedBadge: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    paddingBottom: 4,
+    gap: 5,
+    backgroundColor: "white",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  ticketCity: { flex: 1 },
-  ticketTime: {
-    fontSize: 26,
+  confirmedText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#059669",
+  },
+
+  // Route hero
+  routeHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+    paddingBottom: 16,
+    backgroundColor: "#FAFBFF",
+  },
+  heroCity: { flex: 1 },
+  heroTime: {
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
     color: "#0F172A",
   },
-  ticketCityName: {
-    fontSize: 12,
+  heroCityName: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#334155",
+    marginTop: 1,
+  },
+  heroLabel: {
+    fontSize: 10,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
+    color: "#94A3B8",
     marginTop: 2,
   },
-  ticketMid: {
+  heroMid: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: 3,
   },
-  dotGreen: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#10B981",
-  },
-  dotRed: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "#EF4444",
-  },
-  ticketLine: {
-    flex: 1,
-    height: 1.5,
-    backgroundColor: "#E2E8F0",
-  },
-  ticketDate: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
+  midDotGreen: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981" },
+  midDotRed: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" },
+  midLine: { flex: 1, height: 1.5, backgroundColor: "#CBD5E1" },
+  busIconBox: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  // Details grid
-  detailsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 16,
-    gap: 12,
-    paddingBottom: 16,
-  },
-  detailItem: {
-    width: "45%",
-  },
-  detailLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textMuted,
-    letterSpacing: 0.8,
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: "#0F172A",
+  // Detail rows
+  detailsSection: {
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 8,
   },
 
   // Perforation
-  perforationRow: {
+  perf: {
     flexDirection: "row",
     alignItems: "center",
-    position: "relative",
-    marginBottom: 0,
+    marginVertical: 4,
   },
-  perfCircleLeft: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  perfCircleL: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#F1F5F9",
-    marginLeft: -12,
+    marginLeft: -13,
   },
-  perforationDash: {
+  perfDash: {
     flex: 1,
     height: 1.5,
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderStyle: "dashed",
   },
-  perfCircleRight: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  perfCircleR: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#F1F5F9",
-    marginRight: -12,
+    marginRight: -13,
   },
 
-  // QR section
+  // QR
   qrSection: {
     alignItems: "center",
     paddingVertical: 24,
-    gap: 10,
+    paddingBottom: 28,
+    gap: 12,
   },
-  qrLabel: {
-    fontSize: 12,
+  qrHint: {
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
+    color: "#94A3B8",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.9,
   },
-  qrWrapper: {
+  qrFrame: {
     position: "relative",
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 3,
   },
-  qrOverlay: {
+  qrLogoBox: {
     position: "absolute",
     justifyContent: "center",
     alignItems: "center",
   },
   qrLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: Colors.light.primary,
+    width: 34,
+    height: 34,
+    borderRadius: 9,
     justifyContent: "center",
     alignItems: "center",
   },
   qrLogoText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
     color: "white",
   },
   qrRef: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "#0F172A",
-    letterSpacing: 2,
-  },
-  statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  statusConfirmed: {
-    backgroundColor: "#ECFDF5",
-    borderWidth: 1,
-    borderColor: "#A7F3D0",
-  },
-  statusPending: {
-    backgroundColor: "#FFFBEB",
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 2.5,
   },
 
-  // Cards
-  card: {
-    backgroundColor: "white",
-    marginHorizontal: 16,
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: "#0F172A",
-    marginBottom: 12,
-  },
-  paxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 8,
-  },
-  paxNum: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  paxNumText: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.primary,
-  },
-  paxName: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#0F172A",
-  },
-  seatChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#EEF2FF",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  seatChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.primary,
-  },
-
-  // Info card
-  infoCard: {
+  // Info box
+  infoBox: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+    marginHorizontal: 16,
     backgroundColor: "#EEF2FF",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
   },
   infoText: {
     flex: 1,
@@ -707,42 +640,36 @@ const styles = StyleSheet.create({
     color: Colors.light.primary,
     lineHeight: 20,
   },
-  infoBold: {
-    fontFamily: "Inter_600SemiBold",
-  },
+  infoBold: { fontFamily: "Inter_700Bold" },
 
   // Actions
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
+  actions: {
     paddingHorizontal: 16,
-    marginBottom: 8,
+    gap: 10,
   },
   outlineBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
     borderWidth: 1.5,
     borderColor: Colors.light.primary,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 15,
   },
   outlineBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.light.primary,
   },
   solidBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 8,
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 15,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -750,7 +677,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   solidBtnText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: "white",
   },
