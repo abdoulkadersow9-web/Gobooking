@@ -216,20 +216,32 @@ export default function ParcelConfirmationScreen() {
 
         {/* Ticket card */}
         <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          {/* Card header */}
-          <LinearGradient
-            colors={["#059669", "#047857"]}
-            style={styles.cardHeader}
+          {/* Card header — tappable → tracking screen */}
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/suivi",
+                params: { ref: trackingRef },
+              })
+            }
           >
-            <View style={styles.cardHeaderLeft}>
-              <Feather name="package" size={16} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.cardHeaderTitle}>GoBooking Colis</Text>
-            </View>
-            <View style={styles.confirmedBadge}>
-              <Feather name="check-circle" size={11} color="#059669" />
-              <Text style={styles.confirmedText}>Confirmé</Text>
-            </View>
-          </LinearGradient>
+            {({ pressed }) => (
+              <LinearGradient
+                colors={["#059669", "#047857"]}
+                style={[styles.cardHeader, pressed && { opacity: 0.88 }]}
+              >
+                <View style={styles.cardHeaderLeft}>
+                  <Feather name="package" size={16} color="rgba(255,255,255,0.8)" />
+                  <Text style={styles.cardHeaderTitle}>GoBooking Colis</Text>
+                </View>
+                <View style={styles.confirmedBadge}>
+                  <Feather name="map-pin" size={11} color="#059669" />
+                  <Text style={styles.confirmedText}>Suivre</Text>
+                  <Feather name="chevron-right" size={11} color="#059669" />
+                </View>
+              </LinearGradient>
+            )}
+          </Pressable>
 
           {/* Route */}
           <View style={styles.routeSection}>
