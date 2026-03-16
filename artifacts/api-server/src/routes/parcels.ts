@@ -6,8 +6,13 @@ import { tokenStore } from "./auth";
 const router: IRouter = Router();
 
 const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
-const generateTrackingRef = () =>
-  "GBP" + Math.random().toString(36).toUpperCase().substr(2, 7);
+const generateTrackingRef = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let part1 = "", part2 = "";
+  for (let i = 0; i < 4; i++) part1 += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) part2 += chars[Math.floor(Math.random() * chars.length)];
+  return `GBX-${part1}-${part2}`;
+};
 
 function getUserIdFromToken(authHeader: string | undefined): string | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -71,6 +76,7 @@ router.post("/", async (req, res) => {
       deliveryType,
       paymentMethod,
       notes,
+      trackingRef: clientTrackingRef,
     } = req.body;
 
     if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
@@ -81,9 +87,14 @@ router.post("/", async (req, res) => {
 
     const amount = calculateParcelPrice(fromCity, toCity, parseFloat(weight), deliveryType);
 
+    // Use the client-supplied ref if it looks valid, otherwise generate one
+    const trackingRef = (typeof clientTrackingRef === "string" && clientTrackingRef.startsWith("GBX-"))
+      ? clientTrackingRef
+      : generateTrackingRef();
+
     const parcel = await db.insert(parcelsTable).values({
       id: generateId(),
-      trackingRef: generateTrackingRef(),
+      trackingRef,
       userId,
       senderName,
       senderPhone,

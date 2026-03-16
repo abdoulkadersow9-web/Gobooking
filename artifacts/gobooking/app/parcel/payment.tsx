@@ -97,36 +97,46 @@ export default function ParcelPaymentScreen() {
     setLoading(true);
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const trackingRef = generateTrackingRef();
-      updateParcel({ paymentMethod: method, trackingRef });
 
-      // Fire-and-forget: try to persist to DB if authenticated
+      // Generate the ref client-side so it's available immediately
+      const clientRef = generateTrackingRef();
+      let confirmedRef = clientRef;
+
+      // Save to DB and let the server confirm (or keep) the tracking ref
       if (token) {
-        apiFetch("/parcels", {
-          method: "POST",
-          token,
-          body: JSON.stringify({
-            fromCity: parcel.fromCity,
-            toCity: parcel.toCity,
-            senderName: parcel.senderName,
-            senderPhone: parcel.senderPhone,
-            receiverName: parcel.receiverName,
-            receiverPhone: parcel.receiverPhone,
-            parcelType: parcel.parcelType,
-            weight: parcel.weight,
-            description: parcel.description,
-            deliveryType: parcel.deliveryType,
-            paymentMethod: method,
-          }),
-        }).catch(() => null);
+        try {
+          const saved = await apiFetch<{ trackingRef: string; id: string }>("/parcels", {
+            method: "POST",
+            token,
+            body: JSON.stringify({
+              fromCity: parcel.fromCity,
+              toCity: parcel.toCity,
+              senderName: parcel.senderName,
+              senderPhone: parcel.senderPhone,
+              receiverName: parcel.receiverName,
+              receiverPhone: parcel.receiverPhone,
+              parcelType: parcel.parcelType,
+              weight: parcel.weight,
+              description: parcel.description,
+              deliveryType: parcel.deliveryType,
+              paymentMethod: method,
+              trackingRef: clientRef,
+            }),
+          });
+          // Use the ref the server actually stored
+          if (saved?.trackingRef) confirmedRef = saved.trackingRef;
+        } catch {
+          // API failed — the client ref will still work via context fallback
+        }
       }
+
+      updateParcel({ paymentMethod: method, trackingRef: confirmedRef });
 
       router.replace({
         pathname: "/parcel/confirmation/[parcelId]",
-        params: { parcelId: "local", trackingRef },
+        params: { parcelId: "local", trackingRef: confirmedRef },
       });
     } catch {
-      // still navigate even on error
       const trackingRef = generateTrackingRef();
       updateParcel({ paymentMethod: method, trackingRef });
       router.replace({
