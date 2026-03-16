@@ -115,20 +115,26 @@ export default function SearchResultsScreen() {
         </View>
       </View>
 
+      <View style={styles.amenitiesRow}>
+        {item.amenities.slice(0, 3).map((a) => (
+          <View key={a} style={styles.amenityChip}>
+            <Feather
+              name={(AMENITY_ICONS[a.toLowerCase()] || "check") as never}
+              size={11}
+              color={Colors.light.primary}
+            />
+            <Text style={styles.amenityText}>{a}</Text>
+          </View>
+        ))}
+      </View>
+
       <View style={styles.tripFooter}>
-        <View style={styles.amenities}>
-          {item.amenities.slice(0, 4).map((a) => (
-            <View key={a} style={styles.amenityChip}>
-              <Feather
-                name={(AMENITY_ICONS[a.toLowerCase()] || "check") as never}
-                size={11}
-                color={Colors.light.primary}
-              />
-              <Text style={styles.amenityText}>{a}</Text>
-            </View>
-          ))}
-        </View>
         <View style={styles.seatsInfo}>
+          <Feather
+            name="users"
+            size={13}
+            color={item.availableSeats < 5 ? Colors.light.error : Colors.light.success}
+          />
           <Text style={[
             styles.seatsText,
             item.availableSeats < 5 && { color: Colors.light.error }
@@ -136,6 +142,16 @@ export default function SearchResultsScreen() {
             {item.availableSeats} seats left
           </Text>
         </View>
+        <Pressable
+          style={({ pressed }) => [styles.detailsBtn, pressed && { opacity: 0.85 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push({ pathname: "/trip/[id]", params: { id: item.id } });
+          }}
+        >
+          <Text style={styles.detailsBtnText}>View Details</Text>
+          <Feather name="arrow-right" size={14} color="white" />
+        </Pressable>
       </View>
     </Pressable>
   );
@@ -369,16 +385,30 @@ const styles = StyleSheet.create({
     color: Colors.light.textMuted,
     marginTop: 4,
   },
+  amenitiesRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginBottom: 12,
+  },
   tripFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  amenities: {
+  detailsBtn: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    flex: 1,
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  detailsBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "white",
   },
   amenityChip: {
     flexDirection: "row",
@@ -394,7 +424,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.light.primary,
   },
-  seatsInfo: { alignItems: "flex-end" },
+  seatsInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
   seatsText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
