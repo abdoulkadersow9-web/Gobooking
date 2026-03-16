@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
+import { ParcelProvider } from "@/context/ParcelContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,10 @@ function RootLayoutNav() {
       <Stack.Screen name="confirmation/[bookingId]" options={{ headerShown: false }} />
       <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
+      <Stack.Screen name="parcel/send" options={{ headerShown: false }} />
+      <Stack.Screen name="parcel/payment" options={{ headerShown: false }} />
+      <Stack.Screen name="parcel/confirmation/[parcelId]" options={{ headerShown: false }} />
+      <Stack.Screen name="parcel/tracking/[parcelId]" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -66,11 +71,13 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <BookingProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
+              <ParcelProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </ParcelProvider>
             </BookingProvider>
           </AuthProvider>
         </QueryClientProvider>
