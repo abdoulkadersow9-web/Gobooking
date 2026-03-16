@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "GoBooking"
+version = "1.0.0"
+id = "artifacts/gobooking"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+localPort = 25841
+name = "expo"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/gobooking run dev"
+
+[services.env]
+PORT = "25841"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/gobooking", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/gobooking", "run", "serve"]
