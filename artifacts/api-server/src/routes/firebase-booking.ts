@@ -3,6 +3,20 @@ import db from "../firebase.js";
 
 const router = Router();
 
+// GET /firebase/test-db
+router.get("/test-db", async (_req: Request, res: Response) => {
+  if (!db) {
+    return res.status(503).send("Firebase non configuré — ajoutez les secrets FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY");
+  }
+  try {
+    const snapshot = await db.collection("trajets").get();
+    res.send("Nombre de trajets: " + snapshot.size);
+  } catch (error) {
+    console.error("[Firebase /test-db]", error);
+    res.status(500).send("Erreur connexion Firestore");
+  }
+});
+
 // Middleware : vérifie que Firebase est configuré
 function requireFirebase(req: Request, res: Response, next: Function) {
   if (!db) {
