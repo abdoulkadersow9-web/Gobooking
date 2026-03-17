@@ -28,7 +28,7 @@ interface AuthResponse {
     name: string;
     email: string;
     phone: string;
-    role: "user" | "client" | "admin" | "super_admin" | "company_admin" | "agent";
+    role: "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
     createdAt: string;
   };
 }

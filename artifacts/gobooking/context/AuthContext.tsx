@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-export type UserRole = "user" | "client" | "admin" | "super_admin" | "company_admin" | "agent";
+export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 
 export interface User {
   id: string;
@@ -20,7 +20,7 @@ export interface User {
 }
 
 export function getDashboardPath(role: UserRole): string | null {
-  if (role === "company_admin") return "/dashboard/company";
+  if (role === "compagnie" || role === "company_admin") return "/dashboard/company";
   if (role === "agent") return "/dashboard/agent";
   if (role === "admin" || role === "super_admin") return "/dashboard/super-admin";
   return null;
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         isAdmin: user?.role === "admin" || user?.role === "super_admin",
-        isCompanyAdmin: user?.role === "company_admin",
+        isCompanyAdmin: user?.role === "compagnie" || user?.role === "company_admin",
         isAgent: user?.role === "agent",
         isSuperAdmin: user?.role === "admin" || user?.role === "super_admin",
         dashboardPath: user ? getDashboardPath(user.role) : null,
