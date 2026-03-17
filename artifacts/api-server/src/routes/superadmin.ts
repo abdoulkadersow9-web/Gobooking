@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import crypto from "crypto";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -169,6 +170,72 @@ router.get("/bookings", async (req, res) => {
     })));
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── Création de compte staff (Agent / Compagnie / Admin) ─── */
+const STAFF_ROLES = ["agent", "compagnie", "admin"] as const;
+type StaffRole = typeof STAFF_ROLES[number];
+
+function generateProvisionalPassword(): string {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  let pw = "GB";
+  for (let i = 0; i < 6; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+  pw += "!";
+  pw += Math.floor(10 + Math.random() * 90).toString();
+  return pw;
+}
+
+function hashPasswordSuper(password: string): string {
+  return crypto.createHash("sha256").update(password + "gobooking_salt_2024").digest("hex");
+}
+
+router.post("/users", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
+
+    const { name, email, role } = req.body;
+    if (!name || !email || !role) {
+      res.status(400).json({ error: "Nom, email et rôle sont requis" });
+      return;
+    }
+    if (!STAFF_ROLES.includes(role as StaffRole)) {
+      res.status(400).json({ error: "Rôle invalide. Utilisez : agent, compagnie ou admin" });
+      return;
+    }
+
+    const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (existing.length > 0) {
+      res.status(400).json({ error: "Cet email est déjà utilisé" });
+      return;
+    }
+
+    const provisionalPassword = generateProvisionalPassword();
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    const [user] = await db.insert(usersTable).values({
+      id,
+      name,
+      email,
+      phone: "",
+      passwordHash: hashPasswordSuper(provisionalPassword),
+      role: role as StaffRole,
+    }).returning();
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
+      },
+      provisionalPassword,
+    });
+  } catch (err) {
+    console.error("Create staff error:", err);
+    res.status(500).json({ error: "Échec de la création du compte" });
   }
 });
 

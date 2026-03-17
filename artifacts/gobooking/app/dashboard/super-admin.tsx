@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -85,10 +86,12 @@ const DEMO_PAYMENTS: PaymentItem[] = [
 
 const ROLE_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   user:          { label: "Client",      color: PRIMARY,   bg: "#EEF2FF" },
-  company_admin: { label: "Entreprise",  color: "#D97706", bg: "#FFFBEB" },
+  client:        { label: "Client",      color: PRIMARY,   bg: "#EEF2FF" },
+  company_admin: { label: "Compagnie",   color: "#D97706", bg: "#FFFBEB" },
+  compagnie:     { label: "Compagnie",   color: "#D97706", bg: "#FFFBEB" },
   agent:         { label: "Agent",       color: "#059669", bg: "#ECFDF5" },
-  admin:         { label: "Super Admin", color: "#7C3AED", bg: "#F5F3FF" },
-  super_admin:   { label: "Super Admin", color: "#7C3AED", bg: "#F5F3FF" },
+  admin:         { label: "Admin",       color: "#7C3AED", bg: "#F5F3FF" },
+  super_admin:   { label: "Admin",       color: "#7C3AED", bg: "#F5F3FF" },
 };
 const METHOD_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   orange: { label: "Orange Money", color: "#FF6B00", bg: "#FFF4EE" },
@@ -119,10 +122,15 @@ export default function SuperAdminDashboard() {
   const [payments, setPayments] = useState<PaymentItem[]>(DEMO_PAYMENTS);
   const [addCityModal, setAddCityModal] = useState(false);
   const [addCompanyModal, setAddCompanyModal] = useState(false);
+  const [addUserModal, setAddUserModal] = useState(false);
   const [newCity, setNewCity] = useState({ name: "", region: "" });
   const [newCompany, setNewCompany] = useState({ name: "", email: "", phone: "", city: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", role: "agent" as "agent" | "compagnie" | "admin" });
+  const [staffCreating, setStaffCreating] = useState(false);
+  const [staffError, setStaffError] = useState("");
+  const [provisionalCreds, setProvisionalCreds] = useState<{ name: string; email: string; role: string; password: string } | null>(null);
   const [payFilter, setPayFilter] = useState<"all" | "booking" | "parcel">("all");
-  const [roleFilter, setRoleFilter] = useState<"all" | "user" | "agent" | "company_admin" | "admin">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
 
   useEffect(() => {
     if (!token) return;
@@ -144,6 +152,27 @@ export default function SuperAdminDashboard() {
   const toggleCompanyStatus = async (id: string) => {
     setCompanies(prev => prev.map(c => c.id === id ? { ...c, status: c.status === "active" ? "inactive" : "active" } : c));
     if (token) { try { await apiFetch(`/superadmin/companies/${id}/status`, { token, method: "PATCH", body: { status: companies.find(c => c.id === id)?.status === "active" ? "inactive" : "active" } }); } catch {} }
+  };
+
+  const createStaffAccount = async () => {
+    setStaffError("");
+    if (!newStaff.name.trim()) { setStaffError("Le nom est requis."); return; }
+    if (!newStaff.email.trim() || !newStaff.email.includes("@")) { setStaffError("Email invalide."); return; }
+    setStaffCreating(true);
+    try {
+      const res = await apiFetch<{ user: UserItem; provisionalPassword: string }>(
+        "/superadmin/users",
+        { token: token || "", method: "POST", body: { name: newStaff.name.trim(), email: newStaff.email.trim().toLowerCase(), role: newStaff.role } }
+      );
+      setUsers(prev => [{ ...res.user, createdAt: res.user.createdAt || new Date().toISOString() }, ...prev]);
+      setProvisionalCreds({ name: res.user.name, email: res.user.email, role: res.user.role, password: res.provisionalPassword });
+      setNewStaff({ name: "", email: "", role: "agent" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Échec de la création";
+      setStaffError(msg);
+    } finally {
+      setStaffCreating(false);
+    }
   };
 
   const filteredPayments = payFilter === "all" ? payments : payments.filter(p => p.refType === payFilter);
@@ -260,13 +289,20 @@ export default function SuperAdminDashboard() {
         {activeTab === "utilisateurs" && (<>
           <View style={S.sectionRow}>
             <Text style={S.sectionTitle}>Utilisateurs ({users.length})</Text>
+            <TouchableOpacity style={S.addBtn} onPress={() => { setAddUserModal(true); setProvisionalCreds(null); setStaffError(""); }} activeOpacity={0.8}>
+              <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Créer</Text>
+            </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-            {(["all", "user", "agent", "company_admin", "admin"] as const).map(f => (
+            {[
+              { f: "all",        label: "Tous" },
+              { f: "client",     label: "Clients" },
+              { f: "agent",      label: "Agents" },
+              { f: "compagnie",  label: "Compagnies" },
+              { f: "admin",      label: "Admins" },
+            ].map(({ f, label }) => (
               <Pressable key={f} style={[S.filterChip, roleFilter === f && S.filterChipActive]} onPress={() => setRoleFilter(f)}>
-                <Text style={[S.filterChipText, roleFilter === f && S.filterChipTextActive]}>
-                  {f === "all" ? "Tous" : f === "user" ? "Clients" : f === "agent" ? "Agents" : f === "company_admin" ? "Entreprises" : "Admins"}
-                </Text>
+                <Text style={[S.filterChipText, roleFilter === f && S.filterChipTextActive]}>{label}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -430,6 +466,129 @@ export default function SuperAdminDashboard() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* ── Modal Créer un compte Staff ── */}
+      <Modal visible={addUserModal} transparent animationType="slide">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={S.modalOverlay}>
+          <View style={S.modalCard}>
+            {provisionalCreds ? (
+              /* ── Affichage des identifiants provisoires ── */
+              <>
+                <View style={{ alignItems: "center", marginBottom: 16 }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 20, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center", marginBottom: 10 }}>
+                    <Feather name="check-circle" size={28} color="#059669" />
+                  </View>
+                  <Text style={[S.modalTitle, { textAlign: "center" }]}>Compte créé avec succès</Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", marginTop: 4 }}>
+                    Communiquez ces identifiants provisoires à l'utilisateur
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: "#F8FAFC", borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 16 }}>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Nom</Text>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{provisionalCreds.name}</Text>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Email (identifiant)</Text>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#1A56DB" }}>{provisionalCreds.email}</Text>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Mot de passe provisoire</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FDE68A" }}>
+                        <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#92400E", letterSpacing: 2 }}>{provisionalCreds.password}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={{ gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Rôle attribué</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {(() => { const rs = ROLE_STYLE[provisionalCreds.role] ?? ROLE_STYLE.agent; return (
+                        <View style={{ backgroundColor: rs.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: rs.color }}>{rs.label}</Text>
+                        </View>
+                      ); })()}
+                    </View>
+                  </View>
+                </View>
+                <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 12, flexDirection: "row", gap: 8, alignItems: "flex-start", marginBottom: 16, borderWidth: 1, borderColor: "#FECACA" }}>
+                  <Feather name="alert-triangle" size={14} color="#DC2626" style={{ marginTop: 1 }} />
+                  <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: "#DC2626" }}>
+                    Notez ce mot de passe maintenant. Il ne sera plus affiché après fermeture de cette fenêtre.
+                  </Text>
+                </View>
+                <Pressable style={[S.modalConfirm, { backgroundColor: "#7C3AED" }]} onPress={() => { setAddUserModal(false); setProvisionalCreds(null); }}>
+                  <Text style={S.modalConfirmText}>Fermer</Text>
+                </Pressable>
+              </>
+            ) : (
+              /* ── Formulaire de création ── */
+              <>
+                <Text style={S.modalTitle}>Créer un compte</Text>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", marginBottom: 16 }}>
+                  Réservé aux rôles Agent, Compagnie et Admin
+                </Text>
+                {!!staffError && (
+                  <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 10, flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: "#FECACA" }}>
+                    <Feather name="alert-circle" size={13} color="#DC2626" />
+                    <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626" }}>{staffError}</Text>
+                  </View>
+                )}
+                <TextInput
+                  style={S.modalInput}
+                  placeholder="Nom complet"
+                  value={newStaff.name}
+                  onChangeText={v => { setNewStaff(p => ({ ...p, name: v })); setStaffError(""); }}
+                  autoCapitalize="words"
+                />
+                <TextInput
+                  style={[S.modalInput, { marginTop: 10 }]}
+                  placeholder="Email"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={newStaff.email}
+                  onChangeText={v => { setNewStaff(p => ({ ...p, email: v })); setStaffError(""); }}
+                />
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 14, marginBottom: 8 }}>Rôle</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  {([
+                    { key: "agent",     label: "Agent",     icon: "briefcase", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
+                    { key: "compagnie", label: "Compagnie", icon: "truck",     color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+                    { key: "admin",     label: "Admin",     icon: "shield",    color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
+                  ] as const).map(r => {
+                    const active = newStaff.role === r.key;
+                    return (
+                      <Pressable
+                        key={r.key}
+                        style={{ flex: 1, alignItems: "center", borderRadius: 12, paddingVertical: 12, borderWidth: active ? 2 : 1.5, borderColor: active ? r.color : "#E2E8F0", backgroundColor: active ? r.bg : "#F8FAFC", gap: 4 }}
+                        onPress={() => setNewStaff(p => ({ ...p, role: r.key }))}
+                      >
+                        <Feather name={r.icon} size={18} color={active ? r.color : "#94A3B8"} />
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: active ? r.color : "#64748B" }}>{r.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <View style={S.modalBtns}>
+                  <Pressable style={S.modalCancel} onPress={() => { setAddUserModal(false); setStaffError(""); setNewStaff({ name: "", email: "", role: "agent" }); }}>
+                    <Text style={S.modalCancelText}>Annuler</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[S.modalConfirm, { backgroundColor: "#7C3AED", opacity: staffCreating ? 0.7 : 1 }]}
+                    onPress={createStaffAccount}
+                    disabled={staffCreating}
+                  >
+                    {staffCreating
+                      ? <ActivityIndicator size="small" color="white" />
+                      : <Text style={S.modalConfirmText}>Créer le compte</Text>
+                    }
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        </ScrollView>
       </Modal>
 
       {/* Add Company Modal */}

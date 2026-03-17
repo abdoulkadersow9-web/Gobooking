@@ -18,19 +18,17 @@ function generateToken_simple(): string {
 
 const tokenStore = new Map<string, string>();
 
-const ALLOWED_ROLES = ["client", "agent", "compagnie", "admin"] as const;
-type RegisterRole = typeof ALLOWED_ROLES[number];
-
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, email, phone, password } = req.body;
 
     if (!name || !email || !password) {
       res.status(400).json({ error: "Nom, email et mot de passe sont requis" });
       return;
     }
 
-    const mappedRole: RegisterRole = ALLOWED_ROLES.includes(role) ? role : "client";
+    // L'inscription publique crée uniquement des comptes Client
+    const mappedRole = "client" as const;
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existing.length > 0) {

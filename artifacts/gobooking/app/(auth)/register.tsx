@@ -17,7 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { getDashboardPath, useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 interface AuthResponse {
@@ -27,102 +27,44 @@ interface AuthResponse {
     name: string;
     email: string;
     phone: string;
-    role: "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
+    role: "client";
     createdAt: string;
   };
 }
-
-type RoleKey = "client" | "agent" | "compagnie" | "admin";
-
-interface RoleOption {
-  key: RoleKey;
-  label: string;
-  description: string;
-  icon: "user" | "briefcase" | "truck" | "shield";
-  color: string;
-  bg: string;
-  border: string;
-}
-
-const ROLES: RoleOption[] = [
-  {
-    key: "client",
-    label: "Client",
-    description: "Réserver des billets",
-    icon: "user",
-    color: "#0891B2",
-    bg: "#ECFEFF",
-    border: "#A5F3FC",
-  },
-  {
-    key: "agent",
-    label: "Agent",
-    description: "Scanner & embarquer",
-    icon: "briefcase",
-    color: "#059669",
-    bg: "#ECFDF5",
-    border: "#A7F3D0",
-  },
-  {
-    key: "compagnie",
-    label: "Compagnie",
-    description: "Gérer les voyages",
-    icon: "truck",
-    color: "#1A56DB",
-    bg: "#EEF2FF",
-    border: "#C7D2FE",
-  },
-  {
-    key: "admin",
-    label: "Admin",
-    description: "Accès complet",
-    icon: "shield",
-    color: "#7C3AED",
-    bg: "#F5F3FF",
-    border: "#DDD6FE",
-  },
-];
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
 
-  const [name, setName]                 = useState("");
-  const [email, setEmail]               = useState("");
-  const [password, setPassword]         = useState("");
+  const [name, setName]               = useState("");
+  const [email, setEmail]             = useState("");
+  const [password, setPassword]       = useState("");
+  const [confirm, setConfirm]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole]                 = useState<RoleKey>("client");
-  const [loading, setLoading]           = useState(false);
-  const [fieldError, setFieldError]     = useState("");
-  const [serverError, setServerError]   = useState("");
+  const [showConfirm, setShowConfirm]   = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [fieldError, setFieldError]   = useState("");
+  const [serverError, setServerError] = useState("");
 
   const clearErrors = () => { setFieldError(""); setServerError(""); };
 
   const handleRegister = async () => {
     clearErrors();
 
-    if (!name.trim() && !email.trim() && !password.trim()) {
-      setFieldError("Veuillez remplir tous les champs.");
-      return;
-    }
-    if (!name.trim()) {
-      setFieldError("Le nom complet est requis.");
-      return;
-    }
-    if (!email.trim()) {
-      setFieldError("L'adresse email est requise.");
-      return;
-    }
+    if (!name.trim()) { setFieldError("Le nom complet est requis."); return; }
+    if (!email.trim()) { setFieldError("L'adresse email est requise."); return; }
     if (!email.includes("@") || !email.includes(".")) {
       setFieldError("Veuillez entrer une adresse email valide.");
       return;
     }
-    if (!password.trim()) {
-      setFieldError("Le mot de passe est requis.");
-      return;
-    }
+    if (!password) { setFieldError("Le mot de passe est requis."); return; }
     if (password.length < 6) {
       setFieldError("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (!confirm) { setFieldError("Veuillez confirmer votre mot de passe."); return; }
+    if (password !== confirm) {
+      setFieldError("Les mots de passe ne correspondent pas.");
       return;
     }
 
@@ -134,18 +76,12 @@ export default function RegisterScreen() {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
-          role,
         }),
       });
       await login(res.token, res.user);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.dismissAll();
-      const dashPath = getDashboardPath(res.user.role);
-      if (dashPath) {
-        router.replace(dashPath as never);
-      } else {
-        router.replace("/(tabs)");
-      }
+      router.replace("/(tabs)");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Inscription échouée. Veuillez réessayer.";
       setServerError(msg);
@@ -156,6 +92,13 @@ export default function RegisterScreen() {
 
   const errorMessage = fieldError || serverError;
   const isServerErr  = !!serverError && !fieldError;
+
+  const pwStrength = password.length === 0 ? 0
+    : password.length < 6 ? 1
+    : password.length < 10 ? 2
+    : 3;
+  const pwStrengthLabel = ["", "Faible", "Moyen", "Fort"][pwStrength];
+  const pwStrengthColor = ["", "#EF4444", "#F59E0B", "#059669"][pwStrength];
 
   return (
     <KeyboardAvoidingView
@@ -173,7 +116,7 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header gradient ── */}
+        {/* ── Header ── */}
         <LinearGradient
           colors={[Colors.light.primary, Colors.light.primaryDark]}
           style={styles.headerGradient}
@@ -182,22 +125,22 @@ export default function RegisterScreen() {
             <Feather name="user-plus" size={30} color="white" />
           </View>
           <Text style={styles.appName}>GoBooking</Text>
-          <Text style={styles.tagline}>Créez votre compte en 1 minute</Text>
+          <Text style={styles.tagline}>Créez votre compte voyageur</Text>
         </LinearGradient>
 
         <View style={styles.formCard}>
           <Text style={styles.welcomeTitle}>Créer un compte</Text>
-          <Text style={styles.welcomeSubtitle}>Rejoignez des milliers de voyageurs</Text>
+          <Text style={styles.welcomeSubtitle}>Rejoignez des milliers de voyageurs en Côte d'Ivoire</Text>
 
-          {/* ── Message d'erreur inline ── */}
+          {/* ── Erreur inline ── */}
           {!!errorMessage && (
-            <View style={[styles.errorBanner, isServerErr && styles.errorBannerServer]}>
+            <View style={[styles.errorBanner, isServerErr && styles.errorBannerRed]}>
               <Feather
                 name={isServerErr ? "alert-circle" : "alert-triangle"}
                 size={15}
                 color={isServerErr ? "#B91C1C" : "#92400E"}
               />
-              <Text style={[styles.errorText, isServerErr && styles.errorTextServer]}>
+              <Text style={[styles.errorText, isServerErr && styles.errorTextRed]}>
                 {errorMessage}
               </Text>
             </View>
@@ -206,17 +149,14 @@ export default function RegisterScreen() {
           {/* ── Nom ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Nom complet</Text>
-            <View style={[
-              styles.inputContainer,
-              fieldError.includes("nom") && styles.inputError,
-            ]}>
-              <Feather name="user" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
+            <View style={[styles.inputRow, fieldError.includes("nom") && styles.inputRowError]}>
+              <Feather name="user" size={18} color={Colors.light.textMuted} style={styles.icon} />
               <TextInput
                 style={styles.input}
                 placeholder="Kouassi Yao"
                 placeholderTextColor={Colors.light.textMuted}
                 value={name}
-                onChangeText={(t) => { setName(t); clearErrors(); }}
+                onChangeText={t => { setName(t); clearErrors(); }}
                 autoCapitalize="words"
               />
             </View>
@@ -224,18 +164,15 @@ export default function RegisterScreen() {
 
           {/* ── Email ── */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <View style={[
-              styles.inputContainer,
-              fieldError.includes("email") && styles.inputError,
-            ]}>
-              <Feather name="mail" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
+            <Text style={styles.label}>Adresse email</Text>
+            <View style={[styles.inputRow, fieldError.includes("email") && styles.inputRowError]}>
+              <Feather name="mail" size={18} color={Colors.light.textMuted} style={styles.icon} />
               <TextInput
                 style={styles.input}
                 placeholder="vous@exemple.com"
                 placeholderTextColor={Colors.light.textMuted}
                 value={email}
-                onChangeText={(t) => { setEmail(t); clearErrors(); }}
+                onChangeText={t => { setEmail(t); clearErrors(); }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -246,94 +183,73 @@ export default function RegisterScreen() {
           {/* ── Mot de passe ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Mot de passe</Text>
-            <View style={[
-              styles.inputContainer,
-              fieldError.includes("mot de passe") && styles.inputError,
-            ]}>
-              <Feather name="lock" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
+            <View style={[styles.inputRow, fieldError.includes("mot de passe") && styles.inputRowError]}>
+              <Feather name="lock" size={18} color={Colors.light.textMuted} style={styles.icon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder="Minimum 6 caractères"
                 placeholderTextColor={Colors.light.textMuted}
                 value={password}
-                onChangeText={(t) => { setPassword(t); clearErrors(); }}
+                onChangeText={t => { setPassword(t); clearErrors(); }}
                 secureTextEntry={!showPassword}
               />
-              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+              <Pressable onPress={() => setShowPassword(v => !v)} style={styles.eye}>
                 <Feather name={showPassword ? "eye-off" : "eye"} size={18} color={Colors.light.textMuted} />
               </Pressable>
             </View>
             {password.length > 0 && (
               <View style={styles.strengthRow}>
-                {[1,2,3,4].map((lvl) => (
+                {[1, 2, 3].map(lvl => (
                   <View
                     key={lvl}
                     style={[
                       styles.strengthBar,
-                      {
-                        backgroundColor:
-                          password.length >= lvl * 3
-                            ? password.length >= 10 ? "#059669" : "#F59E0B"
-                            : "#E2E8F0",
-                      },
+                      { backgroundColor: pwStrength >= lvl ? pwStrengthColor : "#E2E8F0" },
                     ]}
                   />
                 ))}
-                <Text style={styles.strengthLabel}>
-                  {password.length < 6 ? "Faible" : password.length < 10 ? "Moyen" : "Fort"}
+                <Text style={[styles.strengthLabel, { color: pwStrengthColor }]}>
+                  {pwStrengthLabel}
                 </Text>
               </View>
             )}
           </View>
 
-          {/* ── Sélecteur de rôle ── */}
+          {/* ── Confirmation ── */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Je suis…</Text>
-            <View style={styles.roleGrid}>
-              {ROLES.map((r) => {
-                const isActive = role === r.key;
-                return (
-                  <Pressable
-                    key={r.key}
-                    style={[
-                      styles.roleCard,
-                      isActive
-                        ? { backgroundColor: r.bg, borderColor: r.color, borderWidth: 2 }
-                        : { backgroundColor: Colors.light.background, borderColor: Colors.light.border, borderWidth: 1.5 },
-                    ]}
-                    onPress={() => { setRole(r.key); clearErrors(); }}
-                  >
-                    <View
-                      style={[
-                        styles.roleIcon,
-                        { backgroundColor: isActive ? r.color : Colors.light.border + "66" },
-                      ]}
-                    >
-                      <Feather name={r.icon} size={18} color={isActive ? "white" : Colors.light.textMuted} />
-                    </View>
-                    <Text style={[styles.roleLabel, isActive && { color: r.color }]}>
-                      {r.label}
-                    </Text>
-                    <Text style={[styles.roleDesc, isActive && { color: r.color + "CC" }]}>
-                      {r.description}
-                    </Text>
-                    {isActive && (
-                      <View style={[styles.roleCheck, { backgroundColor: r.color }]}>
-                        <Feather name="check" size={10} color="white" />
-                      </View>
-                    )}
-                  </Pressable>
-                );
-              })}
+            <Text style={styles.label}>Confirmer le mot de passe</Text>
+            <View style={[
+              styles.inputRow,
+              (fieldError.includes("correspon") || fieldError.includes("confirmer")) && styles.inputRowError,
+              confirm.length > 0 && confirm === password && styles.inputRowSuccess,
+            ]}>
+              <Feather name="shield" size={18} color={Colors.light.textMuted} style={styles.icon} />
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Répétez votre mot de passe"
+                placeholderTextColor={Colors.light.textMuted}
+                value={confirm}
+                onChangeText={t => { setConfirm(t); clearErrors(); }}
+                secureTextEntry={!showConfirm}
+              />
+              <Pressable onPress={() => setShowConfirm(v => !v)} style={styles.eye}>
+                <Feather name={showConfirm ? "eye-off" : "eye"} size={18} color={Colors.light.textMuted} />
+              </Pressable>
             </View>
+            {confirm.length > 0 && confirm === password && (
+              <View style={styles.matchRow}>
+                <Feather name="check-circle" size={13} color="#059669" />
+                <Text style={styles.matchText}>Les mots de passe correspondent</Text>
+              </View>
+            )}
           </View>
 
           {/* ── Bouton S'inscrire ── */}
           <Pressable
             style={({ pressed }) => [
-              styles.registerButton,
-              pressed && styles.buttonPressed,
-              loading && styles.buttonDisabled,
+              styles.submitBtn,
+              pressed && styles.submitBtnPressed,
+              loading && styles.submitBtnDisabled,
             ]}
             onPress={handleRegister}
             disabled={loading}
@@ -343,17 +259,15 @@ export default function RegisterScreen() {
             ) : (
               <>
                 <Feather name="user-check" size={18} color="white" />
-                <Text style={styles.registerButtonText}>S'inscrire</Text>
+                <Text style={styles.submitBtnText}>Créer mon compte</Text>
               </>
             )}
           </Pressable>
 
           {/* ── Mention sécurité ── */}
-          <View style={styles.securityNote}>
+          <View style={styles.securityRow}>
             <Feather name="shield" size={13} color={Colors.light.textMuted} />
-            <Text style={styles.securityText}>
-              Données chiffrées SSL · Confidentiel
-            </Text>
+            <Text style={styles.securityText}>Données chiffrées SSL · Accès sécurisé</Text>
           </View>
 
           {/* ── Lien connexion ── */}
@@ -421,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  /* Error banner */
+  /* Error */
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -434,7 +348,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FDE68A",
   },
-  errorBannerServer: {
+  errorBannerRed: {
     backgroundColor: "#FEF2F2",
     borderColor: "#FECACA",
   },
@@ -444,7 +358,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: "#92400E",
   },
-  errorTextServer: {
+  errorTextRed: {
     color: "#B91C1C",
   },
 
@@ -458,7 +372,7 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     marginBottom: 6,
   },
-  inputContainer: {
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.light.background,
@@ -467,11 +381,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.border,
     paddingHorizontal: 14,
   },
-  inputError: {
+  inputRowError: {
     borderColor: "#EF4444",
     backgroundColor: "#FFF5F5",
   },
-  inputIcon: {
+  inputRowSuccess: {
+    borderColor: "#059669",
+    backgroundColor: "#F0FDF4",
+  },
+  icon: {
     marginRight: 10,
   },
   input: {
@@ -481,7 +399,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.light.text,
   },
-  eyeButton: {
+  eye: {
     padding: 4,
   },
 
@@ -499,56 +417,25 @@ const styles = StyleSheet.create({
   },
   strengthLabel: {
     fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.textMuted,
+    fontFamily: "Inter_600SemiBold",
     marginLeft: 4,
   },
 
-  /* Role selector */
-  roleGrid: {
+  /* Match indicator */
+  matchRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  roleCard: {
-    width: "47%",
-    borderRadius: 14,
-    padding: 14,
-    alignItems: "flex-start",
-    position: "relative",
-    gap: 6,
-  },
-  roleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 2,
+    gap: 5,
+    marginTop: 5,
   },
-  roleLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  roleDesc: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textMuted,
-  },
-  roleCheck: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: "center",
-    alignItems: "center",
+  matchText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#059669",
   },
 
   /* Button */
-  registerButton: {
+  submitBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -563,21 +450,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  buttonPressed: {
+  submitBtnPressed: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
-  buttonDisabled: {
+  submitBtnDisabled: {
     opacity: 0.7,
   },
-  registerButtonText: {
+  submitBtnText: {
     color: "white",
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
   },
 
-  /* Security note */
-  securityNote: {
+  /* Security */
+  securityRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
