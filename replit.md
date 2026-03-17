@@ -126,6 +126,12 @@ Tables: users, trips, seats, bookings, parcels, companies, buses, agents, cities
 Seeded with Côte d'Ivoire routes (Abidjan, Bouaké, Yamoussoukro, Korhogo, San Pedro, Daloa, Man, etc.).
 Data: ~2708 trips, ~107680 seats, demo companies/buses/agents pre-seeded.
 
+## Platform Notes (Web vs Native)
+- `react-native-webview` not supported on Expo Web → loaded via conditional require (Platform.OS !== "web")
+- `cars-en-route-map.tsx`: On web shows a fallback UI ("Carte interactive - disponible sur mobile") + bus list; on native shows Leaflet/OpenStreetMap with bus markers
+- All Animated calls use `useNativeDriver: false` for web compatibility
+- useNativeDriver must be false on Expo Web for all Animated calls
+
 ## Auth Token Handling
 In-memory tokenStore (auth.ts) — tokens lost on server restart.
 AuthContext verifies token via GET /auth/me on startup; clears if invalid (forces re-login).

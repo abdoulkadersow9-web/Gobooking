@@ -27,10 +27,17 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import WebView from "react-native-webview";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetch } from "@/utils/api";
+
+/* ─── Cross-platform WebView ─────────────────────────────────────────────── */
+/* On Expo Web: react-native-webview is not supported; map tiles need native. */
+/* We keep WebView = null on web so the component renders cleanly.            */
+let WebView: any = null;
+if (Platform.OS !== "web") {
+  try { WebView = require("react-native-webview").default; } catch {}
+}
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
@@ -202,12 +209,17 @@ function updateBuses(buses){
   var ids={};
   buses.forEach(function(b){
     ids[b.id]=true;
+    var seatLabel = b.availableSeats > 0
+      ? '<span class="popup-badge">'+b.availableSeats+' sièges libres</span>'
+      : '<span class="popup-badge" style="background:#EF4444">Complet</span>';
+    var reserveBtn = b.availableSeats > 0
+      ? '<button class="popup-btn" onclick="rn({type:\'selectBus\',busId:\''+b.id+'\'})">Réserver ce bus</button>'
+      : '<button class="popup-btn" style="background:#475569;cursor:not-allowed" disabled>Bus complet</button>';
     var popup='<div class="popup-title">'+b.companyName+'</div>'+
       '<div class="popup-sub">'+b.fromCity+' → '+b.toCity+'</div>'+
       '<div class="popup-sub">Agent: '+b.agentName+'</div>'+
       (b.speed?'<div class="popup-sub">'+Math.round(b.speed)+' km/h</div>':'')+
-      '<span class="popup-badge">'+b.availableSeats+' sièges</span>'+
-      '<button class="popup-btn" onclick="rn({type:\'selectBus\',busId:\''+b.id+'\'})">Réserver ce bus</button>';
+      seatLabel+reserveBtn;
     if(busMarkers[b.id]){
       busMarkers[b.id].setLatLng([b.lat,b.lon]);
       busMarkers[b.id].setIcon(makeBusIcon(b.availableSeats,b.gpsLive));
@@ -287,7 +299,7 @@ export default function CarsEnRouteMap() {
   const [countdown, setCountdown]       = useState(5);
   const [successMsg, setSuccessMsg]     = useState("");
 
-  const webviewRef = useRef<WebView>(null);
+  const webviewRef = useRef<any>(null);
   const sheetY     = useRef(new Animated.Value(0)).current;
   const firstLoad  = useRef(true);
   const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -356,6 +368,11 @@ export default function CarsEnRouteMap() {
     }
   },[clientPos, mapReady]);
 
+  /* ── On web, mark map ready immediately (no WebView to trigger onLoad) ── */
+  useEffect(()=>{
+    if(Platform.OS === "web") setMapReady(true);
+  },[]);
+
   /* ── Countdown & poll ── */
   useEffect(()=>{
     if(!mapReady) return;
@@ -369,11 +386,11 @@ export default function CarsEnRouteMap() {
     return ()=>clearInterval(t);
   },[]);
 
-  /* ── Send JSON to WebView ── */
+  /* ── Send JSON to Leaflet map (native only — no-op on web) ── */
   const sendToMap = useCallback((msg:object)=>{
-    webviewRef.current?.injectJavaScript(
-      `(function(){ window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(JSON.stringify(msg))}})); })(); true;`
-    );
+    if(Platform.OS === "web" || !webviewRef.current) return;
+    const js = `(function(){ window.dispatchEvent(new MessageEvent('message',{data:${JSON.stringify(JSON.stringify(msg))}})); })(); true;`;
+    webviewRef.current.injectJavaScript(js);
   },[]);
 
   /* ── Handle WebView → RN messages ── */
@@ -507,20 +524,30 @@ export default function CarsEnRouteMap() {
         </View>
       )}
 
-      {/* ── Map WebView ── */}
+      {/* ── Map ── */}
       <View style={styles.mapContainer}>
-        <WebView
-          ref={webviewRef}
-          source={{ html: mapHtml }}
-          style={styles.map}
-          onLoad={()=>setMapReady(true)}
-          onMessage={onWebMessage}
-          javaScriptEnabled
-          domStorageEnabled
-          mixedContentMode="always"
-          originWhitelist={["*"]}
-        />
-        {loading && (
+        {Platform.OS === "web" ? (
+          /* Web fallback: map tiles require native app */
+          <View style={[styles.map, styles.mapWebFallback]}>
+            <Text style={styles.mapWebIcon}>🗺️</Text>
+            <Text style={styles.mapWebTitle}>Carte interactive</Text>
+            <Text style={styles.mapWebSub}>Disponible sur l'application mobile</Text>
+            <Text style={styles.mapWebSub}>{buses.length} cars en route ci-dessous</Text>
+          </View>
+        ) : WebView ? (
+          <WebView
+            ref={webviewRef}
+            source={{ html: mapHtml }}
+            style={styles.map}
+            onLoad={()=>setMapReady(true)}
+            onMessage={onWebMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            mixedContentMode="always"
+            originWhitelist={["*"]}
+          />
+        ) : null}
+        {loading && Platform.OS !== "web" && (
           <View style={styles.mapLoader}>
             <ActivityIndicator size="large" color="#1A56DB"/>
             <Text style={styles.mapLoaderText}>Chargement des cars…</Text>
@@ -622,13 +649,20 @@ export default function CarsEnRouteMap() {
 
             {/* Actions */}
             <View style={styles.sheetActions}>
-              <TouchableOpacity
-                style={styles.reserveBtn}
-                onPress={()=>setShowRequest(true)}
-              >
-                <Feather name="check-circle" size={16} color="#fff"/>
-                <Text style={styles.reserveBtnText}>Réserver ce bus</Text>
-              </TouchableOpacity>
+              {selectedBus.availableSeats > 0 ? (
+                <TouchableOpacity
+                  style={styles.reserveBtn}
+                  onPress={()=>setShowRequest(true)}
+                >
+                  <Feather name="check-circle" size={16} color="#fff"/>
+                  <Text style={styles.reserveBtnText}>Réserver ce bus</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.fullBusBtn}>
+                  <Feather name="x-circle" size={16} color="#94a3b8"/>
+                  <Text style={styles.fullBusBtnText}>Bus complet — aucune place disponible</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.sheetComms}>
@@ -780,10 +814,14 @@ const styles = StyleSheet.create({
   seatToggleActive:{ backgroundColor:"#059669", borderColor:"#059669" },
   seatToggleText:{ fontSize:12, color:"#94a3b8" },
 
-  mapContainer:  { flex:1, position:"relative" },
-  map:           { flex:1 },
-  mapLoader:     { ...StyleSheet.absoluteFillObject, justifyContent:"center", alignItems:"center", backgroundColor:"rgba(15,23,42,0.7)" },
-  mapLoaderText: { color:"#94a3b8", marginTop:8, fontSize:13 },
+  mapContainer:    { flex:1, position:"relative" },
+  map:             { flex:1 },
+  mapLoader:       { ...StyleSheet.absoluteFillObject, justifyContent:"center", alignItems:"center", backgroundColor:"rgba(15,23,42,0.7)" },
+  mapLoaderText:   { color:"#94a3b8", marginTop:8, fontSize:13 },
+  mapWebFallback:  { justifyContent:"center", alignItems:"center", backgroundColor:"#0f172a" },
+  mapWebIcon:      { fontSize:48, marginBottom:12 },
+  mapWebTitle:     { fontSize:18, fontWeight:"700", color:"#f1f5f9", marginBottom:6 },
+  mapWebSub:       { fontSize:13, color:"#64748b", marginBottom:4, textAlign:"center" as const },
 
   successBanner: { backgroundColor:"#059669", padding:12, alignItems:"center" },
   successText:   { color:"#fff", fontWeight:"600", fontSize:13 },
@@ -826,6 +864,8 @@ const styles = StyleSheet.create({
   sheetActions:  { marginBottom:10 },
   reserveBtn:    { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, backgroundColor:"#1A56DB", borderRadius:12, paddingVertical:12 },
   reserveBtnText:{ color:"#fff", fontWeight:"700", fontSize:14 },
+  fullBusBtn:    { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, backgroundColor:"rgba(71,85,105,0.3)", borderRadius:12, paddingVertical:12, borderWidth:1, borderColor:"rgba(71,85,105,0.4)" },
+  fullBusBtnText:{ color:"#94a3b8", fontWeight:"600", fontSize:13 },
   sheetComms:    { flexDirection:"row", gap:10 },
   callBtn:       { flex:1, flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, backgroundColor:"rgba(5,150,105,0.2)", borderRadius:10, paddingVertical:10, borderWidth:1, borderColor:"rgba(5,150,105,0.3)" },
   callBtnText:   { color:"#34d399", fontWeight:"600", fontSize:13 },

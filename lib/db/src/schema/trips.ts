@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const tripsTable = pgTable("trips", {
   id: text("id").primaryKey(),
   companyId: text("company_id"),
+  agentId: text("agent_id"),
   from: varchar("from_city", { length: 100 }).notNull(),
   to: varchar("to_city", { length: 100 }).notNull(),
   departureTime: varchar("departure_time", { length: 10 }).notNull(),

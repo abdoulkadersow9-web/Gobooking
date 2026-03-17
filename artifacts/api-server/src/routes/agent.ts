@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable } from "@workspace/db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
+import { eq, desc, and, gte, inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
@@ -227,7 +228,7 @@ router.post("/trip/:tripId/location", async (req, res) => {
       agentId:   user.id,
     });
 
-    /* ── 2. Persist to database (fire-and-forget, don't block response) ── */
+    /* ── 2. Persist GPS trail to positions table (fire-and-forget) ── */
     db.insert(positionsTable).values({
       tripId:   req.params.tripId,
       agentId:  user.id,
@@ -237,6 +238,26 @@ router.post("/trip/:tripId/location", async (req, res) => {
       accuracy: typeof accuracy === "number" ? accuracy : null,
       heading:  typeof heading  === "number" ? heading  : null,
     }).catch(err => console.error("positions insert error:", err));
+
+    /* ── 3. Upsert latest position to bus_positions (one row per trip) ── */
+    db.insert(busPositionsTable).values({
+      tripId:    req.params.tripId,
+      latitude:  lat,
+      longitude: lon,
+      speed:     typeof speed   === "number" ? speed   : null,
+      heading:   typeof heading === "number" ? heading : null,
+    })
+    .onConflictDoUpdate({
+      target: busPositionsTable.tripId,
+      set: {
+        latitude:  lat,
+        longitude: lon,
+        speed:     typeof speed   === "number" ? speed   : null,
+        heading:   typeof heading === "number" ? heading : null,
+        updatedAt: sql`now()`,
+      },
+    })
+    .catch(err => console.error("bus_positions upsert error:", err));
 
     res.json({ success: true, updatedAt: Date.now() });
   } catch (err) {
@@ -348,8 +369,57 @@ router.get("/requests", async (req, res) => {
 
     pruneOldRequests();
     const tripId = (req.query.tripId as string) || "live-1";
-    const requests = requestsForTrip(tripId);
-    res.json(requests);
+
+    /* 1. Get from in-memory store (fast path) */
+    const memRequests = requestsForTrip(tripId);
+
+    if (memRequests.length > 0) {
+      res.json(memRequests);
+      return;
+    }
+
+    /* 2. Fallback: read from boarding_requests DB (e.g. after server restart) */
+    try {
+      const dbRows = await db
+        .select()
+        .from(boardingRequestsTable)
+        .where(eq(boardingRequestsTable.tripId, tripId))
+        .orderBy(desc(boardingRequestsTable.createdAt))
+        .limit(50);
+
+      /* Rehydrate in-memory store from DB (pending only) */
+      for (const row of dbRows) {
+        if (!requestStore.has(row.id)) {
+          requestStore.set(row.id, {
+            id:             row.id,
+            tripId:         row.tripId,
+            clientName:     row.clientName,
+            clientPhone:    row.clientPhone,
+            seatsRequested: parseInt(row.seatsRequested ?? "1", 10),
+            boardingPoint:  row.boardingPoint,
+            status:         row.status as "pending" | "accepted" | "rejected",
+            createdAt:      row.createdAt?.getTime() ?? Date.now(),
+            respondedAt:    row.respondedAt?.getTime() ?? undefined,
+          });
+        }
+      }
+
+      const result = dbRows.map(row => ({
+        id:             row.id,
+        tripId:         row.tripId,
+        clientName:     row.clientName,
+        clientPhone:    row.clientPhone,
+        seatsRequested: parseInt(row.seatsRequested ?? "1", 10),
+        boardingPoint:  row.boardingPoint,
+        status:         row.status,
+        createdAt:      row.createdAt?.getTime() ?? Date.now(),
+        respondedAt:    row.respondedAt?.getTime() ?? null,
+      }));
+
+      res.json(result);
+    } catch (dbErr) {
+      res.json([]); /* return empty if DB also fails */
+    }
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }
@@ -398,6 +468,12 @@ router.post("/requests/:id/accept", async (req, res) => {
     req_.respondedAt = Date.now();
     requestStore.set(req_.id, req_);
 
+    /* Sync to boarding_requests DB table (fire-and-forget) */
+    db.update(boardingRequestsTable)
+      .set({ status: "accepted", respondedAt: new Date() })
+      .where(eq(boardingRequestsTable.id, req_.id))
+      .catch(err => console.error("boarding_requests accept sync error:", err));
+
     res.json({ success: true, request: req_, seatsBooked });
   } catch (err) {
     console.error("Accept request error:", err);
@@ -418,6 +494,12 @@ router.post("/requests/:id/reject", async (req, res) => {
     req_.status      = "rejected";
     req_.respondedAt = Date.now();
     requestStore.set(req_.id, req_);
+
+    /* Sync to boarding_requests DB table (fire-and-forget) */
+    db.update(boardingRequestsTable)
+      .set({ status: "rejected", respondedAt: new Date() })
+      .where(eq(boardingRequestsTable.id, req_.id))
+      .catch(err => console.error("boarding_requests reject sync error:", err));
 
     res.json({ success: true, request: req_ });
   } catch (err) {

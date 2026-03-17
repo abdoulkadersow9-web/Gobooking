@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable } from "@workspace/db";
+import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
 import { eq, and, ilike, inArray, desc } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
@@ -129,71 +129,91 @@ router.get("/live", async (req, res) => {
 
     pruneStale();
 
-    /* ── Fetch active trips from DB (status = "en_route") ── */
+    /* ── Fetch active trips from DB (status = "en_route" or "en_cours") ── */
     const dbTrips = await db
       .select()
       .from(tripsTable)
-      .where(eq(tripsTable.status, "en_route"));
-
-    if (dbTrips.length > 0) {
-      /* Fetch last DB position for every active trip in one query */
-      const lastDbPositions = await Promise.all(
-        dbTrips.map(trip =>
-          db.select({
-            lat:        positionsTable.lat,
-            lon:        positionsTable.lon,
-            speed:      positionsTable.speed,
-            heading:    positionsTable.heading,
-            recordedAt: positionsTable.recordedAt,
-          })
-          .from(positionsTable)
-          .where(eq(positionsTable.tripId, trip.id))
-          .orderBy(desc(positionsTable.recordedAt))
-          .limit(1)
-          .then(rows => ({ tripId: trip.id, pos: rows[0] ?? null }))
+      .where(
+        and(
+          eq(tripsTable.status, "en_route")
         )
       );
-      const dbPosMap = new Map(lastDbPositions.map(r => [r.tripId, r.pos]));
 
-      /* Fetch agent + user info for trips whose bus is assigned to an agent */
-      const busIds = dbTrips.map(t => t.busId).filter(Boolean) as string[];
-      const agentRows = busIds.length > 0
+    if (dbTrips.length > 0) {
+      /* ── Fetch latest bus_positions for all active trips in one query ── */
+      const tripIds = dbTrips.map(t => t.id);
+      const busPosList = await db
+        .select()
+        .from(busPositionsTable)
+        .where(inArray(busPositionsTable.tripId, tripIds));
+      const busPosMap = new Map(busPosList.map(p => [p.tripId, p]));
+
+      /* ── Fetch agent + user info via agents table ── */
+      const agentIdList = dbTrips.map(t => t.agentId).filter(Boolean) as string[];
+      const agentRows = agentIdList.length > 0
         ? await db
             .select({
-              busId:     agentsTable.busId,
-              agentName: usersTable.name,
+              agentId:    agentsTable.id,
+              agentName:  usersTable.name,
               agentPhone: usersTable.phone,
-              companyId: agentsTable.companyId,
+              companyId:  agentsTable.companyId,
+            })
+            .from(agentsTable)
+            .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+            .where(inArray(agentsTable.id, agentIdList))
+        : [];
+      const agentById = new Map(agentRows.map(a => [a.agentId, a]));
+
+      /* Fallback: also support bus-based agent lookup for older trips */
+      const busIds = dbTrips.map(t => (t as any).busId).filter(Boolean) as string[];
+      const agentByBusRows = busIds.length > 0
+        ? await db
+            .select({
+              busId:      agentsTable.busId,
+              agentId:    agentsTable.id,
+              agentName:  usersTable.name,
+              agentPhone: usersTable.phone,
+              companyId:  agentsTable.companyId,
             })
             .from(agentsTable)
             .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
             .where(inArray(agentsTable.busId, busIds))
         : [];
-      const agentByBus = new Map(agentRows.map(a => [a.busId, a]));
+      const agentByBus = new Map(agentByBusRows.map(a => [a.busId, a]));
 
       const result = await Promise.all(
         dbTrips.map(async (trip) => {
+          /* Available seats = count of seats with status "available" */
           const availSeats = await db
             .select()
             .from(seatsTable)
             .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
 
-          /* GPS priority: 1) in-memory store (freshest), 2) DB positions table, 3) map center */
-          const memGps    = isAuthenticated ? locationStore.get(trip.id) : undefined;
-          const dbPos     = dbPosMap.get(trip.id);
-          const freshSecs = memGps ? (Date.now() - memGps.updatedAt) / 1000 : Infinity;
-          const useMemGps = !!memGps && freshSecs < 60; /* prefer memory if < 60s old */
-          const useDbPos  = !useMemGps && isAuthenticated && !!dbPos;
+          /* GPS priority:
+             1) in-memory store (< 60s)  — real-time broadcasting agent
+             2) bus_positions table       — most recent persisted position
+             3) positions trail table     — fallback to most recent trail entry
+             4) Map center default        */
+          const memGps     = isAuthenticated ? locationStore.get(trip.id) : undefined;
+          const busPos     = busPosMap.get(trip.id);
+          const freshSecs  = memGps ? (Date.now() - memGps.updatedAt) / 1000 : Infinity;
+          const useMemGps  = !!memGps && freshSecs < 60;
+          const useBusPos  = !useMemGps && !!busPos;
 
           const defaultCoords = mapXYtoLatLon(50, 50);
-          const lat = useMemGps ? memGps!.lat : useDbPos ? dbPos!.lat : defaultCoords.lat;
-          const lon = useMemGps ? memGps!.lon : useDbPos ? dbPos!.lon : defaultCoords.lon;
-          const speed = useMemGps ? (memGps!.speed ?? null) : useDbPos ? (dbPos!.speed ?? null) : null;
-          const lastUpdate = useMemGps ? memGps!.updatedAt : useDbPos ? dbPos!.recordedAt?.getTime() ?? null : null;
+          const lat  = useMemGps ? memGps!.lat       : useBusPos ? busPos!.latitude  : defaultCoords.lat;
+          const lon  = useMemGps ? memGps!.lon       : useBusPos ? busPos!.longitude : defaultCoords.lon;
+          const speed = useMemGps ? (memGps!.speed ?? null) : useBusPos ? (busPos!.speed ?? null) : null;
+          const lastUpdate = useMemGps
+            ? memGps!.updatedAt
+            : useBusPos ? busPos!.updatedAt?.getTime() ?? null : null;
           const mapX = Math.max(2, Math.min(98, ((lon - (-8.4)) / 5.2) * 100));
           const mapY = Math.max(2, Math.min(98, ((10.7 - lat) / 6.4) * 100));
 
-          const agent     = trip.busId ? agentByBus.get(trip.busId) : null;
+          /* Agent lookup: try by agentId first, then by busId */
+          const agentByIdResult = trip.agentId ? agentById.get(trip.agentId) : null;
+          const agentByBusResult = (trip as any).busId ? agentByBus.get((trip as any).busId) : null;
+          const agent      = agentByIdResult ?? agentByBusResult;
           const agentName  = agent?.agentName  ?? "Agent GoBooking";
           const agentPhone = agent?.agentPhone ?? "+225 07 00 00 00";
 
@@ -205,8 +225,7 @@ router.get("/live", async (req, res) => {
             fromCity:         trip.from,
             toCity:           trip.to,
             currentCity:      trip.from,
-            lat,  lon,
-            mapX, mapY,
+            lat, lon, mapX, mapY,
             availableSeats:   availSeats.length,
             totalSeats:       trip.totalSeats,
             departureTime:    trip.departureTime,
@@ -216,7 +235,7 @@ router.get("/live", async (req, res) => {
             price:            trip.price,
             color:            "#1A56DB",
             boardingPoints:   [trip.from],
-            gpsLive:          useMemGps || useDbPos,
+            gpsLive:          useMemGps || useBusPos,
             lastGpsUpdate:    lastUpdate,
             speed,
           };
@@ -324,18 +343,41 @@ router.get("/:tripId/seats", async (req, res) => {
 });
 
 /* ─── Client polls their boarding request status ─────────────────────────── */
-router.get("/:tripId/request/:requestId", (req, res) => {
+router.get("/:tripId/request/:requestId", async (req, res) => {
+  /* 1. Check in-memory store first (fastest) */
   const entry = requestStore.get(req.params.requestId);
-  if (!entry || entry.tripId !== req.params.tripId) {
-    res.status(404).json({ error: "Demande introuvable" }); return;
+  if (entry && entry.tripId === req.params.tripId) {
+    res.json({
+      id:          entry.id,
+      status:      entry.status,
+      createdAt:   entry.createdAt,
+      respondedAt: entry.respondedAt ?? null,
+    });
+    return;
   }
-  /* Return enough for the client to react, without exposing full entry */
-  res.json({
-    id:           entry.id,
-    status:       entry.status,
-    createdAt:    entry.createdAt,
-    respondedAt:  entry.respondedAt ?? null,
-  });
+  /* 2. Fallback: check boarding_requests table in DB */
+  try {
+    const rows = await db
+      .select()
+      .from(boardingRequestsTable)
+      .where(
+        and(
+          eq(boardingRequestsTable.id,     req.params.requestId),
+          eq(boardingRequestsTable.tripId, req.params.tripId)
+        )
+      )
+      .limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Demande introuvable" }); return; }
+    const r = rows[0];
+    res.json({
+      id:          r.id,
+      status:      r.status,
+      createdAt:   r.createdAt?.getTime() ?? Date.now(),
+      respondedAt: r.respondedAt?.getTime() ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
 });
 
 /* ─── Client sends a boarding request for a live bus ─────────────────────── */
@@ -343,6 +385,7 @@ router.post("/:tripId/request", async (req, res) => {
   try {
     const {
       clientName, clientPhone, seatsRequested = 1, boardingPoint,
+      userId,
       /* Pickup location fields */
       pickupType, pickupLat, pickupLon, pickupLabel, pickupCity,
     } = req.body ?? {};
@@ -375,7 +418,21 @@ router.post("/:tripId/request", async (req, res) => {
       pickupLabel:   typeof pickupLabel === "string" ? pickupLabel.trim()  : undefined,
       pickupCity:    typeof pickupCity  === "string" ? pickupCity.trim()   : undefined,
     };
+
+    /* 1. Store in memory (for fast agent reads) */
     requestStore.set(id, entry);
+
+    /* 2. Persist to boarding_requests table (fire-and-forget) */
+    db.insert(boardingRequestsTable).values({
+      id,
+      tripId:         req.params.tripId,
+      userId:         typeof userId === "string" ? userId : null,
+      clientName:     clientName.trim(),
+      clientPhone:    clientPhone.trim(),
+      boardingPoint:  boardingPoint.trim(),
+      seatsRequested: String(seats),
+      status:         "pending",
+    }).catch(err => console.error("boarding_requests insert error:", err));
 
     res.status(201).json({ success: true, requestId: id });
   } catch (err) {
