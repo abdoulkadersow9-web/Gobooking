@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, tripsTable, seatsTable } from "@workspace/db";
-import { eq, and, ilike, inArray } from "drizzle-orm";
+import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable } from "@workspace/db";
+import { eq, and, ilike, inArray, desc } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
 import { tokenStore } from "./auth";
@@ -119,66 +119,7 @@ router.post("/:tripId/seats/hold", async (req, res) => {
   }
 });
 
-router.get("/:tripId", async (req, res) => {
-  try {
-    const { tripId } = req.params;
-    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
-
-    if (!trips.length) {
-      res.status(404).json({ error: "Trip not found" });
-      return;
-    }
-
-    const trip = trips[0];
-    const seats = await db
-      .select()
-      .from(seatsTable)
-      .where(and(eq(seatsTable.tripId, tripId), eq(seatsTable.status, "available")));
-
-    res.json({
-      id: trip.id,
-      from: trip.from,
-      to: trip.to,
-      departureTime: trip.departureTime,
-      arrivalTime: trip.arrivalTime,
-      date: trip.date,
-      price: trip.price,
-      busType: trip.busType,
-      busName: trip.busName,
-      totalSeats: trip.totalSeats,
-      availableSeats: seats.length,
-      duration: trip.duration,
-      amenities: trip.amenities,
-      stops: trip.stops,
-      policies: trip.policies,
-    });
-  } catch (err) {
-    console.error("Get trip error:", err);
-    res.status(500).json({ error: "Failed to get trip" });
-  }
-});
-
-router.get("/:tripId/seats", async (req, res) => {
-  try {
-    const { tripId } = req.params;
-    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
-
-    res.json(seats.map((s) => ({
-      id: s.id,
-      number: s.number,
-      row: s.row,
-      column: s.column,
-      type: s.type,
-      status: s.status,
-      price: s.price,
-    })));
-  } catch (err) {
-    console.error("Get seats error:", err);
-    res.status(500).json({ error: "Failed to get seats" });
-  }
-});
-
-/* ── Cars en route (live positions) ─────────────────────────────────────── */
+/* ── Cars en route (live positions) — MUST be before /:tripId ─────────── */
 router.get("/live", async (req, res) => {
   try {
     /* Authenticated users see real GPS positions; unauthenticated see no GPS */
@@ -188,13 +129,48 @@ router.get("/live", async (req, res) => {
 
     pruneStale();
 
-    /* Try DB trips with status "en_route" first */
+    /* ── Fetch active trips from DB (status = "en_route") ── */
     const dbTrips = await db
       .select()
       .from(tripsTable)
       .where(eq(tripsTable.status, "en_route"));
 
     if (dbTrips.length > 0) {
+      /* Fetch last DB position for every active trip in one query */
+      const lastDbPositions = await Promise.all(
+        dbTrips.map(trip =>
+          db.select({
+            lat:        positionsTable.lat,
+            lon:        positionsTable.lon,
+            speed:      positionsTable.speed,
+            heading:    positionsTable.heading,
+            recordedAt: positionsTable.recordedAt,
+          })
+          .from(positionsTable)
+          .where(eq(positionsTable.tripId, trip.id))
+          .orderBy(desc(positionsTable.recordedAt))
+          .limit(1)
+          .then(rows => ({ tripId: trip.id, pos: rows[0] ?? null }))
+        )
+      );
+      const dbPosMap = new Map(lastDbPositions.map(r => [r.tripId, r.pos]));
+
+      /* Fetch agent + user info for trips whose bus is assigned to an agent */
+      const busIds = dbTrips.map(t => t.busId).filter(Boolean) as string[];
+      const agentRows = busIds.length > 0
+        ? await db
+            .select({
+              busId:     agentsTable.busId,
+              agentName: usersTable.name,
+              agentPhone: usersTable.phone,
+              companyId: agentsTable.companyId,
+            })
+            .from(agentsTable)
+            .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+            .where(inArray(agentsTable.busId, busIds))
+        : [];
+      const agentByBus = new Map(agentRows.map(a => [a.busId, a]));
+
       const result = await Promise.all(
         dbTrips.map(async (trip) => {
           const availSeats = await db
@@ -202,13 +178,24 @@ router.get("/live", async (req, res) => {
             .from(seatsTable)
             .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
 
-          /* Merge real GPS — only for authenticated users */
-          const gps = isAuthenticated ? locationStore.get(trip.id) : undefined;
+          /* GPS priority: 1) in-memory store (freshest), 2) DB positions table, 3) map center */
+          const memGps    = isAuthenticated ? locationStore.get(trip.id) : undefined;
+          const dbPos     = dbPosMap.get(trip.id);
+          const freshSecs = memGps ? (Date.now() - memGps.updatedAt) / 1000 : Infinity;
+          const useMemGps = !!memGps && freshSecs < 60; /* prefer memory if < 60s old */
+          const useDbPos  = !useMemGps && isAuthenticated && !!dbPos;
+
           const defaultCoords = mapXYtoLatLon(50, 50);
-          const lat = gps?.lat ?? defaultCoords.lat;
-          const lon = gps?.lon ?? defaultCoords.lon;
-          const mapX = ((lon - (-8.4)) / 5.2) * 100;
-          const mapY = ((10.7 - lat) / 6.4) * 100;
+          const lat = useMemGps ? memGps!.lat : useDbPos ? dbPos!.lat : defaultCoords.lat;
+          const lon = useMemGps ? memGps!.lon : useDbPos ? dbPos!.lon : defaultCoords.lon;
+          const speed = useMemGps ? (memGps!.speed ?? null) : useDbPos ? (dbPos!.speed ?? null) : null;
+          const lastUpdate = useMemGps ? memGps!.updatedAt : useDbPos ? dbPos!.recordedAt?.getTime() ?? null : null;
+          const mapX = Math.max(2, Math.min(98, ((lon - (-8.4)) / 5.2) * 100));
+          const mapY = Math.max(2, Math.min(98, ((10.7 - lat) / 6.4) * 100));
+
+          const agent     = trip.busId ? agentByBus.get(trip.busId) : null;
+          const agentName  = agent?.agentName  ?? "Agent GoBooking";
+          const agentPhone = agent?.agentPhone ?? "+225 07 00 00 00";
 
           return {
             id:               trip.id,
@@ -219,20 +206,19 @@ router.get("/live", async (req, res) => {
             toCity:           trip.to,
             currentCity:      trip.from,
             lat,  lon,
-            mapX: Math.max(2, Math.min(98, mapX)),
-            mapY: Math.max(2, Math.min(98, mapY)),
+            mapX, mapY,
             availableSeats:   availSeats.length,
             totalSeats:       trip.totalSeats,
             departureTime:    trip.departureTime,
             estimatedArrival: trip.arrivalTime ?? "—",
-            agentPhone:       "+225 07 00 00 00 00",
-            agentName:        "Agent GoBooking",
+            agentPhone,
+            agentName,
             price:            trip.price,
             color:            "#1A56DB",
             boardingPoints:   [trip.from],
-            gpsLive:          !!gps,
-            lastGpsUpdate:    gps?.updatedAt ?? null,
-            speed:            gps?.speed ?? null,
+            gpsLive:          useMemGps || useDbPos,
+            lastGpsUpdate:    lastUpdate,
+            speed,
           };
         })
       );
@@ -273,6 +259,67 @@ router.get("/live", async (req, res) => {
   } catch (err) {
     console.error("Live trips error:", err);
     res.status(500).json({ error: "Erreur récupération cars en route" });
+  }
+});
+
+/* ─── Single trip detail ─────────────────────────────────────────────────── */
+router.get("/:tripId", async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+
+    if (!trips.length) {
+      res.status(404).json({ error: "Trip not found" });
+      return;
+    }
+
+    const trip = trips[0];
+    const seats = await db
+      .select()
+      .from(seatsTable)
+      .where(and(eq(seatsTable.tripId, tripId), eq(seatsTable.status, "available")));
+
+    res.json({
+      id:             trip.id,
+      from:           trip.from,
+      to:             trip.to,
+      departureTime:  trip.departureTime,
+      arrivalTime:    trip.arrivalTime,
+      date:           trip.date,
+      price:          trip.price,
+      busType:        trip.busType,
+      busName:        trip.busName,
+      totalSeats:     trip.totalSeats,
+      availableSeats: seats.length,
+      duration:       trip.duration,
+      amenities:      trip.amenities,
+      stops:          trip.stops,
+      policies:       trip.policies,
+    });
+  } catch (err) {
+    console.error("Get trip error:", err);
+    res.status(500).json({ error: "Failed to get trip" });
+  }
+});
+
+/* ─── Trip seats ─────────────────────────────────────────────────────────── */
+router.get("/:tripId/seats", async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
+
+    res.json(seats.map((s) => ({
+      id:     s.id,
+      number: s.number,
+      row:    s.row,
+      column: s.column,
+      type:   s.type,
+      status: s.status,
+      price:  s.price,
+    })));
+  } catch (err) {
+    console.error("Get seats error:", err);
+    res.status(500).json({ error: "Failed to get seats" });
   }
 });
 
