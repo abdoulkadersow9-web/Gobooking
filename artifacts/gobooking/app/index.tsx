@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import React, { useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 
-import { useAuth } from "@/context/AuthContext";
+import { getDashboardPath, useAuth } from "@/context/AuthContext";
 import Colors from "@/constants/colors";
 
 export default function IndexScreen() {
@@ -11,7 +11,8 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        router.replace("/(tabs)");
+        const dashPath = getDashboardPath(user.role);
+        router.replace((dashPath ?? "/(tabs)") as never);
       } else {
         router.replace("/(auth)/login");
       }

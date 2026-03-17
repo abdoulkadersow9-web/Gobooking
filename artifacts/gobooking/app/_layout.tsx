@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -14,7 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, getDashboardPath, useAuth } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ParcelProvider } from "@/context/ParcelContext";
@@ -23,8 +23,60 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+/* ─── Rôle → segments dashboard autorisés ────────────────── */
+const DASHBOARD_ROLES: Record<string, string[]> = {
+  company:       ["compagnie", "company_admin"],
+  agent:         ["agent"],
+  "super-admin": ["admin", "super_admin"],
+};
+
+/* ─── Routes publiques (pas besoin d'être connecté) ────────── */
+const PUBLIC_ROOTS = ["index", "(auth)"];
+
+function AuthGuard() {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const root = segments[0] as string | undefined;
+    const isPublic = !root || PUBLIC_ROOTS.includes(root);
+
+    if (!user) {
+      if (!isPublic) {
+        router.replace("/(auth)/login");
+      }
+      return;
+    }
+
+    /* Utilisateur connecté sur un écran d'auth → rediriger */
+    if (root === "(auth)") {
+      const dashPath = getDashboardPath(user.role);
+      router.replace((dashPath ?? "/(tabs)") as never);
+      return;
+    }
+
+    /* Contrôle d'accès aux dashboards selon le rôle */
+    if (root === "dashboard") {
+      const requestedDash = segments[1] as string | undefined;
+      if (requestedDash) {
+        const allowedRoles = DASHBOARD_ROLES[requestedDash] ?? [];
+        if (!allowedRoles.includes(user.role)) {
+          const correctDash = getDashboardPath(user.role);
+          router.replace((correctDash ?? "/(tabs)") as never);
+        }
+      }
+    }
+  }, [user, isLoading, segments]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   return (
+    <>
+    <AuthGuard />
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(tabs)" />
@@ -51,6 +103,7 @@ function RootLayoutNav() {
       <Stack.Screen name="dashboard/agent" options={{ headerShown: false }} />
       <Stack.Screen name="dashboard/super-admin" options={{ headerShown: false }} />
     </Stack>
+    </>
   );
 }
 
