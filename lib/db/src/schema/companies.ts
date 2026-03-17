@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { pgTable, real, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -11,6 +11,7 @@ export const companiesTable = pgTable("companies", {
   city: varchar("city", { length: 100 }),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   licenseNumber: varchar("license_number", { length: 100 }),
+  walletBalance: real("wallet_balance").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

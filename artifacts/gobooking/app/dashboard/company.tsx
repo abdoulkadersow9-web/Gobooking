@@ -30,6 +30,8 @@ interface Reservation { id: string; bookingRef: string; tripId: string; totalAmo
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
 interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string }
+interface WalletTx { id: string; bookingRef?: string | null; type: string; grossAmount: number; commissionAmount: number; netAmount: number; description?: string | null; createdAt: string }
+interface WalletData { balance: number; totalGross: number; totalCommission: number; totalNet: number; transactions: WalletTx[] }
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_STATS: Stats = { totalBuses: 12, totalAgents: 18, totalTrips: 284, totalReservations: 1_420, totalParcels: 638, totalRevenue: 8_760_000, activeBuses: 9 };
@@ -114,7 +116,18 @@ const CI_CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pedro",
 const BUS_CAPACITIES = [49, 59, 63];
 const BUS_TYPES = ["Standard", "Premium", "VIP"];
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents";
+const DEMO_WALLET: WalletData = {
+  balance: 1_280_500, totalGross: 1_423_000, totalCommission: 142_500, totalNet: 1_280_500,
+  transactions: [
+    { id: "wt1", bookingRef: "GBB5AKZ8DZ", type: "credit", grossAmount: 14000, commissionAmount: 1400, netAmount: 12600, description: "Réservation GBB5AKZ8DZ — Abidjan → Bouaké", createdAt: new Date(Date.now() - 3_600_000).toISOString() },
+    { id: "wt2", bookingRef: "GBB9MNX2PL", type: "credit", grossAmount: 5000,  commissionAmount: 500,  netAmount: 4500,  description: "Réservation GBB9MNX2PL — Abidjan → Yamoussoukro", createdAt: new Date(Date.now() - 7_200_000).toISOString() },
+    { id: "wt3", bookingRef: "GBB7FPV6NM", type: "credit", grossAmount: 7000,  commissionAmount: 700,  netAmount: 6300,  description: "Réservation GBB7FPV6NM — Abidjan → Bouaké", createdAt: new Date(Date.now() - 86_400_000).toISOString() },
+    { id: "wt4", bookingRef: "GBB2VT9KLM", type: "credit", grossAmount: 8000,  commissionAmount: 800,  netAmount: 7200,  description: "Réservation GBB2VT9KLM — Abidjan → Daloa", createdAt: new Date(Date.now() - 172_800_000).toISOString() },
+    { id: "wt5", bookingRef: "GBB8WR4XNP", type: "credit", grossAmount: 10000, commissionAmount: 1000, netAmount: 9000,  description: "Réservation GBB8WR4XNP — Abidjan → Yamoussoukro", createdAt: new Date(Date.now() - 259_200_000).toISOString() },
+  ],
+};
+
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille";
 
 /* ─── Reusable picker row ─────────────────────────────────── */
 function PickerRow<T>({ label, options, value, onSelect, display }: { label: string; options: T[]; value: T; onSelect: (v: T) => void; display?: (v: T) => string }) {
@@ -187,6 +200,7 @@ export default function CompanyDashboard() {
   const [reservations, setReservations] = useState<Reservation[]>(DEMO_RESERVATIONS);
   const [parcels, setParcels] = useState<Parcel[]>(DEMO_PARCELS);
   const [agents, setAgents] = useState<AgentItem[]>(DEMO_AGENTS);
+  const [walletData, setWalletData] = useState<WalletData>(DEMO_WALLET);
   const [selectedTripForSeats, setSelectedTripForSeats] = useState<Trip>(DEMO_TRIPS[0]);
   const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 49, 31));
   const [selectedSeat, setSelectedSeat] = useState<SeatItem | null>(null);
@@ -213,17 +227,19 @@ export default function CompanyDashboard() {
   useEffect(() => {
     if (!token) return;
     Promise.allSettled([
-      apiFetch<Stats>("/company/stats", { token }),
-      apiFetch<Bus[]>("/company/buses", { token }),
-      apiFetch<Trip[]>("/company/trips", { token }),
+      apiFetch<Stats>("/company/stats",     { token }),
+      apiFetch<Bus[]>("/company/buses",     { token }),
+      apiFetch<Trip[]>("/company/trips",    { token }),
       apiFetch<Reservation[]>("/company/reservations", { token }),
-      apiFetch<Parcel[]>("/company/parcels", { token }),
-    ]).then(([s, b, t, r, p]) => {
+      apiFetch<Parcel[]>("/company/parcels",{ token }),
+      apiFetch<WalletData>("/company/wallet",{ token }),
+    ]).then(([s, b, t, r, p, w]) => {
       if (s.status === "fulfilled") setStats(s.value);
       if (b.status === "fulfilled" && b.value.length > 0) setBuses(b.value);
       if (t.status === "fulfilled" && t.value.length > 0) setTrips(t.value);
       if (r.status === "fulfilled" && r.value.length > 0) setReservations(r.value);
       if (p.status === "fulfilled" && p.value.length > 0) setParcels(p.value);
+      if (w.status === "fulfilled") setWalletData(w.value);
     });
   }, [token]);
 
@@ -321,13 +337,14 @@ export default function CompanyDashboard() {
   };
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "apercu",       label: "Aperçu",       icon: "bar-chart-2" },
-    { id: "trajets",      label: "Trajets",      icon: "navigation" },
-    { id: "reservations", label: "Réservations", icon: "bookmark" },
-    { id: "sieges",       label: "Sièges",       icon: "grid" },
-    { id: "bus",          label: "Bus",          icon: "truck" },
-    { id: "colis",        label: "Colis",        icon: "package" },
-    { id: "agents",       label: "Agents",       icon: "users" },
+    { id: "apercu",       label: "Aperçu",        icon: "bar-chart-2" },
+    { id: "portefeuille", label: "Portefeuille",  icon: "credit-card" },
+    { id: "trajets",      label: "Trajets",       icon: "navigation" },
+    { id: "reservations", label: "Réservations",  icon: "bookmark" },
+    { id: "sieges",       label: "Sièges",        icon: "grid" },
+    { id: "bus",          label: "Bus",           icon: "truck" },
+    { id: "colis",        label: "Colis",         icon: "package" },
+    { id: "agents",       label: "Agents",        icon: "users" },
   ];
 
   const filteredRes = reservationFilter === "all" ? reservations : reservations.filter(r => r.status === reservationFilter);
@@ -419,6 +436,92 @@ export default function CompanyDashboard() {
                   <View style={[S.busAvailFill, { width: `${pct}%` as never, backgroundColor: pct > 80 ? "#DC2626" : pct > 60 ? "#D97706" : PRIMARY }]} />
                 </View>
                 <Text style={S.busAvailPct}>{pct}%</Text>
+              </View>
+            );
+          })}
+        </>)}
+
+        {/* ══ Portefeuille ═══════════════════════════════════════════ */}
+        {activeTab === "portefeuille" && (<>
+          {/* Solde principal */}
+          <LinearGradient colors={["#D97706", "#B45309"]} style={{ borderRadius: 20, padding: 22, gap: 2, marginBottom: 2 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="credit-card" size={18} color="white" />
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.85)" }}>Solde disponible</Text>
+            </View>
+            <Text style={{ fontSize: 36, fontFamily: "Inter_700Bold", color: "white" }}>{walletData.balance.toLocaleString()}</Text>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.75)" }}>FCFA</Text>
+          </LinearGradient>
+
+          {/* Statistiques rapides */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#059669", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+              <Feather name="trending-up" size={16} color="#059669" />
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalGross.toLocaleString()}</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA total brut</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#DC2626", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+              <Feather name="minus-circle" size={16} color="#DC2626" />
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalCommission.toLocaleString()}</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA commissions</Text>
+            </View>
+            <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#D97706", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+              <Feather name="dollar-sign" size={16} color="#D97706" />
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalNet.toLocaleString()}</Text>
+              <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA net reçu</Text>
+            </View>
+          </View>
+
+          {/* Info commission */}
+          <View style={{ backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14, flexDirection: "row", gap: 10, alignItems: "flex-start", borderWidth: 1, borderColor: "#FDE68A" }}>
+            <Feather name="info" size={14} color="#D97706" style={{ marginTop: 1 }} />
+            <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: "#92400E" }}>
+              GoBooking déduit automatiquement sa commission sur chaque réservation confirmée. Le montant net est crédité immédiatement sur votre solde.
+            </Text>
+          </View>
+
+          {/* Historique transactions */}
+          <Text style={[S.sectionTitle, { marginBottom: 0 }]}>Historique des transactions ({walletData.transactions.length})</Text>
+
+          {walletData.transactions.length === 0 ? (
+            <View style={{ alignItems: "center", paddingVertical: 40, gap: 8 }}>
+              <Feather name="inbox" size={32} color="#CBD5E1" />
+              <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>Aucune transaction pour l'instant</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#CBD5E1", textAlign: "center" }}>Les transactions apparaissent ici dès qu'une réservation est confirmée</Text>
+            </View>
+          ) : walletData.transactions.map(tx => {
+            const date = new Date(tx.createdAt);
+            const dateStr = date.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+            const timeStr = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+            return (
+              <View key={tx.id} style={{ backgroundColor: "white", borderRadius: 14, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center" }}>
+                    <Feather name="arrow-down-left" size={18} color="#059669" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }} numberOfLines={1}>{tx.description || `Réservation ${tx.bookingRef}`}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 }}>{dateStr} à {timeStr}{tx.bookingRef ? ` · Réf. ${tx.bookingRef}` : ""}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#059669" }}>+{tx.netAmount.toLocaleString()} F</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>net</Text>
+                  </View>
+                </View>
+                {/* Détail commission */}
+                <View style={{ flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9", gap: 16 }}>
+                  <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Prix transport</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{tx.grossAmount.toLocaleString()} FCFA</Text>
+                  </View>
+                  <View style={{ width: 1, backgroundColor: "#F1F5F9" }} />
+                  <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Commission</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>-{tx.commissionAmount.toLocaleString()} FCFA</Text>
+                  </View>
+                </View>
               </View>
             );
           })}

@@ -10,3 +10,4 @@ export * from "./cities";
 export * from "./payments";
 export * from "./notifications_db";
 export * from "./commission_settings";
+export * from "./wallet_transactions";

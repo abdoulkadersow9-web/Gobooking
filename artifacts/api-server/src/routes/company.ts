@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -239,6 +239,48 @@ router.patch("/seats/:seatId/status", async (req, res) => {
     res.json({ success: true, seatId: req.params.seatId, status });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── Wallet endpoints ───────────────────────────────────────────── */
+
+router.get("/wallet", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await getOrCreateCompany(user);
+
+    const transactions = await db
+      .select()
+      .from(walletTransactionsTable)
+      .where(eq(walletTransactionsTable.companyId, company.id))
+      .orderBy(desc(walletTransactionsTable.createdAt))
+      .limit(100);
+
+    const totalGross      = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.grossAmount, 0);
+    const totalCommission = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.commissionAmount, 0);
+    const totalNet        = transactions.filter(t => t.type === "credit").reduce((s, t) => s + t.netAmount, 0);
+
+    res.json({
+      balance:          company.walletBalance,
+      totalGross,
+      totalCommission,
+      totalNet,
+      transactions:     transactions.map(t => ({
+        id:               t.id,
+        bookingRef:       t.bookingRef,
+        type:             t.type,
+        grossAmount:      t.grossAmount,
+        commissionAmount: t.commissionAmount,
+        netAmount:        t.netAmount,
+        description:      t.description,
+        createdAt:        t.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error("Wallet error:", err);
+    res.status(500).json({ error: "Failed to get wallet" });
   }
 });
 

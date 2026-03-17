@@ -1,8 +1,39 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
+
+const genId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+async function creditWalletIfNeeded(bookingId: string) {
+  try {
+    const [booking] = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!booking) return;
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
+    if (!trip) return;
+    let companyId: string | null = trip.companyId ?? null;
+    if (!companyId) {
+      const [bus] = await db.select().from(busesTable).where(eq(busesTable.busName, trip.busName)).limit(1);
+      if (bus) companyId = bus.companyId;
+    }
+    if (!companyId) return;
+    const alreadyCredited = await db.select().from(walletTransactionsTable)
+      .where(eq(walletTransactionsTable.bookingId, bookingId)).limit(1);
+    if (alreadyCredited.length) return;
+    const gross = booking.totalAmount;
+    const commission = booking.commissionAmount || 0;
+    const net = gross - commission;
+    await db.insert(walletTransactionsTable).values({
+      id: genId(), companyId, bookingId: booking.id, bookingRef: booking.bookingRef,
+      type: "credit", grossAmount: gross, commissionAmount: commission, netAmount: net,
+      description: `Réservation ${booking.bookingRef} — ${trip.from} → ${trip.to}`,
+    });
+    await db.update(companiesTable).set({ walletBalance: sql`wallet_balance + ${net}` }).where(eq(companiesTable.id, companyId));
+  } catch (err) {
+    console.error("creditWalletIfNeeded error:", err);
+  }
+}
 
 const router: IRouter = Router();
 
@@ -245,8 +276,12 @@ router.patch("/bookings/:id/status", async (req, res) => {
     if (!["confirmed", "pending", "cancelled"].includes(status)) {
       res.status(400).json({ error: "Statut invalide. Utilisez : confirmed, pending ou cancelled" }); return;
     }
+    const prev = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
     const [booking] = await db.update(bookingsTable).set({ status }).where(eq(bookingsTable.id, req.params.id)).returning();
     if (!booking) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    if (status === "confirmed" && prev[0]?.status !== "confirmed") {
+      await creditWalletIfNeeded(booking.id);
+    }
     res.json({ id: booking.id, status: booking.status });
   } catch (err) {
     res.status(500).json({ error: "Échec de la mise à jour" });

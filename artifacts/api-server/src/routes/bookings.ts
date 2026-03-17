@@ -1,12 +1,59 @@
 import { Router, type IRouter } from "express";
-import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable } from "@workspace/db";
-import { eq, desc, inArray, ne, and } from "drizzle-orm";
+import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable } from "@workspace/db";
+import { eq, desc, inArray, ne, and, sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
 
 const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
 const generateRef = () => "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
+
+/* ── Credit company wallet after a confirmed booking ─────────────── */
+async function creditCompanyWallet(bookingId: string) {
+  try {
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!bookings.length) return;
+    const booking = bookings[0];
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
+    if (!trips.length) return;
+    const trip = trips[0];
+
+    let companyId: string | null = null;
+
+    if (trip.companyId) {
+      companyId = trip.companyId;
+    } else {
+      const buses = await db.select().from(busesTable).where(eq(busesTable.busName, trip.busName)).limit(1);
+      if (buses.length) companyId = buses[0].companyId;
+    }
+
+    if (!companyId) return;
+
+    const gross      = booking.totalAmount;
+    const commission = booking.commissionAmount || 0;
+    const net        = gross - commission;
+
+    const txId = generateId();
+    await db.insert(walletTransactionsTable).values({
+      id:               txId,
+      companyId,
+      bookingId:        booking.id,
+      bookingRef:       booking.bookingRef,
+      type:             "credit",
+      grossAmount:      gross,
+      commissionAmount: commission,
+      netAmount:        net,
+      description:      `Réservation ${booking.bookingRef} — ${trip.from} → ${trip.to}`,
+    });
+
+    await db.update(companiesTable)
+      .set({ walletBalance: sql`wallet_balance + ${net}` })
+      .where(eq(companiesTable.id, companyId));
+  } catch (err) {
+    console.error("creditCompanyWallet error:", err);
+  }
+}
 
 function getUserIdFromToken(authHeader: string | undefined): string | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -216,6 +263,8 @@ router.post("/:bookingId/confirm", async (req, res) => {
         ...(paymentMethod ? { paymentMethod } : {}),
       })
       .where(eq(bookingsTable.id, bookingId));
+
+    await creditCompanyWallet(bookingId);
 
     const full = await getFullBooking(bookingId);
     res.json(full);
