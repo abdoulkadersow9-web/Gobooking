@@ -304,6 +304,35 @@ export default function LiveTrackingScreen() {
     AsyncStorage.getItem("auth_token").then(t => { if (t) setAuthToken(t); }).catch(() => {});
   }, []);
 
+  /* ── GPS trail state (breadcrumb dots on map) ── */
+  const [gpsTrail, setGpsTrail]   = useState<{ x: number; y: number; speed: number | null }[]>([]);
+  const trailTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchTrail = useCallback(async (busId: string, token: string | null) => {
+    if (!token) return;
+    try {
+      const rows = await apiFetch<{ lat: number; lon: number; speed: number | null }[]>(
+        `/agent/trip/${busId}/trail?limit=30`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!Array.isArray(rows)) return;
+      const pts = rows.map(r => ({
+        x: Math.max(1, Math.min(99, ((r.lon - (-8.4)) / 5.2) * 100)),
+        y: Math.max(1, Math.min(99, ((10.7 - r.lat) / 6.4) * 100)),
+        speed: r.speed,
+      }));
+      setGpsTrail(pts);
+    } catch { /* silent — trail is optional */ }
+  }, []);
+
+  /* Refresh trail every 10s while a bus is selected */
+  useEffect(() => {
+    if (!selected || !authToken) { setGpsTrail([]); return; }
+    fetchTrail(selected.id, authToken);
+    trailTimerRef.current = setInterval(() => fetchTrail(selected.id, authToken), 10_000);
+    return () => { if (trailTimerRef.current) { clearInterval(trailTimerRef.current); trailTimerRef.current = null; } };
+  }, [selected, authToken, fetchTrail]);
+
   /* ── Client GPS ── */
   const [clientPos,    setClientPos]    = useState<ClientPosition | null>(null);
   const [gpsGranted,   setGpsGranted]   = useState<boolean | null>(null);
@@ -608,6 +637,27 @@ export default function LiveTrackingScreen() {
           })}
         </Svg>
 
+        {/* GPS trail dots — breadcrumb showing where selected bus has been */}
+        {gpsTrail.map((pt, i) => {
+          const opacity = 0.25 + (i / Math.max(gpsTrail.length - 1, 1)) * 0.6;
+          const size    = 5 + (i / Math.max(gpsTrail.length - 1, 1)) * 4;
+          return (
+            <View
+              key={`trail-${i}`}
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                left: (pt.x / 100) * mapSize.w - size / 2,
+                top:  (pt.y / 100) * mapSize.h - size / 2,
+                width: size, height: size,
+                borderRadius: size / 2,
+                backgroundColor: "#10B981",
+                opacity,
+              }}
+            />
+          );
+        })}
+
         {/* Animated bus markers */}
         {buses.map((bus) => (
           <BusMarker
@@ -669,6 +719,12 @@ export default function LiveTrackingScreen() {
             <View style={[S.legendItem, { marginTop: 3 }]}>
               <View style={[S.legendDot, { backgroundColor: "#F97316", borderRadius: 2, transform: [{ rotate: "45deg" }] }]} />
               <Text style={S.legendText}>Point de montée</Text>
+            </View>
+          )}
+          {gpsTrail.length > 0 && (
+            <View style={[S.legendItem, { marginTop: 3 }]}>
+              <View style={[S.legendDot, { backgroundColor: "#10B981" }]} />
+              <Text style={S.legendText}>Trajet parcouru</Text>
             </View>
           )}
         </View>

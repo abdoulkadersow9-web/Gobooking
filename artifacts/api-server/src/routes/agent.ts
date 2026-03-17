@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable } from "@workspace/db";
+import { eq, desc, and, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
@@ -216,6 +216,7 @@ router.post("/trip/:tripId/location", async (req, res) => {
 
     pruneStale();
 
+    /* ── 1. Update in-memory store for real-time reads ── */
     locationStore.set(req.params.tripId, {
       tripId:    req.params.tripId,
       lat, lon,
@@ -225,6 +226,17 @@ router.post("/trip/:tripId/location", async (req, res) => {
       updatedAt: Date.now(),
       agentId:   user.id,
     });
+
+    /* ── 2. Persist to database (fire-and-forget, don't block response) ── */
+    db.insert(positionsTable).values({
+      tripId:   req.params.tripId,
+      agentId:  user.id,
+      lat,
+      lon,
+      speed:    typeof speed    === "number" ? speed    : null,
+      accuracy: typeof accuracy === "number" ? accuracy : null,
+      heading:  typeof heading  === "number" ? heading  : null,
+    }).catch(err => console.error("positions insert error:", err));
 
     res.json({ success: true, updatedAt: Date.now() });
   } catch (err) {
@@ -241,6 +253,39 @@ router.get("/trip/:tripId/location", async (req, res) => {
     const loc = locationStore.get(req.params.tripId);
     res.json(loc ?? null);
   } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GPS trail — last N positions from DB for a trip ───── */
+/* Used by the map to draw a breadcrumb trail behind the bus  */
+router.get("/trip/:tripId/trail", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const limit = Math.min(50, Math.max(5, parseInt(String(req.query.limit ?? "20"), 10)));
+    /* Last 30 minutes of positions */
+    const since = new Date(Date.now() - 30 * 60 * 1000);
+
+    const rows = await db
+      .select({
+        lat:        positionsTable.lat,
+        lon:        positionsTable.lon,
+        speed:      positionsTable.speed,
+        recordedAt: positionsTable.recordedAt,
+      })
+      .from(positionsTable)
+      .where(and(
+        eq(positionsTable.tripId, req.params.tripId),
+        gte(positionsTable.recordedAt, since),
+      ))
+      .orderBy(desc(positionsTable.recordedAt))
+      .limit(limit);
+
+    res.json(rows.reverse()); /* chronological order */
+  } catch (err) {
+    console.error("Trail fetch error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

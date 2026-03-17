@@ -609,7 +609,7 @@ export default function AgentDashboard() {
     };
 
     sendPosition();
-    gpsIntervalRef.current = setInterval(sendPosition, 10_000);
+    gpsIntervalRef.current = setInterval(sendPosition, 8_000);
     return () => {
       cancelled = true;
       if (gpsIntervalRef.current) { clearInterval(gpsIntervalRef.current); gpsIntervalRef.current = null; }
