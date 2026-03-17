@@ -704,6 +704,11 @@ export default function AgentDashboard() {
       setTripStatus("arrived");
       setTripStartedAt(null);
       if (timerRef.current) clearInterval(timerRef.current);
+      /* ── Auto-disable GPS — trip is over, clear location broadcast ── */
+      setGpsEnabled(false);
+      if (gpsIntervalRef.current) { clearInterval(gpsIntervalRef.current); gpsIntervalRef.current = null; }
+      setGpsStatus("idle");
+      setGpsCoords(null);
     } catch (e: any) {
       setTripError(e?.message ?? "Impossible de confirmer l'arrivée");
     }

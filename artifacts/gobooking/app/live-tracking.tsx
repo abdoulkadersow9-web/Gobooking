@@ -23,6 +23,7 @@ import {
 import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetch } from "@/utils/api";
 
 const { width: SW, height: SH } = Dimensions.get("window");
@@ -297,6 +298,12 @@ export default function LiveTrackingScreen() {
   const [mapSize, setMapSize] = useState({ w: SW, h: MAP_H });
   const slideAnim = useRef(new Animated.Value(600)).current;
 
+  /* ── Auth token (loaded from storage to authenticate GPS calls) ── */
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem("auth_token").then(t => { if (t) setAuthToken(t); }).catch(() => {});
+  }, []);
+
   /* ── Client GPS ── */
   const [clientPos,    setClientPos]    = useState<ClientPosition | null>(null);
   const [gpsGranted,   setGpsGranted]   = useState<boolean | null>(null);
@@ -322,15 +329,16 @@ export default function LiveTrackingScreen() {
     return () => { active = false; };
   }, []);
 
-  /* Fetch buses (and re-fetch every 10s) */
+  /* Fetch buses (and re-fetch every 10s) — pass auth token for live GPS */
   const fetchBuses = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await apiFetch<LiveBus[]>("/trips/live", {});
+      const token = authToken ?? (await AsyncStorage.getItem("auth_token")) ?? undefined;
+      const data = await apiFetch<LiveBus[]>("/trips/live", { token: token ?? undefined });
       if (data?.length) setRawBuses(data);
     } catch { /* keep demo data */ }
     finally { if (!silent) setLoading(false); }
-  }, []);
+  }, [authToken]);
 
   useEffect(() => {
     fetchBuses();
@@ -358,6 +366,33 @@ export default function LiveTrackingScreen() {
   const [reqSeats,           setReqSeats]           = useState("1");
   const [reqLoading,         setReqLoading]         = useState(false);
   const [reqSuccess,         setReqSuccess]         = useState(false);
+
+  /* ── Request status tracking (polling after submission) ── */
+  const [submittedReqId,  setSubmittedReqId]  = useState<string | null>(null);
+  const [reqStatus,       setReqStatus]       = useState<"pending"|"accepted"|"rejected"|null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* Poll for request status every 5s after submission */
+  useEffect(() => {
+    if (!submittedReqId || !selected) return;
+    const doCheck = async () => {
+      try {
+        const data = await apiFetch<{ status: string }>(
+          `/trips/${selected.id}/request/${submittedReqId}`, {}
+        );
+        if (data?.status === "accepted") {
+          setReqStatus("accepted");
+          if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+        } else if (data?.status === "rejected") {
+          setReqStatus("rejected");
+          if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+        }
+      } catch { /* keep polling */ }
+    };
+    doCheck();
+    pollTimerRef.current = setInterval(doCheck, 5_000);
+    return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
+  }, [submittedReqId, selected]);
 
   /* Pickup point selection */
   const [pickupType,         setPickupType]         = useState<"gps"|"landmark"|null>(null);
@@ -434,7 +469,7 @@ export default function LiveTrackingScreen() {
     }
     setReqLoading(true);
     try {
-      await apiFetch(`/trips/${selected.id}/request`, {
+      const data = await apiFetch<{ success: boolean; requestId: string }>(`/trips/${selected.id}/request`, {
         method: "POST",
         body: JSON.stringify({
           clientName:     reqName.trim(),
@@ -449,8 +484,9 @@ export default function LiveTrackingScreen() {
         }),
       });
       setReqSuccess(true);
+      setSubmittedReqId(data.requestId);   /* start polling for status */
+      setReqStatus("pending");
       setReqName(""); setReqPhone(""); setReqSeats("1");
-      setTimeout(() => { setReqSuccess(false); setShowRequestForm(false); clearPickup(); }, 3500);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible d'envoyer la demande. Réessayez.");
     }
@@ -477,6 +513,10 @@ export default function LiveTrackingScreen() {
     setPickupType(null); setPickupLat(null); setPickupLon(null);
     setPickupLabel(""); setPickupCity("");
     setShowLandmarkPicker(false); setLandmarkSearch("");
+    /* Reset communication state */
+    setSubmittedReqId(null);
+    setReqStatus(null);
+    if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
     slideAnim.setValue(600);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, tension: 65, friction: 11 }).start();
   }, [slideAnim]);
@@ -1065,19 +1105,147 @@ export default function LiveTrackingScreen() {
               </View>
             )}
 
-            {/* Success banner */}
-            {reqSuccess && (
+            {/* ── Communication banner — status-aware ── */}
+            {reqSuccess && reqStatus === "pending" && (
               <View style={{
                 marginHorizontal: 16, marginBottom: 12, padding: 14,
-                backgroundColor: "#ECFDF5", borderRadius: 14,
-                borderWidth: 1.5, borderColor: "#BBF7D0",
+                backgroundColor: "#FFFBEB", borderRadius: 14,
+                borderWidth: 1.5, borderColor: "#FDE68A",
                 flexDirection: "row", alignItems: "center", gap: 10,
               }}>
-                <Feather name="check-circle" size={20} color="#059669" />
+                <ActivityIndicator size="small" color="#D97706" />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#065F46" }}>Demande envoyée !</Text>
-                  <Text style={{ fontSize: 12, color: "#059669" }}>L'agent vous contactera prochainement.</Text>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#92400E" }}>
+                    Demande envoyée !
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#B45309", fontFamily: "Inter_400Regular" }}>
+                    En attente de l'agent…
+                  </Text>
                 </View>
+              </View>
+            )}
+
+            {/* Accepted — show agent contact */}
+            {reqSuccess && reqStatus === "accepted" && selected && (
+              <View style={{
+                marginHorizontal: 16, marginBottom: 12,
+                backgroundColor: "#ECFDF5", borderRadius: 14,
+                borderWidth: 1.5, borderColor: "#BBF7D0", overflow: "hidden",
+              }}>
+                <View style={{ height: 4, backgroundColor: "#10B981" }} />
+                <View style={{ padding: 14, gap: 10 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 18,
+                      backgroundColor: "#D1FAE5", justifyContent: "center", alignItems: "center",
+                    }}>
+                      <Feather name="check-circle" size={18} color="#059669" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#065F46" }}>
+                        Montée acceptée ! ✓
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#059669" }}>
+                        L'agent {selected.agentName} vous attend
+                      </Text>
+                    </View>
+                  </View>
+                  {/* Agent contact info */}
+                  <View style={{
+                    flexDirection: "row", alignItems: "center", gap: 8,
+                    backgroundColor: "white", borderRadius: 10, padding: 10,
+                    borderWidth: 1, borderColor: "#BBF7D0",
+                  }}>
+                    <View style={{
+                      width: 34, height: 34, borderRadius: 17,
+                      backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center",
+                    }}>
+                      <Feather name="user" size={16} color="#059669" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                        {selected.agentName}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#475569" }}>{selected.agentPhone}</Text>
+                    </View>
+                  </View>
+                  {/* Call & SMS buttons */}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <Pressable
+                      style={({ pressed }) => [{
+                        flex: 1, height: 44, borderRadius: 12,
+                        backgroundColor: "#059669",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                        opacity: pressed ? 0.85 : 1,
+                      }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        Linking.openURL(`tel:${selected.agentPhone.replace(/\s/g, "")}`);
+                      }}
+                    >
+                      <Feather name="phone" size={16} color="white" />
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
+                        Appeler l'agent
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [{
+                        flex: 1, height: 44, borderRadius: 12,
+                        backgroundColor: "#1A56DB",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                        opacity: pressed ? 0.85 : 1,
+                      }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        const msg = `Bonjour ${selected.agentName}, je vous attends pour ${parseInt(reqSeats)||1} place(s).`;
+                        Linking.openURL(`sms:${selected.agentPhone.replace(/\s/g, "")}?body=${encodeURIComponent(msg)}`);
+                      }}
+                    >
+                      <Feather name="message-circle" size={16} color="white" />
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
+                        Envoyer message
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Rejected — show retry option */}
+            {reqSuccess && reqStatus === "rejected" && (
+              <View style={{
+                marginHorizontal: 16, marginBottom: 12, padding: 14,
+                backgroundColor: "#FEF2F2", borderRadius: 14,
+                borderWidth: 1.5, borderColor: "#FECACA",
+                gap: 10,
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Feather name="x-circle" size={20} color="#DC2626" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#7F1D1D" }}>
+                      Demande refusée
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#EF4444" }}>
+                      L'agent ne peut pas vous prendre en charge.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [{
+                    height: 38, borderRadius: 10, backgroundColor: "#F1F5F9",
+                    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                    opacity: pressed ? 0.8 : 1,
+                  }]}
+                  onPress={() => {
+                    setReqSuccess(false); setSubmittedReqId(null); setReqStatus(null);
+                    setShowRequestForm(true);
+                  }}
+                >
+                  <Feather name="refresh-cw" size={13} color="#1A56DB" />
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#1A56DB" }}>
+                    Réessayer
+                  </Text>
+                </Pressable>
               </View>
             )}
 
@@ -1088,8 +1256,8 @@ export default function LiveTrackingScreen() {
                   <Text style={S.priceLabel}>Prix / place</Text>
                   <Text style={[S.priceVal, { color: selected.color }]}>{selected.price.toLocaleString()} F</Text>
                 </View>
-                {/* "Demander en direct" toggle */}
-                {!reqSuccess && (
+                {/* "Demander en direct" toggle — hidden when pending/accepted, shown when idle or rejected */}
+                {(!reqSuccess || reqStatus === "rejected") && (
                   <Pressable
                     style={({ pressed }) => [{
                       flexDirection: "row", alignItems: "center", gap: 6,

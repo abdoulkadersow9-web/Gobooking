@@ -3,6 +3,7 @@ import { db, tripsTable, seatsTable } from "@workspace/db";
 import { eq, and, ilike, inArray } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
+import { tokenStore } from "./auth";
 
 /* Convert mapX%/mapY% back to approximate real-world lat/lon for demo buses.
    Bounding box: lat 4.3–10.7N, lon 8.4W–3.2W */
@@ -178,8 +179,13 @@ router.get("/:tripId/seats", async (req, res) => {
 });
 
 /* ── Cars en route (live positions) ─────────────────────────────────────── */
-router.get("/live", async (_req, res) => {
+router.get("/live", async (req, res) => {
   try {
+    /* Authenticated users see real GPS positions; unauthenticated see no GPS */
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const isAuthenticated = token ? tokenStore.has(token) : false;
+
     pruneStale();
 
     /* Try DB trips with status "en_route" first */
@@ -196,8 +202,8 @@ router.get("/live", async (_req, res) => {
             .from(seatsTable)
             .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
 
-          /* Merge real GPS if agent is broadcasting */
-          const gps = locationStore.get(trip.id);
+          /* Merge real GPS — only for authenticated users */
+          const gps = isAuthenticated ? locationStore.get(trip.id) : undefined;
           const defaultCoords = mapXYtoLatLon(50, 50);
           const lat = gps?.lat ?? defaultCoords.lat;
           const lon = gps?.lon ?? defaultCoords.lon;
@@ -247,8 +253,8 @@ router.get("/live", async (_req, res) => {
     ];
 
     const demo = demoRaw.map(d => {
-      /* Check for real GPS from locationStore */
-      const gps = locationStore.get(d.id);
+      /* Real GPS only exposed to authenticated users */
+      const gps = isAuthenticated ? locationStore.get(d.id) : undefined;
       const coords = gps ? { lat: gps.lat, lon: gps.lon } : mapXYtoLatLon(d.mapX, d.mapY);
       const mapX   = gps ? Math.max(2, Math.min(98, ((coords.lon - (-8.4)) / 5.2) * 100)) : d.mapX;
       const mapY   = gps ? Math.max(2, Math.min(98, ((10.7 - coords.lat) / 6.4) * 100))   : d.mapY;
@@ -268,6 +274,21 @@ router.get("/live", async (_req, res) => {
     console.error("Live trips error:", err);
     res.status(500).json({ error: "Erreur récupération cars en route" });
   }
+});
+
+/* ─── Client polls their boarding request status ─────────────────────────── */
+router.get("/:tripId/request/:requestId", (req, res) => {
+  const entry = requestStore.get(req.params.requestId);
+  if (!entry || entry.tripId !== req.params.tripId) {
+    res.status(404).json({ error: "Demande introuvable" }); return;
+  }
+  /* Return enough for the client to react, without exposing full entry */
+  res.json({
+    id:           entry.id,
+    status:       entry.status,
+    createdAt:    entry.createdAt,
+    respondedAt:  entry.respondedAt ?? null,
+  });
 });
 
 /* ─── Client sends a boarding request for a live bus ─────────────────────── */

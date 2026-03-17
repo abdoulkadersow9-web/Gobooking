@@ -174,6 +174,9 @@ router.post("/trip/:tripId/arrive", async (req, res) => {
       .set({ status: "arrived", arrivedAt: new Date() })
       .where(eq(tripsTable.id, req.params.tripId));
 
+    /* ── Clear live GPS — trip is over ── */
+    locationStore.delete(req.params.tripId);
+
     res.json({ success: true, status: "arrived", arrivedAt: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
@@ -195,6 +198,22 @@ router.post("/trip/:tripId/location", async (req, res) => {
       res.status(400).json({ error: "lat et lon requis" }); return;
     }
 
+    /* ── Security: only allow GPS push when trip is actually en_route ── */
+    /* Demo trips (id starts with "t-" or "live-") bypass the DB check   */
+    const isDemoTrip = /^(t-|live-)/.test(req.params.tripId);
+    if (!isDemoTrip) {
+      const trips = await db.select().from(tripsTable)
+        .where(eq(tripsTable.id, req.params.tripId)).limit(1);
+      if (!trips.length) {
+        res.status(404).json({ error: "Trajet introuvable" }); return;
+      }
+      if (trips[0].status !== "en_route") {
+        /* Trip ended or not started — clear stale position and refuse */
+        locationStore.delete(req.params.tripId);
+        res.status(403).json({ error: "GPS non autorisé : trajet non actif", code: "TRIP_NOT_ACTIVE" }); return;
+      }
+    }
+
     pruneStale();
 
     locationStore.set(req.params.tripId, {
@@ -209,6 +228,7 @@ router.post("/trip/:tripId/location", async (req, res) => {
 
     res.json({ success: true, updatedAt: Date.now() });
   } catch (err) {
+    console.error("GPS push error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
