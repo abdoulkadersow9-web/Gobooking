@@ -282,6 +282,45 @@ export default function HomeScreen() {
         )}
       </LinearGradient>
 
+      {/* ── Dashboard Navigation ── */}
+      <View style={styles.dashNav}>
+        <TouchableOpacity
+          style={[styles.dashNavBtn, { backgroundColor: "#2563eb" }]}
+          activeOpacity={0.85}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/dashboard/company" as never);
+          }}
+        >
+          <Feather name="briefcase" size={16} color="white" />
+          <Text style={styles.dashNavText}>Espace Compagnie</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.dashNavBtn, { backgroundColor: "#16a34a" }]}
+          activeOpacity={0.85}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/dashboard/agent" as never);
+          }}
+        >
+          <Feather name="user" size={16} color="white" />
+          <Text style={styles.dashNavText}>Espace Agent</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.dashNavBtn, { backgroundColor: "#9333ea" }]}
+          activeOpacity={0.85}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/dashboard/super-admin" as never);
+          }}
+        >
+          <Feather name="shield" size={16} color="white" />
+          <Text style={styles.dashNavText}>Espace Admin</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* ── Quick CTAs ── */}
       <View style={styles.ctaRow}>
         <TouchableOpacity
@@ -576,6 +615,11 @@ const styles = StyleSheet.create({
   colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   colisTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
   colisSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 4 },
+
+  // Dashboard nav buttons
+  dashNav: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4, gap: 10 },
+  dashNavBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 13, borderRadius: 10 },
+  dashNavText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
 
   // Quick CTAs
   ctaRow: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
