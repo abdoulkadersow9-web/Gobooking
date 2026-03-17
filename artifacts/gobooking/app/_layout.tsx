@@ -30,6 +30,9 @@ const DASHBOARD_ROLES: Record<string, string[]> = {
   "super-admin": ["admin", "super_admin"],
 };
 
+/* ─── Rôles qui n'ont accès QU'à leur dashboard (jamais /(tabs)) ─── */
+const DASHBOARD_ONLY_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
+
 /* ─── Routes publiques (pas besoin d'être connecté) ────────── */
 const PUBLIC_ROOTS = ["index", "(auth)"];
 
@@ -43,6 +46,7 @@ function AuthGuard() {
     const root = segments[0] as string | undefined;
     const isPublic = !root || PUBLIC_ROOTS.includes(root);
 
+    /* Utilisateur non connecté → page de login si route protégée */
     if (!user) {
       if (!isPublic) {
         router.replace("/(auth)/login");
@@ -50,8 +54,14 @@ function AuthGuard() {
       return;
     }
 
-    /* Utilisateur connecté sur un écran d'auth → rediriger */
+    /* Utilisateur connecté sur un écran d'auth → son dashboard */
     if (root === "(auth)") {
+      router.replace(getDashboardPath(user.role) as never);
+      return;
+    }
+
+    /* Agent / Compagnie / Admin → ne peuvent PAS accéder à /(tabs) */
+    if (root === "(tabs)" && DASHBOARD_ONLY_ROLES.includes(user.role)) {
       router.replace(getDashboardPath(user.role) as never);
       return;
     }
@@ -63,8 +73,14 @@ function AuthGuard() {
         const allowedRoles = DASHBOARD_ROLES[requestedDash] ?? [];
         if (!allowedRoles.includes(user.role)) {
           router.replace(getDashboardPath(user.role) as never);
+          return;
         }
       }
+    }
+
+    /* Client → ne peut accéder à aucun dashboard */
+    if (root === "dashboard" && !DASHBOARD_ONLY_ROLES.includes(user.role)) {
+      router.replace("/(tabs)");
     }
   }, [user, isLoading, segments]);
 

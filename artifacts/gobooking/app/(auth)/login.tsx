@@ -96,8 +96,9 @@ export default function LoginScreen() {
     setDemoLoading(account.label);
     try {
       await doLogin(account.email, account.password);
-    } catch {
-      setServerError("Impossible de se connecter avec ce compte démo.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Impossible de se connecter avec ce compte démo.";
+      setServerError(msg);
     } finally {
       setDemoLoading(null);
     }

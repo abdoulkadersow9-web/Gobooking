@@ -12,6 +12,7 @@ async function requireAgent(authHeader: string | undefined) {
   if (!userId) return null;
   const users = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (!users.length || !["admin", "agent"].includes(users[0].role)) return null;
+  if (users[0].status === "inactive") return null;
   return users[0];
 }
 

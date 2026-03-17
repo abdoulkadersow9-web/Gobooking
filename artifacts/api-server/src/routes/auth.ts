@@ -90,7 +90,13 @@ router.post("/login", async (req, res) => {
 
     const user = users[0];
     if (user.passwordHash !== hashPassword(password)) {
-      res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Email ou mot de passe incorrect" });
+      return;
+    }
+
+    // Bloquer la connexion des comptes désactivés
+    if (user.status === "inactive") {
+      res.status(403).json({ error: "Votre compte a été désactivé. Contactez l'administrateur pour le réactiver." });
       return;
     }
 
@@ -105,6 +111,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        status: user.status,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
     });
@@ -135,12 +142,20 @@ router.get("/me", async (req, res) => {
     }
     const user = users[0];
 
+    // Si le compte a été désactivé depuis la dernière connexion → invalider le token
+    if (user.status === "inactive") {
+      tokenStore.delete(token);
+      res.status(403).json({ error: "Compte désactivé" });
+      return;
+    }
+
     res.json({
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
       role: user.role,
+      status: user.status,
       createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
     });
   } catch (err) {
