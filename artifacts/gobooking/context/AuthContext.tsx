@@ -49,29 +49,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
+        // window.onload equivalent: read stored user, redirect based on role
         const storedToken = await AsyncStorage.getItem("auth_token");
         const storedUser = await AsyncStorage.getItem("auth_user");
+        const lsUser = await AsyncStorage.getItem("user");
+
+        const rawUser = storedUser
+          ? (JSON.parse(storedUser) as User)
+          : lsUser
+          ? (JSON.parse(lsUser) as Partial<User>)
+          : null;
+
+        if (!rawUser || !rawUser.role) return;
+
         if (storedToken && storedUser) {
-          const parsedUser: User = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(parsedUser);
-          // Mirror Firebase onAuthStateChanged: redirect based on role on every app start
-          const dashPath = getDashboardPath(parsedUser.role);
-          if (dashPath) {
-            router.replace(dashPath as never);
-          }
+          setUser(rawUser as User);
+        }
+
+        // Mirrors: if role === "admin" → /admin-dashboard
+        //          elif role === "compagnie" → /company-dashboard
+        //          elif role === "agent" → /agent-dashboard
+        //          else → /home
+        const dashPath = getDashboardPath(rawUser.role);
+        if (dashPath) {
+          router.replace(dashPath as never);
         } else {
-          // Fallback: check localStorage "user" key (e.g. set via browser console)
-          const lsUser = await AsyncStorage.getItem("user");
-          if (lsUser) {
-            const parsed = JSON.parse(lsUser) as { role?: UserRole };
-            if (parsed.role) {
-              const dashPath = getDashboardPath(parsed.role);
-              if (dashPath) {
-                router.replace(dashPath as never);
-              }
-            }
-          }
+          router.replace("/(tabs)" as never);
         }
       } catch {
         // ignore
