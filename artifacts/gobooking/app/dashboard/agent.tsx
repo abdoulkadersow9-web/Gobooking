@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -446,9 +446,13 @@ export default function AgentDashboard() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const [activeTab, setActiveTab] = useState<Tab>("mission");
-  const [boarding,  setBoarding]  = useState<BoardingEntry[]>(DEMO_BOARDING);
-  const [parcels,   setParcels]   = useState<ParcelEntry[]>(DEMO_PARCELS);
-  const [seats,     setSeats]     = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
+  const [boarding,       setBoarding]       = useState<BoardingEntry[]>(DEMO_BOARDING);
+  const [parcels,        setParcels]        = useState<ParcelEntry[]>(DEMO_PARCELS);
+  const [seats,          setSeats]          = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
+  const [paxValidated,   setPaxValidated]   = useState<Set<string>>(
+    () => new Set(DEMO_BOARDING.filter(b => b.status === "boarded").flatMap(b => b.passengers.map(p => `${b.id}-${p.seatNumber}`)))
+  );
+  const [passengerSearch, setPassengerSearch] = useState("");
 
   /* ── Trip status ── */
   const [tripStatus,       setTripStatus]       = useState<TripStatus>("scheduled");
@@ -490,6 +494,39 @@ export default function AgentDashboard() {
     setBoarding(prev => prev.map(b => b.id === bookingId ? { ...b, status: "boarded" } : b));
     if (token) { try { await apiFetch(`/agent/boarding/${bookingId}/validate`, { token, method: "POST" }); } catch {} }
   };
+
+  const validatePax = (paxKey: string, bookingId: string) => {
+    const next = new Set([...paxValidated, paxKey]);
+    setPaxValidated(next);
+    const entry = boarding.find(b => b.id === bookingId);
+    if (entry) {
+      const allKeys = entry.passengers.map(p => `${entry.id}-${p.seatNumber}`);
+      if (allKeys.every(k => next.has(k))) {
+        setBoarding(prev => prev.map(b => b.id === bookingId ? { ...b, status: "boarded" } : b));
+        if (token) { try { apiFetch(`/agent/boarding/${bookingId}/validate`, { token, method: "POST" }); } catch {} }
+      }
+    }
+  };
+
+  const flatPassengers = useMemo(() => {
+    const q = passengerSearch.trim().toLowerCase();
+    const all = boarding.flatMap(b =>
+      b.passengers.map(p => ({
+        key:        `${b.id}-${p.seatNumber}`,
+        bookingId:  b.id,
+        bookingRef: b.bookingRef,
+        name:       p.name,
+        seat:       p.seatNumber,
+        age:        p.age,
+        gender:     p.gender,
+        validated:  paxValidated.has(`${b.id}-${p.seatNumber}`),
+      }))
+    );
+    if (!q) return all;
+    return all.filter(p =>
+      p.name.toLowerCase().includes(q) || p.seat.toLowerCase().includes(q)
+    );
+  }, [boarding, paxValidated, passengerSearch]);
 
   const updateParcel = async (parcelId: string, newStatus: string, action: "pickup" | "transit" | "deliver") => {
     setParcels(prev => prev.map(p => p.id === parcelId ? { ...p, status: newStatus } : p));
@@ -845,47 +882,113 @@ export default function AgentDashboard() {
           </View>
         </>)}
 
-        {/* ── Embarquement ── */}
-        {activeTab === "embarquement" && (<>
-          <View style={S.sectionRow}>
-            <Text style={S.sectionTitle}>Passagers ({boarding.length})</Text>
-            <Text style={S.boardedCount}>{boarded} embarqués / {boarding.length}</Text>
-          </View>
-          {boarding.map(entry => (
-            <View key={entry.id} style={[S.boardingCard, entry.status === "boarded" && S.boardingDone]}>
-              <View style={S.boardingTop}>
-                <View style={S.bookingRefRow}>
-                  <Feather name="bookmark" size={12} color={entry.status === "boarded" ? "#065F46" : PRIMARY} />
-                  <Text style={[S.bookingRef, { color: entry.status === "boarded" ? "#065F46" : PRIMARY }]}>#{entry.bookingRef}</Text>
-                </View>
-                <View style={[S.badge, { backgroundColor: entry.status === "boarded" ? "#ECFDF5" : "#EEF2FF" }]}>
-                  <Text style={[S.badgeText, { color: entry.status === "boarded" ? "#065F46" : PRIMARY }]}>
-                    {entry.status === "boarded" ? "✓ Embarqué" : "En attente"}
-                  </Text>
-                </View>
-              </View>
-              {entry.passengers.map((pax, i) => (
-                <View key={i} style={S.paxRow}>
-                  <View style={S.seatTag}><Text style={S.seatTagText}>{pax.seatNumber}</Text></View>
+        {/* ── Liste des voyageurs ── */}
+        {activeTab === "embarquement" && (() => {
+          const totalPax      = boarding.flatMap(b => b.passengers).length;
+          const validatedCount = paxValidated.size;
+          const pct           = totalPax > 0 ? Math.round((validatedCount / totalPax) * 100) : 0;
+          return (
+            <>
+              {/* Header card */}
+              <View style={S.paxHeaderCard}>
+                <View style={S.paxHeaderRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={S.paxName}>{pax.name}</Text>
-                    <Text style={S.paxMeta}>{pax.age} ans · {pax.gender === "M" ? "Homme" : "Femme"}</Text>
+                    <Text style={S.paxHeaderTitle}>Liste des voyageurs</Text>
+                    <Text style={S.paxHeaderSub}>Trajet en cours · {DEMO_TRIP.from} → {DEMO_TRIP.to}</Text>
+                  </View>
+                  <View style={S.paxCountBadge}>
+                    <Text style={S.paxCountText}>{validatedCount}/{totalPax}</Text>
                   </View>
                 </View>
-              ))}
-              {entry.status !== "boarded" && (
-                <TouchableOpacity style={S.validateBtn} onPress={() => validateBoarding(entry.id)} activeOpacity={0.8}>
-                  <Feather name="check-circle" size={16} color="white" />
-                  <Text style={S.validateText}>Valider l'embarquement</Text>
-                </TouchableOpacity>
-              )}
-              <View style={S.totalRow}>
-                <Text style={S.totalLabel}>{entry.passengers.length} passager{entry.passengers.length > 1 ? "s" : ""}</Text>
-                <Text style={S.totalAmount}>{entry.totalAmount.toLocaleString()} FCFA</Text>
+                {/* Progress bar */}
+                <View style={S.paxProgressBg}>
+                  <View style={[S.paxProgressFill, { width: `${pct}%` as any }]} />
+                </View>
+                <View style={S.paxProgressRow}>
+                  <Text style={S.paxProgressLabel}>Embarquement</Text>
+                  <Text style={S.paxProgressPct}>{pct}%</Text>
+                </View>
               </View>
-            </View>
-          ))}
-        </>)}
+
+              {/* Search bar */}
+              <View style={S.paxSearchBar}>
+                <Feather name="search" size={15} color="#94A3B8" />
+                <TextInput
+                  style={S.paxSearchInput}
+                  placeholder="Rechercher par nom ou siège…"
+                  placeholderTextColor="#94A3B8"
+                  value={passengerSearch}
+                  onChangeText={setPassengerSearch}
+                  clearButtonMode="while-editing"
+                />
+              </View>
+
+              {/* Passenger cards */}
+              {flatPassengers.length === 0 ? (
+                <View style={S.paxEmpty}>
+                  <Feather name="users" size={28} color="#CBD5E1" />
+                  <Text style={S.paxEmptyText}>Aucun passager trouvé</Text>
+                </View>
+              ) : (
+                flatPassengers.map(p => (
+                  <View key={p.key} style={[S.paxCard, p.validated && S.paxCardDone]}>
+                    {/* Avatar */}
+                    <View style={[S.paxAvatar, { backgroundColor: p.validated ? "#ECFDF5" : "#EEF2FF" }]}>
+                      <Text style={[S.paxAvatarText, { color: p.validated ? GREEN : PRIMARY }]}>
+                        {p.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+
+                    {/* Info */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={S.paxCardName} numberOfLines={1}>{p.name}</Text>
+                      <View style={S.paxBadgeRow}>
+                        <View style={S.paxSeatBadge}>
+                          <Feather name="grid" size={10} color={PRIMARY} />
+                          <Text style={S.paxSeatText}>{p.seat}</Text>
+                        </View>
+                        <View style={[S.paxStatusBadge, { backgroundColor: p.validated ? "#ECFDF5" : "#FFFBEB", borderColor: p.validated ? "#6EE7B7" : "#FDE68A" }]}>
+                          <Text style={[S.paxStatusText, { color: p.validated ? "#065F46" : "#D97706" }]}>
+                            {p.validated ? "✓ Validé" : "Non validé"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Action */}
+                    {p.validated ? (
+                      <View style={S.paxDoneIcon}>
+                        <Feather name="check-circle" size={22} color={GREEN} />
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={S.paxValidateBtn}
+                        onPress={() => validatePax(p.key, p.bookingId)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={S.paxValidateBtnText}>Valider</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))
+              )}
+
+              {/* Summary footer */}
+              <View style={S.paxFooter}>
+                {[
+                  { label: "Validés",     value: validatedCount, color: GREEN   },
+                  { label: "En attente",  value: totalPax - validatedCount, color: "#D97706" },
+                  { label: "Total",       value: totalPax,       color: "#64748B" },
+                ].map(item => (
+                  <View key={item.label} style={S.paxFooterItem}>
+                    <Text style={[S.paxFooterNum, { color: item.color }]}>{item.value}</Text>
+                    <Text style={S.paxFooterLabel}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          );
+        })()}
 
         {/* ── Colis ── */}
         {activeTab === "colis" && (<>
@@ -1056,6 +1159,44 @@ const S = StyleSheet.create({
   parcelActions: { flexDirection: "row", gap: 8 },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   actionText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+
+  /* ── Passenger list (Liste des voyageurs) ── */
+  paxHeaderCard: { backgroundColor: GREEN, borderRadius: 16, padding: 16, gap: 10, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+  paxHeaderRow: { flexDirection: "row", alignItems: "center" },
+  paxHeaderTitle: { fontSize: 16, fontFamily: "Inter_800ExtraBold", color: "white" },
+  paxHeaderSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.78)", marginTop: 2 },
+  paxCountBadge: { backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },
+  paxCountText: { fontSize: 13, fontFamily: "Inter_800ExtraBold", color: "white" },
+  paxProgressBg: { height: 6, backgroundColor: "rgba(255,255,255,0.28)", borderRadius: 99, overflow: "hidden" },
+  paxProgressFill: { height: "100%", backgroundColor: "white", borderRadius: 99 },
+  paxProgressRow: { flexDirection: "row", justifyContent: "space-between" },
+  paxProgressLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.82)" },
+  paxProgressPct: { fontSize: 11, fontFamily: "Inter_700Bold", color: "white" },
+
+  paxSearchBar: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "white", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
+  paxSearchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#1E293B" },
+
+  paxCard: { backgroundColor: "white", borderRadius: 14, padding: 13, flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
+  paxCardDone: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
+  paxAvatar: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  paxAvatarText: { fontSize: 14, fontFamily: "Inter_800ExtraBold" },
+  paxCardName: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 5 },
+  paxBadgeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  paxSeatBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  paxSeatText: { fontSize: 11, fontFamily: "Inter_700Bold", color: PRIMARY },
+  paxStatusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  paxStatusText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+  paxDoneIcon: { flexShrink: 0, paddingHorizontal: 4 },
+  paxValidateBtn: { backgroundColor: GREEN, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, flexShrink: 0, shadowColor: GREEN, shadowOpacity: 0.35, shadowRadius: 6, elevation: 2 },
+  paxValidateBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
+
+  paxEmpty: { alignItems: "center", gap: 10, paddingVertical: 40 },
+  paxEmptyText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
+
+  paxFooter: { flexDirection: "row", backgroundColor: "white", borderRadius: 14, padding: 14, justifyContent: "space-around", borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  paxFooterItem: { alignItems: "center", gap: 2 },
+  paxFooterNum: { fontSize: 22, fontFamily: "Inter_800ExtraBold" },
+  paxFooterLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" },
 });
 
 /* ─── Scanner Styles ──────────────────────────────────────── */
