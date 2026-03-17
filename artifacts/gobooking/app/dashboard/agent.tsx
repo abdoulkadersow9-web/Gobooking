@@ -96,10 +96,10 @@ function ScanResultCard({
   const canBoard    = !isBoarded && !isCancelled;
 
   const STATUS_CFG = {
-    confirmed: { label: "Confirmé",  bg: "#EFF6FF", color: PRIMARY,   icon: "check-circle" as const },
-    boarded:   { label: "Embarqué",  bg: "#ECFDF5", color: "#065F46", icon: "user-check"   as const },
-    cancelled: { label: "Annulé",    bg: "#FEF2F2", color: "#DC2626", icon: "x-circle"     as const },
-    pending:   { label: "En attente",bg: "#FFFBEB", color: "#B45309", icon: "clock"        as const },
+    confirmed: { label: "Ticket valide",  bg: "#ECFDF5", color: "#065F46", icon: "check-circle" as const },
+    boarded:   { label: "Déjà utilisé",   bg: "#FFFBEB", color: "#B45309", icon: "repeat"       as const },
+    cancelled: { label: "Ticket invalide",bg: "#FEF2F2", color: "#DC2626", icon: "x-circle"     as const },
+    pending:   { label: "En attente",     bg: "#FFFBEB", color: "#B45309", icon: "clock"        as const },
   };
   const st = STATUS_CFG[result.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.pending;
 
@@ -154,20 +154,26 @@ function ScanResultCard({
             ? <ActivityIndicator size="small" color="white" />
             : <Feather name="check-circle" size={18} color="white" />
           }
-          <Text style={SC.validateText}>{validating ? "Validation…" : "Valider l'embarquement"}</Text>
+          <Text style={SC.validateText}>{validating ? "Validation…" : "Valider le ticket"}</Text>
         </TouchableOpacity>
       )}
 
       {isBoarded && (
-        <View style={SC.boardedBanner}>
-          <Feather name="check-circle" size={16} color="#065F46" />
-          <Text style={SC.boardedBannerText}>Passager déjà embarqué</Text>
+        <View style={[SC.boardedBanner, { backgroundColor: "#FFFBEB", borderColor: "#FDE68A" }]}>
+          <Feather name="alert-circle" size={16} color="#D97706" />
+          <View style={{ flex: 1 }}>
+            <Text style={[SC.boardedBannerText, { color: "#B45309" }]}>Déjà utilisé</Text>
+            <Text style={{ fontSize: 11, color: "#D97706", fontFamily: "Inter_400Regular", marginTop: 1 }}>Ce ticket a déjà été scanné. Vérifiez l'identité.</Text>
+          </View>
         </View>
       )}
       {isCancelled && (
-        <View style={[SC.boardedBanner, { backgroundColor: "#FEF2F2" }]}>
-          <Feather name="alert-triangle" size={16} color="#DC2626" />
-          <Text style={[SC.boardedBannerText, { color: "#DC2626" }]}>Billet annulé — Accès refusé</Text>
+        <View style={[SC.boardedBanner, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+          <Feather name="x-circle" size={16} color="#DC2626" />
+          <View style={{ flex: 1 }}>
+            <Text style={[SC.boardedBannerText, { color: "#DC2626" }]}>Ticket invalide</Text>
+            <Text style={{ fontSize: 11, color: "#EF4444", fontFamily: "Inter_400Regular", marginTop: 1 }}>Accès refusé — billet annulé ou inconnu.</Text>
+          </View>
         </View>
       )}
     </View>
@@ -814,13 +820,13 @@ export default function AgentDashboard() {
         {/* ── Scanner ── */}
         {activeTab === "scanner" && (<>
           <View style={S.sectionRow}>
-            <Text style={S.sectionTitle}>Scanner un billet</Text>
+            <Text style={S.sectionTitle}>Scanner de ticket</Text>
             <View style={[S.badge, { backgroundColor: "#F0FDF4" }]}>
               <Feather name="maximize" size={11} color={GREEN} />
               <Text style={[S.badgeText, { color: GREEN }]}>QR · Code-barres</Text>
             </View>
           </View>
-          <Text style={S.subLabel}>Scannez le QR code du billet ou entrez la référence manuellement</Text>
+          <Text style={S.subLabel}>Scannez le QR code ou entrez la référence du ticket</Text>
           <ScannerTab boarding={boarding} setBoarding={setBoarding} token={token} />
         </>)}
 
@@ -1262,7 +1268,7 @@ const SC = StyleSheet.create({
   amountVal: { fontSize: 18, fontFamily: "Inter_800ExtraBold", color: GREEN },
   validateBtn: { backgroundColor: GREEN, borderRadius: 14, padding: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   validateText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
-  boardedBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12 },
+  boardedBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#A7F3D0" },
   boardedBannerText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#065F46" },
 });
 
