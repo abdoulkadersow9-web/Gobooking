@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 const PRIMARY = "#1A56DB";
 const SUCCESS = "#059669";
 const DANGER  = "#DC2626";
 
 type PayMethod = "orange" | "mtn" | "wave" | "card" | null;
-type Screen    = "payment" | "processing" | "success" | "error";
+type Screen    = "payment" | "processing" | "success" | "error" | "ticket";
 
 /* ── Demo trip data (would come from previous screen in real app) ── */
 const TRIP = {
@@ -160,11 +160,14 @@ function makeRef() {
 
 /* ════════════════════════════════════════════════════════════════════ */
 export default function Payment() {
-  const [screen,      setScreen]      = useState<Screen>("payment");
-  const [method,      setMethod]      = useState<PayMethod>(null);
-  const [submitted,   setSubmitted]   = useState(false);
-  const [simulateFail,setSimulateFail]= useState(false);
-  const [bookingRef]                  = useState(() => makeRef());
+  const [screen,       setScreen]       = useState<Screen>("payment");
+  const [method,       setMethod]       = useState<PayMethod>(null);
+  const [submitted,    setSubmitted]    = useState(false);
+  const [simulateFail, setSimulateFail] = useState(false);
+  const [bookingRef]                    = useState(() => makeRef());
+  const [dlDone,       setDlDone]       = useState(false);
+  const [shareDone,    setShareDone]    = useState(false);
+  const [shareMsg,     setShareMsg]     = useState("");
 
   const pm = PAY_METHODS.find(p => p.id === method);
 
@@ -174,6 +177,13 @@ export default function Payment() {
     setScreen("processing");
     setTimeout(() => setScreen(simulateFail ? "error" : "success"), 2400);
   };
+
+  /* Auto-redirect: success → ticket après 2 s */
+  useEffect(() => {
+    if (screen !== "success") return;
+    const t = setTimeout(() => setScreen("ticket"), 2000);
+    return () => clearTimeout(t);
+  }, [screen]);
 
   /* ── Processing ── */
   if (screen === "processing") {
@@ -311,157 +321,176 @@ export default function Payment() {
     );
   }
 
-  /* ── Success screen ── */
+  /* ── Success (transition rapide → ticket) ── */
   if (screen === "success") {
     return (
       <div style={{
         fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column",
+        background: `linear-gradient(135deg, ${SUCCESS} 0%, #047857 100%)`,
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", padding: 32, textAlign: "center",
       }}>
-        <div style={{
-          background: `linear-gradient(135deg, ${SUCCESS} 0%, #047857 100%)`,
-          padding: "60px 20px 28px", textAlign: "center",
-        }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: "50%",
-            background: "rgba(255,255,255,0.2)", margin: "0 auto 16px",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36,
-          }}>✅</div>
-          <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 800, color: "white" }}>
-            Réservation confirmée !
-          </h2>
-          <p style={{ margin: "0 0 10px", fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
-            Paiement accepté — Billet généré avec succès
-          </p>
-          <div style={{
-            display: "inline-block", background: "rgba(255,255,255,0.20)",
-            borderRadius: 10, padding: "6px 16px",
-          }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "white", letterSpacing: 1.5 }}>
-              {bookingRef}
-            </span>
+        <div style={{ width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 46, marginBottom: 22 }}>✅</div>
+        <h2 style={{ margin: "0 0 10px", fontSize: 24, fontWeight: 900, color: "white" }}>Paiement réussi !</h2>
+        <p style={{ margin: "0 0 6px", fontSize: 14, color: "rgba(255,255,255,0.90)" }}>
+          {TOTAL.toLocaleString("fr-FR")} FCFA · {pm?.label ?? "Carte bancaire"}
+        </p>
+        <p style={{ margin: "0 0 32px", fontSize: 13, color: "rgba(255,255,255,0.75)" }}>
+          📱 Billet envoyé par SMS et email
+        </p>
+        <div style={{ width: 200, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.25)", marginBottom: 24, overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: 2, background: "white", animation: "growBar 2s linear forwards" }} />
+        </div>
+        <p style={{ margin: "0 0 28px", fontSize: 12, color: "rgba(255,255,255,0.75)" }}>Redirection vers votre ticket…</p>
+        <button onClick={() => setScreen("ticket")} style={{ padding: "14px 32px", borderRadius: 16, border: "2px solid white", background: "transparent", color: "white", fontSize: 15, fontWeight: 800, cursor: "pointer" }}>
+          Voir mon ticket →
+        </button>
+        <style>{`@keyframes growBar { from { width: 0% } to { width: 100% } }`}</style>
+      </div>
+    );
+  }
+
+  /* ── Ticket screen ── */
+  if (screen === "ticket") {
+    const fromCode  = TRIP.from.slice(0, 3).toUpperCase();
+    const toCode    = TRIP.to.slice(0, 3).toUpperCase();
+    const seatStrs  = TRIP.seats.map(String);
+    const qrPayload = [bookingRef, seatStrs.join(","), `${fromCode}-${toCode}`, TRIP.departureTime, "Passager GoBooking"].join("|");
+
+    const handleDownload = () => {
+      setDlDone(true);
+      setTimeout(() => { window.print(); setTimeout(() => setDlDone(false), 1600); }, 150);
+    };
+    const handleShare = async () => {
+      const text = `🎫 GoBooking\n📍 ${TRIP.from} → ${TRIP.to}\n🕐 ${TRIP.date} à ${TRIP.departureTime}\n💺 Siège(s) : ${seatStrs.join(", ")}\n🔖 ${bookingRef}`;
+      if (typeof navigator.share === "function") {
+        try { await navigator.share({ title: "Mon ticket GoBooking", text }); setShareMsg("Partagé !"); }
+        catch { setShareMsg("Annulé"); }
+      } else {
+        try { await navigator.clipboard.writeText(text); setShareMsg("Copié !"); }
+        catch { setShareMsg("Copié !"); }
+      }
+      setShareDone(true);
+      setTimeout(() => { setShareDone(false); setShareMsg(""); }, 2400);
+    };
+
+    return (
+      <div id="gobooking-ticket-root" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
+        <div style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, padding: "52px 20px 28px", position: "relative" }}>
+          <button onClick={() => setScreen("payment")} style={{ position: "absolute", top: 16, left: 16, width: 36, height: 36, borderRadius: 10, border: "none", background: "rgba(255,255,255,0.20)", color: "white", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: "white", textAlign: "center" }}>Mon ticket</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.80)", textAlign: "center" }}>Billet électronique confirmé</p>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 14 }}>
+            <div style={{ background: "rgba(255,255,255,0.18)", borderRadius: 20, padding: "6px 16px", display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80" }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: "white" }}>Réservation confirmée</span>
+            </div>
           </div>
         </div>
 
-        <div style={{ padding: "20px 16px 24px" }}>
-          {/* ─── TICKET ─── */}
-          <div style={{
-            background: "white", borderRadius: 20, overflow: "hidden",
-            boxShadow: "0 6px 28px rgba(0,0,0,0.10)", marginBottom: 14,
-          }}>
-            {/* Ticket header */}
-            <div style={{
-              background: TRIP.companyColor + "10",
-              borderBottom: "2px dashed #E2E8F0",
-              padding: "14px 18px",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: TRIP.companyColor + "22",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 17, fontWeight: 800, color: TRIP.companyColor,
-                }}>{TRIP.companyInitial}</div>
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 32px" }}>
+          {/* Ticket card */}
+          <div style={{ background: "white", borderRadius: 24, overflow: "hidden", boxShadow: "0 6px 32px rgba(0,0,0,0.10)", marginBottom: 16 }}>
+            {/* Company + route */}
+            <div style={{ background: TRIP.companyColor + "10", padding: "20px 20px 18px", borderBottom: "2px dashed #E2E8F0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 12, background: TRIP.companyColor + "18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: TRIP.companyColor }}>{TRIP.companyInitial}</div>
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{TRIP.company}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>{TRIP.busType}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748B" }}>{TRIP.busType}</p>
+                </div>
+                <div style={{ marginLeft: "auto", background: SUCCESS + "18", borderRadius: 8, padding: "4px 10px" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: SUCCESS }}>✔ Payé</span>
                 </div>
               </div>
-              <div style={{
-                background: "#DCFCE7", color: SUCCESS,
-                fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 20,
-              }}>✓ Confirmé</div>
-            </div>
-
-            {/* Route + times */}
-            <div style={{ padding: "16px 18px", borderBottom: "1px solid #F1F5F9" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#0F172A" }}>{TRIP.departureTime}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 12, fontWeight: 600, color: "#64748B" }}>{TRIP.from}</p>
+                  <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: "#0F172A", lineHeight: 1 }}>{TRIP.departureTime}</p>
+                  <p style={{ margin: "5px 0 0", fontSize: 14, fontWeight: 800, color: PRIMARY }}>{fromCode}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748B" }}>{TRIP.from}</p>
                 </div>
-                <div style={{ textAlign: "center", flex: 1, padding: "0 10px" }}>
-                  <p style={{ margin: "0 0 5px", fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>{TRIP.duration}</p>
-                  <div style={{ height: 2, background: "#E2E8F0", position: "relative" }}>
-                    <div style={{
-                      position: "absolute", top: "50%", left: "50%",
-                      transform: "translate(-50%, -50%)",
-                      width: 8, height: 8, borderRadius: "50%", background: SUCCESS,
-                    }} />
+                <div style={{ flex: 1, textAlign: "center", padding: "0 10px" }}>
+                  <p style={{ margin: 0, fontSize: 10, color: "#94A3B8", fontWeight: 600 }}>{TRIP.duration}</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "center", margin: "6px 0" }}>
+                    <div style={{ flex: 1, height: 1.5, background: "#E2E8F0" }} />
+                    <span style={{ fontSize: 14 }}>🚌</span>
+                    <div style={{ flex: 1, height: 1.5, background: "#E2E8F0" }} />
                   </div>
-                  <p style={{ margin: "5px 0 0", fontSize: 10, color: "#CBD5E1" }}>🚌 Direct</p>
+                  <p style={{ margin: 0, fontSize: 10, color: "#94A3B8" }}>Direct</p>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <p style={{ margin: 0, fontSize: 26, fontWeight: 900, color: "#0F172A" }}>{TRIP.arrivalTime}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 12, fontWeight: 600, color: "#64748B" }}>{TRIP.to}</p>
+                  <p style={{ margin: 0, fontSize: 28, fontWeight: 900, color: "#0F172A", lineHeight: 1 }}>{TRIP.arrivalTime}</p>
+                  <p style={{ margin: "5px 0 0", fontSize: 14, fontWeight: 800, color: "#7C3AED" }}>{toCode}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748B" }}>{TRIP.to}</p>
                 </div>
-              </div>
-              <p style={{ margin: "10px 0 0", fontSize: 12, color: "#94A3B8", textAlign: "center" }}>📅 {TRIP.date}</p>
-            </div>
-
-            {/* Seats + QR */}
-            <div style={{
-              padding: "14px 18px",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <div>
-                <p style={{ margin: "0 0 8px", fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>
-                  Sièges réservés
-                </p>
-                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {TRIP.seats.map(s => (
-                    <div key={s} style={{
-                      width: 36, height: 36, borderRadius: 9,
-                      background: SUCCESS, color: "white",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 14, fontWeight: 900,
-                    }}>{s}</div>
-                  ))}
-                </div>
-                <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.4, fontWeight: 700 }}>
-                  Montant payé
-                </p>
-                <p style={{ margin: "3px 0 0", fontSize: 18, fontWeight: 900, color: SUCCESS }}>
-                  {TOTAL.toLocaleString("fr-FR")} FCFA
-                </p>
-              </div>
-
-              {/* QR code */}
-              <div style={{ textAlign: "center" }}>
-                <QRCode value={bookingRef} />
-                <p style={{ margin: "6px 0 0", fontSize: 10, color: "#94A3B8", letterSpacing: 0.5, fontWeight: 600 }}>
-                  {bookingRef}
-                </p>
               </div>
             </div>
 
-            {/* Payment method used */}
-            <div style={{
-              background: "#F8FAFC", borderTop: "1px solid #F1F5F9",
-              padding: "10px 18px", display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <span style={{ fontSize: 14 }}>{pm?.icon ?? "💳"}</span>
-              <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>
-                Payé via {pm?.label ?? "carte bancaire"}
-              </span>
+            {/* Tear notches */}
+            <div style={{ position: "relative", height: 0, overflow: "visible" }}>
+              <div style={{ position: "absolute", left: -14, top: -14, width: 28, height: 28, borderRadius: "50%", background: "#F1F5F9" }} />
+              <div style={{ position: "absolute", right: -14, top: -14, width: 28, height: 28, borderRadius: "50%", background: "#F1F5F9" }} />
+            </div>
+
+            {/* Info rows */}
+            <div style={{ padding: "18px 20px 4px" }}>
+              {[
+                { label: "Date",      value: TRIP.date },
+                { label: "Siège(s)",  value: seatStrs.map(s => `N°${s}`).join("  ·  "), accent: true },
+                { label: "Paiement",  value: pm?.label ?? "Carte bancaire" },
+                { label: "N° ticket", value: bookingRef, accent: true },
+              ].map(r => (
+                <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F1F5F9" }}>
+                  <span style={{ fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4 }}>{r.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: r.accent ? PRIMARY : "#0F172A" }}>{r.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* QR section */}
+            <div style={{ padding: "20px 20px 24px", borderTop: "2px dashed #E2E8F0", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Scannez à l'embarquement</p>
+              <QRCode value={qrPayload} />
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 900, color: "#0F172A", letterSpacing: 2 }}>{bookingRef}</p>
+              <div style={{ background: "#F8FAFF", borderRadius: 10, padding: "8px 14px", width: "100%", boxSizing: "border-box" as const }}>
+                <p style={{ margin: 0, fontSize: 10, color: "#64748B", textAlign: "center", fontFamily: "monospace" }}>
+                  {seatStrs.join(",")} · {fromCode}→{toCode} · {TRIP.departureTime}
+                </p>
+              </div>
+              <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textAlign: "center", lineHeight: 1.5 }}>Ce QR code est personnel et unique.<br />Ne le partagez pas avec des tiers.</p>
             </div>
           </div>
 
-          {/* Notification info */}
-          <div style={{ background: "#EFF6FF", borderRadius: 14, padding: 14, marginBottom: 16, border: "1px solid #BFDBFE" }}>
-            <p style={{ margin: 0, fontSize: 12, color: "#1E40AF", lineHeight: 1.65 }}>
-              📱 Billet envoyé au <strong>+225 07 XX XX XX XX</strong><br />
-              📧 Confirmation envoyée à <strong>k.jean@email.com</strong>
+          {/* Amount */}
+          <div style={{ background: "white", borderRadius: 14, padding: "14px 18px", marginBottom: 16, boxShadow: "0 1px 8px rgba(0,0,0,0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Montant payé</p>
+              <p style={{ margin: "4px 0 0", fontSize: 22, fontWeight: 900, color: SUCCESS }}>{TOTAL.toLocaleString("fr-FR")} FCFA</p>
+            </div>
+            <div style={{ background: SUCCESS + "12", borderRadius: 10, padding: "8px 12px" }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: SUCCESS, textTransform: "uppercase", letterSpacing: 0.5 }}>via {pm?.label ?? "carte"}</span>
+            </div>
+          </div>
+
+          {/* Notice */}
+          <div style={{ background: "#EFF6FF", borderRadius: 14, padding: "12px 16px", border: "1px solid #BFDBFE", marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#1E40AF", lineHeight: 1.7 }}>
+              📱 Ticket envoyé par <strong>SMS</strong> et <strong>email</strong>. Arrivez <strong>15 min</strong> avant le départ.
             </p>
           </div>
 
-          <button onClick={() => setScreen("payment")} style={{
-            width: "100%", padding: "15px 0", borderRadius: 16, border: "none",
-            background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`,
-            color: "white", fontSize: 14, fontWeight: 800, cursor: "pointer",
-            boxShadow: "0 4px 16px rgba(26,86,219,0.25)",
-          }}>🏠 Retour à l'accueil</button>
+          {/* Action buttons */}
+          <button onClick={handleDownload} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: dlDone ? `linear-gradient(135deg, ${SUCCESS} 0%, #047857 100%)` : `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, color: "white", fontSize: 15, fontWeight: 800, cursor: "pointer", marginBottom: 12, transition: "all 0.25s", boxShadow: "0 4px 20px rgba(26,86,219,0.30)" }}>
+            {dlDone ? "✅ Ouverture PDF…" : "⬇ Télécharger le ticket (PDF)"}
+          </button>
+          <button onClick={handleShare} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: `2px solid ${shareDone ? SUCCESS : PRIMARY}`, background: shareDone ? SUCCESS + "12" : "white", color: shareDone ? SUCCESS : PRIMARY, fontSize: 15, fontWeight: 800, cursor: "pointer", marginBottom: 12, transition: "all 0.25s" }}>
+            {shareDone ? `✅ ${shareMsg}` : "↗ Partager le ticket"}
+          </button>
+          <button onClick={() => { setScreen("payment"); setMethod(null); setSubmitted(false); setDlDone(false); setShareDone(false); }} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "1.5px solid #E2E8F0", background: "white", color: "#475569", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+            🏠 Retour à l'accueil
+          </button>
         </div>
       </div>
     );
