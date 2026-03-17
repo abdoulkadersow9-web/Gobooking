@@ -4,5 +4,6 @@ export const modules: ModuleMap = {
   "./components/mockups/agent-mission.tsx": () => import("../components/mockups/agent-mission.tsx"),
   "./components/mockups/agent-scanner.tsx": () => import("../components/mockups/agent-scanner.tsx"),
   "./components/mockups/company-dashboard.tsx": () => import("../components/mockups/company-dashboard.tsx"),
-  "./components/mockups/company-seats.tsx": () => import("../components/mockups/company-seats.tsx")
+  "./components/mockups/company-seats.tsx": () => import("../components/mockups/company-seats.tsx"),
+  "./components/mockups/seat-manager.tsx": () => import("../components/mockups/seat-manager.tsx")
 };
