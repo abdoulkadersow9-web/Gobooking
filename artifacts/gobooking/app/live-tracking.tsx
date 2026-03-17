@@ -1302,24 +1302,45 @@ export default function LiveTrackingScreen() {
                       <Text style={{ fontSize: 12, color: "#475569" }}>{selected.agentPhone}</Text>
                     </View>
                   </View>
-                  {/* Call button */}
-                  <Pressable
-                    style={({ pressed }) => [{
-                      height: 44, borderRadius: 12,
-                      backgroundColor: "#059669",
-                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                      opacity: pressed ? 0.85 : 1,
-                    }]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      Linking.openURL(`tel:${selected.agentPhone.replace(/\s/g, "")}`);
-                    }}
-                  >
-                    <Feather name="phone" size={16} color="white" />
-                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
-                      Appeler l'agent
-                    </Text>
-                  </Pressable>
+                  {/* Call + WhatsApp buttons row */}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <Pressable
+                      style={({ pressed }) => [{
+                        flex: 1, height: 44, borderRadius: 12,
+                        backgroundColor: "#059669",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                        opacity: pressed ? 0.85 : 1,
+                      }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        Linking.openURL(`tel:${selected.agentPhone.replace(/\s/g, "")}`);
+                      }}
+                    >
+                      <Feather name="phone" size={16} color="white" />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>
+                        Appeler
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [{
+                        flex: 1, height: 44, borderRadius: 12,
+                        backgroundColor: "#25D366",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                        opacity: pressed ? 0.85 : 1,
+                      }]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        const phone = selected.agentPhone.replace(/[\s\-\+]/g, "");
+                        const msg = "Bonjour, je suis client GoBooking, je suis à mon point de montée";
+                        Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+                      }}
+                    >
+                      <Feather name="message-circle" size={16} color="white" />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>
+                        WhatsApp
+                      </Text>
+                    </Pressable>
+                  </View>
 
                   {/* Quick messages section */}
                   <View style={{ gap: 6 }}>
