@@ -1,7 +1,56 @@
 import { useState, useMemo } from "react";
 
-const PRIMARY = "#1A56DB";
-const SUCCESS = "#059669";
+const PRIMARY    = "#1A56DB";
+const SUCCESS    = "#059669";
+const DANGER     = "#DC2626";
+const AVAIL_BG   = "#DCFCE7";
+const AVAIL_TEXT = "#166534";
+const TAKEN_BG   = "#FEE2E2";
+const TAKEN_TEXT = "#991B1B";
+const SEL_BG     = "#FEF08A";
+const SEL_BORDER = "#CA8A04";
+const SEL_TEXT   = "#713F12";
+
+const PAY_METHODS = [
+  { id: "orange", label: "Orange Money", subtitle: "Via votre compte Orange", icon: "🟠", color: "#FF6B00" },
+  { id: "mtn",    label: "MTN Money",    subtitle: "Via votre compte MTN",    icon: "🟡", color: "#EAB308" },
+  { id: "wave",   label: "Wave",         subtitle: "Paiement rapide via Wave",icon: "🌊", color: "#0EA5E9" },
+  { id: "card",   label: "Carte bancaire", subtitle: "Visa, Mastercard",      icon: "💳", color: "#059669" },
+] as const;
+
+type PayMethod = (typeof PAY_METHODS)[number]["id"] | null;
+
+const ERROR_MSGS: Record<string, string> = {
+  orange: "Solde Orange Money insuffisant. Rechargez votre compte et réessayez.",
+  mtn:    "Transaction MTN Money refusée. Vérifiez votre PIN ou contactez le service client.",
+  wave:   "Échec de connexion Wave. Réessayez dans quelques instants.",
+  card:   "Carte refusée. Vérifiez les informations ou contactez votre banque.",
+};
+
+function makeRef() {
+  const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return "GBK-" + Array.from({ length: 8 }, () => c[Math.floor(Math.random() * c.length)]).join("");
+}
+
+function QRCode({ value }: { value: string }) {
+  const sz = 72, cells = 7, cell = sz / cells;
+  const seed = value.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const grid = Array.from({ length: cells }, (_, r) =>
+    Array.from({ length: cells }, (_, c) => {
+      if ((r < 2 && c < 2) || (r < 2 && c >= cells - 2) || (r >= cells - 2 && c < 2)) return true;
+      return ((seed * (r + 1) * (c + 3) + r * c) % 3) === 0;
+    })
+  );
+  return (
+    <div style={{ width: sz + 10, height: sz + 10, background: "white", borderRadius: 7, padding: 5, boxShadow: "0 1px 6px rgba(0,0,0,0.10)" }}>
+      {grid.map((row, r) => (
+        <div key={r} style={{ display: "flex" }}>
+          {row.map((f, c) => <div key={c} style={{ width: cell, height: cell, background: f ? "#0F172A" : "white" }} />)}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
 type Trip = {
@@ -23,7 +72,7 @@ type Trip = {
 };
 
 type SortKey = "price_asc" | "price_desc" | "time_asc";
-type Screen  = "results" | "seats" | "confirm";
+type Screen  = "results" | "seats" | "confirm" | "payment" | "processing" | "success" | "error";
 
 /* ─── Demo data ──────────────────────────────────────────────────────── */
 const TRIPS: Trip[] = [
@@ -97,9 +146,9 @@ function SeatPicker({
   };
 
   const seatColor = (n: number) => {
-    if (trip.occupiedSeats.includes(n)) return { bg: "#CBD5E1", text: "#94A3B8", cursor: "default" };
-    if (selected.includes(n))           return { bg: PRIMARY,   text: "white",   cursor: "pointer" };
-    return { bg: "#F1F5F9", text: "#475569", cursor: "pointer" };
+    if (trip.occupiedSeats.includes(n)) return { bg: TAKEN_BG, text: TAKEN_TEXT, border: TAKEN_BG,   cursor: "default",  strip: "#FCA5A5" };
+    if (selected.includes(n))           return { bg: SEL_BG,   text: SEL_TEXT,   border: SEL_BORDER, cursor: "pointer",  strip: "#FDE047" };
+    return                                     { bg: AVAIL_BG, text: AVAIL_TEXT,  border: AVAIL_BG,   cursor: "pointer",  strip: "#86EFAC" };
   };
 
   return (
@@ -148,17 +197,14 @@ function SeatPicker({
         </div>
 
         {/* Legend */}
-        <div style={{ display: "flex", gap: 14, marginBottom: 16, padding: "0 4px" }}>
+        <div style={{ display: "flex", gap: 12, marginBottom: 16, padding: "0 4px", flexWrap: "wrap" }}>
           {[
-            { bg: "#F1F5F9", text: "#475569", label: "Disponible" },
-            { bg: PRIMARY,   text: "white",   label: "Sélectionné" },
-            { bg: "#CBD5E1", text: "#94A3B8", label: "Occupé" },
+            { bg: AVAIL_BG, border: AVAIL_BG,   label: "Disponible" },
+            { bg: TAKEN_BG, border: TAKEN_BG,   label: "Réservé" },
+            { bg: SEL_BG,   border: SEL_BORDER, label: "Mon choix" },
           ].map(l => (
             <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{
-                width: 18, height: 18, borderRadius: 5, background: l.bg,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }} />
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: l.bg, border: `1.5px solid ${l.border}` }} />
               <span style={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>{l.label}</span>
             </div>
           ))}
@@ -182,33 +228,41 @@ function SeatPicker({
           </div>
 
           {/* Seat grid */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
             {Array.from({ length: rows }, (_, row) => (
-              <div key={row} style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                {Array.from({ length: cols }, (_, col) => {
-                  const seatNum = row * cols + col + 1;
-                  if (seatNum > trip.totalSeats) return <div key={col} style={{ width: 46, height: 40 }} />;
-                  const { bg, text, cursor } = seatColor(seatNum);
-                  /* aisle gap after col 1 */
-                  const marginRight = col === 1 ? 16 : 0;
-                  return (
-                    <div
-                      key={col}
-                      onClick={() => toggle(seatNum)}
-                      style={{
-                        width: 46, height: 40, borderRadius: 8,
-                        background: bg, color: text,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 11, fontWeight: 700, cursor,
-                        marginRight, transition: "all 0.12s",
-                        border: selected.includes(seatNum) ? `2px solid #1240a8` : "2px solid transparent",
-                        userSelect: "none",
-                      }}
-                    >
-                      {seatNum}
-                    </div>
-                  );
-                })}
+              <div key={row} style={{ display: "flex", alignItems: "center" }}>
+                {/* Row number */}
+                <span style={{ width: 20, fontSize: 10, color: "#CBD5E1", fontWeight: 700, textAlign: "right", marginRight: 8, flexShrink: 0 }}>{row + 1}</span>
+                {/* Left pair */}
+                <div style={{ display: "flex", gap: 5 }}>
+                  {[0, 1].map(col => {
+                    const n = row * cols + col + 1;
+                    if (n > trip.totalSeats) return <div key={col} style={{ width: 44, height: 46 }} />;
+                    const { bg, text, border, cursor, strip } = seatColor(n);
+                    return (
+                      <div key={col} onClick={() => toggle(n)} style={{ width: 44, height: 46, borderRadius: 9, background: bg, color: text, border: `2px solid ${border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor, userSelect: "none", transition: "all 0.12s" }}>
+                        <div style={{ width: 26, height: 5, borderRadius: "4px 4px 0 0", background: strip, marginBottom: 2 }} />
+                        <span style={{ fontSize: 11, fontWeight: 800 }}>{n}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Aisle */}
+                <div style={{ width: 18, flexShrink: 0 }} />
+                {/* Right pair */}
+                <div style={{ display: "flex", gap: 5 }}>
+                  {[2, 3].map(col => {
+                    const n = row * cols + col + 1;
+                    if (n > trip.totalSeats) return <div key={col} style={{ width: 44, height: 46 }} />;
+                    const { bg, text, border, cursor, strip } = seatColor(n);
+                    return (
+                      <div key={col} onClick={() => toggle(n)} style={{ width: 44, height: 46, borderRadius: 9, background: bg, color: text, border: `2px solid ${border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor, userSelect: "none", transition: "all 0.12s" }}>
+                        <div style={{ width: 26, height: 5, borderRadius: "4px 4px 0 0", background: strip, marginBottom: 2 }} />
+                        <span style={{ fontSize: 11, fontWeight: 800 }}>{n}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>
@@ -251,6 +305,20 @@ export default function TripResults() {
   const [chosen,       setChosen]       = useState<Trip | null>(null);
   const [chosenSeats,  setChosenSeats]  = useState<number[]>([]);
   const [sortKey,      setSortKey]      = useState<SortKey>("price_asc");
+  const [method,       setMethod]       = useState<PayMethod>(null);
+  const [paySubmitted, setPaySubmitted] = useState(false);
+  const [simulateFail, setSimulateFail] = useState(false);
+  const [bookingRef]                    = useState(() => makeRef());
+
+  const total   = chosen ? chosen.price * chosenSeats.length : 0;
+  const pm      = PAY_METHODS.find(p => p.id === method) ?? null;
+
+  const handlePay = () => {
+    setPaySubmitted(true);
+    if (!method) return;
+    setScreen("processing");
+    setTimeout(() => setScreen(simulateFail ? "error" : "success"), 2400);
+  };
 
   /* Filter: only trips with enough available seats matching the route */
   const available = useMemo(() => {
@@ -403,13 +471,171 @@ export default function TripResults() {
             </p>
           </div>
 
-          <button style={{
+          <button onClick={() => setScreen("payment")} style={{
             width: "100%", padding: "16px 0", borderRadius: 16, border: "none",
             background: `linear-gradient(135deg, ${SUCCESS} 0%, #047857 100%)`,
             color: "white", fontSize: 15, fontWeight: 800, cursor: "pointer",
             boxShadow: "0 4px 20px rgba(5,150,105,0.35)",
           }}>
             ✅ Confirmer la réservation
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Payment screen ── */
+  if (screen === "payment" && chosen) {
+    return (
+      <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, padding: "52px 20px 24px", position: "relative" }}>
+          <button onClick={() => setScreen("confirm")} style={{ position: "absolute", top: 16, left: 16, width: 36, height: 36, borderRadius: 10, border: "none", background: "rgba(255,255,255,0.2)", color: "white", fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>←</button>
+          <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 800, color: "white", textAlign: "center" }}>Paiement sécurisé</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.80)", textAlign: "center" }}>Choisissez votre mode de paiement</p>
+        </div>
+        <div style={{ padding: "20px 16px", flex: 1, overflowY: "auto" }}>
+          {/* Amount card */}
+          <div style={{ background: "white", borderRadius: 16, padding: 18, marginBottom: 16, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>À payer</p>
+              <p style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 900, color: SUCCESS }}>{total.toLocaleString("fr-FR")} FCFA</p>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <p style={{ margin: 0, fontSize: 11, color: "#64748B" }}>{chosen.from} → {chosen.to}</p>
+              <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{chosen.departureTime} · {chosenSeats.length} siège{chosenSeats.length > 1 ? "s" : ""} ({chosenSeats.join(", ")})</p>
+            </div>
+          </div>
+          {/* Method list */}
+          <p style={{ margin: "0 0 12px", fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Mode de paiement</p>
+          {PAY_METHODS.map(pm => {
+            const sel = method === pm.id;
+            return (
+              <div key={pm.id} onClick={() => { setMethod(pm.id as PayMethod); setPaySubmitted(false); }} style={{ background: "white", borderRadius: 14, padding: "14px 16px", marginBottom: 10, boxShadow: "0 1px 8px rgba(0,0,0,0.05)", border: `2px solid ${sel ? pm.color : "transparent"}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 14, transition: "all 0.15s" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: pm.color + "18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{pm.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{pm.label}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "#64748B" }}>{pm.subtitle}</p>
+                </div>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${sel ? pm.color : "#CBD5E1"}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {sel && <div style={{ width: 10, height: 10, borderRadius: "50%", background: pm.color }} />}
+                </div>
+              </div>
+            );
+          })}
+          {paySubmitted && !method && (
+            <p style={{ margin: "4px 0 16px", fontSize: 12, color: DANGER, fontWeight: 700, textAlign: "center" }}>⚠ Veuillez sélectionner un mode de paiement</p>
+          )}
+          {/* Demo toggle */}
+          <div style={{ background: "#FEF9C3", borderRadius: 12, padding: "10px 14px", marginBottom: 20, border: "1px solid #FDE047", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <p style={{ margin: 0, fontSize: 11, color: "#713F12", fontWeight: 700 }}>🧪 Simuler un échec (démo)</p>
+            <button onClick={() => setSimulateFail(f => !f)} style={{ width: 40, height: 22, borderRadius: 11, border: "none", background: simulateFail ? DANGER : "#CBD5E1", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+              <div style={{ position: "absolute", top: 2, left: simulateFail ? 20 : 2, width: 18, height: 18, borderRadius: "50%", background: "white", transition: "left 0.2s" }} />
+            </button>
+          </div>
+          <button onClick={handlePay} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, color: "white", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(26,86,219,0.30)" }}>
+            🔒 Payer {total.toLocaleString("fr-FR")} FCFA
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Processing screen ── */
+  if (screen === "processing") {
+    return (
+      <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+        <div style={{ background: "white", borderRadius: 24, padding: 40, width: "100%", maxWidth: 320, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: (pm?.color ?? PRIMARY) + "18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 16px" }}>{pm?.icon ?? "💳"}</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Traitement en cours…</h2>
+          <p style={{ margin: "0 0 24px", fontSize: 13, color: "#64748B" }}>{pm?.label}</p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: "50%", background: pm?.color ?? PRIMARY, opacity: 0.3 + i * 0.35, animation: "pulse 1.2s ease-in-out infinite" }} />
+            ))}
+          </div>
+          <p style={{ margin: "18px 0 0", fontSize: 11, color: "#94A3B8" }}>Ne fermez pas cette fenêtre</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Success screen ── */
+  if (screen === "success") {
+    return (
+      <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ background: `linear-gradient(135deg, ${SUCCESS} 0%, #047857 100%)`, padding: "52px 20px 32px", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto 14px" }}>✅</div>
+          <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 900, color: "white" }}>Paiement réussi !</h2>
+          <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.85)" }}>Votre billet a été confirmé</p>
+        </div>
+        <div style={{ padding: "24px 16px" }}>
+          {/* Ticket card */}
+          <div style={{ background: "white", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.10)", marginBottom: 16 }}>
+            <div style={{ background: `${SUCCESS}12`, padding: "18px 20px", borderBottom: "2px dashed #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 700 }}>Référence</p>
+                <p style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 900, color: "#0F172A", letterSpacing: 1 }}>{bookingRef}</p>
+              </div>
+              <QRCode value={bookingRef} />
+            </div>
+            <div style={{ padding: "18px 20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>DÉPART</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 24, fontWeight: 900, color: "#0F172A" }}>{chosen?.departureTime}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748B", fontWeight: 700 }}>{chosen?.from}</p>
+                </div>
+                <div style={{ textAlign: "center", paddingTop: 8 }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8" }}>{chosen?.duration}</p>
+                  <p style={{ margin: "6px 0 0", fontSize: 13 }}>✈️→</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", fontWeight: 600 }}>ARRIVÉE</p>
+                  <p style={{ margin: "4px 0 0", fontSize: 24, fontWeight: 900, color: "#0F172A" }}>{chosen?.arrivalTime}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748B", fontWeight: 700 }}>{chosen?.to}</p>
+                </div>
+              </div>
+              <div style={{ borderTop: "1px dashed #E2E8F0", paddingTop: 14, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Compagnie</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{chosen?.company}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Sièges</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{chosenSeats.join(", ")}</p>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <p style={{ margin: 0, fontSize: 11, color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Montant</p>
+                  <p style={{ margin: "3px 0 0", fontSize: 15, fontWeight: 900, color: SUCCESS }}>{total.toLocaleString("fr-FR")} FCFA</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style={{ background: "#DCFCE7", borderRadius: 14, padding: 14, marginBottom: 20, border: "1px solid #86EFAC" }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#14532D", lineHeight: 1.6 }}>📱 Votre billet a été envoyé par <strong>SMS</strong> et <strong>email</strong>. Présentez le QR code à l'embarquement.</p>
+          </div>
+          <button onClick={() => { setScreen("results"); setChosen(null); setChosenSeats([]); setMethod(null); setPaySubmitted(false); }} style={{ width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, color: "white", fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 20px rgba(26,86,219,0.30)" }}>
+            Retour à l'accueil
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Error screen ── */
+  if (screen === "error") {
+    return (
+      <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", background: "#F1F5F9", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+        <div style={{ background: "white", borderRadius: 24, padding: 36, width: "100%", maxWidth: 320, boxShadow: "0 4px 24px rgba(0,0,0,0.08)", textAlign: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto 16px" }}>❌</div>
+          <h2 style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 800, color: "#0F172A" }}>Échec du paiement</h2>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748B", lineHeight: 1.6 }}>{method ? ERROR_MSGS[method] : "Une erreur est survenue."}</p>
+          <p style={{ margin: "0 0 24px", fontSize: 11, color: "#94A3B8" }}>Aucun montant n'a été débité de votre compte.</p>
+          <button onClick={() => { setScreen("payment"); setPaySubmitted(false); }} style={{ width: "100%", padding: "14px 0", borderRadius: 14, border: "none", background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`, color: "white", fontSize: 14, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
+            Réessayer
+          </button>
+          <button onClick={() => { setScreen("results"); setChosen(null); setChosenSeats([]); setMethod(null); setPaySubmitted(false); }} style={{ width: "100%", padding: "14px 0", borderRadius: 14, border: "1.5px solid #E2E8F0", background: "white", color: "#475569", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            Changer de trajet
           </button>
         </div>
       </div>
