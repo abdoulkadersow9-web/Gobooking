@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-export type UserRole = "user" | "admin" | "super_admin" | "company_admin" | "agent";
+export type UserRole = "user" | "client" | "admin" | "super_admin" | "company_admin" | "agent";
 
 export interface User {
   id: string;
