@@ -130,10 +130,71 @@ router.get("/trips", async (req, res) => {
   try {
     const admin = await requireSuperAdmin(req.headers.authorization);
     if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const trips = await db.select().from(tripsTable);
+    const trips = await db.select().from(tripsTable).orderBy(desc(tripsTable.date));
     res.json(trips);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.post("/trips", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { from, to, date, departureTime, arrivalTime, price, busType, busName, totalSeats, duration } = req.body;
+    if (!from || !to || !date || !departureTime || !arrivalTime || !price || !busName) {
+      res.status(400).json({ error: "Champs obligatoires manquants" }); return;
+    }
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    const [trip] = await db.insert(tripsTable).values({
+      id, from, to, date, departureTime, arrivalTime,
+      price: parseFloat(price),
+      busType: busType || "Standard",
+      busName,
+      totalSeats: parseInt(totalSeats) || 44,
+      duration: duration || "",
+      status: "scheduled",
+    }).returning();
+    res.json(trip);
+  } catch (err) {
+    console.error("Create trip error:", err);
+    res.status(500).json({ error: "Échec de la création du trajet" });
+  }
+});
+
+router.patch("/trips/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { from, to, date, departureTime, arrivalTime, price, busType, busName, totalSeats, duration, status } = req.body;
+    const updates: Record<string, unknown> = {};
+    if (from)          updates.from          = from;
+    if (to)            updates.to            = to;
+    if (date)          updates.date          = date;
+    if (departureTime) updates.departureTime = departureTime;
+    if (arrivalTime)   updates.arrivalTime   = arrivalTime;
+    if (price)         updates.price         = parseFloat(price);
+    if (busType)       updates.busType       = busType;
+    if (busName)       updates.busName       = busName;
+    if (totalSeats)    updates.totalSeats    = parseInt(totalSeats);
+    if (duration)      updates.duration      = duration;
+    if (status)        updates.status        = status;
+    const [trip] = await db.update(tripsTable).set(updates).where(eq(tripsTable.id, req.params.id)).returning();
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    res.json(trip);
+  } catch (err) {
+    res.status(500).json({ error: "Échec de la modification" });
+  }
+});
+
+router.delete("/trips/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    await db.delete(tripsTable).where(eq(tripsTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec de la suppression" });
   }
 });
 
@@ -167,10 +228,28 @@ router.get("/bookings", async (req, res) => {
     res.json(bookings.map(b => ({
       id: b.id, bookingRef: b.bookingRef, tripId: b.tripId,
       totalAmount: b.totalAmount, status: b.status, paymentMethod: b.paymentMethod,
-      passengers: b.passengers, seatNumbers: b.seatNumbers, createdAt: b.createdAt?.toISOString(),
+      passengers: b.passengers, seatNumbers: b.seatNumbers,
+      contactEmail: b.contactEmail, contactPhone: b.contactPhone,
+      createdAt: b.createdAt?.toISOString(),
     })));
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.patch("/bookings/:id/status", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { status } = req.body;
+    if (!["confirmed", "pending", "cancelled"].includes(status)) {
+      res.status(400).json({ error: "Statut invalide. Utilisez : confirmed, pending ou cancelled" }); return;
+    }
+    const [booking] = await db.update(bookingsTable).set({ status }).where(eq(bookingsTable.id, req.params.id)).returning();
+    if (!booking) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    res.json({ id: booking.id, status: booking.status });
+  } catch (err) {
+    res.status(500).json({ error: "Échec de la mise à jour" });
   }
 });
 
