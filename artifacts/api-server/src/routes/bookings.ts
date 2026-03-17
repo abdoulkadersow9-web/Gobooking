@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, bookingsTable, tripsTable, seatsTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, ne, and } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -55,6 +55,13 @@ async function getFullBooking(bookingId: string) {
   };
 }
 
+/* ── Créer une réservation (statut: pending) ───────────────────────────────
+   POST /bookings
+   - Vérifie en transaction que chaque siège n'est PAS "booked"
+   - Marque les sièges "booked" atomiquement (évite la double réservation)
+   - Crée la réservation avec status:"pending" + paymentStatus:"pending"
+   - Le client doit ensuite appeler POST /bookings/:id/confirm pour payer
+─────────────────────────────────────────────────────────────────────────── */
 router.post("/", async (req, res) => {
   try {
     const userId = getUserIdFromToken(req.headers.authorization);
@@ -66,41 +73,138 @@ router.post("/", async (req, res) => {
     const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
-      res.status(400).json({ error: "Missing required fields" });
+      res.status(400).json({ error: "Champs requis manquants" });
       return;
     }
 
-    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
-    const selectedSeats = seats.filter((s) => seatIds.includes(s.id));
-    const totalAmount = selectedSeats.reduce((sum, s) => sum + s.price, 0);
-    const seatNumbers = selectedSeats.map((s) => s.number);
+    /* ── Vérification atomique anti double-réservation ─────────────────────
+       Pour chaque siège, on tente une mise à jour WHERE status != 'booked'.
+       Si le nb de lignes mises à jour < nb de sièges demandés, un siège
+       a été pris en simultané par un autre utilisateur → 409.
+    ─────────────────────────────────────────────────────────────────────── */
+    const seatsData = await db
+      .select()
+      .from(seatsTable)
+      .where(and(eq(seatsTable.tripId, tripId), inArray(seatsTable.id, seatIds)));
 
-    // Mark seats as booked
-    for (const seatId of seatIds) {
-      await db.update(seatsTable).set({ status: "booked" }).where(eq(seatsTable.id, seatId));
+    if (seatsData.length !== seatIds.length) {
+      res.status(404).json({ error: "Un ou plusieurs sièges introuvables" });
+      return;
     }
 
-    const booking = await db.insert(bookingsTable).values({
-      id: generateId(),
-      bookingRef: generateRef(),
-      userId,
-      tripId,
-      seatIds,
-      seatNumbers,
-      passengers,
-      totalAmount,
-      paymentMethod,
-      paymentStatus: "paid",
-      status: "confirmed",
-      contactEmail,
-      contactPhone,
-    }).returning();
+    const alreadyBooked = seatsData.filter((s) => s.status === "booked");
+    if (alreadyBooked.length > 0) {
+      res.status(409).json({
+        error: `Double réservation impossible — siège(s) déjà pris : ${alreadyBooked.map((s) => s.number).join(", ")}`,
+      });
+      return;
+    }
 
-    const full = await getFullBooking(booking[0].id);
+    // Marquer chaque siège comme "booked" de façon atomique (WHERE != booked)
+    const bookedSeats: string[] = [];
+    for (const seatId of seatIds) {
+      const updated = await db
+        .update(seatsTable)
+        .set({ status: "booked" })
+        .where(and(eq(seatsTable.id, seatId), ne(seatsTable.status, "booked")))
+        .returning({ id: seatsTable.id });
+      if (updated.length > 0) bookedSeats.push(seatId);
+    }
+
+    if (bookedSeats.length !== seatIds.length) {
+      // Race condition : libérer les sièges déjà bloqués
+      for (const seatId of bookedSeats) {
+        await db.update(seatsTable).set({ status: "available" }).where(eq(seatsTable.id, seatId));
+      }
+      res.status(409).json({ error: "Un ou plusieurs sièges viennent d'être réservés simultanément. Veuillez recommencer." });
+      return;
+    }
+
+    const totalAmount = seatsData.reduce((sum, s) => sum + s.price, 0);
+    const seatNumbers = seatsData.map((s) => s.number);
+
+    const newBookingId = generateId();
+    const newBookingRef = generateRef();
+
+    await db
+      .insert(bookingsTable)
+      .values({
+        id: newBookingId,
+        bookingRef: newBookingRef,
+        userId,
+        tripId,
+        seatIds,
+        seatNumbers,
+        passengers,
+        totalAmount,
+        paymentMethod,
+        paymentStatus: "pending",
+        status: "pending",
+        contactEmail,
+        contactPhone,
+      });
+
+    const bookingResult = await getFullBooking(newBookingId);
+    res.json(bookingResult);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Réservation échouée";
+    const isConflict = msg.includes("Double réservation");
+    res.status(isConflict ? 409 : 500).json({ error: msg });
+  }
+});
+
+/* ── Confirmer le paiement d'une réservation ──────────────────────────────
+   POST /bookings/:bookingId/confirm
+   Body: { paymentMethod?: string }
+   - Réservation doit être "pending" et appartenir à l'utilisateur connecté
+   - Passe status → "confirmed", paymentStatus → "paid"
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/:bookingId/confirm", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const { bookingId } = req.params;
+    const { paymentMethod } = req.body as { paymentMethod?: string };
+
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!bookings.length) {
+      res.status(404).json({ error: "Réservation introuvable" });
+      return;
+    }
+
+    const booking = bookings[0];
+    if (booking.userId !== userId) {
+      res.status(403).json({ error: "Non autorisé" });
+      return;
+    }
+    if (booking.status === "confirmed") {
+      const full = await getFullBooking(bookingId);
+      res.json(full);
+      return;
+    }
+    if (booking.status !== "pending") {
+      res.status(400).json({ error: `Impossible de confirmer une réservation "${booking.status}"` });
+      return;
+    }
+
+    await db
+      .update(bookingsTable)
+      .set({
+        status: "confirmed",
+        paymentStatus: "paid",
+        ...(paymentMethod ? { paymentMethod } : {}),
+      })
+      .where(eq(bookingsTable.id, bookingId));
+
+    const full = await getFullBooking(bookingId);
     res.json(full);
   } catch (err) {
-    console.error("Create booking error:", err);
-    res.status(500).json({ error: "Booking failed" });
+    console.error("Confirm booking error:", err);
+    res.status(500).json({ error: "Échec de la confirmation" });
   }
 });
 

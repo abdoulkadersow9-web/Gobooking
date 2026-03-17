@@ -64,7 +64,7 @@ router.post("/boarding/:bookingId/validate", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    await db.update(bookingsTable).set({ status: "boarded" }).where(eq(bookingsTable.id, req.params.bookingId));
+    await db.update(bookingsTable).set({ status: "validated" }).where(eq(bookingsTable.id, req.params.bookingId));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed" });

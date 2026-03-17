@@ -99,6 +99,7 @@ export default function PaymentScreen() {
   const [cvv, setCvv] = useState("");
   const [cardName, setCardName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [payStep, setPayStep] = useState<"idle" | "creating" | "processing" | "confirming">("idle");
 
   useEffect(() => {
     if (!booking?.tripId) return;
@@ -124,6 +125,11 @@ export default function PaymentScreen() {
     return digits;
   };
 
+  /* ── Flux de paiement en 3 étapes ──────────────────────────────────────
+     1. Créer réservation (status: pending)
+     2. Simuler le traitement du paiement mobile
+     3. Confirmer la réservation (status: confirmed, paymentStatus: paid)
+  ────────────────────────────────────────────────────────────────────── */
   const handlePay = async () => {
     if (!booking || !token) return;
 
@@ -141,7 +147,9 @@ export default function PaymentScreen() {
 
     setLoading(true);
     try {
-      const res = await apiFetch<BookingResponse>("/bookings", {
+      // Étape 1 — Créer la réservation (pending)
+      setPayStep("creating");
+      const created = await apiFetch<BookingResponse>("/bookings", {
         method: "POST",
         token,
         body: JSON.stringify({
@@ -160,18 +168,39 @@ export default function PaymentScreen() {
           contactPhone: booking.contactPhone || phone,
         }),
       });
+
+      // Étape 2 — Simuler le traitement du paiement
+      setPayStep("processing");
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+
+      // Étape 3 — Confirmer la réservation (confirmed + paid)
+      setPayStep("confirming");
+      await apiFetch(`/bookings/${created.id}/confirm`, {
+        method: "POST",
+        token,
+        body: JSON.stringify({ paymentMethod: method }),
+      });
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       updateBooking({ paymentMethod: method });
       router.replace({
         pathname: "/confirmation/[bookingId]",
-        params: { bookingId: res.id },
+        params: { bookingId: created.id },
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Échec du paiement";
       Alert.alert("Paiement échoué", msg);
     } finally {
       setLoading(false);
+      setPayStep("idle");
     }
+  };
+
+  const payStepLabel = () => {
+    if (payStep === "creating") return "Création de la réservation…";
+    if (payStep === "processing") return "Traitement du paiement…";
+    if (payStep === "confirming") return "Confirmation en cours…";
+    return "Payer maintenant";
   };
 
   const selectedMethod = PAYMENT_METHODS.find((m) => m.id === method)!;
@@ -437,7 +466,10 @@ export default function PaymentScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="white" />
+              <>
+                <ActivityIndicator color="white" size="small" />
+                <Text style={styles.payBtnText}>{payStepLabel()}</Text>
+              </>
             ) : (
               <>
                 <Feather name="check-circle" size={18} color="white" />

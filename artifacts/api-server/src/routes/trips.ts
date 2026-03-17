@@ -1,10 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, tripsTable, seatsTable } from "@workspace/db";
-import { eq, and, ilike } from "drizzle-orm";
+import { eq, and, ilike, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
-
-const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
 router.get("/search", async (req, res) => {
   try {
@@ -52,6 +50,61 @@ router.get("/search", async (req, res) => {
   } catch (err) {
     console.error("Search error:", err);
     res.status(500).json({ error: "Search failed" });
+  }
+});
+
+/* ── Réservation temporaire de sièges (hold) ──────────────────────────────
+   POST /trips/:tripId/seats/hold
+   Body: { seatIds: string[] }
+   - Vérifie que chaque siège est disponible (status !== "booked")
+   - Marque les sièges comme "selected" pour bloquer les autres utilisateurs
+   - Retourne 409 si un siège est déjà "booked"
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/:tripId/seats/hold", async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const { seatIds } = req.body as { seatIds: string[] };
+
+    if (!seatIds?.length) {
+      res.status(400).json({ error: "seatIds requis" });
+      return;
+    }
+
+    const seats = await db
+      .select()
+      .from(seatsTable)
+      .where(and(eq(seatsTable.tripId, tripId), inArray(seatsTable.id, seatIds)));
+
+    if (seats.length !== seatIds.length) {
+      res.status(404).json({ error: "Un ou plusieurs sièges introuvables" });
+      return;
+    }
+
+    const alreadyBooked = seats.filter((s) => s.status === "booked");
+    if (alreadyBooked.length > 0) {
+      res.status(409).json({
+        error: `Siège(s) déjà réservé(s) : ${alreadyBooked.map((s) => s.number).join(", ")}`,
+        bookedSeats: alreadyBooked.map((s) => s.id),
+      });
+      return;
+    }
+
+    for (const seatId of seatIds) {
+      await db
+        .update(seatsTable)
+        .set({ status: "selected" })
+        .where(and(eq(seatsTable.id, seatId), eq(seatsTable.status, "available")));
+    }
+
+    const updated = await db
+      .select()
+      .from(seatsTable)
+      .where(and(eq(seatsTable.tripId, tripId), inArray(seatsTable.id, seatIds)));
+
+    res.json(updated.map((s) => ({ id: s.id, number: s.number, status: s.status })));
+  } catch (err) {
+    console.error("Hold seats error:", err);
+    res.status(500).json({ error: "Erreur lors du blocage des sièges" });
   }
 });
 

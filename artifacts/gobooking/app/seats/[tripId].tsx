@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Platform,
   Pressable,
@@ -16,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
@@ -29,47 +31,57 @@ interface Seat {
   price: number;
 }
 
-const SEAT_AVAILABLE = "#D1FAE5";
+const SEAT_AVAILABLE        = "#D1FAE5";
 const SEAT_AVAILABLE_BORDER = "#10B981";
-const SEAT_AVAILABLE_TEXT = "#065F46";
+const SEAT_AVAILABLE_TEXT   = "#065F46";
 
-const SEAT_BOOKED = "#FEE2E2";
+const SEAT_BOOKED        = "#FEE2E2";
 const SEAT_BOOKED_BORDER = "#EF4444";
-const SEAT_BOOKED_TEXT = "#B91C1C";
+const SEAT_BOOKED_TEXT   = "#B91C1C";
 
-const SEAT_SELECTED = "#1A56DB";
+const SEAT_HELD        = "#FEF3C7";
+const SEAT_HELD_BORDER = "#F59E0B";
+const SEAT_HELD_TEXT   = "#92400E";
+
+const SEAT_SELECTED        = "#1A56DB";
 const SEAT_SELECTED_BORDER = "#0F3BA0";
-const SEAT_SELECTED_TEXT = "#FFFFFF";
+const SEAT_SELECTED_TEXT   = "#FFFFFF";
 
 export default function SeatSelectionScreen() {
   const insets = useSafeAreaInsets();
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const { token } = useAuth();
   const { booking, updateBooking } = useBooking();
   const [seats, setSeats] = useState<Seat[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [lastTapped, setLastTapped] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [holding, setHolding] = useState(false);
   const popAnim = useRef(new Animated.Value(0)).current;
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
+  const loadSeats = async () => {
+    try {
+      const data = await apiFetch<Seat[]>(`/trips/${tripId}/seats`);
+      setSeats(data);
+    } catch {
+      setSeats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await apiFetch<Seat[]>(`/trips/${tripId}/seats`);
-        setSeats(data);
-      } catch {
-        setSeats([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadSeats();
   }, [tripId]);
 
+  const isUnavailable = (seat: Seat) =>
+    seat.status === "booked" || (seat.status === "selected" && !selected.includes(seat.id));
+
   const toggleSeat = (seat: Seat) => {
-    if (seat.status === "booked") return;
+    if (isUnavailable(seat)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLastTapped(seat.id);
     Animated.sequence([
@@ -84,9 +96,31 @@ export default function SeatSelectionScreen() {
     );
   };
 
-  const handleContinue = () => {
+  /* ── Bloquer les sièges en base avant de passer à l'étape suivante ── */
+  const handleContinue = async () => {
     if (!selected.length) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    setHolding(true);
+    try {
+      await apiFetch(`/trips/${tripId}/seats/hold`, {
+        method: "POST",
+        token: token ?? undefined,
+        body: JSON.stringify({ seatIds: selected }),
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Siège(s) indisponible(s)";
+      Alert.alert(
+        "Siège indisponible",
+        msg + "\n\nLa liste des sièges va être actualisée.",
+        [{ text: "OK", onPress: () => { setSelected([]); loadSeats(); } }]
+      );
+      setHolding(false);
+      return;
+    } finally {
+      setHolding(false);
+    }
+
     const selectedSeats = seats.filter((s) => selected.includes(s.id));
     const seatNumbers = selectedSeats.map((s) => s.number);
     updateBooking({
@@ -111,26 +145,11 @@ export default function SeatSelectionScreen() {
   const tappedSeat = seats.find((s) => s.id === lastTapped);
 
   const getSeatStyle = (seat: Seat) => {
-    const isSelected = selected.includes(seat.id);
-    if (isSelected) {
-      return {
-        bg: SEAT_SELECTED,
-        border: SEAT_SELECTED_BORDER,
-        text: SEAT_SELECTED_TEXT,
-      };
-    }
-    if (seat.status === "booked") {
-      return {
-        bg: SEAT_BOOKED,
-        border: SEAT_BOOKED_BORDER,
-        text: SEAT_BOOKED_TEXT,
-      };
-    }
-    return {
-      bg: SEAT_AVAILABLE,
-      border: SEAT_AVAILABLE_BORDER,
-      text: SEAT_AVAILABLE_TEXT,
-    };
+    const isLocallySelected = selected.includes(seat.id);
+    if (isLocallySelected) return { bg: SEAT_SELECTED, border: SEAT_SELECTED_BORDER, text: SEAT_SELECTED_TEXT };
+    if (seat.status === "booked") return { bg: SEAT_BOOKED, border: SEAT_BOOKED_BORDER, text: SEAT_BOOKED_TEXT };
+    if (seat.status === "selected") return { bg: SEAT_HELD, border: SEAT_HELD_BORDER, text: SEAT_HELD_TEXT };
+    return { bg: SEAT_AVAILABLE, border: SEAT_AVAILABLE_BORDER, text: SEAT_AVAILABLE_TEXT };
   };
 
   return (
@@ -171,16 +190,16 @@ export default function SeatSelectionScreen() {
           <Text style={styles.legendText}>Sélectionné</Text>
         </View>
         <View style={styles.legendItem}>
+          <View style={[styles.legendSeat, { backgroundColor: SEAT_HELD, borderColor: SEAT_HELD_BORDER }]}>
+            <Feather name="clock" size={10} color={SEAT_HELD_TEXT} />
+          </View>
+          <Text style={styles.legendText}>En cours</Text>
+        </View>
+        <View style={styles.legendItem}>
           <View style={[styles.legendSeat, { backgroundColor: SEAT_BOOKED, borderColor: SEAT_BOOKED_BORDER }]}>
             <Feather name="x" size={10} color={SEAT_BOOKED_TEXT} />
           </View>
           <Text style={styles.legendText}>Réservé</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={styles.aisleIndicator}>
-            <Text style={styles.aisleIndicatorText}>|</Text>
-          </View>
-          <Text style={styles.legendText}>Allée</Text>
         </View>
       </View>
 
@@ -235,25 +254,27 @@ export default function SeatSelectionScreen() {
                 <View style={styles.seatPair}>
                   {left.map((seat) => {
                     const s = getSeatStyle(seat);
-                    const isLast = lastTapped === seat.id;
                     return (
                       <Pressable
                         key={seat.id}
                         onPress={() => toggleSeat(seat)}
-                        disabled={seat.status === "booked"}
+                        disabled={isUnavailable(seat)}
                         style={({ pressed }) => [
                           styles.seat,
                           {
                             backgroundColor: s.bg,
                             borderColor: s.border,
-                            transform: pressed && seat.status !== "booked"
-                              ? [{ scale: 0.92 }]
-                              : [],
+                            transform: pressed && !isUnavailable(seat) ? [{ scale: 0.92 }] : [],
                           },
                         ]}
                       >
                         <Feather
-                          name={seat.status === "booked" ? "x" : selected.includes(seat.id) ? "user" : "check"}
+                          name={
+                            seat.status === "booked" ? "x"
+                            : seat.status === "selected" && !selected.includes(seat.id) ? "clock"
+                            : selected.includes(seat.id) ? "user"
+                            : "check"
+                          }
                           size={11}
                           color={s.text}
                         />
@@ -272,20 +293,23 @@ export default function SeatSelectionScreen() {
                       <Pressable
                         key={seat.id}
                         onPress={() => toggleSeat(seat)}
-                        disabled={seat.status === "booked"}
+                        disabled={isUnavailable(seat)}
                         style={({ pressed }) => [
                           styles.seat,
                           {
                             backgroundColor: s.bg,
                             borderColor: s.border,
-                            transform: pressed && seat.status !== "booked"
-                              ? [{ scale: 0.92 }]
-                              : [],
+                            transform: pressed && !isUnavailable(seat) ? [{ scale: 0.92 }] : [],
                           },
                         ]}
                       >
                         <Feather
-                          name={seat.status === "booked" ? "x" : selected.includes(seat.id) ? "user" : "check"}
+                          name={
+                            seat.status === "booked" ? "x"
+                            : seat.status === "selected" && !selected.includes(seat.id) ? "clock"
+                            : selected.includes(seat.id) ? "user"
+                            : "check"
+                          }
                           size={11}
                           color={s.text}
                         />
@@ -342,11 +366,21 @@ export default function SeatSelectionScreen() {
             </View>
           </View>
           <Pressable
-            style={({ pressed }) => [styles.continueBtn, pressed && styles.continueBtnPressed]}
+            style={({ pressed }) => [
+              styles.continueBtn,
+              (pressed || holding) && styles.continueBtnPressed,
+            ]}
             onPress={handleContinue}
+            disabled={holding}
           >
-            <Text style={styles.continueBtnText}>Continuer vers paiement</Text>
-            <Feather name="arrow-right" size={18} color="white" />
+            {holding ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Text style={styles.continueBtnText}>Continuer vers paiement</Text>
+                <Feather name="arrow-right" size={18} color="white" />
+              </>
+            )}
           </Pressable>
         </View>
       )}
@@ -421,7 +455,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
+    gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: "white",
@@ -442,17 +476,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_500Medium",
     color: Colors.light.textSecondary,
-  },
-  aisleIndicator: {
-    width: 20,
-    alignItems: "center",
-  },
-  aisleIndicatorText: {
-    fontSize: 16,
-    color: "#CBD5E1",
   },
 
   // Scroll
