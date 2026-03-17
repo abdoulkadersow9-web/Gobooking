@@ -66,6 +66,10 @@ const DEMO_PARCELS: Parcel[] = [
     senderName: "Ouattara Paul", receiverName: "Diomandé Cissé", parcelType: "alimentaire",
     weight: 8.0, deliveryType: "retrait_agence", amount: 8200, status: "pris_en_charge",
     createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  { id: "d5", trackingRef: "GBX-E2A1-ZP77", fromCity: "Man", toCity: "Abidjan",
+    senderName: "Bamba Seydou", receiverName: "Coulibaly Awa", parcelType: "cosmetique",
+    weight: 1.2, deliveryType: "livraison_domicile", amount: 3500, status: "en_livraison",
+    createdAt: new Date(Date.now() - 4 * 86400000).toISOString() },
 ];
 
 function formatDate(iso: string, lang: string) {
