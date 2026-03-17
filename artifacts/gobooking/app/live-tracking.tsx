@@ -5,6 +5,8 @@ import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Linking,
@@ -14,6 +16,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -274,6 +277,48 @@ export default function LiveTrackingScreen() {
       .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
   }, [rawBuses, clientPos]);
 
+  /* ── Client request form state ── */
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [reqName,     setReqName]     = useState("");
+  const [reqPhone,    setReqPhone]    = useState("");
+  const [reqSeats,    setReqSeats]    = useState("1");
+  const [reqLoading,  setReqLoading]  = useState(false);
+  const [reqSuccess,  setReqSuccess]  = useState(false);
+
+  const submitRequest = useCallback(async () => {
+    if (!selected) return;
+    if (!boardingPoint) {
+      Alert.alert("Point de montée requis", "Sélectionnez d'abord un point de montée.");
+      return;
+    }
+    if (reqName.trim().length < 2) {
+      Alert.alert("Nom invalide", "Entrez votre nom complet (min. 2 caractères).");
+      return;
+    }
+    if (reqPhone.trim().length < 8) {
+      Alert.alert("Téléphone invalide", "Entrez un numéro valide.");
+      return;
+    }
+    setReqLoading(true);
+    try {
+      await apiFetch(`/trips/${selected.id}/request`, {
+        method: "POST",
+        body: JSON.stringify({
+          clientName:     reqName.trim(),
+          clientPhone:    reqPhone.trim(),
+          seatsRequested: parseInt(reqSeats, 10) || 1,
+          boardingPoint,
+        }),
+      });
+      setReqSuccess(true);
+      setReqName(""); setReqPhone(""); setReqSeats("1");
+      setTimeout(() => { setReqSuccess(false); setShowRequestForm(false); }, 3000);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible d'envoyer la demande. Réessayez.");
+    }
+    setReqLoading(false);
+  }, [selected, boardingPoint, reqName, reqPhone, reqSeats]);
+
   /* Client position on map (mapX/mapY %) — clamped to CI bounding box */
   const clientMapPos = useMemo<{ x: number; y: number } | null>(() => {
     if (!clientPos) return null;
@@ -288,12 +333,19 @@ export default function LiveTrackingScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSelected(bus);
     setBoardingPoint(null);
+    setShowRequestForm(false);
+    setReqSuccess(false);
+    setReqName(""); setReqPhone(""); setReqSeats("1");
     slideAnim.setValue(600);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, tension: 65, friction: 11 }).start();
   }, [slideAnim]);
 
   const closeDetail = useCallback(() => {
-    Animated.timing(slideAnim, { toValue: 600, duration: 260, useNativeDriver: false }).start(() => setSelected(null));
+    Animated.timing(slideAnim, { toValue: 600, duration: 260, useNativeDriver: false }).start(() => {
+      setSelected(null);
+      setShowRequestForm(false);
+      setReqSuccess(false);
+    });
   }, [slideAnim]);
 
   const callAgent = (bus: LiveBus) => {
@@ -635,11 +687,135 @@ export default function LiveTrackingScreen() {
               </View>
             </ScrollView>
 
+            {/* Request form — inline below scroll content */}
+            {showRequestForm && !reqSuccess && (
+              <View style={{
+                marginHorizontal: 16, marginBottom: 12,
+                backgroundColor: "#F8FAFC", borderRadius: 14,
+                borderWidth: 1.5, borderColor: "#E2E8F0",
+                padding: 14, gap: 10,
+              }}>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                  Demander une montée
+                </Text>
+                {!boardingPoint && (
+                  <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                    <Feather name="alert-circle" size={13} color="#D97706" />
+                    <Text style={{ fontSize: 12, color: "#D97706", fontFamily: "Inter_500Medium" }}>
+                      Sélectionnez d'abord un point de montée ci-dessus
+                    </Text>
+                  </View>
+                )}
+                <TextInput
+                  style={{
+                    backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0",
+                    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular",
+                  }}
+                  placeholder="Votre nom complet"
+                  placeholderTextColor="#94A3B8"
+                  value={reqName}
+                  onChangeText={setReqName}
+                  autoCapitalize="words"
+                />
+                <TextInput
+                  style={{
+                    backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0",
+                    paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular",
+                  }}
+                  placeholder="Numéro de téléphone"
+                  placeholderTextColor="#94A3B8"
+                  value={reqPhone}
+                  onChangeText={setReqPhone}
+                  keyboardType="phone-pad"
+                />
+                {/* Seats selector */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Text style={{ fontSize: 13, color: "#475569", fontFamily: "Inter_500Medium" }}>Places :</Text>
+                  {["1","2","3","4"].map(n => (
+                    <Pressable
+                      key={n}
+                      onPress={() => setReqSeats(n)}
+                      style={{
+                        width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center",
+                        backgroundColor: reqSeats === n ? selected.color : "#F1F5F9",
+                        borderWidth: 1.5, borderColor: reqSeats === n ? selected.color : "#E2E8F0",
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: reqSeats === n ? "white" : "#475569" }}>{n}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {/* Action row */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable
+                    style={{ flex: 1, height: 40, borderRadius: 10, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" }}
+                    onPress={() => setShowRequestForm(false)}
+                  >
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#64748B" }}>Annuler</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [{
+                      flex: 2, height: 40, borderRadius: 10,
+                      backgroundColor: selected.color,
+                      justifyContent: "center", alignItems: "center",
+                      flexDirection: "row", gap: 6,
+                      opacity: reqLoading || !boardingPoint ? 0.7 : (pressed ? 0.88 : 1),
+                    }]}
+                    onPress={submitRequest}
+                    disabled={reqLoading || !boardingPoint}
+                  >
+                    {reqLoading
+                      ? <ActivityIndicator color="white" size="small" />
+                      : <><Feather name="send" size={14} color="white" />
+                         <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>Envoyer la demande</Text></>
+                    }
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Success banner */}
+            {reqSuccess && (
+              <View style={{
+                marginHorizontal: 16, marginBottom: 12, padding: 14,
+                backgroundColor: "#ECFDF5", borderRadius: 14,
+                borderWidth: 1.5, borderColor: "#BBF7D0",
+                flexDirection: "row", alignItems: "center", gap: 10,
+              }}>
+                <Feather name="check-circle" size={20} color="#059669" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#065F46" }}>Demande envoyée !</Text>
+                  <Text style={{ fontSize: 12, color: "#059669" }}>L'agent vous contactera prochainement.</Text>
+                </View>
+              </View>
+            )}
+
             {/* Reserve CTA */}
-            <View style={S.sheetFooter}>
-              <View style={S.priceWrap}>
-                <Text style={S.priceLabel}>Prix / place</Text>
-                <Text style={[S.priceVal, { color: selected.color }]}>{selected.price.toLocaleString()} F</Text>
+            <View style={[S.sheetFooter, { flexDirection: "column", gap: 10 }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={S.priceWrap}>
+                  <Text style={S.priceLabel}>Prix / place</Text>
+                  <Text style={[S.priceVal, { color: selected.color }]}>{selected.price.toLocaleString()} F</Text>
+                </View>
+                {/* "Demander en direct" toggle */}
+                {!reqSuccess && (
+                  <Pressable
+                    style={({ pressed }) => [{
+                      flexDirection: "row", alignItems: "center", gap: 6,
+                      paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12,
+                      backgroundColor: showRequestForm ? "#F1F5F9" : "#F0FDF4",
+                      borderWidth: 1.5,
+                      borderColor: showRequestForm ? "#E2E8F0" : "#BBF7D0",
+                      opacity: pressed ? 0.8 : 1,
+                    }]}
+                    onPress={() => { Haptics.selectionAsync(); setShowRequestForm(v => !v); }}
+                  >
+                    <Feather name={showRequestForm ? "x" : "radio"} size={13} color={showRequestForm ? "#94A3B8" : "#059669"} />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: showRequestForm ? "#64748B" : "#059669" }}>
+                      {showRequestForm ? "Fermer" : "Demander en direct"}
+                    </Text>
+                  </Pressable>
+                )}
               </View>
               <Pressable
                 style={({ pressed }) => [S.reserveBtn, { backgroundColor: selected.color }, pressed && { opacity: 0.88, transform: [{ scale: 0.97 }] }]}

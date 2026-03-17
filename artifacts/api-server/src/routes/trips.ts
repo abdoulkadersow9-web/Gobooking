@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, tripsTable, seatsTable } from "@workspace/db";
 import { eq, and, ilike, inArray } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
+import { requestStore, newRequestId } from "../requestStore";
 
 /* Convert mapX%/mapY% back to approximate real-world lat/lon for demo buses.
    Bounding box: lat 4.3–10.7N, lon 8.4W–3.2W */
@@ -266,6 +267,42 @@ router.get("/live", async (_req, res) => {
   } catch (err) {
     console.error("Live trips error:", err);
     res.status(500).json({ error: "Erreur récupération cars en route" });
+  }
+});
+
+/* ─── Client sends a boarding request for a live bus ─────────────────────── */
+router.post("/:tripId/request", async (req, res) => {
+  try {
+    const { clientName, clientPhone, seatsRequested = 1, boardingPoint } = req.body ?? {};
+
+    if (!clientName || typeof clientName !== "string" || clientName.trim().length < 2) {
+      res.status(400).json({ error: "Nom requis (min. 2 caractères)" }); return;
+    }
+    if (!clientPhone || typeof clientPhone !== "string" || clientPhone.trim().length < 8) {
+      res.status(400).json({ error: "Numéro de téléphone invalide" }); return;
+    }
+    if (!boardingPoint || typeof boardingPoint !== "string") {
+      res.status(400).json({ error: "Point de montée requis" }); return;
+    }
+    const seats = Math.max(1, Math.min(9, parseInt(seatsRequested, 10) || 1));
+
+    const id = newRequestId();
+    const entry = {
+      id,
+      tripId:         req.params.tripId,
+      clientName:     clientName.trim(),
+      clientPhone:    clientPhone.trim(),
+      seatsRequested: seats,
+      boardingPoint:  boardingPoint.trim(),
+      status:         "pending" as const,
+      createdAt:      Date.now(),
+    };
+    requestStore.set(id, entry);
+
+    res.status(201).json({ success: true, requestId: id });
+  } catch (err) {
+    console.error("Trip request error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

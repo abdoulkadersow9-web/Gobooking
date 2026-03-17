@@ -6,6 +6,8 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -81,7 +83,20 @@ const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }
   livre:          { label: "Livré",          color: "#065F46", bg: "#ECFDF5" },
 };
 
-type Tab = "mission" | "sieges" | "embarquement" | "colis" | "scanner";
+type Tab = "mission" | "demandes" | "sieges" | "embarquement" | "colis" | "scanner";
+
+/* ─── Trip request type (mirrors server requestStore) ── */
+interface TripRequest {
+  id:             string;
+  tripId:         string;
+  clientName:     string;
+  clientPhone:    string;
+  seatsRequested: number;
+  boardingPoint:  string;
+  status:         "pending" | "accepted" | "rejected";
+  createdAt:      number;
+  respondedAt?:   number;
+}
 
 /* ─── Scan Result Card ───────────────────────────────────── */
 function ScanResultCard({
@@ -489,11 +504,69 @@ export default function AgentDashboard() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [tripStatus, tripStartedAt]);
 
-  /* GPS position broadcast — runs every 10s while en_route */
+  /* ── Trip request state ── */
+  const [requests,       setRequests]       = useState<TripRequest[]>([]);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const requestPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [respondingId,   setRespondingId]   = useState<string | null>(null);
+
+  const pendingCount = requests.filter(r => r.status === "pending").length;
+
+  const fetchRequests = useCallback(async (silent = false) => {
+    if (!token) return;
+    if (!silent) setRequestLoading(true);
+    try {
+      const data = await apiFetch<TripRequest[]>(`/agent/requests?tripId=${DEMO_TRIP.id}`, { token });
+      setRequests(data);
+    } catch { /* non-blocking */ }
+    finally { if (!silent) setRequestLoading(false); }
+  }, [token]);
+
   useEffect(() => {
-    if (tripStatus !== "en_route") {
+    fetchRequests();
+    requestPollRef.current = setInterval(() => fetchRequests(true), 10_000);
+    return () => { if (requestPollRef.current) clearInterval(requestPollRef.current); };
+  }, [fetchRequests]);
+
+  const handleAccept = async (reqId: string, seatsRequested: number) => {
+    setRespondingId(reqId);
+    try {
+      await apiFetch(`/agent/requests/${reqId}/accept`, { token: token ?? undefined, method: "POST" });
+      setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: "accepted" as const } : r));
+      /* Decrement available seats locally */
+      setBoarding(prev => prev); /* trigger re-render after seat update below */
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible d'accepter la demande");
+    }
+    setRespondingId(null);
+  };
+
+  const handleReject = async (reqId: string) => {
+    setRespondingId(reqId);
+    try {
+      await apiFetch(`/agent/requests/${reqId}/reject`, { token: token ?? undefined, method: "POST" });
+      setRequests(prev => prev.map(r => r.id === reqId ? { ...r, status: "rejected" as const } : r));
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de refuser la demande");
+    }
+    setRespondingId(null);
+  };
+
+  const callClient = (phone: string) => {
+    Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
+  };
+  const smsClient = (phone: string) => {
+    Linking.openURL(`sms:${phone.replace(/\s/g, "")}`);
+  };
+
+  /* ── GPS toggle (manual override) ── */
+  const [gpsEnabled, setGpsEnabled] = useState(true); /* user can mute GPS if needed */
+
+  /* GPS position broadcast — runs every 10s while en_route AND gpsEnabled */
+  useEffect(() => {
+    if (tripStatus !== "en_route" || !gpsEnabled) {
       if (gpsIntervalRef.current) { clearInterval(gpsIntervalRef.current); gpsIntervalRef.current = null; }
-      if (tripStatus === "arrived") setGpsStatus("idle");
+      if (tripStatus === "arrived" || !gpsEnabled) setGpsStatus(gpsEnabled ? "idle" : "idle");
       return;
     }
 
@@ -648,12 +721,13 @@ export default function AgentDashboard() {
     : tripStatus === "arrived" ? "Arrivé ✓"
     : "En service";
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "mission",       label: "Mission",     icon: "navigation"  },
-    { id: "scanner",       label: "Scanner",     icon: "maximize"    },
-    { id: "embarquement",  label: "Embarquement",icon: "users"       },
-    { id: "sieges",        label: "Sièges",      icon: "grid"        },
-    { id: "colis",         label: "Colis",       icon: "package"     },
+  const TABS: { id: Tab; label: string; icon: string; badge?: number }[] = [
+    { id: "mission",      label: "Mission",      icon: "navigation" },
+    { id: "demandes",     label: "Demandes",     icon: "bell",       badge: pendingCount },
+    { id: "scanner",      label: "Scanner",      icon: "maximize"   },
+    { id: "embarquement", label: "Embarquement", icon: "users"      },
+    { id: "sieges",       label: "Sièges",       icon: "grid"       },
+    { id: "colis",        label: "Colis",        icon: "package"    },
   ];
 
   return (
@@ -704,9 +778,23 @@ export default function AgentDashboard() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabBar} contentContainerStyle={S.tabBarContent}>
         {TABS.map(tab => (
           <Pressable key={tab.id} style={[S.tab, activeTab === tab.id && S.tabActive]} onPress={() => setActiveTab(tab.id)}>
-            <Feather name={tab.icon as never} size={14} color={activeTab === tab.id ? GREEN : "#94A3B8"} />
+            <View style={{ position: "relative" }}>
+              <Feather name={tab.icon as never} size={14} color={activeTab === tab.id ? GREEN : "#94A3B8"} />
+              {tab.badge != null && tab.badge > 0 && (
+                <View style={{
+                  position: "absolute", top: -5, right: -7,
+                  minWidth: 14, height: 14, borderRadius: 7,
+                  backgroundColor: "#EF4444",
+                  justifyContent: "center", alignItems: "center",
+                  paddingHorizontal: 2,
+                }}>
+                  <Text style={{ fontSize: 8, fontFamily: "Inter_700Bold", color: "white" }}>
+                    {tab.badge > 9 ? "9+" : tab.badge}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={[S.tabText, activeTab === tab.id && S.tabTextActive]}>{tab.label}</Text>
-            {tab.id === "scanner" && <View style={S.tabDot} />}
           </Pressable>
         ))}
       </ScrollView>
@@ -891,6 +979,256 @@ export default function AgentDashboard() {
               <Text style={[S.quickActionText, { color: "#D97706" }]}>Colis</Text>
             </TouchableOpacity>
           </View>
+        </>)}
+
+        {/* ── Demandes clients ── */}
+        {activeTab === "demandes" && (<>
+
+          {/* GPS toggle + header */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <View>
+              <Text style={S.sectionTitle}>Demandes entrantes</Text>
+              <Text style={S.subLabel}>{DEMO_TRIP.from} → {DEMO_TRIP.to}</Text>
+            </View>
+            {/* GPS toggle button */}
+            <TouchableOpacity
+              style={[{
+                flexDirection: "row", alignItems: "center", gap: 6,
+                paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
+                borderWidth: 1.5,
+              }, gpsEnabled
+                ? { backgroundColor: "#F0FDF4", borderColor: GREEN }
+                : { backgroundColor: "#F8FAFC", borderColor: "#CBD5E1" }
+              ]}
+              onPress={() => setGpsEnabled(v => !v)}
+              activeOpacity={0.8}
+            >
+              <View style={{
+                width: 8, height: 8, borderRadius: 4,
+                backgroundColor: gpsEnabled ? (gpsStatus === "active" ? "#22C55E" : "#FCD34D") : "#CBD5E1",
+              }} />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: gpsEnabled ? GREEN : "#94A3B8" }}>
+                GPS {gpsEnabled ? "actif" : "désactivé"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* GPS live status row */}
+          {tripStatus === "en_route" && gpsEnabled && (
+            <View style={{
+              flexDirection: "row", alignItems: "center", gap: 8,
+              backgroundColor: gpsStatus === "active" ? "#F0FDF4" : "#FFFBEB",
+              borderRadius: 10, padding: 10, borderWidth: 1,
+              borderColor: gpsStatus === "active" ? "#BBF7D0" : "#FDE68A",
+            }}>
+              <Feather name="navigation" size={14} color={gpsStatus === "active" ? GREEN : "#D97706"} />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: gpsStatus === "active" ? "#065F46" : "#B45309", flex: 1 }}>
+                {gpsStatus === "active"
+                  ? `Suivi GPS en cours${gpsCoords?.speed != null ? ` · ${gpsCoords.speed} km/h` : ""}`
+                  : gpsStatus === "denied"
+                  ? "Permission GPS refusée"
+                  : "Acquisition de la position…"}
+              </Text>
+              {gpsCoords && (
+                <Text style={{ fontSize: 10, color: "#94A3B8" }}>
+                  {gpsCoords.lat.toFixed(4)}, {gpsCoords.lon.toFixed(4)}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {tripStatus !== "en_route" && (
+            <View style={{ backgroundColor: "#FFFBEB", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#FDE68A", alignItems: "center" }}>
+              <Feather name="info" size={16} color="#D97706" />
+              <Text style={{ fontSize: 12, color: "#B45309", fontFamily: "Inter_500Medium", marginTop: 4, textAlign: "center" }}>
+                Le suivi GPS et les demandes sont actifs pendant le trajet.{"\n"}Démarrez le trajet depuis l'onglet Mission.
+              </Text>
+            </View>
+          )}
+
+          {/* Request list */}
+          {requestLoading && requests.length === 0 && (
+            <View style={{ alignItems: "center", paddingVertical: 24 }}>
+              <ActivityIndicator color={GREEN} />
+            </View>
+          )}
+
+          {!requestLoading && requests.length === 0 && (
+            <View style={{
+              alignItems: "center", paddingVertical: 32,
+              backgroundColor: "#F8FAFC", borderRadius: 14,
+              borderWidth: 1, borderColor: "#E2E8F0", borderStyle: "dashed",
+            }}>
+              <Feather name="inbox" size={32} color="#CBD5E1" />
+              <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#94A3B8", marginTop: 10 }}>
+                Aucune demande pour l'instant
+              </Text>
+              <Text style={{ fontSize: 12, color: "#CBD5E1", marginTop: 4 }}>
+                Les demandes des clients apparaissent ici
+              </Text>
+            </View>
+          )}
+
+          {requests.map(req => {
+            const isPending  = req.status === "pending";
+            const isAccepted = req.status === "accepted";
+            const isRejected = req.status === "rejected";
+            const isResponding = respondingId === req.id;
+
+            const timeAgo = (() => {
+              const secs = Math.floor((Date.now() - req.createdAt) / 1000);
+              if (secs < 60) return `${secs}s`;
+              if (secs < 3600) return `${Math.floor(secs / 60)}min`;
+              return `${Math.floor(secs / 3600)}h`;
+            })();
+
+            return (
+              <View key={req.id} style={{
+                backgroundColor: "white",
+                borderRadius: 14,
+                borderWidth: 1.5,
+                borderColor: isPending ? "#FDE68A"
+                  : isAccepted ? "#BBF7D0"
+                  : "#FECACA",
+                overflow: "hidden",
+                shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+              }}>
+                {/* Status stripe */}
+                <View style={{
+                  height: 4,
+                  backgroundColor: isPending ? "#F59E0B" : isAccepted ? GREEN : "#EF4444",
+                }} />
+
+                <View style={{ padding: 12 }}>
+                  {/* Client info row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <View style={{
+                      width: 40, height: 40, borderRadius: 20,
+                      backgroundColor: isPending ? "#FFFBEB" : isAccepted ? "#ECFDF5" : "#FEF2F2",
+                      justifyContent: "center", alignItems: "center",
+                    }}>
+                      <Feather name="user" size={18} color={isPending ? "#D97706" : isAccepted ? GREEN : "#EF4444"} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                        {req.clientName}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#64748B", fontFamily: "Inter_400Regular" }}>
+                        {req.clientPhone}
+                      </Text>
+                    </View>
+                    <View style={{
+                      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+                      backgroundColor: isPending ? "#FFFBEB" : isAccepted ? "#ECFDF5" : "#FEF2F2",
+                    }}>
+                      <Text style={{
+                        fontSize: 11, fontFamily: "Inter_600SemiBold",
+                        color: isPending ? "#D97706" : isAccepted ? GREEN : "#EF4444",
+                      }}>
+                        {isPending ? "En attente" : isAccepted ? "Accepté ✓" : "Refusé ✗"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Request details */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <Feather name="users" size={12} color={PRIMARY} />
+                      <Text style={{ fontSize: 12, color: PRIMARY, fontFamily: "Inter_600SemiBold" }}>
+                        {req.seatsRequested} place{req.seatsRequested > 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <Feather name="map-pin" size={12} color="#6D28D9" />
+                      <Text style={{ fontSize: 12, color: "#4C1D95", fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                        {req.boardingPoint}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <Feather name="clock" size={12} color="#94A3B8" />
+                      <Text style={{ fontSize: 12, color: "#64748B" }}>Il y a {timeAgo}</Text>
+                    </View>
+                  </View>
+
+                  {/* Action row */}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {/* Contact buttons */}
+                    <TouchableOpacity
+                      style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center" }}
+                      onPress={() => smsClient(req.clientPhone)}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="message-circle" size={16} color={GREEN} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center" }}
+                      onPress={() => callClient(req.clientPhone)}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="phone" size={16} color={PRIMARY} />
+                    </TouchableOpacity>
+
+                    {/* Accept / Reject — only for pending */}
+                    {isPending && (
+                      <>
+                        <TouchableOpacity
+                          style={[{
+                            flex: 1, height: 36, borderRadius: 10,
+                            justifyContent: "center", alignItems: "center",
+                            flexDirection: "row", gap: 5,
+                            backgroundColor: "#FEF2F2",
+                            opacity: isResponding ? 0.6 : 1,
+                          }]}
+                          onPress={() => handleReject(req.id)}
+                          disabled={isResponding}
+                          activeOpacity={0.8}
+                        >
+                          {isResponding ? <ActivityIndicator size="small" color="#EF4444" />
+                            : <><Feather name="x" size={14} color="#EF4444" />
+                               <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>Refuser</Text></>
+                          }
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[{
+                            flex: 1.4, height: 36, borderRadius: 10,
+                            justifyContent: "center", alignItems: "center",
+                            flexDirection: "row", gap: 5,
+                            backgroundColor: GREEN,
+                            opacity: isResponding ? 0.6 : 1,
+                          }]}
+                          onPress={() => handleAccept(req.id, req.seatsRequested)}
+                          disabled={isResponding}
+                          activeOpacity={0.8}
+                        >
+                          {isResponding ? <ActivityIndicator size="small" color="white" />
+                            : <><Feather name="check" size={14} color="white" />
+                               <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>Accepter</Text></>
+                          }
+                        </TouchableOpacity>
+                      </>
+                    )}
+
+                    {/* Already responded — show quick message */}
+                    {!isPending && (
+                      <View style={{ flex: 1, justifyContent: "center", alignItems: "flex-end" }}>
+                        <Text style={{ fontSize: 11, color: "#94A3B8", fontFamily: "Inter_400Regular" }}>
+                          Répondu · {new Date(req.respondedAt ?? req.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Refresh hint */}
+          {requests.length > 0 && (
+            <View style={{ alignItems: "center", paddingVertical: 8 }}>
+              <Text style={{ fontSize: 11, color: "#CBD5E1" }}>Actualisation automatique toutes les 10s</Text>
+            </View>
+          )}
         </>)}
 
         {/* ── Scanner ── */}

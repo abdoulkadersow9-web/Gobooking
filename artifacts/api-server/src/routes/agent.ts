@@ -3,6 +3,7 @@ import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, s
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { locationStore, pruneStale } from "../locationStore";
+import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
 
 const router: IRouter = Router();
 
@@ -265,6 +266,65 @@ router.get("/scan/:ref", async (req, res) => {
         busName: trip.busName,
       } : null,
     });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ───────────────────────────────────────────────────────────────────────────
+   TRIP REQUEST ROUTES  (agent reads / responds to client requests)
+─────────────────────────────────────────────────────────────────────────── */
+
+/* GET /agent/requests?tripId=live-1  — pending + recent requests for trip */
+router.get("/requests", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    pruneOldRequests();
+    const tripId = (req.query.tripId as string) || "live-1";
+    const requests = requestsForTrip(tripId);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /agent/requests/:id/accept */
+router.post("/requests/:id/accept", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const req_ = requestStore.get(req.params.id);
+    if (!req_) { res.status(404).json({ error: "Demande introuvable" }); return; }
+    if (req_.status !== "pending") { res.status(409).json({ error: "Demande déjà traitée" }); return; }
+
+    req_.status      = "accepted";
+    req_.respondedAt = Date.now();
+    requestStore.set(req_.id, req_);
+
+    res.json({ success: true, request: req_ });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /agent/requests/:id/reject */
+router.post("/requests/:id/reject", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const req_ = requestStore.get(req.params.id);
+    if (!req_) { res.status(404).json({ error: "Demande introuvable" }); return; }
+    if (req_.status !== "pending") { res.status(409).json({ error: "Demande déjà traitée" }); return; }
+
+    req_.status      = "rejected";
+    req_.respondedAt = Date.now();
+    requestStore.set(req_.id, req_);
+
+    res.json({ success: true, request: req_ });
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }
