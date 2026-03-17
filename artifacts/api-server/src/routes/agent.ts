@@ -138,6 +138,45 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ─── Start / Arrive trip ───────────────────────────────── */
+router.post("/trip/:tripId/start", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const trips = await db.select().from(tripsTable)
+      .where(eq(tripsTable.id, req.params.tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    if (trips[0].status === "en_route") {
+      res.status(409).json({ error: "Trajet déjà démarré", code: "ALREADY_STARTED" }); return;
+    }
+
+    await db.update(tripsTable)
+      .set({ status: "en_route", startedAt: new Date() })
+      .where(eq(tripsTable.id, req.params.tripId));
+
+    res.json({ success: true, status: "en_route", startedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.post("/trip/:tripId/arrive", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(tripsTable)
+      .set({ status: "arrived", arrivedAt: new Date() })
+      .where(eq(tripsTable.id, req.params.tripId));
+
+    res.json({ success: true, status: "arrived", arrivedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── Ticket scan by booking reference ─────────────────── */
 router.get("/scan/:ref", async (req, res) => {
   try {

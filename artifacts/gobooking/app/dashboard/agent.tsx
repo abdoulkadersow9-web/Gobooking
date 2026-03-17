@@ -387,6 +387,57 @@ function ScannerTab({
   );
 }
 
+type TripStatus = "scheduled" | "en_route" | "arrived";
+
+/* ─── Confirm Modal ─────────────────────────────────────── */
+function ConfirmModal({
+  visible, title, subtitle, icon, iconBg, iconColor,
+  confirmLabel, confirmColor, onConfirm, onCancel, loading,
+}: {
+  visible: boolean; title: string; subtitle: string;
+  icon: string; iconBg: string; iconColor: string;
+  confirmLabel: string; confirmColor: string;
+  onConfirm: () => void; onCancel: () => void; loading: boolean;
+}) {
+  if (!visible) return null;
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <Pressable style={CM.overlay} onPress={onCancel}>
+        <Pressable style={CM.sheet} onPress={e => e.stopPropagation()}>
+          <View style={[CM.iconWrap, { backgroundColor: iconBg }]}>
+            <Feather name={icon as never} size={28} color={iconColor} />
+          </View>
+          <Text style={CM.title}>{title}</Text>
+          <Text style={CM.subtitle}>{subtitle}</Text>
+          <View style={CM.btnRow}>
+            <TouchableOpacity style={CM.cancelBtn} onPress={onCancel} disabled={loading} activeOpacity={0.8}>
+              <Text style={CM.cancelText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[CM.confirmBtn, { backgroundColor: confirmColor }, loading && { opacity: 0.7 }]}
+              onPress={onConfirm} disabled={loading} activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator size="small" color="white" />
+                : <Text style={CM.confirmText}>{confirmLabel}</Text>
+              }
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function fmtElapsed(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,"0")}min`;
+  if (m > 0) return `${m}min ${String(s).padStart(2,"0")}s`;
+  return `${s}s`;
+}
+
 /* ─── Main Component ─────────────────────────────────────── */
 export default function AgentDashboard() {
   const insets    = useSafeAreaInsets();
@@ -398,6 +449,29 @@ export default function AgentDashboard() {
   const [boarding,  setBoarding]  = useState<BoardingEntry[]>(DEMO_BOARDING);
   const [parcels,   setParcels]   = useState<ParcelEntry[]>(DEMO_PARCELS);
   const [seats,     setSeats]     = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
+
+  /* ── Trip status ── */
+  const [tripStatus,       setTripStatus]       = useState<TripStatus>("scheduled");
+  const [tripStartedAt,    setTripStartedAt]    = useState<Date | null>(null);
+  const [elapsed,          setElapsed]          = useState(0);
+  const [startConfirm,     setStartConfirm]     = useState(false);
+  const [arriveConfirm,    setArriveConfirm]    = useState(false);
+  const [tripStarting,     setTripStarting]     = useState(false);
+  const [tripArriving,     setTripArriving]     = useState(false);
+  const [tripError,        setTripError]        = useState("");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* elapsed timer */
+  useEffect(() => {
+    if (tripStatus === "en_route" && tripStartedAt) {
+      timerRef.current = setInterval(() => {
+        setElapsed(Math.floor((Date.now() - tripStartedAt.getTime()) / 1000));
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [tripStatus, tripStartedAt]);
 
   useEffect(() => {
     if (!token) return;
@@ -422,10 +496,60 @@ export default function AgentDashboard() {
     if (token) { try { await apiFetch(`/agent/parcels/${parcelId}/${action}`, { token, method: "POST" }); } catch {} }
   };
 
+  const handleStartTrip = async () => {
+    setTripStarting(true);
+    setTripError("");
+    try {
+      await apiFetch(`/agent/trip/${DEMO_TRIP.id}/start`, { token: token ?? undefined, method: "POST" });
+      const now = new Date();
+      setTripStatus("en_route");
+      setTripStartedAt(now);
+      setElapsed(0);
+    } catch (e: any) {
+      if (e?.code !== "ALREADY_STARTED") {
+        setTripError(e?.message ?? "Impossible de démarrer le trajet");
+        setTripStarting(false);
+        setStartConfirm(false);
+        return;
+      }
+      const now = new Date();
+      setTripStatus("en_route");
+      setTripStartedAt(now);
+    }
+    setTripStarting(false);
+    setStartConfirm(false);
+  };
+
+  const handleArriveTrip = async () => {
+    setTripArriving(true);
+    setTripError("");
+    try {
+      await apiFetch(`/agent/trip/${DEMO_TRIP.id}/arrive`, { token: token ?? undefined, method: "POST" });
+      setTripStatus("arrived");
+      setTripStartedAt(null);
+      if (timerRef.current) clearInterval(timerRef.current);
+    } catch (e: any) {
+      setTripError(e?.message ?? "Impossible de confirmer l'arrivée");
+    }
+    setTripArriving(false);
+    setArriveConfirm(false);
+  };
+
   const boarded    = boarding.filter(b => b.status === "boarded").length;
   const waiting    = boarding.filter(b => b.status === "confirmed").length;
   const seatBooked = seats.filter(s => s.status === "booked").length;
   const seatAvail  = seats.filter(s => s.status === "available").length;
+
+  /* bus card colours per trip status */
+  const busCardColors: [string, string] = tripStatus === "en_route"
+    ? ["#D97706", "#B45309"]
+    : tripStatus === "arrived"
+    ? ["#059669", "#047857"]
+    : [PRIMARY, "#0F3BA0"];
+
+  const busStatusLabel = tripStatus === "en_route" ? "En route 🚌"
+    : tripStatus === "arrived" ? "Arrivé ✓"
+    : "En service";
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: "mission",       label: "Mission",     icon: "navigation"  },
@@ -437,6 +561,35 @@ export default function AgentDashboard() {
 
   return (
     <View style={[S.container, { paddingTop: topPad }]}>
+
+      {/* ── Trip confirmation modals ── */}
+      <ConfirmModal
+        visible={startConfirm}
+        title="Démarrer le trajet ?"
+        subtitle={`${DEMO_TRIP.from} → ${DEMO_TRIP.to}\n${boarded} passagers embarqués · Départ ${DEMO_TRIP.departureTime}`}
+        icon="play-circle"
+        iconBg="#FFF7ED"
+        iconColor="#D97706"
+        confirmLabel="Démarrer"
+        confirmColor="#D97706"
+        onConfirm={handleStartTrip}
+        onCancel={() => setStartConfirm(false)}
+        loading={tripStarting}
+      />
+      <ConfirmModal
+        visible={arriveConfirm}
+        title="Confirmer l'arrivée ?"
+        subtitle={`Déclarer l'arrivée à ${DEMO_TRIP.to}\nDurée du trajet : ${fmtElapsed(elapsed)}`}
+        icon="map-pin"
+        iconBg="#ECFDF5"
+        iconColor="#059669"
+        confirmLabel="Confirmer arrivée"
+        confirmColor="#059669"
+        onConfirm={handleArriveTrip}
+        onCancel={() => setArriveConfirm(false)}
+        loading={tripArriving}
+      />
+
       <LinearGradient colors={[GREEN, GREEN_D]} style={S.header}>
         <Pressable onPress={() => router.back()} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
@@ -465,17 +618,32 @@ export default function AgentDashboard() {
 
         {/* ── Mission ── */}
         {activeTab === "mission" && (<>
+
+          {/* Bus card — colour changes per trip status */}
           <View style={S.busCard}>
-            <LinearGradient colors={[PRIMARY, "#0F3BA0"]} style={S.busGradient}>
+            <LinearGradient colors={busCardColors} style={S.busGradient}>
               <View style={S.busTop}>
                 <View style={S.busIconWrap}><Feather name="truck" size={26} color="white" /></View>
                 <View style={S.onlinePill}>
-                  <View style={S.onlineDot} />
-                  <Text style={S.onlineText}>En service</Text>
+                  <View style={[S.onlineDot, tripStatus === "en_route" && { backgroundColor: "#FCD34D" }]} />
+                  <Text style={S.onlineText}>{busStatusLabel}</Text>
                 </View>
               </View>
               <Text style={S.busName}>{DEMO_BUS.busName}</Text>
               <Text style={S.busPlate}>{DEMO_BUS.plateNumber} · {DEMO_BUS.busType} · {DEMO_BUS.capacity} places</Text>
+              {/* Elapsed timer when en route */}
+              {tripStatus === "en_route" && (
+                <View style={S.elapsedRow}>
+                  <Feather name="clock" size={13} color="rgba(255,255,255,0.85)" />
+                  <Text style={S.elapsedText}>En route depuis {fmtElapsed(elapsed)}</Text>
+                </View>
+              )}
+              {tripStatus === "arrived" && (
+                <View style={S.elapsedRow}>
+                  <Feather name="check-circle" size={13} color="rgba(255,255,255,0.85)" />
+                  <Text style={S.elapsedText}>Trajet terminé · Arrivé à {DEMO_TRIP.to}</Text>
+                </View>
+              )}
             </LinearGradient>
           </View>
 
@@ -499,6 +667,72 @@ export default function AgentDashboard() {
               </View>
             </View>
           </View>
+
+          {/* ── TRIP ACTION CARD ── */}
+          {tripStatus === "scheduled" && (
+            <View style={S.tripActionCard}>
+              <View style={S.tripActionLeft}>
+                <View style={[S.tripActionIcon, { backgroundColor: "#FFF7ED" }]}>
+                  <Feather name="play-circle" size={22} color="#D97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.tripActionTitle}>Prêt au départ</Text>
+                  <Text style={S.tripActionSub}>{boarded}/{boarding.length} passagers embarqués</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={S.startBtn}
+                onPress={() => setStartConfirm(true)}
+                activeOpacity={0.85}
+              >
+                <Feather name="play" size={16} color="white" />
+                <Text style={S.startBtnText}>Démarrer le trajet</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {tripStatus === "en_route" && (
+            <View style={[S.tripActionCard, { borderColor: "#FED7AA" }]}>
+              <View style={S.tripActionLeft}>
+                <View style={[S.tripActionIcon, { backgroundColor: "#FFF7ED" }]}>
+                  <Feather name="navigation" size={22} color="#D97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[S.tripActionTitle, { color: "#D97706" }]}>Trajet en cours</Text>
+                  <Text style={S.tripActionSub}>{fmtElapsed(elapsed)} · {DEMO_TRIP.from} → {DEMO_TRIP.to}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[S.startBtn, { backgroundColor: GREEN }]}
+                onPress={() => setArriveConfirm(true)}
+                activeOpacity={0.85}
+              >
+                <Feather name="map-pin" size={16} color="white" />
+                <Text style={S.startBtnText}>Arrivée</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {tripStatus === "arrived" && (
+            <View style={[S.tripActionCard, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4" }]}>
+              <View style={S.tripActionLeft}>
+                <View style={[S.tripActionIcon, { backgroundColor: "#DCFCE7" }]}>
+                  <Feather name="check-circle" size={22} color={GREEN} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[S.tripActionTitle, { color: GREEN }]}>Arrivé à destination</Text>
+                  <Text style={[S.tripActionSub, { color: "#059669" }]}>Trajet terminé avec succès</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {tripError ? (
+            <View style={S.tripErrorBanner}>
+              <Feather name="alert-circle" size={14} color="#DC2626" />
+              <Text style={S.tripErrorText}>{tripError}</Text>
+            </View>
+          ) : null}
 
           <Text style={S.sectionTitle}>Résumé de mission</Text>
           <View style={S.summaryGrid}>
@@ -745,6 +979,17 @@ const S = StyleSheet.create({
   onlineText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
   busName: { fontSize: 20, fontFamily: "Inter_700Bold", color: "white" },
   busPlate: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)" },
+  elapsedRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, backgroundColor: "rgba(0,0,0,0.15)", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start" },
+  elapsedText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.9)" },
+  tripActionCard: { backgroundColor: "white", borderRadius: 16, padding: 14, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2, gap: 12 },
+  tripActionLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  tripActionIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  tripActionTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  tripActionSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
+  startBtn: { backgroundColor: "#D97706", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start" },
+  startBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
+  tripErrorBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderRadius: 12, padding: 12 },
+  tripErrorText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#DC2626" },
   tripCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   tripRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   cityBlock: { flex: 1, gap: 4 },
@@ -874,4 +1119,18 @@ const SC = StyleSheet.create({
   validateText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
   boardedBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12 },
   boardedBannerText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#065F46" },
+});
+
+/* ─── Confirm Modal Styles ───────────────────────────────── */
+const CM = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  sheet: { backgroundColor: "white", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 28, gap: 16, alignItems: "center" },
+  iconWrap: { width: 68, height: 68, borderRadius: 20, justifyContent: "center", alignItems: "center", marginBottom: 4 },
+  title: { fontSize: 20, fontFamily: "Inter_800ExtraBold", color: "#0F172A", textAlign: "center" },
+  subtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", lineHeight: 20 },
+  btnRow: { flexDirection: "row", gap: 12, marginTop: 8, width: "100%" },
+  cancelBtn: { flex: 1, borderRadius: 14, paddingVertical: 14, backgroundColor: "#F1F5F9", alignItems: "center" },
+  cancelText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#64748B" },
+  confirmBtn: { flex: 1.4, borderRadius: 14, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
+  confirmText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
 });
