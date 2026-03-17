@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { apiFetch } from "@/utils/api";
 
 interface Parcel {
@@ -37,13 +38,13 @@ interface Parcel {
 
 type Filter = "tous" | "en_cours" | "livres";
 
-const STATUS: Record<string, { label: string; color: string; bg: string; strip: string }> = {
-  en_attente:     { label: "Colis enregistré", color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B" },
-  pris_en_charge: { label: "Reçu en agence",   color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6" },
-  en_transit:     { label: "En transit",        color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6" },
-  en_livraison:   { label: "En livraison",      color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4" },
-  livre:          { label: "Livré",             color: "#065F46", bg: "#ECFDF5", strip: "#10B981" },
-  annule:         { label: "Annulé",            color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444" },
+const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string }> = {
+  en_attente:     { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B" },
+  pris_en_charge: { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6" },
+  en_transit:     { color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6" },
+  en_livraison:   { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4" },
+  livre:          { color: "#065F46", bg: "#ECFDF5", strip: "#10B981" },
+  annule:         { color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444" },
 };
 
 const IN_PROGRESS = ["en_attente", "pris_en_charge", "en_transit", "en_livraison"];
@@ -67,16 +68,25 @@ const DEMO_PARCELS: Parcel[] = [
     createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
 ];
 
-function formatDate(iso: string) {
+function formatDate(iso: string, lang: string) {
   try {
-    return new Date(iso).toLocaleDateString("fr-FR", {
+    return new Date(iso).toLocaleDateString(lang === "en" ? "en-GB" : "fr-FR", {
       day: "2-digit", month: "long", year: "numeric",
     });
   } catch { return "—"; }
 }
 
 function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
-  const st = STATUS[item.status] ?? STATUS.en_attente;
+  const { t, lang } = useLanguage();
+  const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.en_attente;
+  const statusLabels: Record<string, string> = {
+    en_attente: t.statusEnAttente,
+    pris_en_charge: t.statusPrisEnCharge,
+    en_transit: t.statusEnTransit,
+    en_livraison: t.statusEnLivraison,
+    livre: t.statusLivre,
+    annule: t.statusAnnule,
+  };
   return (
     <TouchableOpacity style={styles.row} activeOpacity={0.75} onPress={onPress}>
       <View style={[styles.strip, { backgroundColor: st.strip }]} />
@@ -88,7 +98,9 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
             <Text style={styles.refText}>{item.trackingRef}</Text>
           </View>
           <View style={[styles.badge, { backgroundColor: st.bg }]}>
-            <Text style={[styles.badgeText, { color: st.color }]}>{st.label}</Text>
+            <Text style={[styles.badgeText, { color: st.color }]}>
+              {statusLabels[item.status] ?? t.statusEnAttente}
+            </Text>
           </View>
         </View>
 
@@ -107,10 +119,10 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
         <View style={styles.rowBottom}>
           <View style={styles.dateRow}>
             <Feather name="calendar" size={11} color="#94A3B8" />
-            <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
+            <Text style={styles.dateText}>{formatDate(item.createdAt, lang)}</Text>
           </View>
           <View style={styles.detailBtn}>
-            <Text style={styles.detailBtnText}>Suivre</Text>
+            <Text style={styles.detailBtnText}>{t.suivre}</Text>
             <Feather name="chevron-right" size={13} color={Colors.light.primary} />
           </View>
         </View>
@@ -122,6 +134,7 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
 export default function ColisScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
+  const { t } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -157,9 +170,9 @@ export default function ColisScreen() {
   };
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: "tous",     label: "Tous" },
-    { key: "en_cours", label: "En cours" },
-    { key: "livres",   label: "Livrés" },
+    { key: "tous",     label: t.tous },
+    { key: "en_cours", label: t.enCours },
+    { key: "livres",   label: t.livres },
   ];
 
   const openSuivi = (item: Parcel) =>
@@ -173,14 +186,14 @@ export default function ColisScreen() {
         style={styles.header}
       >
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Mes colis</Text>
+          <Text style={styles.headerTitle}>{t.mesColis}</Text>
           {!loading && token && parcels.length > 0 && (
             <Text style={styles.headerSub}>
-              {parcels.length} expédition{parcels.length > 1 ? "s" : ""}
+              {parcels.length} {parcels.length > 1 ? t.expeditionsPlural : t.expeditions}
             </Text>
           )}
           {(!token || parcels.length === 0) && (
-            <Text style={styles.headerSub}>Suivi de vos expéditions</Text>
+            <Text style={styles.headerSub}>{t.suiviExpeditions}</Text>
           )}
         </View>
         <TouchableOpacity
@@ -188,7 +201,7 @@ export default function ColisScreen() {
           onPress={() => router.push("/parcel/send")}
         >
           <Feather name="plus" size={16} color="white" />
-          <Text style={styles.sendBtnText}>Envoyer</Text>
+          <Text style={styles.sendBtnText}>{t.envoyer}</Text>
         </TouchableOpacity>
       </LinearGradient>
 
@@ -225,7 +238,7 @@ export default function ColisScreen() {
       {loading && token ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={styles.loadingText}>Chargement…</Text>
+          <Text style={styles.loadingText}>{t.chargement}</Text>
         </View>
       ) : (
         <FlatList
@@ -247,10 +260,10 @@ export default function ColisScreen() {
               <View style={styles.emptyIcon}>
                 <Feather name="package" size={34} color={Colors.light.primary} />
               </View>
-              <Text style={styles.emptyTitle}>Aucun résultat</Text>
-              <Text style={styles.emptyDesc}>Aucun colis dans cette catégorie</Text>
+              <Text style={styles.emptyTitle}>{t.aucunResultat}</Text>
+              <Text style={styles.emptyDesc}>{t.aucunColisCategorie}</Text>
               <TouchableOpacity style={styles.resetBtn} onPress={() => setFilter("tous")}>
-                <Text style={styles.resetBtnText}>Voir tous les colis</Text>
+                <Text style={styles.resetBtnText}>{t.voirTousLesColis}</Text>
               </TouchableOpacity>
             </View>
           }
@@ -262,11 +275,9 @@ export default function ColisScreen() {
                 onPress={() => router.push("/(auth)/login")}
               >
                 <Feather name="lock" size={15} color={Colors.light.primary} />
-                <Text style={styles.loginBannerText}>
-                  Connectez-vous pour voir vos vrais colis
-                </Text>
+                <Text style={styles.loginBannerText}>{t.connectezVous}</Text>
                 <View style={styles.loginBannerBtn}>
-                  <Text style={styles.loginBannerBtnText}>Se connecter →</Text>
+                  <Text style={styles.loginBannerBtnText}>{t.seConnecter} →</Text>
                 </View>
               </TouchableOpacity>
             ) : null

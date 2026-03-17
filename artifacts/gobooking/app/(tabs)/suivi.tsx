@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useLanguage } from "@/context/LanguageContext";
 import { useParcel } from "@/context/ParcelContext";
 import { apiFetch } from "@/utils/api";
 
@@ -112,6 +113,7 @@ export default function SuiviScreen() {
   const insets = useSafeAreaInsets();
   const { parcel: contextParcel } = useParcel();
   const { ref: refParam } = useLocalSearchParams<{ ref?: string }>();
+  const { t } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -254,10 +256,8 @@ export default function SuiviScreen() {
             <Feather name="map-pin" size={20} color="white" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>Suivi colis</Text>
-            <Text style={styles.headerSub}>
-              Localisez votre colis en temps réel
-            </Text>
+            <Text style={styles.headerTitle}>{t.suiviColis}</Text>
+            <Text style={styles.headerSub}>{t.suiviColisDesc}</Text>
           </View>
         </LinearGradient>
 
@@ -268,10 +268,10 @@ export default function SuiviScreen() {
             <TextInput
               ref={inputRef}
               style={styles.searchInput}
-              placeholder="Entrer numéro de suivi (ex: GBX-H77Y-USDE)"
+              placeholder={`${t.numeroDeSuivi} (ex: GBX-H77Y-USDE)`}
               placeholderTextColor={Colors.light.textMuted}
               value={query}
-              onChangeText={(t) => setQuery(t.toUpperCase())}
+              onChangeText={(val) => setQuery(val.toUpperCase())}
               autoCapitalize="characters"
               returnKeyType="search"
               onSubmitEditing={handleSearch}
@@ -297,7 +297,7 @@ export default function SuiviScreen() {
             ) : (
               <>
                 <Feather name="search" size={15} color="white" />
-                <Text style={styles.searchBtnText}>Rechercher</Text>
+                <Text style={styles.searchBtnText}>{t.rechercher}</Text>
               </>
             )}
           </Pressable>

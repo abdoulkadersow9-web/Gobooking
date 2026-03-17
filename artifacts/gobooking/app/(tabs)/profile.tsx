@@ -9,30 +9,37 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, isAdmin } = useAuth();
+  const { t, lang, setLang } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          logout();
+    Alert.alert(
+      t.deconnexion,
+      t.deconnexionConfirm,
+      [
+        { text: t.annuler, style: "cancel" },
+        {
+          text: t.deconnexion,
+          style: "destructive",
+          onPress: () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            logout();
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const MenuItem = ({
@@ -101,44 +108,71 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <Text style={styles.sectionTitle}>{t.monCompte}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="user" label="Edit Profile" onPress={() => {}} />
+          <MenuItem icon="user" label={t.modifier} onPress={() => {}} />
           <View style={styles.menuDivider} />
-          <MenuItem icon="phone" label="Contact: {user?.phone || 'Not set'}" onPress={() => {}} />
-          <View style={styles.menuDivider} />
-          <MenuItem icon="lock" label="Change Password" onPress={() => {}} />
+          <MenuItem icon="lock" label={t.motDePasse} onPress={() => {}} />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Bookings</Text>
+        <Text style={styles.sectionTitle}>{t.mesReservations}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="bookmark" label="My Bookings" onPress={() => router.push("/(tabs)/bookings")} />
+          <MenuItem icon="bookmark" label={t.mesReservations} onPress={() => router.push("/(tabs)/bookings")} />
+        </View>
+      </View>
+
+      {/* Language Switch */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t.parametres}</Text>
+        <View style={styles.menuCard}>
+          <View style={styles.langRow}>
+            <View style={styles.langLeft}>
+              <View style={styles.langIconWrap}>
+                <Feather name="globe" size={18} color={Colors.light.primary} />
+              </View>
+              <Text style={styles.langLabel}>{t.langue}</Text>
+            </View>
+            <View style={styles.langToggle}>
+              <TouchableOpacity
+                style={[styles.langBtn, lang === "fr" && styles.langBtnActive]}
+                onPress={() => { Haptics.selectionAsync(); setLang("fr"); }}
+              >
+                <Text style={[styles.langBtnText, lang === "fr" && styles.langBtnTextActive]}>FR</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.langBtn, lang === "en" && styles.langBtnActive]}
+                onPress={() => { Haptics.selectionAsync(); setLang("en"); }}
+              >
+                <Text style={[styles.langBtnText, lang === "en" && styles.langBtnTextActive]}>EN</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </View>
 
       {isAdmin && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Administration</Text>
+          <Text style={styles.sectionTitle}>{t.administration}</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="settings" label="Admin Dashboard" onPress={() => router.push("/admin")} />
+            <MenuItem icon="settings" label={t.adminDashboard} onPress={() => router.push("/admin")} />
           </View>
         </View>
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support</Text>
+        <Text style={styles.sectionTitle}>{t.support}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="help-circle" label="Help & FAQ" onPress={() => {}} />
+          <MenuItem icon="help-circle" label={t.aide} onPress={() => {}} />
           <View style={styles.menuDivider} />
-          <MenuItem icon="info" label="About GoBooking" onPress={() => {}} />
+          <MenuItem icon="info" label={t.apropos} onPress={() => {}} />
         </View>
       </View>
 
       <View style={styles.section}>
         <View style={styles.menuCard}>
-          <MenuItem icon="log-out" label="Sign Out" onPress={handleLogout} danger />
+          <MenuItem icon="log-out" label={t.deconnexion} onPress={handleLogout} danger />
         </View>
       </View>
     </ScrollView>
@@ -282,5 +316,54 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.light.border,
     marginLeft: 64,
+  },
+
+  langRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    paddingLeft: 16,
+  },
+  langLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  langIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.primaryLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  langLabel: {
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.text,
+  },
+  langToggle: {
+    flexDirection: "row",
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.light.border,
+    overflow: "hidden",
+  },
+  langBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    backgroundColor: "transparent",
+  },
+  langBtnActive: {
+    backgroundColor: Colors.light.primary,
+  },
+  langBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.textSecondary,
+  },
+  langBtnTextActive: {
+    color: "white",
   },
 });
