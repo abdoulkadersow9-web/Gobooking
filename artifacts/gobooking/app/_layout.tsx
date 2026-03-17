@@ -52,8 +52,7 @@ function AuthGuard() {
 
     /* Utilisateur connecté sur un écran d'auth → rediriger */
     if (root === "(auth)") {
-      const dashPath = getDashboardPath(user.role);
-      router.replace((dashPath ?? "/(tabs)") as never);
+      router.replace(getDashboardPath(user.role) as never);
       return;
     }
 
@@ -63,8 +62,7 @@ function AuthGuard() {
       if (requestedDash) {
         const allowedRoles = DASHBOARD_ROLES[requestedDash] ?? [];
         if (!allowedRoles.includes(user.role)) {
-          const correctDash = getDashboardPath(user.role);
-          router.replace((correctDash ?? "/(tabs)") as never);
+          router.replace(getDashboardPath(user.role) as never);
         }
       }
     }

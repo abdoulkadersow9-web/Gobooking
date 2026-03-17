@@ -59,12 +59,7 @@ export default function LoginScreen() {
     await login(res.token, res.user);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.dismissAll();
-    const dashPath = getDashboardPath(res.user.role);
-    if (dashPath) {
-      router.replace(dashPath as never);
-    } else {
-      router.replace("/(tabs)");
-    }
+    router.replace(getDashboardPath(res.user.role) as never);
   };
 
   const handleLogin = async () => {

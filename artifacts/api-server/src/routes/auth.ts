@@ -18,12 +18,20 @@ function generateToken_simple(): string {
 
 const tokenStore = new Map<string, string>();
 
+const RESTRICTED_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
+
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, role } = req.body;
 
     if (!name || !email || !password) {
       res.status(400).json({ error: "Nom, email et mot de passe sont requis" });
+      return;
+    }
+
+    // Bloquer toute tentative de créer un compte agent/compagnie/admin via l'API publique
+    if (role && RESTRICTED_ROLES.includes(role)) {
+      res.status(403).json({ error: "La création de comptes agent, compagnie ou admin est réservée aux administrateurs" });
       return;
     }
 

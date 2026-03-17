@@ -11,8 +11,7 @@ export default function IndexScreen() {
   useEffect(() => {
     if (!isLoading) {
       if (user) {
-        const dashPath = getDashboardPath(user.role);
-        router.replace((dashPath ?? "/(tabs)") as never);
+        router.replace(getDashboardPath(user.role) as never);
       } else {
         router.replace("/(auth)/login");
       }

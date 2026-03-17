@@ -22,11 +22,11 @@ export interface User {
   createdAt: string;
 }
 
-export function getDashboardPath(role: UserRole): string | null {
+export function getDashboardPath(role: UserRole): string {
   if (role === "compagnie" || role === "company_admin") return "/dashboard/company";
-  if (role === "agent") return "/dashboard/agent";
-  if (role === "admin" || role === "super_admin") return "/dashboard/super-admin";
-  return null;
+  if (role === "agent")                                 return "/dashboard/agent";
+  if (role === "admin"   || role === "super_admin")     return "/dashboard/super-admin";
+  return "/(tabs)"; // client / user
 }
 
 interface AuthContextType {
@@ -68,7 +68,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(freshUser);
 
           const dashPath = getDashboardPath(freshUser.role);
-          if (dashPath && currentPathRef.current !== dashPath) {
+          const cur = currentPathRef.current;
+          const alreadyThere =
+            cur === dashPath ||
+            cur.startsWith(dashPath + "/") ||
+            (dashPath === "/(tabs)" && cur.startsWith("/(tabs)"));
+          if (!alreadyThere) {
             router.replace(dashPath as never);
           }
         } catch {
