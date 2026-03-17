@@ -78,7 +78,8 @@ function formatDeparture(iso: string): string {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user, token, dashboardPath } = useAuth();
+  const { user, token, dashboardPath, isAdmin, isCompanyAdmin, isAgent } = useAuth();
+  const hasProfessionalRole = isAdmin || isCompanyAdmin || isAgent;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const firstName = user?.name?.split(" ")[0] || "";
 
@@ -284,41 +285,54 @@ export default function HomeScreen() {
 
       {/* ── Dashboard Navigation ── */}
       <View style={styles.dashNav}>
-        <TouchableOpacity
-          style={[styles.dashNavBtn, { backgroundColor: "#2563eb" }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/dashboard/company" as never);
-          }}
-        >
-          <Feather name="briefcase" size={16} color="white" />
-          <Text style={styles.dashNavText}>Espace Compagnie</Text>
-        </TouchableOpacity>
+        <Text style={styles.dashNavLabel}>
+          {hasProfessionalRole ? "Mon espace" : "Espaces professionnels"}
+        </Text>
 
-        <TouchableOpacity
-          style={[styles.dashNavBtn, { backgroundColor: "#16a34a" }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/dashboard/agent" as never);
-          }}
-        >
-          <Feather name="user" size={16} color="white" />
-          <Text style={styles.dashNavText}>Espace Agent</Text>
-        </TouchableOpacity>
+        {/* Compagnie button — shown for compagnie role, or for all when not logged in */}
+        {(isCompanyAdmin || !hasProfessionalRole) && (
+          <TouchableOpacity
+            style={[styles.dashNavBtn, { backgroundColor: "#2563eb" }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/dashboard/company" as never);
+            }}
+          >
+            <Feather name="briefcase" size={16} color="white" />
+            <Text style={styles.dashNavText}>Espace Compagnie</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={[styles.dashNavBtn, { backgroundColor: "#9333ea" }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/dashboard/super-admin" as never);
-          }}
-        >
-          <Feather name="shield" size={16} color="white" />
-          <Text style={styles.dashNavText}>Espace Admin</Text>
-        </TouchableOpacity>
+        {/* Agent button — shown for agent role, or for all when not logged in */}
+        {(isAgent || !hasProfessionalRole) && (
+          <TouchableOpacity
+            style={[styles.dashNavBtn, { backgroundColor: "#16a34a" }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/dashboard/agent" as never);
+            }}
+          >
+            <Feather name="user" size={16} color="white" />
+            <Text style={styles.dashNavText}>Espace Agent</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Admin button — shown only if user.role === "admin", or for all when not logged in */}
+        {(isAdmin || !hasProfessionalRole) && (
+          <TouchableOpacity
+            style={[styles.dashNavBtn, { backgroundColor: "#9333ea" }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push("/dashboard/super-admin" as never);
+            }}
+          >
+            <Feather name="shield" size={16} color="white" />
+            <Text style={styles.dashNavText}>Espace Admin</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Quick CTAs ── */}
@@ -618,6 +632,7 @@ const styles = StyleSheet.create({
 
   // Dashboard nav buttons
   dashNav: { paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4, gap: 10 },
+  dashNavLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.textSecondary, paddingHorizontal: 4, marginBottom: 2 },
   dashNavBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 13, borderRadius: 10 },
   dashNavText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
 
