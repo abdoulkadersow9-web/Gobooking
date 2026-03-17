@@ -52,8 +52,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedToken = await AsyncStorage.getItem("auth_token");
         const storedUser = await AsyncStorage.getItem("auth_user");
         if (storedToken && storedUser) {
+          const parsedUser: User = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(parsedUser);
+          // Mirror Firebase onAuthStateChanged: redirect based on role on every app start
+          const dashPath = getDashboardPath(parsedUser.role);
+          if (dashPath) {
+            router.replace(dashPath as never);
+          }
         }
       } catch {
         // ignore
