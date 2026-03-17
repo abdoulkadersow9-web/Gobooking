@@ -1,0 +1,118 @@
+const express = require("express");
+const db = require("./firebase");
+
+const app = express();
+app.use(express.json());
+
+app.get("/", (req, res) => {
+  res.send("GoBooking API fonctionne ✅");
+});
+
+app.post("/reserver", async (req, res) => {
+  try {
+    const { user_id, trajet_id, siege_numero } = req.body;
+
+    const trajetRef = db.collection("trajets").doc(trajet_id);
+    const trajetDoc = await trajetRef.get();
+
+    if (!trajetDoc.exists) {
+      return res.status(404).send("Trajet introuvable");
+    }
+
+    const trajet = trajetDoc.data();
+
+    if (trajet.places_disponibles <= 0) {
+      return res.status(400).send("Plus de places disponibles");
+    }
+
+    const check = await db.collection("reservations")
+      .where("trajet_id", "==", trajet_id)
+      .where("siege_numero", "==", siege_numero)
+      .get();
+
+    if (!check.empty) {
+      return res.status(400).send("Siège déjà réservé");
+    }
+
+    const reservationRef = await db.collection("reservations").add({
+      user_id,
+      trajet_id,
+      bus_id: trajet.bus_id,
+      compagnie_id: trajet.compagnie_id,
+      siege_numero,
+      prix: trajet.prix,
+      statut: "en_attente",
+      date_reservation: new Date(),
+    });
+
+    await trajetRef.update({
+      places_disponibles: trajet.places_disponibles - 1,
+    });
+
+    res.send({
+      success: true,
+      reservation_id: reservationRef.id,
+      message: "Réservation créée",
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Erreur serveur");
+  }
+});
+
+app.post("/payer", async (req, res) => {
+  try {
+    const { reservation_id, methode } = req.body;
+
+    const reservationRef = db.collection("reservations").doc(reservation_id);
+    const reservationDoc = await reservationRef.get();
+
+    if (!reservationDoc.exists) {
+      return res.status(404).send("Réservation introuvable");
+    }
+
+    const reservation = reservationDoc.data();
+
+    await db.collection("paiements").add({
+      reservation_id,
+      user_id: reservation.user_id,
+      montant: reservation.prix,
+      methode,
+      statut: "payé",
+      date_paiement: new Date(),
+    });
+
+    await reservationRef.update({
+      statut: "confirmé",
+    });
+
+    const codeTicket = "GB-" + Date.now();
+
+    await db.collection("tickets").add({
+      reservation_id,
+      user_id: reservation.user_id,
+      trajet_id: reservation.trajet_id,
+      bus_id: reservation.bus_id,
+      compagnie_id: reservation.compagnie_id,
+      siege_numero: reservation.siege_numero,
+      code_ticket: codeTicket,
+      statut: "valide",
+      date_creation: new Date(),
+    });
+
+    res.send({
+      success: true,
+      message: "Paiement effectué et ticket généré",
+      code_ticket: codeTicket,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Erreur serveur");
+  }
+});
+
+app.listen(3000, () => {
+  console.log("Serveur GoBooking lancé sur le port 3000 🚀");
+});
+
+

@@ -8,6 +8,7 @@ import parcelsRouter from "./parcels";
 import superadminRouter from "./superadmin";
 import companyRouter from "./company";
 import agentRouter from "./agent";
+import firebaseBookingRouter from "./firebase-booking";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use("/parcels", parcelsRouter);
 router.use("/superadmin", superadminRouter);
 router.use("/company", companyRouter);
 router.use("/agent", agentRouter);
+router.use("/firebase", firebaseBookingRouter);
 
 export default router;
