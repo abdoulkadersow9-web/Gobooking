@@ -96,6 +96,12 @@ interface TripRequest {
   status:         "pending" | "accepted" | "rejected";
   createdAt:      number;
   respondedAt?:   number;
+  /* Pickup location */
+  pickupType?:    "gps" | "landmark";
+  pickupLat?:     number;
+  pickupLon?:     number;
+  pickupLabel?:   string;
+  pickupCity?:    string;
 }
 
 /* ─── Scan Result Card ───────────────────────────────────── */
@@ -1132,7 +1138,7 @@ export default function AgentDashboard() {
                   </View>
 
                   {/* Request details */}
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: req.pickupType ? 8 : 10 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                       <Feather name="users" size={12} color={PRIMARY} />
                       <Text style={{ fontSize: 12, color: PRIMARY, fontFamily: "Inter_600SemiBold" }}>
@@ -1149,7 +1155,78 @@ export default function AgentDashboard() {
                       <Feather name="clock" size={12} color="#94A3B8" />
                       <Text style={{ fontSize: 12, color: "#64748B" }}>Il y a {timeAgo}</Text>
                     </View>
+                    {/* Distance badge — only if GPS active and pickup has coords */}
+                    {gpsCoords && req.pickupLat != null && req.pickupLon != null && (() => {
+                      const dLat = (req.pickupLat - gpsCoords.lat) * Math.PI / 180;
+                      const dLon = (req.pickupLon - gpsCoords.lon) * Math.PI / 180;
+                      const a = Math.sin(dLat/2)**2 + Math.cos(gpsCoords.lat*Math.PI/180)*Math.cos(req.pickupLat*Math.PI/180)*Math.sin(dLon/2)**2;
+                      const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                      const txt = km < 1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1)} km`;
+                      return (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                          <Feather name="navigation" size={12} color="#D97706" />
+                          <Text style={{ fontSize: 12, color: "#B45309", fontFamily: "Inter_600SemiBold" }}>{txt}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
+
+                  {/* Pickup location row */}
+                  {req.pickupType && req.pickupLat != null && req.pickupLon != null && (
+                    <View style={{
+                      flexDirection: "row", alignItems: "center", gap: 8,
+                      backgroundColor: "#FFF7ED", borderRadius: 10, padding: 9,
+                      borderWidth: 1, borderColor: "#FED7AA", marginBottom: 10,
+                    }}>
+                      <View style={{
+                        width: 28, height: 28, borderRadius: 8, backgroundColor: "#FFEDD5",
+                        justifyContent: "center", alignItems: "center",
+                      }}>
+                        <Feather name={req.pickupType === "gps" ? "crosshair" : "map-pin"} size={14} color="#F97316" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C2D12" }} numberOfLines={1}>
+                          {req.pickupLabel ?? (req.pickupType === "gps" ? "Position GPS client" : "Point de repère")}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: "#92400E", fontFamily: "Inter_400Regular" }}>
+                          {req.pickupLat.toFixed(5)}, {req.pickupLon.toFixed(5)}
+                        </Text>
+                      </View>
+                      {/* Navigation buttons */}
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: "row", alignItems: "center", gap: 4,
+                          backgroundColor: "#1D4ED8", borderRadius: 8,
+                          paddingHorizontal: 8, paddingVertical: 5,
+                        }}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          const url = `https://www.google.com/maps/search/?api=1&query=${req.pickupLat},${req.pickupLon}`;
+                          Linking.openURL(url);
+                        }}
+                      >
+                        <Feather name="map" size={11} color="white" />
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>Maps</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: "row", alignItems: "center", gap: 4,
+                          backgroundColor: "#00AAFF", borderRadius: 8,
+                          paddingHorizontal: 8, paddingVertical: 5,
+                        }}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          const url = `waze://?ll=${req.pickupLat},${req.pickupLon}&navigate=yes`;
+                          Linking.openURL(url).catch(() =>
+                            Linking.openURL(`https://waze.com/ul?ll=${req.pickupLat},${req.pickupLon}&navigate=yes`)
+                          );
+                        }}
+                      >
+                        <Feather name="navigation" size={11} color="white" />
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>Waze</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
                   {/* Action row */}
                   <View style={{ flexDirection: "row", gap: 8 }}>

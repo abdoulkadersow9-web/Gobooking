@@ -79,6 +79,80 @@ function fmtDist(km: number): string {
   return `${Math.round(km)} km`;
 }
 
+/* ─── Landmark database (Côte d'Ivoire) ─────────────────────────────────── */
+type LandmarkType = "gare" | "carrefour" | "station" | "marche" | "place" | "hopital";
+
+interface Landmark {
+  id:    string;
+  city:  string;
+  name:  string;
+  type:  LandmarkType;
+  lat:   number;
+  lon:   number;
+}
+
+const LANDMARK_ICON: Record<LandmarkType, string> = {
+  gare:       "navigation",
+  carrefour:  "shuffle",
+  station:    "zap",
+  marche:     "shopping-bag",
+  place:      "map-pin",
+  hopital:    "plus-circle",
+};
+
+const CI_LANDMARKS: Landmark[] = [
+  /* ── Abidjan ── */
+  { id:"abi-1", city:"Abidjan", name:"Gare routière d'Adjamé",     type:"gare",      lat:5.3620, lon:-4.0195 },
+  { id:"abi-2", city:"Abidjan", name:"Gare de Port-Bouët",         type:"gare",      lat:5.2546, lon:-3.9375 },
+  { id:"abi-3", city:"Abidjan", name:"Gare de Bassam",             type:"gare",      lat:5.3105, lon:-3.8720 },
+  { id:"abi-4", city:"Abidjan", name:"Carrefour Palmeraie",        type:"carrefour", lat:5.3850, lon:-3.9780 },
+  { id:"abi-5", city:"Abidjan", name:"Carrefour Banco Nord",       type:"carrefour", lat:5.4150, lon:-4.0500 },
+  { id:"abi-6", city:"Abidjan", name:"Carrefour CHR",              type:"carrefour", lat:5.3320, lon:-4.0010 },
+  { id:"abi-7", city:"Abidjan", name:"Station Total Yopougon",     type:"station",   lat:5.3710, lon:-4.0860 },
+  { id:"abi-8", city:"Abidjan", name:"Station Shell Cocody",       type:"station",   lat:5.3565, lon:-3.9865 },
+  { id:"abi-9", city:"Abidjan", name:"Marché de Treichville",      type:"marche",    lat:5.2985, lon:-4.0075 },
+  { id:"abi-10",city:"Abidjan", name:"Marché d'Abobo",             type:"marche",    lat:5.4185, lon:-4.0300 },
+  /* ── Bouaké ── */
+  { id:"bou-1", city:"Bouaké",  name:"Gare routière Nord",         type:"gare",      lat:7.6972, lon:-5.0183 },
+  { id:"bou-2", city:"Bouaké",  name:"Gare routière Sud",          type:"gare",      lat:7.6769, lon:-5.0378 },
+  { id:"bou-3", city:"Bouaké",  name:"Carrefour Nimbo",            type:"carrefour", lat:7.6940, lon:-5.0179 },
+  { id:"bou-4", city:"Bouaké",  name:"Carrefour Broukro",          type:"carrefour", lat:7.6895, lon:-5.0225 },
+  { id:"bou-5", city:"Bouaké",  name:"Station Shell Bouaké",       type:"station",   lat:7.6900, lon:-5.0250 },
+  { id:"bou-6", city:"Bouaké",  name:"Grand Marché de Bouaké",     type:"marche",    lat:7.6932, lon:-5.0304 },
+  /* ── Yamoussoukro ── */
+  { id:"yam-1", city:"Yamoussoukro", name:"Gare routière centrale",    type:"gare",      lat:6.8276, lon:-5.2893 },
+  { id:"yam-2", city:"Yamoussoukro", name:"Carrefour Sinfra",          type:"carrefour", lat:6.8372, lon:-5.2872 },
+  { id:"yam-3", city:"Yamoussoukro", name:"Place de la Paix",          type:"place",     lat:6.8202, lon:-5.2765 },
+  { id:"yam-4", city:"Yamoussoukro", name:"Station Total Yamoussoukro",type:"station",   lat:6.8250, lon:-5.2840 },
+  /* ── Korhogo ── */
+  { id:"kor-1", city:"Korhogo", name:"Gare centrale de Korhogo",   type:"gare",      lat:9.4524, lon:-5.6253 },
+  { id:"kor-2", city:"Korhogo", name:"Carrefour Sinématiali",      type:"carrefour", lat:9.4590, lon:-5.6320 },
+  { id:"kor-3", city:"Korhogo", name:"Station Total Korhogo",      type:"station",   lat:9.4452, lon:-5.6198 },
+  { id:"kor-4", city:"Korhogo", name:"Grand Marché de Korhogo",    type:"marche",    lat:9.4507, lon:-5.6289 },
+  /* ── San-Pédro ── */
+  { id:"san-1", city:"San-Pédro", name:"Gare routière de San-Pédro", type:"gare",  lat:4.7481, lon:-6.6360 },
+  { id:"san-2", city:"San-Pédro", name:"Port de San-Pédro",          type:"place", lat:4.7350, lon:-6.6250 },
+  { id:"san-3", city:"San-Pédro", name:"Carrefour Tabou",            type:"carrefour", lat:4.7420, lon:-6.6280 },
+  /* ── Man ── */
+  { id:"man-1", city:"Man", name:"Gare centrale de Man",           type:"gare",      lat:7.4123, lon:-7.5554 },
+  { id:"man-2", city:"Man", name:"Carrefour Mont Nimba",           type:"carrefour", lat:7.4180, lon:-7.5480 },
+  { id:"man-3", city:"Man", name:"Marché de Man",                  type:"marche",    lat:7.4102, lon:-7.5533 },
+  /* ── Daloa ── */
+  { id:"dal-1", city:"Daloa", name:"Gare routière de Daloa",       type:"gare",      lat:6.8740, lon:-6.4502 },
+  { id:"dal-2", city:"Daloa", name:"Carrefour PK18 Daloa",         type:"carrefour", lat:6.8910, lon:-6.4420 },
+  { id:"dal-3", city:"Daloa", name:"Station Shell Daloa",          type:"station",   lat:6.8765, lon:-6.4480 },
+  /* ── Divo ── */
+  { id:"div-1", city:"Divo",   name:"Gare routière de Divo",       type:"gare",      lat:5.8380, lon:-5.3573 },
+  { id:"div-2", city:"Divo",   name:"Carrefour Lakota-Divo",       type:"carrefour", lat:5.8420, lon:-5.3540 },
+  /* ── Gagnoa ── */
+  { id:"gag-1", city:"Gagnoa", name:"Gare routière de Gagnoa",     type:"gare",      lat:6.1330, lon:-5.9483 },
+  { id:"gag-2", city:"Gagnoa", name:"Carrefour Lakota",            type:"carrefour", lat:6.1400, lon:-5.9530 },
+  { id:"gag-3", city:"Gagnoa", name:"Grand Marché de Gagnoa",      type:"marche",    lat:6.1312, lon:-5.9461 },
+  /* ── Agboville (intermédiaire) ── */
+  { id:"agb-1", city:"Agboville", name:"Gare d'Agboville",         type:"gare",      lat:5.9240, lon:-4.2183 },
+  { id:"agb-2", city:"Agboville", name:"Carrefour Agboville",      type:"carrefour", lat:5.9260, lon:-4.2150 },
+];
+
 /* ─── City nodes on the CI map ─────────────────────────────────────────── */
 const CITIES: Record<string, { x: number; y: number; label: string; major?: boolean }> = {
   Abidjan:      { x: 84, y: 84, label: "Abidjan",      major: true },
@@ -278,17 +352,76 @@ export default function LiveTrackingScreen() {
   }, [rawBuses, clientPos]);
 
   /* ── Client request form state ── */
-  const [showRequestForm, setShowRequestForm] = useState(false);
-  const [reqName,     setReqName]     = useState("");
-  const [reqPhone,    setReqPhone]    = useState("");
-  const [reqSeats,    setReqSeats]    = useState("1");
-  const [reqLoading,  setReqLoading]  = useState(false);
-  const [reqSuccess,  setReqSuccess]  = useState(false);
+  const [showRequestForm,    setShowRequestForm]    = useState(false);
+  const [reqName,            setReqName]            = useState("");
+  const [reqPhone,           setReqPhone]           = useState("");
+  const [reqSeats,           setReqSeats]           = useState("1");
+  const [reqLoading,         setReqLoading]         = useState(false);
+  const [reqSuccess,         setReqSuccess]         = useState(false);
+
+  /* Pickup point selection */
+  const [pickupType,         setPickupType]         = useState<"gps"|"landmark"|null>(null);
+  const [pickupLat,          setPickupLat]          = useState<number|null>(null);
+  const [pickupLon,          setPickupLon]          = useState<number|null>(null);
+  const [pickupLabel,        setPickupLabel]        = useState<string>("");
+  const [pickupCity,         setPickupCity]         = useState<string>("");
+  const [showLandmarkPicker, setShowLandmarkPicker] = useState(false);
+  const [landmarkSearch,     setLandmarkSearch]     = useState("");
+
+  /* Pickup marker position on map (%) */
+  const pickupMapPos = useMemo(() => {
+    if (pickupLat == null || pickupLon == null) return null;
+    const x = Math.max(1, Math.min(99, ((pickupLon - (-8.4)) / 5.2) * 100));
+    const y = Math.max(1, Math.min(99, ((10.7 - pickupLat) / 6.4) * 100));
+    return { x, y };
+  }, [pickupLat, pickupLon]);
+
+  /* Landmarks filtered by search + boarding city */
+  const filteredLandmarks = useMemo<Landmark[]>(() => {
+    /* Try to extract city from boardingPoint string */
+    const bpCity = boardingPoint
+      ? CI_LANDMARKS.find(l => boardingPoint.toLowerCase().includes(l.city.toLowerCase()))?.city
+      : null;
+    const q = landmarkSearch.trim().toLowerCase();
+    return CI_LANDMARKS.filter(l => {
+      const matchCity = !bpCity || l.city === bpCity;
+      if (!q) return matchCity;
+      return matchCity && (l.name.toLowerCase().includes(q) || l.city.toLowerCase().includes(q) || l.type.includes(q));
+    });
+  }, [boardingPoint, landmarkSearch]);
+
+  const selectGpsPickup = () => {
+    if (!clientPos) {
+      Alert.alert("Localisation indisponible", "Activez la localisation pour utiliser votre position actuelle.");
+      return;
+    }
+    setPickupType("gps");
+    setPickupLat(clientPos.lat);
+    setPickupLon(clientPos.lon);
+    setPickupLabel("Ma position actuelle");
+    setPickupCity("");
+    setShowLandmarkPicker(false);
+  };
+
+  const selectLandmark = (lm: Landmark) => {
+    setPickupType("landmark");
+    setPickupLat(lm.lat);
+    setPickupLon(lm.lon);
+    setPickupLabel(lm.name);
+    setPickupCity(lm.city);
+    setShowLandmarkPicker(false);
+    setLandmarkSearch("");
+  };
+
+  const clearPickup = () => {
+    setPickupType(null); setPickupLat(null); setPickupLon(null);
+    setPickupLabel(""); setPickupCity("");
+  };
 
   const submitRequest = useCallback(async () => {
     if (!selected) return;
     if (!boardingPoint) {
-      Alert.alert("Point de montée requis", "Sélectionnez d'abord un point de montée.");
+      Alert.alert("Point de montée requis", "Sélectionnez d'abord un point de montée ci-dessus.");
       return;
     }
     if (reqName.trim().length < 2) {
@@ -308,16 +441,21 @@ export default function LiveTrackingScreen() {
           clientPhone:    reqPhone.trim(),
           seatsRequested: parseInt(reqSeats, 10) || 1,
           boardingPoint,
+          pickupType:  pickupType  ?? undefined,
+          pickupLat:   pickupLat   ?? undefined,
+          pickupLon:   pickupLon   ?? undefined,
+          pickupLabel: pickupLabel || undefined,
+          pickupCity:  pickupCity  || undefined,
         }),
       });
       setReqSuccess(true);
       setReqName(""); setReqPhone(""); setReqSeats("1");
-      setTimeout(() => { setReqSuccess(false); setShowRequestForm(false); }, 3000);
+      setTimeout(() => { setReqSuccess(false); setShowRequestForm(false); clearPickup(); }, 3500);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible d'envoyer la demande. Réessayez.");
     }
     setReqLoading(false);
-  }, [selected, boardingPoint, reqName, reqPhone, reqSeats]);
+  }, [selected, boardingPoint, reqName, reqPhone, reqSeats, pickupType, pickupLat, pickupLon, pickupLabel, pickupCity]);
 
   /* Client position on map (mapX/mapY %) — clamped to CI bounding box */
   const clientMapPos = useMemo<{ x: number; y: number } | null>(() => {
@@ -336,6 +474,9 @@ export default function LiveTrackingScreen() {
     setShowRequestForm(false);
     setReqSuccess(false);
     setReqName(""); setReqPhone(""); setReqSeats("1");
+    setPickupType(null); setPickupLat(null); setPickupLon(null);
+    setPickupLabel(""); setPickupCity("");
+    setShowLandmarkPicker(false); setLandmarkSearch("");
     slideAnim.setValue(600);
     Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, tension: 65, friction: 11 }).start();
   }, [slideAnim]);
@@ -439,27 +580,37 @@ export default function LiveTrackingScreen() {
           />
         ))}
 
-        {/* Client position marker */}
+        {/* Client position marker (cyan circle) */}
         {clientMapPos && (
-          <View
-            style={{
-              position: "absolute",
-              left: (clientMapPos.x / 100) * mapSize.w - 10,
-              top:  (clientMapPos.y / 100) * mapSize.h - 10,
-              width: 20, height: 20,
-              borderRadius: 10,
-              backgroundColor: "#22D3EE",
-              borderWidth: 3,
-              borderColor: "white",
-              justifyContent: "center",
-              alignItems: "center",
-              shadowColor: "#22D3EE",
+          <View style={{
+            position: "absolute",
+            left: (clientMapPos.x / 100) * mapSize.w - 10,
+            top:  (clientMapPos.y / 100) * mapSize.h - 10,
+            width: 20, height: 20, borderRadius: 10,
+            backgroundColor: "#22D3EE", borderWidth: 3, borderColor: "white",
+            shadowColor: "#22D3EE", shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.9, shadowRadius: 6, elevation: 10,
+          }} />
+        )}
+
+        {/* Selected pickup point marker (orange diamond) */}
+        {pickupMapPos && (
+          <View style={{
+            position: "absolute",
+            left: (pickupMapPos.x / 100) * mapSize.w - 11,
+            top:  (pickupMapPos.y / 100) * mapSize.h - 11,
+          }}>
+            <View style={{
+              width: 22, height: 22,
+              backgroundColor: "#F97316",
+              borderWidth: 2.5, borderColor: "white",
+              borderRadius: 3,
+              transform: [{ rotate: "45deg" }],
+              shadowColor: "#F97316",
               shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.9,
-              shadowRadius: 6,
-              elevation: 10,
-            }}
-          />
+              shadowOpacity: 0.9, shadowRadius: 8, elevation: 12,
+            }} />
+          </View>
         )}
 
         {/* Legend bottom-left */}
@@ -472,6 +623,12 @@ export default function LiveTrackingScreen() {
             <View style={[S.legendItem, { marginTop: 3 }]}>
               <View style={[S.legendDot, { backgroundColor: "#22D3EE" }]} />
               <Text style={S.legendText}>Votre position</Text>
+            </View>
+          )}
+          {pickupMapPos && (
+            <View style={[S.legendItem, { marginTop: 3 }]}>
+              <View style={[S.legendDot, { backgroundColor: "#F97316", borderRadius: 2, transform: [{ rotate: "45deg" }] }]} />
+              <Text style={S.legendText}>Point de montée</Text>
             </View>
           )}
         </View>
@@ -702,7 +859,7 @@ export default function LiveTrackingScreen() {
                   <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
                     <Feather name="alert-circle" size={13} color="#D97706" />
                     <Text style={{ fontSize: 12, color: "#D97706", fontFamily: "Inter_500Medium" }}>
-                      Sélectionnez d'abord un point de montée ci-dessus
+                      Sélectionnez d'abord un arrêt ci-dessus
                     </Text>
                   </View>
                 )}
@@ -728,6 +885,139 @@ export default function LiveTrackingScreen() {
                   onChangeText={setReqPhone}
                   keyboardType="phone-pad"
                 />
+
+                {/* ── Pickup point selector ── */}
+                <View>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#475569", marginBottom: 6 }}>
+                    Point de montée précis
+                  </Text>
+
+                  {/* Selected pickup badge */}
+                  {pickupType ? (
+                    <View style={{
+                      flexDirection: "row", alignItems: "center", gap: 8,
+                      backgroundColor: "#FFF7ED", borderRadius: 10, padding: 10,
+                      borderWidth: 1.5, borderColor: "#FDBA74",
+                    }}>
+                      <Feather name={pickupType === "gps" ? "crosshair" : "map-pin"} size={15} color="#F97316" />
+                      <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#9A3412" }} numberOfLines={1}>
+                        {pickupLabel}
+                      </Text>
+                      <Pressable onPress={clearPickup} hitSlop={8}>
+                        <Feather name="x" size={14} color="#94A3B8" />
+                      </Pressable>
+                    </View>
+                  ) : (
+                    /* Choice buttons */
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {/* GPS button */}
+                      <Pressable
+                        onPress={selectGpsPickup}
+                        style={({ pressed }) => [{
+                          flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                          gap: 6, height: 40, borderRadius: 10,
+                          backgroundColor: clientPos ? "#F0FDF4" : "#F8FAFC",
+                          borderWidth: 1.5, borderColor: clientPos ? "#86EFAC" : "#E2E8F0",
+                          opacity: pressed ? 0.8 : 1,
+                        }]}
+                      >
+                        <Feather name="crosshair" size={13} color={clientPos ? "#16A34A" : "#94A3B8"} />
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: clientPos ? "#16A34A" : "#94A3B8" }}>
+                          Ma position
+                        </Text>
+                      </Pressable>
+
+                      {/* Landmark button */}
+                      <Pressable
+                        onPress={() => setShowLandmarkPicker(v => !v)}
+                        style={({ pressed }) => [{
+                          flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                          gap: 6, height: 40, borderRadius: 10,
+                          backgroundColor: showLandmarkPicker ? "#EEF2FF" : "#F8FAFC",
+                          borderWidth: 1.5, borderColor: showLandmarkPicker ? "#A5B4FC" : "#E2E8F0",
+                          opacity: pressed ? 0.8 : 1,
+                        }]}
+                      >
+                        <Feather name="search" size={13} color={showLandmarkPicker ? "#4F46E5" : "#64748B"} />
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: showLandmarkPicker ? "#4F46E5" : "#64748B" }}>
+                          Point de repère
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {/* Landmark search panel */}
+                  {showLandmarkPicker && !pickupType && (
+                    <View style={{ marginTop: 8, gap: 6 }}>
+                      <TextInput
+                        style={{
+                          backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: "#C7D2FE",
+                          paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, fontFamily: "Inter_400Regular",
+                        }}
+                        placeholder="Chercher gare, carrefour, station…"
+                        placeholderTextColor="#94A3B8"
+                        value={landmarkSearch}
+                        onChangeText={setLandmarkSearch}
+                        autoCapitalize="none"
+                      />
+                      <View style={{
+                        maxHeight: 190,
+                        backgroundColor: "white", borderRadius: 10,
+                        borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden",
+                      }}>
+                        {filteredLandmarks.length === 0 ? (
+                          <View style={{ padding: 14, alignItems: "center" }}>
+                            <Text style={{ fontSize: 12, color: "#94A3B8" }}>Aucun résultat</Text>
+                          </View>
+                        ) : (
+                          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                            {filteredLandmarks.map((lm, idx) => (
+                              <Pressable
+                                key={lm.id}
+                                onPress={() => selectLandmark(lm)}
+                                style={({ pressed }) => [{
+                                  flexDirection: "row", alignItems: "center", gap: 10,
+                                  paddingHorizontal: 12, paddingVertical: 10,
+                                  backgroundColor: pressed ? "#F1F5F9" : "white",
+                                  borderTopWidth: idx > 0 ? 1 : 0,
+                                  borderTopColor: "#F1F5F9",
+                                }]}
+                              >
+                                <View style={{
+                                  width: 28, height: 28, borderRadius: 8,
+                                  backgroundColor: lm.type === "gare" ? "#EFF6FF"
+                                    : lm.type === "carrefour" ? "#F0FDF4"
+                                    : lm.type === "station" ? "#FFFBEB"
+                                    : lm.type === "marche" ? "#FDF4FF"
+                                    : "#F8FAFC",
+                                  justifyContent: "center", alignItems: "center",
+                                }}>
+                                  <Feather
+                                    name={LANDMARK_ICON[lm.type] as any}
+                                    size={13}
+                                    color={lm.type === "gare" ? "#1D4ED8"
+                                      : lm.type === "carrefour" ? "#059669"
+                                      : lm.type === "station" ? "#D97706"
+                                      : lm.type === "marche" ? "#7C3AED"
+                                      : "#64748B"}
+                                  />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#0F172A" }} numberOfLines={1}>
+                                    {lm.name}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: "#64748B" }}>{lm.city} · {lm.type}</Text>
+                                </View>
+                                <Feather name="chevron-right" size={13} color="#CBD5E1" />
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        )}
+                      </View>
+                    </View>
+                  )}
+                </View>
+
                 {/* Seats selector */}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                   <Text style={{ fontSize: 13, color: "#475569", fontFamily: "Inter_500Medium" }}>Places :</Text>
@@ -745,6 +1035,7 @@ export default function LiveTrackingScreen() {
                     </Pressable>
                   ))}
                 </View>
+
                 {/* Action row */}
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <Pressable

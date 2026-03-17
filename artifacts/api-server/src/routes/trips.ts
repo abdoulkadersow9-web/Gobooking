@@ -273,7 +273,11 @@ router.get("/live", async (_req, res) => {
 /* ─── Client sends a boarding request for a live bus ─────────────────────── */
 router.post("/:tripId/request", async (req, res) => {
   try {
-    const { clientName, clientPhone, seatsRequested = 1, boardingPoint } = req.body ?? {};
+    const {
+      clientName, clientPhone, seatsRequested = 1, boardingPoint,
+      /* Pickup location fields */
+      pickupType, pickupLat, pickupLon, pickupLabel, pickupCity,
+    } = req.body ?? {};
 
     if (!clientName || typeof clientName !== "string" || clientName.trim().length < 2) {
       res.status(400).json({ error: "Nom requis (min. 2 caractères)" }); return;
@@ -296,6 +300,12 @@ router.post("/:tripId/request", async (req, res) => {
       boardingPoint:  boardingPoint.trim(),
       status:         "pending" as const,
       createdAt:      Date.now(),
+      /* Pickup location — optional */
+      pickupType:    (pickupType === "gps" || pickupType === "landmark") ? pickupType : undefined,
+      pickupLat:     typeof pickupLat  === "number" ? pickupLat  : undefined,
+      pickupLon:     typeof pickupLon  === "number" ? pickupLon  : undefined,
+      pickupLabel:   typeof pickupLabel === "string" ? pickupLabel.trim()  : undefined,
+      pickupCity:    typeof pickupCity  === "string" ? pickupCity.trim()   : undefined,
     };
     requestStore.set(id, entry);
 

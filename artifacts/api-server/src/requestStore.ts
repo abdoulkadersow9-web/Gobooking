@@ -1,20 +1,27 @@
 /* ─── In-memory real-time trip request store ──────────────────────────────
-   Clients send booking requests from the live-tracking screen.
+   Clients send boarding requests from the live-tracking screen.
    Agents see and act on them in real time.  Ephemeral — resets on restart.
 ─────────────────────────────────────────────────────────────────────────── */
 
-export type RequestStatus = "pending" | "accepted" | "rejected";
+export type RequestStatus  = "pending" | "accepted" | "rejected";
+export type PickupType     = "gps" | "landmark";
 
 export interface TripRequest {
-  id:            string;
-  tripId:        string;
-  clientName:    string;
-  clientPhone:   string;
-  seatsRequested: number;
-  boardingPoint: string;
-  status:        RequestStatus;
-  createdAt:     number;   /* Date.now() ms */
-  respondedAt?:  number;
+  id:              string;
+  tripId:          string;
+  clientName:      string;
+  clientPhone:     string;
+  seatsRequested:  number;
+  boardingPoint:   string;
+  status:          RequestStatus;
+  createdAt:       number;   /* Date.now() ms */
+  respondedAt?:    number;
+  /* Pickup location */
+  pickupType?:     PickupType;
+  pickupLat?:      number;
+  pickupLon?:      number;
+  pickupLabel?:    string;
+  pickupCity?:     string;
 }
 
 /* Singleton — imported by agent.ts and trips.ts */
