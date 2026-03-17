@@ -27,7 +27,7 @@ interface Stats { totalBuses: number; totalAgents: number; totalTrips: number; t
 interface Bus { id: string; busName: string; plateNumber: string; busType: string; capacity: number; status: string }
 interface Trip { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; totalSeats: number; busName: string; duration: string }
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
-interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number }
+interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
 interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string }
 
@@ -189,6 +189,10 @@ export default function CompanyDashboard() {
   const [agents, setAgents] = useState<AgentItem[]>(DEMO_AGENTS);
   const [selectedTripForSeats, setSelectedTripForSeats] = useState<Trip>(DEMO_TRIPS[0]);
   const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 49, 31));
+  const [selectedSeat, setSelectedSeat] = useState<SeatItem | null>(null);
+  const [seatDetailModal, setSeatDetailModal] = useState(false);
+  const [seatActionLoading, setSeatActionLoading] = useState(false);
+  const [seatFilter, setSeatFilter] = useState<"all" | "available" | "booked" | "blocked">("all");
   const [reservationFilter, setReservationFilter] = useState<"all" | "confirmed" | "boarded" | "cancelled">("all");
 
   /* modal states */
@@ -226,11 +230,41 @@ export default function CompanyDashboard() {
   const loadSeats = (trip: Trip) => {
     setSelectedTripForSeats(trip);
     setActiveTab("sieges");
+    setSeatFilter("all");
     setSeats(genDemoSeats(trip.id, trip.totalSeats, Math.floor(trip.totalSeats * 0.65)));
     if (token) {
-      apiFetch<SeatItem[]>(`/company/seats/${trip.id}`, { token })
+      apiFetch<SeatItem[]>(`/company/seats/${trip.id}/detail`, { token })
         .then(s => { if (s.length > 0) setSeats(s); })
-        .catch(() => {});
+        .catch(() => {
+          apiFetch<SeatItem[]>(`/company/seats/${trip.id}`, { token })
+            .then(s => { if (s.length > 0) setSeats(s); })
+            .catch(() => {});
+        });
+    }
+  };
+
+  const openSeatDetail = (seat: SeatItem) => {
+    setSelectedSeat(seat);
+    setSeatDetailModal(true);
+  };
+
+  const handleToggleSeatBlock = async () => {
+    if (!selectedSeat || !token) return;
+    const newStatus = selectedSeat.status === "blocked" ? "available" : "blocked";
+    setSeatActionLoading(true);
+    try {
+      await apiFetch(`/company/seats/${selectedSeat.id}/status`, {
+        token, method: "PATCH", body: JSON.stringify({ status: newStatus }),
+      });
+      setSeats(prev => prev.map(s => s.id === selectedSeat.id ? { ...s, status: newStatus } : s));
+      setSelectedSeat(prev => prev ? { ...prev, status: newStatus } : null);
+    } catch {
+      /* optimistic update if API unavailable */
+      setSeats(prev => prev.map(s => s.id === selectedSeat.id ? { ...s, status: newStatus } : s));
+      setSelectedSeat(prev => prev ? { ...prev, status: newStatus } : null);
+    } finally {
+      setSeatActionLoading(false);
+      setSeatDetailModal(false);
     }
   };
 
@@ -297,9 +331,12 @@ export default function CompanyDashboard() {
   ];
 
   const filteredRes = reservationFilter === "all" ? reservations : reservations.filter(r => r.status === reservationFilter);
-  const seatBooked = seats.filter(s => s.status === "booked").length;
-  const seatAvail  = seats.filter(s => s.status === "available").length;
-  const seatRows   = Math.ceil(seats.length / 4);
+  const seatBooked  = seats.filter(s => s.status === "booked").length;
+  const seatAvail   = seats.filter(s => s.status === "available").length;
+  const seatBlocked = seats.filter(s => s.status === "blocked").length;
+  const seatRevenue = seats.filter(s => s.status === "booked").reduce((sum, s) => sum + s.price, 0);
+  const filteredSeats = seatFilter === "all" ? seats : seats.filter(s => s.status === seatFilter);
+  const seatRows    = Math.ceil(seats.length / 4);
 
   return (
     <View style={[S.container, { paddingTop: topPad }]}>
@@ -459,8 +496,9 @@ export default function CompanyDashboard() {
         {/* ── Sièges ── */}
         {activeTab === "sieges" && (<>
           <Text style={S.sectionTitle}>Sièges — {selectedTripForSeats.from} → {selectedTripForSeats.to}</Text>
-          <Text style={[S.subLabel, { marginBottom: 4 }]}>{selectedTripForSeats.date} · {selectedTripForSeats.departureTime} · {selectedTripForSeats.busName}</Text>
+          <Text style={[S.subLabel, { marginBottom: 8 }]}>{selectedTripForSeats.date} · {selectedTripForSeats.departureTime} · {selectedTripForSeats.busName}</Text>
 
+          {/* Stats row */}
           <View style={S.seatSummaryRow}>
             <View style={[S.seatSummaryCard, { borderColor: "#BBF7D0" }]}>
               <Text style={[S.seatSummaryNum, { color: "#059669" }]}>{seatAvail}</Text>
@@ -470,9 +508,9 @@ export default function CompanyDashboard() {
               <Text style={[S.seatSummaryNum, { color: "#DC2626" }]}>{seatBooked}</Text>
               <Text style={S.seatSummaryLabel}>Réservés</Text>
             </View>
-            <View style={[S.seatSummaryCard, { borderColor: "#C7D2FE" }]}>
-              <Text style={[S.seatSummaryNum, { color: PRIMARY }]}>{seats.length}</Text>
-              <Text style={S.seatSummaryLabel}>Total</Text>
+            <View style={[S.seatSummaryCard, { borderColor: "#E9D5FF" }]}>
+              <Text style={[S.seatSummaryNum, { color: "#7C3AED" }]}>{seatBlocked}</Text>
+              <Text style={S.seatSummaryLabel}>Bloqués</Text>
             </View>
             <View style={[S.seatSummaryCard, { borderColor: "#FDE68A" }]}>
               <Text style={[S.seatSummaryNum, { color: "#D97706" }]}>{Math.round((seatBooked / Math.max(seats.length, 1)) * 100)}%</Text>
@@ -480,12 +518,33 @@ export default function CompanyDashboard() {
             </View>
           </View>
 
-          <View style={S.seatLegend}>
-            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#ECFDF5", borderColor: "#059669" }]} /><Text style={S.legendText}>Disponible</Text></View>
-            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#FEF2F2", borderColor: "#DC2626" }]} /><Text style={S.legendText}>Réservé</Text></View>
+          {/* Revenue card */}
+          <View style={S.revenueCard}>
+            <Feather name="trending-up" size={16} color="#059669" />
+            <Text style={S.revenueLabel}>Recettes sièges :</Text>
+            <Text style={S.revenueAmount}>{seatRevenue.toLocaleString("fr-CI")} FCFA</Text>
           </View>
 
-          {/* Also show other trips to switch */}
+          {/* Legend */}
+          <View style={S.seatLegend}>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#ECFDF5", borderColor: "#059669" }]} /><Text style={S.legendText}>Libre</Text></View>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#FEF2F2", borderColor: "#DC2626" }]} /><Text style={S.legendText}>Réservé</Text></View>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#F5F3FF", borderColor: "#7C3AED" }]} /><Text style={S.legendText}>Bloqué</Text></View>
+          </View>
+
+          {/* Filter chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
+            {(["all","available","booked","blocked"] as const).map(f => (
+              <Pressable key={f} onPress={() => setSeatFilter(f)}
+                style={[S.filterChip, seatFilter === f && S.filterChipActive]}>
+                <Text style={[S.filterChipText, seatFilter === f && S.filterChipTextActive]}>
+                  {f === "all" ? "Tous" : f === "available" ? "Disponibles" : f === "booked" ? "Réservés" : "Bloqués"}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {/* Trip switcher */}
           <Text style={[S.pickerLabel, { marginBottom: 6 }]}>Changer de trajet</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
             {trips.map(trip => (
@@ -496,6 +555,7 @@ export default function CompanyDashboard() {
             ))}
           </ScrollView>
 
+          {/* Seat map */}
           <View style={S.seatBusFrame}>
             <View style={S.busNose}><Feather name="truck" size={18} color="#94A3B8" /></View>
             <View style={S.seatGrid}>
@@ -503,25 +563,38 @@ export default function CompanyDashboard() {
                 <View key={rowIdx} style={S.seatRow}>
                   {[0, 1].map(col => {
                     const s = seats.find(s => s.row === rowIdx + 1 && s.column === col);
-                    return s ? (
-                      <View key={col} style={[S.seat, s.status === "booked" ? S.seatBooked : S.seatAvail]}>
-                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : "#059669" }]}>{s.number}</Text>
-                      </View>
-                    ) : <View key={col} style={S.seatEmpty} />;
+                    if (!s) return <View key={col} style={S.seatEmpty} />;
+                    const hidden = seatFilter !== "all" && s.status !== seatFilter;
+                    const sStyle = s.status === "booked" ? S.seatBooked : s.status === "blocked" ? S.seatBlocked : S.seatAvail;
+                    const tColor = s.status === "booked" ? "#DC2626" : s.status === "blocked" ? "#7C3AED" : "#059669";
+                    return (
+                      <TouchableOpacity key={col} onPress={() => openSeatDetail(s)}
+                        style={[S.seat, sStyle, hidden && { opacity: 0.25 }]} activeOpacity={0.7}>
+                        <Text style={[S.seatNum, { color: tColor }]}>{s.number}</Text>
+                      </TouchableOpacity>
+                    );
                   })}
                   <View style={S.seatAisle} />
                   {[2, 3].map(col => {
                     const s = seats.find(s => s.row === rowIdx + 1 && s.column === col);
-                    return s ? (
-                      <View key={col} style={[S.seat, s.status === "booked" ? S.seatBooked : S.seatAvail]}>
-                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : "#059669" }]}>{s.number}</Text>
-                      </View>
-                    ) : <View key={col} style={S.seatEmpty} />;
+                    if (!s) return <View key={col} style={S.seatEmpty} />;
+                    const hidden = seatFilter !== "all" && s.status !== seatFilter;
+                    const sStyle = s.status === "booked" ? S.seatBooked : s.status === "blocked" ? S.seatBlocked : S.seatAvail;
+                    const tColor = s.status === "booked" ? "#DC2626" : s.status === "blocked" ? "#7C3AED" : "#059669";
+                    return (
+                      <TouchableOpacity key={col} onPress={() => openSeatDetail(s)}
+                        style={[S.seat, sStyle, hidden && { opacity: 0.25 }]} activeOpacity={0.7}>
+                        <Text style={[S.seatNum, { color: tColor }]}>{s.number}</Text>
+                      </TouchableOpacity>
+                    );
                   })}
                 </View>
               ))}
             </View>
           </View>
+          {filteredSeats.length === 0 && (
+            <Text style={[S.subLabel, { textAlign: "center", marginTop: 16 }]}>Aucun siège dans ce filtre</Text>
+          )}
         </>)}
 
         {/* ── Bus ── */}
@@ -613,6 +686,105 @@ export default function CompanyDashboard() {
         </>)}
 
       </ScrollView>
+
+      {/* ─────────── Seat Detail Sheet ─────────── */}
+      <Modal visible={seatDetailModal} transparent animationType="slide" onRequestClose={() => setSeatDetailModal(false)}>
+        <Pressable style={S.modalOverlay} onPress={() => setSeatDetailModal(false)}>
+          <Pressable style={[S.modalCard, { paddingBottom: 32 }]} onPress={e => e.stopPropagation()}>
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Siège {selectedSeat?.number}</Text>
+              <Pressable onPress={() => setSeatDetailModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+            </View>
+
+            {/* Status badge */}
+            <View style={{ alignItems: "flex-start", marginBottom: 16 }}>
+              {selectedSeat?.status === "booked" && (
+                <View style={[S.badge, { backgroundColor: "#FEF2F2" }]}>
+                  <Text style={[S.badgeText, { color: "#DC2626" }]}>Réservé</Text>
+                </View>
+              )}
+              {selectedSeat?.status === "available" && (
+                <View style={[S.badge, { backgroundColor: "#ECFDF5" }]}>
+                  <Text style={[S.badgeText, { color: "#059669" }]}>Disponible</Text>
+                </View>
+              )}
+              {selectedSeat?.status === "blocked" && (
+                <View style={[S.badge, { backgroundColor: "#F5F3FF" }]}>
+                  <Text style={[S.badgeText, { color: "#7C3AED" }]}>Bloqué (maintenance)</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Seat type */}
+            <View style={S.seatDetailRow}>
+              <Feather name="info" size={14} color="#64748B" />
+              <Text style={S.seatDetailLabel}>Type :</Text>
+              <Text style={S.seatDetailValue}>{selectedSeat?.type === "window" ? "Fenêtre" : "Couloir"}</Text>
+            </View>
+            <View style={S.seatDetailRow}>
+              <Feather name="tag" size={14} color="#64748B" />
+              <Text style={S.seatDetailLabel}>Prix :</Text>
+              <Text style={S.seatDetailValue}>{selectedSeat?.price?.toLocaleString("fr-CI")} FCFA</Text>
+            </View>
+
+            {/* Passenger info (if booked) */}
+            {selectedSeat?.status === "booked" && (
+              <View style={S.passengerCard}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <View style={[S.listIcon, { backgroundColor: "#EEF2FF", width: 36, height: 36, borderRadius: 9 }]}>
+                    <Feather name="user" size={16} color={PRIMARY} />
+                  </View>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#1E293B" }}>
+                    {(selectedSeat as any)?.passenger?.name ?? "Passager"}
+                  </Text>
+                </View>
+                {(selectedSeat as any)?.bookingRef && (
+                  <View style={S.seatDetailRow}>
+                    <Feather name="hash" size={13} color="#64748B" />
+                    <Text style={S.seatDetailLabel}>Réf. :</Text>
+                    <Text style={[S.seatDetailValue, { fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }]}>
+                      {(selectedSeat as any).bookingRef}
+                    </Text>
+                  </View>
+                )}
+                {(selectedSeat as any)?.bookingStatus && (
+                  <View style={S.seatDetailRow}>
+                    <Feather name="check-circle" size={13} color="#64748B" />
+                    <Text style={S.seatDetailLabel}>Statut résa :</Text>
+                    <Text style={[S.seatDetailValue, { color: (selectedSeat as any).bookingStatus === "boarded" ? "#059669" : PRIMARY }]}>
+                      {BOOKING_STATUS[(selectedSeat as any).bookingStatus ?? ""]?.label ?? (selectedSeat as any).bookingStatus}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Block / Unblock action (only for non-booked) */}
+            {selectedSeat?.status !== "booked" && (
+              <TouchableOpacity
+                style={[S.modalSubmit, selectedSeat?.status === "blocked"
+                  ? { backgroundColor: "#059669" }
+                  : { backgroundColor: "#7C3AED" }
+                ]}
+                onPress={handleToggleSeatBlock}
+                disabled={seatActionLoading}
+                activeOpacity={0.85}>
+                {seatActionLoading
+                  ? <Text style={S.modalSubmitText}>En cours...</Text>
+                  : <Text style={S.modalSubmitText}>
+                      {selectedSeat?.status === "blocked" ? "✓ Débloquer ce siège" : "⊘ Bloquer (maintenance)"}
+                    </Text>
+                }
+              </TouchableOpacity>
+            )}
+            {selectedSeat?.status === "booked" && (
+              <View style={[S.modalSubmit, { backgroundColor: "#F1F5F9" }]}>
+                <Text style={[S.modalSubmitText, { color: "#64748B" }]}>Siège réservé — non modifiable</Text>
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ─────────── Add Bus Modal ─────────── */}
       <Modal visible={addBusModal} transparent animationType="slide" onRequestClose={() => { if (!busSubmitting) { setAddBusModal(false); setBusError(""); } }}>
@@ -833,9 +1005,22 @@ const S = StyleSheet.create({
   seat:           { width: 40, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
   seatBooked:     { backgroundColor: "#FEF2F2", borderColor: "#FCA5A5" },
   seatAvail:      { backgroundColor: "#ECFDF5", borderColor: "#86EFAC" },
+  seatBlocked:    { backgroundColor: "#F5F3FF", borderColor: "#C4B5FD" },
   seatEmpty:      { width: 40, height: 36 },
   seatAisle:      { width: 12 },
   seatNum:        { fontSize: 10, fontWeight: "700" },
+
+  revenueCard:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12, borderWidth: 1, borderColor: "#86EFAC" },
+  revenueLabel:   { fontSize: 13, color: "#065F46", flex: 1 },
+  revenueAmount:  { fontSize: 14, fontWeight: "700", color: "#059669" },
+
+  modalSubmit:    { borderRadius: 10, paddingVertical: 13, alignItems: "center" as const, justifyContent: "center" as const, marginTop: 4 },
+  modalSubmitText:{ fontSize: 14, fontWeight: "700" as const, color: "white" },
+
+  passengerCard:  { backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12, marginVertical: 12, borderWidth: 1, borderColor: "#E2E8F0" },
+  seatDetailRow:  { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  seatDetailLabel:{ fontSize: 13, color: "#64748B", width: 80 },
+  seatDetailValue:{ fontSize: 13, color: "#1E293B", fontWeight: "600", flex: 1 },
 
   listCard:       { backgroundColor: "white", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   listIcon:       { width: 42, height: 42, borderRadius: 11, alignItems: "center", justifyContent: "center" },

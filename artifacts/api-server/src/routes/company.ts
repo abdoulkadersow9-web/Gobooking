@@ -188,4 +188,57 @@ router.get("/seats/:tripId", async (req, res) => {
   }
 });
 
+/* ─── Seats with passenger info for a trip ──────────────── */
+router.get("/seats/:tripId/detail", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const seats    = await db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId));
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.tripId, req.params.tripId));
+
+    const enriched = seats.map(s => {
+      const booking = bookings.find(b =>
+        b.seatNumbers?.includes(s.number) && b.status !== "cancelled"
+      );
+      const passenger = booking?.passengers?.find((p: any) => p.seatNumber === s.number) ?? null;
+      return {
+        ...s,
+        bookingRef: booking?.bookingRef ?? null,
+        bookingStatus: booking?.status ?? null,
+        passenger: passenger,
+      };
+    });
+
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── Block / unblock a seat ────────────────────────────── */
+router.patch("/seats/:seatId/status", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { status } = req.body as { status: string };
+    const allowed = ["available", "blocked"];
+    if (!allowed.includes(status)) {
+      res.status(400).json({ error: "Statut invalide. Valeurs acceptées : available, blocked" }); return;
+    }
+
+    const seats = await db.select().from(seatsTable).where(eq(seatsTable.id, req.params.seatId)).limit(1);
+    if (!seats.length) { res.status(404).json({ error: "Siège introuvable" }); return; }
+    if (seats[0].status === "booked") {
+      res.status(409).json({ error: "Impossible de modifier un siège déjà réservé" }); return;
+    }
+
+    await db.update(seatsTable).set({ status }).where(eq(seatsTable.id, req.params.seatId));
+    res.json({ success: true, seatId: req.params.seatId, status });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 export default router;
