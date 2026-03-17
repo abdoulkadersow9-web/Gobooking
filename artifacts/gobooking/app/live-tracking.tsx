@@ -602,6 +602,13 @@ export default function LiveTrackingScreen() {
           <Text style={S.headerTitle}>Cars en route</Text>
           <Text style={S.headerSub}>Côte d'Ivoire — temps réel</Text>
         </View>
+        <Pressable
+          onPress={() => router.push("/cars-en-route-map" as any)}
+          style={S.mapBtn}
+        >
+          <Feather name="map" size={16} color="#60a5fa" />
+          <Text style={S.mapBtnText}>Carte</Text>
+        </Pressable>
         <View style={S.liveBadge}>
           <View style={S.liveDot} />
           <Text style={S.liveText}>LIVE</Text>
@@ -1480,6 +1487,8 @@ const S = StyleSheet.create({
   liveBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(239,68,68,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "rgba(239,68,68,0.4)" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444" },
   liveText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
+  mapBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(96,165,250,0.15)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1, borderColor: "rgba(96,165,250,0.3)", marginRight: 8 },
+  mapBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#60a5fa" },
 
   mapContainer: { width: "100%", overflow: "hidden" },
   legend: { position: "absolute", left: 12, bottom: 12, backgroundColor: "rgba(11,22,40,0.85)", borderRadius: 10, padding: 8, gap: 4 },
