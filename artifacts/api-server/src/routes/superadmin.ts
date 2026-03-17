@@ -195,7 +195,7 @@ router.post("/users", async (req, res) => {
     const admin = await requireSuperAdmin(req.headers.authorization);
     if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
 
-    const { name, email, role } = req.body;
+    const { name, email, phone, role, password } = req.body;
     if (!name || !email || !role) {
       res.status(400).json({ error: "Nom, email et rôle sont requis" });
       return;
@@ -211,16 +211,17 @@ router.post("/users", async (req, res) => {
       return;
     }
 
-    const provisionalPassword = generateProvisionalPassword();
+    const provisionalPassword = password || generateProvisionalPassword();
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
     const [user] = await db.insert(usersTable).values({
       id,
       name,
       email,
-      phone: "",
+      phone: phone || "",
       passwordHash: hashPasswordSuper(provisionalPassword),
       role: role as StaffRole,
+      status: "active",
     }).returning();
 
     res.json({
@@ -228,7 +229,9 @@ router.post("/users", async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
+        status: user.status,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
       provisionalPassword,
@@ -236,6 +239,87 @@ router.post("/users", async (req, res) => {
   } catch (err) {
     console.error("Create staff error:", err);
     res.status(500).json({ error: "Échec de la création du compte" });
+  }
+});
+
+router.patch("/users/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
+
+    const { name, email, phone, role } = req.body;
+    if (!name && !email && !phone && !role) {
+      res.status(400).json({ error: "Au moins un champ à modifier est requis" });
+      return;
+    }
+
+    const updates: Record<string, string> = {};
+    if (name)  updates.name  = name;
+    if (email) updates.email = email;
+    if (phone) updates.phone = phone;
+    if (role)  updates.role  = role;
+
+    const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.params.id)).returning();
+    if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
+
+    res.json({ id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, status: user.status, createdAt: user.createdAt?.toISOString() });
+  } catch (err) {
+    console.error("Update user error:", err);
+    res.status(500).json({ error: "Échec de la modification" });
+  }
+});
+
+router.patch("/users/:id/status", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
+
+    const { status } = req.body;
+    if (!["active", "inactive"].includes(status)) {
+      res.status(400).json({ error: "Statut invalide. Utilisez : active ou inactive" });
+      return;
+    }
+
+    const [user] = await db.update(usersTable).set({ status }).where(eq(usersTable.id, req.params.id)).returning();
+    if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
+
+    res.json({ id: user.id, status: user.status });
+  } catch (err) {
+    console.error("Update user status error:", err);
+    res.status(500).json({ error: "Échec de la modification du statut" });
+  }
+});
+
+router.delete("/users/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
+
+    await db.delete(usersTable).where(eq(usersTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Delete user error:", err);
+    res.status(500).json({ error: "Échec de la suppression" });
+  }
+});
+
+router.post("/users/:id/reset-password", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Accès refusé" }); return; }
+
+    const newPassword = generateProvisionalPassword();
+    const [user] = await db.update(usersTable)
+      .set({ passwordHash: hashPasswordSuper(newPassword) })
+      .where(eq(usersTable.id, req.params.id))
+      .returning();
+
+    if (!user) { res.status(404).json({ error: "Utilisateur introuvable" }); return; }
+
+    res.json({ success: true, provisionalPassword: newPassword, email: user.email, name: user.name });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "Échec de la réinitialisation" });
   }
 });
 

@@ -25,7 +25,7 @@ const PRIMARY = Colors.light.primary;
 /* ─── Types ─────────────────────────────────────────────── */
 interface GlobalStats { totalUsers: number; totalCompanies: number; totalAgents: number; totalTrips: number; totalParcels: number; totalBookings: number; totalRevenue: number; totalCities: number; recentUsers: { id: string; name: string; email: string; role: string }[] }
 interface Company { id: string; name: string; email: string; phone: string; city: string; status: string }
-interface UserItem { id: string; name: string; email: string; role: string; createdAt?: string }
+interface UserItem { id: string; name: string; email: string; phone?: string; role: string; status?: string; createdAt?: string }
 interface CityItem { id: string; name: string; region: string }
 interface PaymentItem { id: string; refId: string; refType: string; amount: number; method: string; status: string; createdAt: string }
 
@@ -52,12 +52,12 @@ const DEMO_COMPANIES: Company[] = [
   { id: "c8", name: "Prestige Trans", email: "prestige@pt.ci", phone: "+225 27 22 00 88 77", city: "Daloa", status: "inactive" },
 ];
 const DEMO_USERS: UserItem[] = [
-  { id: "u1", name: "Ama Koné", email: "ama.kone@gmail.com", role: "user", createdAt: "2026-03-15" },
-  { id: "u2", name: "Mamadou Traoré", email: "m.traore@gmail.com", role: "user", createdAt: "2026-03-14" },
-  { id: "u3", name: "Bamba Koffi", email: "b.koffi@sotral.ci", role: "company_admin", createdAt: "2026-03-10" },
-  { id: "u4", name: "Mariam Diallo", email: "diallo@gobooking.com", role: "agent", createdAt: "2026-03-08" },
-  { id: "u5", name: "Super Admin", email: "admin@gobooking.com", role: "admin", createdAt: "2026-01-01" },
-  { id: "u6", name: "Kouassi Jean", email: "kouassi.jean@sotral.ci", role: "agent", createdAt: "2026-03-01" },
+  { id: "u1", name: "Ama Koné",      email: "ama.kone@gmail.com",      phone: "+225 07 12 34 56", role: "user",         status: "active",   createdAt: "2026-03-15" },
+  { id: "u2", name: "Mamadou Traoré",email: "m.traore@gmail.com",       phone: "+225 05 98 76 54", role: "user",         status: "active",   createdAt: "2026-03-14" },
+  { id: "u3", name: "Bamba Koffi",   email: "b.koffi@sotral.ci",        phone: "+225 27 44 11 00", role: "compagnie",    status: "active",   createdAt: "2026-03-10" },
+  { id: "u4", name: "Mariam Diallo", email: "diallo@gobooking.com",      phone: "+225 05 55 22 33", role: "agent",        status: "active",   createdAt: "2026-03-08" },
+  { id: "u5", name: "Super Admin",   email: "admin@gobooking.com",       phone: "+225 01 00 00 01", role: "admin",        status: "active",   createdAt: "2026-01-01" },
+  { id: "u6", name: "Kouassi Jean",  email: "kouassi.jean@sotral.ci",    phone: "+225 07 88 99 11", role: "agent",        status: "inactive", createdAt: "2026-03-01" },
 ];
 const DEMO_CITIES: CityItem[] = [
   { id: "ct1", name: "Abidjan", region: "Lagunes" },
@@ -125,12 +125,21 @@ export default function SuperAdminDashboard() {
   const [addUserModal, setAddUserModal] = useState(false);
   const [newCity, setNewCity] = useState({ name: "", region: "" });
   const [newCompany, setNewCompany] = useState({ name: "", email: "", phone: "", city: "" });
-  const [newStaff, setNewStaff] = useState({ name: "", email: "", role: "agent" as "agent" | "compagnie" | "admin" });
+  const [newStaff, setNewStaff] = useState({ name: "", email: "", phone: "", password: "", role: "agent" as "agent" | "compagnie" | "admin" });
   const [staffCreating, setStaffCreating] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [provisionalCreds, setProvisionalCreds] = useState<{ name: string; email: string; role: string; password: string } | null>(null);
   const [payFilter, setPayFilter] = useState<"all" | "booking" | "parcel">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [editUserModal, setEditUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", role: "" });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [actionMenuUser, setActionMenuUser] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "delete" | "deactivate" | "activate"; user: UserItem } | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [resetPwdResult, setResetPwdResult] = useState<{ name: string; email: string; password: string } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -160,18 +169,96 @@ export default function SuperAdminDashboard() {
     if (!newStaff.email.trim() || !newStaff.email.includes("@")) { setStaffError("Email invalide."); return; }
     setStaffCreating(true);
     try {
+      const body: Record<string, string> = {
+        name: newStaff.name.trim(),
+        email: newStaff.email.trim().toLowerCase(),
+        role: newStaff.role,
+      };
+      if (newStaff.phone.trim()) body.phone = newStaff.phone.trim();
+      if (newStaff.password.trim()) body.password = newStaff.password.trim();
       const res = await apiFetch<{ user: UserItem; provisionalPassword: string }>(
         "/superadmin/users",
-        { token: token || "", method: "POST", body: { name: newStaff.name.trim(), email: newStaff.email.trim().toLowerCase(), role: newStaff.role } }
+        { token: token || "", method: "POST", body }
       );
       setUsers(prev => [{ ...res.user, createdAt: res.user.createdAt || new Date().toISOString() }, ...prev]);
       setProvisionalCreds({ name: res.user.name, email: res.user.email, role: res.user.role, password: res.provisionalPassword });
-      setNewStaff({ name: "", email: "", role: "agent" });
+      setNewStaff({ name: "", email: "", phone: "", password: "", role: "agent" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Échec de la création";
       setStaffError(msg);
     } finally {
       setStaffCreating(false);
+    }
+  };
+
+  const openEditUser = (u: UserItem) => {
+    setSelectedUser(u);
+    setEditForm({ name: u.name, email: u.email, phone: u.phone || "", role: u.role });
+    setEditError("");
+    setActionMenuUser(null);
+    setEditUserModal(true);
+  };
+
+  const saveEditUser = async () => {
+    if (!selectedUser) return;
+    setEditError("");
+    if (!editForm.name.trim()) { setEditError("Le nom est requis."); return; }
+    if (!editForm.email.includes("@")) { setEditError("Email invalide."); return; }
+    setEditLoading(true);
+    try {
+      const updated = await apiFetch<UserItem>(
+        `/superadmin/users/${selectedUser.id}`,
+        { token: token || "", method: "PATCH", body: { name: editForm.name.trim(), email: editForm.email.trim(), phone: editForm.phone.trim(), role: editForm.role } }
+      );
+      setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, ...updated } : u));
+      setEditUserModal(false);
+    } catch (err: unknown) {
+      setEditError(err instanceof Error ? err.message : "Échec de la modification");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!confirmAction) return;
+    const { user, type } = confirmAction;
+    const newStatus = type === "deactivate" ? "inactive" : "active";
+    setConfirmLoading(true);
+    try {
+      await apiFetch(`/superadmin/users/${user.id}/status`, { token: token || "", method: "PATCH", body: { status: newStatus } });
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+      setConfirmAction(null);
+    } catch {
+      setConfirmAction(null);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!confirmAction || confirmAction.type !== "delete") return;
+    setConfirmLoading(true);
+    try {
+      await apiFetch(`/superadmin/users/${confirmAction.user.id}`, { token: token || "", method: "DELETE" });
+      setUsers(prev => prev.filter(u => u.id !== confirmAction.user.id));
+      setConfirmAction(null);
+    } catch {
+      setConfirmAction(null);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (u: UserItem) => {
+    setActionMenuUser(null);
+    try {
+      const res = await apiFetch<{ provisionalPassword: string; email: string; name: string }>(
+        `/superadmin/users/${u.id}/reset-password`,
+        { token: token || "", method: "POST" }
+      );
+      setResetPwdResult({ name: res.name, email: res.email, password: res.provisionalPassword });
+    } catch (err) {
+      console.error("Reset pwd error:", err);
     }
   };
 
@@ -288,35 +375,102 @@ export default function SuperAdminDashboard() {
         {/* ── Utilisateurs ── */}
         {activeTab === "utilisateurs" && (<>
           <View style={S.sectionRow}>
-            <Text style={S.sectionTitle}>Utilisateurs ({users.length})</Text>
-            <TouchableOpacity style={S.addBtn} onPress={() => { setAddUserModal(true); setProvisionalCreds(null); setStaffError(""); }} activeOpacity={0.8}>
-              <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Créer</Text>
+            <View>
+              <Text style={S.sectionTitle}>Gestion des utilisateurs</Text>
+              <Text style={S.subLabel}>{users.length} compte{users.length > 1 ? "s" : ""} enregistré{users.length > 1 ? "s" : ""}</Text>
+            </View>
+            <TouchableOpacity style={S.addBtn} onPress={() => { setAddUserModal(true); setProvisionalCreds(null); setStaffError(""); setNewStaff({ name: "", email: "", phone: "", password: "", role: "agent" }); }} activeOpacity={0.8}>
+              <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
             {[
-              { f: "all",        label: "Tous" },
-              { f: "client",     label: "Clients" },
-              { f: "agent",      label: "Agents" },
-              { f: "compagnie",  label: "Compagnies" },
-              { f: "admin",      label: "Admins" },
-            ].map(({ f, label }) => (
+              { f: "all",        label: "Tous",       count: users.length },
+              { f: "client",     label: "Clients",    count: users.filter(u => u.role === "client" || u.role === "user").length },
+              { f: "agent",      label: "Agents",     count: users.filter(u => u.role === "agent").length },
+              { f: "compagnie",  label: "Compagnies", count: users.filter(u => u.role === "compagnie" || u.role === "company_admin").length },
+              { f: "admin",      label: "Admins",     count: users.filter(u => u.role === "admin" || u.role === "super_admin").length },
+            ].map(({ f, label, count }) => (
               <Pressable key={f} style={[S.filterChip, roleFilter === f && S.filterChipActive]} onPress={() => setRoleFilter(f)}>
-                <Text style={[S.filterChipText, roleFilter === f && S.filterChipTextActive]}>{label}</Text>
+                <Text style={[S.filterChipText, roleFilter === f && S.filterChipTextActive]}>{label} ({count})</Text>
               </Pressable>
             ))}
           </ScrollView>
+
           {filteredUsers.map(u => {
             const rs = ROLE_STYLE[u.role] ?? ROLE_STYLE.user;
+            const isActive = !u.status || u.status === "active";
+            const menuOpen = actionMenuUser === u.id;
             return (
-              <View key={u.id} style={S.listCard}>
-                <View style={S.userAvatar}><Text style={S.userAvatarText}>{u.name.charAt(0)}</Text></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={S.listTitle}>{u.name}</Text>
-                  <Text style={S.listSub}>{u.email}</Text>
-                  {u.createdAt && <Text style={S.listSub}>Inscrit le {u.createdAt.split("T")[0]}</Text>}
+              <View key={u.id} style={[S.userCard, !isActive && S.userCardInactive]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View style={[S.userAvatar, { backgroundColor: rs.color }]}>
+                    <Text style={S.userAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={[S.listTitle, !isActive && { color: "#94A3B8" }]}>{u.name}</Text>
+                      <View style={[S.badge, { backgroundColor: rs.bg }]}>
+                        <Text style={[S.badgeText, { color: rs.color }]}>{rs.label}</Text>
+                      </View>
+                    </View>
+                    <Text style={S.listSub}>{u.email}</Text>
+                    {u.phone ? <Text style={S.listSub}>{u.phone}</Text> : null}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      <View style={[S.statusDot, { backgroundColor: isActive ? "#10B981" : "#EF4444" }]} />
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_500Medium", color: isActive ? "#059669" : "#DC2626" }}>
+                        {isActive ? "Actif" : "Désactivé"}
+                      </Text>
+                      {u.createdAt && (
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#CBD5E1" }}>
+                          · Créé le {u.createdAt.split("T")[0]}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={S.actionMenuBtn}
+                    onPress={() => setActionMenuUser(menuOpen ? null : u.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="more-vertical" size={18} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-                <View style={[S.badge, { backgroundColor: rs.bg }]}><Text style={[S.badgeText, { color: rs.color }]}>{rs.label}</Text></View>
+
+                {menuOpen && (
+                  <View style={S.actionMenu}>
+                    <TouchableOpacity style={S.actionMenuItem} onPress={() => openEditUser(u)} activeOpacity={0.7}>
+                      <Feather name="edit-2" size={14} color="#1A56DB" />
+                      <Text style={[S.actionMenuText, { color: "#1A56DB" }]}>Modifier</Text>
+                    </TouchableOpacity>
+                    <View style={S.actionMenuDivider} />
+                    <TouchableOpacity
+                      style={S.actionMenuItem}
+                      onPress={() => { setActionMenuUser(null); setConfirmAction({ type: isActive ? "deactivate" : "activate", user: u }); }}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name={isActive ? "pause-circle" : "play-circle"} size={14} color={isActive ? "#D97706" : "#059669"} />
+                      <Text style={[S.actionMenuText, { color: isActive ? "#D97706" : "#059669" }]}>
+                        {isActive ? "Désactiver" : "Réactiver"}
+                      </Text>
+                    </TouchableOpacity>
+                    <View style={S.actionMenuDivider} />
+                    <TouchableOpacity style={S.actionMenuItem} onPress={() => handleResetPassword(u)} activeOpacity={0.7}>
+                      <Feather name="refresh-cw" size={14} color="#7C3AED" />
+                      <Text style={[S.actionMenuText, { color: "#7C3AED" }]}>Réinitialiser MDP</Text>
+                    </TouchableOpacity>
+                    <View style={S.actionMenuDivider} />
+                    <TouchableOpacity
+                      style={S.actionMenuItem}
+                      onPress={() => { setActionMenuUser(null); setConfirmAction({ type: "delete", user: u }); }}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="trash-2" size={14} color="#DC2626" />
+                      <Text style={[S.actionMenuText, { color: "#DC2626" }]}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -537,20 +691,40 @@ export default function SuperAdminDashboard() {
                 )}
                 <TextInput
                   style={S.modalInput}
-                  placeholder="Nom complet"
+                  placeholder="Nom complet *"
                   value={newStaff.name}
                   onChangeText={v => { setNewStaff(p => ({ ...p, name: v })); setStaffError(""); }}
                   autoCapitalize="words"
                 />
                 <TextInput
                   style={[S.modalInput, { marginTop: 10 }]}
-                  placeholder="Email"
+                  placeholder="Email *"
                   keyboardType="email-address"
                   autoCapitalize="none"
                   value={newStaff.email}
                   onChangeText={v => { setNewStaff(p => ({ ...p, email: v })); setStaffError(""); }}
                 />
-                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 14, marginBottom: 8 }}>Rôle</Text>
+                <TextInput
+                  style={[S.modalInput, { marginTop: 10 }]}
+                  placeholder="Téléphone (optionnel)"
+                  keyboardType="phone-pad"
+                  value={newStaff.phone}
+                  onChangeText={v => setNewStaff(p => ({ ...p, phone: v }))}
+                />
+                <View style={{ marginTop: 10 }}>
+                  <TextInput
+                    style={S.modalInput}
+                    placeholder="Mot de passe provisoire (laisser vide = auto)"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={newStaff.password}
+                    onChangeText={v => setNewStaff(p => ({ ...p, password: v }))}
+                  />
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 4 }}>
+                    Laissez vide pour générer automatiquement un mot de passe sécurisé (format GB…)
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 14, marginBottom: 8 }}>Type de compte *</Text>
                 <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
                   {([
                     { key: "agent",     label: "Agent",     icon: "briefcase", color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
@@ -612,6 +786,144 @@ export default function SuperAdminDashboard() {
             </View>
           </View>
         </ScrollView>
+      </Modal>
+
+      {/* ── Modal Modifier un utilisateur ── */}
+      <Modal visible={editUserModal} transparent animationType="slide">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={S.modalOverlay}>
+          <View style={S.modalCard}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                <Feather name="edit-2" size={16} color="#1A56DB" />
+              </View>
+              <View>
+                <Text style={S.modalTitle}>Modifier l'utilisateur</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{selectedUser?.email}</Text>
+              </View>
+            </View>
+            {!!editError && (
+              <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 10, flexDirection: "row", gap: 8, alignItems: "center", borderWidth: 1, borderColor: "#FECACA" }}>
+                <Feather name="alert-circle" size={13} color="#DC2626" />
+                <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626" }}>{editError}</Text>
+              </View>
+            )}
+            <TextInput style={S.modalInput} placeholder="Nom complet *" value={editForm.name} onChangeText={v => { setEditForm(p => ({ ...p, name: v })); setEditError(""); }} autoCapitalize="words" />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Email *" keyboardType="email-address" autoCapitalize="none" value={editForm.email} onChangeText={v => { setEditForm(p => ({ ...p, email: v })); setEditError(""); }} />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Téléphone" keyboardType="phone-pad" value={editForm.phone} onChangeText={v => setEditForm(p => ({ ...p, phone: v }))} />
+            <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 14, marginBottom: 8 }}>Rôle</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              {([
+                { key: "agent",     label: "Agent",     icon: "briefcase", color: "#059669", bg: "#ECFDF5" },
+                { key: "compagnie", label: "Compagnie", icon: "truck",     color: "#D97706", bg: "#FFFBEB" },
+                { key: "admin",     label: "Admin",     icon: "shield",    color: "#7C3AED", bg: "#F5F3FF" },
+              ] as const).map(r => {
+                const active = editForm.role === r.key;
+                return (
+                  <Pressable key={r.key} style={{ flex: 1, alignItems: "center", borderRadius: 12, paddingVertical: 12, borderWidth: active ? 2 : 1.5, borderColor: active ? r.color : "#E2E8F0", backgroundColor: active ? r.bg : "#F8FAFC", gap: 4 }} onPress={() => setEditForm(p => ({ ...p, role: r.key }))}>
+                    <Feather name={r.icon} size={18} color={active ? r.color : "#94A3B8"} />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: active ? r.color : "#64748B" }}>{r.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={S.modalBtns}>
+              <Pressable style={S.modalCancel} onPress={() => setEditUserModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable style={[S.modalConfirm, { backgroundColor: "#1A56DB", opacity: editLoading ? 0.7 : 1 }]} onPress={saveEditUser} disabled={editLoading}>
+                {editLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>Enregistrer</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </Modal>
+
+      {/* ── Modal Confirmation (désactiver / supprimer) ── */}
+      <Modal visible={!!confirmAction} transparent animationType="fade">
+        <View style={[S.modalOverlay, { justifyContent: "center", paddingHorizontal: 24 }]}>
+          <View style={[S.modalCard, { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderRadius: 20 }]}>
+            {confirmAction?.type === "delete" ? (
+              <>
+                <View style={{ alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#FEF2F2", justifyContent: "center", alignItems: "center" }}>
+                    <Feather name="trash-2" size={22} color="#DC2626" />
+                  </View>
+                  <Text style={[S.modalTitle, { textAlign: "center" }]}>Supprimer le compte</Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center" }}>
+                    Confirmez-vous la suppression définitive du compte de{"\n"}
+                    <Text style={{ fontFamily: "Inter_700Bold", color: "#0F172A" }}>{confirmAction?.user.name}</Text> ?{"\n"}
+                    Cette action est irréversible.
+                  </Text>
+                </View>
+                <View style={S.modalBtns}>
+                  <Pressable style={S.modalCancel} onPress={() => setConfirmAction(null)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+                  <Pressable style={[S.modalConfirm, { backgroundColor: "#DC2626", opacity: confirmLoading ? 0.7 : 1 }]} onPress={handleDeleteUser} disabled={confirmLoading}>
+                    {confirmLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>Supprimer</Text>}
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={{ alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: confirmAction?.type === "deactivate" ? "#FFFBEB" : "#ECFDF5", justifyContent: "center", alignItems: "center" }}>
+                    <Feather name={confirmAction?.type === "deactivate" ? "pause-circle" : "play-circle"} size={22} color={confirmAction?.type === "deactivate" ? "#D97706" : "#059669"} />
+                  </View>
+                  <Text style={[S.modalTitle, { textAlign: "center" }]}>
+                    {confirmAction?.type === "deactivate" ? "Désactiver le compte" : "Réactiver le compte"}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center" }}>
+                    {confirmAction?.type === "deactivate"
+                      ? `Le compte de ${confirmAction?.user.name} sera suspendu. L'utilisateur ne pourra plus se connecter.`
+                      : `Le compte de ${confirmAction?.user.name} sera réactivé.`}
+                  </Text>
+                </View>
+                <View style={S.modalBtns}>
+                  <Pressable style={S.modalCancel} onPress={() => setConfirmAction(null)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+                  <Pressable style={[S.modalConfirm, { backgroundColor: confirmAction?.type === "deactivate" ? "#D97706" : "#059669", opacity: confirmLoading ? 0.7 : 1 }]} onPress={handleToggleStatus} disabled={confirmLoading}>
+                    {confirmLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>{confirmAction?.type === "deactivate" ? "Désactiver" : "Réactiver"}</Text>}
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Modal Résultat Réinitialisation MDP ── */}
+      <Modal visible={!!resetPwdResult} transparent animationType="slide">
+        <View style={S.modalOverlay}>
+          <View style={S.modalCard}>
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#F5F3FF", justifyContent: "center", alignItems: "center", marginBottom: 10 }}>
+                <Feather name="refresh-cw" size={22} color="#7C3AED" />
+              </View>
+              <Text style={[S.modalTitle, { textAlign: "center" }]}>Mot de passe réinitialisé</Text>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", marginTop: 4 }}>
+                Communiquez ce nouveau mot de passe à l'utilisateur
+              </Text>
+            </View>
+            <View style={{ backgroundColor: "#F8FAFC", borderRadius: 14, padding: 16, gap: 12, borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 12 }}>
+              <View style={{ gap: 2 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Utilisateur</Text>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{resetPwdResult?.name}</Text>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>{resetPwdResult?.email}</Text>
+              </View>
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 }}>Nouveau mot de passe provisoire</Text>
+                <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: "#FDE68A" }}>
+                  <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: "#92400E", letterSpacing: 3 }}>{resetPwdResult?.password}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 10, flexDirection: "row", gap: 8, alignItems: "flex-start", marginBottom: 12, borderWidth: 1, borderColor: "#FECACA" }}>
+              <Feather name="alert-triangle" size={13} color="#DC2626" style={{ marginTop: 1 }} />
+              <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: "#DC2626" }}>
+                Notez ce mot de passe maintenant. Il ne sera plus affiché après fermeture.
+              </Text>
+            </View>
+            <Pressable style={[S.modalConfirm, { backgroundColor: "#7C3AED" }]} onPress={() => setResetPwdResult(null)}>
+              <Text style={S.modalConfirmText}>Fermer</Text>
+            </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -689,6 +1001,14 @@ const S = StyleSheet.create({
   routeStatRank: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#CBD5E1", width: 28 },
   routeStatName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginBottom: 5 },
   routeStatTrips: { fontSize: 12, fontFamily: "Inter_700Bold", color: PRIMARY },
+  userCard: { backgroundColor: "white", borderRadius: 16, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  userCardInactive: { backgroundColor: "#FAFAFA", borderColor: "#F1F5F9", borderWidth: 1 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  actionMenuBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center" },
+  actionMenu: { marginTop: 10, backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0", overflow: "hidden" },
+  actionMenuItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  actionMenuDivider: { height: 1, backgroundColor: "#E2E8F0" },
+  actionMenuText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalCard: { backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
   modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 4 },
