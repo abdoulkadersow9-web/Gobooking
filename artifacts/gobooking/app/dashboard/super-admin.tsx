@@ -165,8 +165,18 @@ export default function SuperAdminDashboard() {
   const [addUserModal, setAddUserModal]       = useState(false);
   const [addTripModal, setAddTripModal]       = useState(false);
   const [editTripModal, setEditTripModal]     = useState(false);
-  const [newCity, setNewCity]         = useState({ name: "", region: "" });
-  const [newCompany, setNewCompany]   = useState({ name: "", email: "", phone: "", city: "" });
+  const [newCity, setNewCity]           = useState({ name: "", region: "" });
+  const [newCompany, setNewCompany]     = useState({ name: "", email: "", phone: "", city: "" });
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companyError, setCompanyError]   = useState("");
+  const [editCompanyModal, setEditCompanyModal]   = useState(false);
+  const [selectedCompany, setSelectedCompany]     = useState<Company | null>(null);
+  const [editCompanyForm, setEditCompanyForm]     = useState({ name: "", email: "", phone: "", city: "" });
+  const [editCompanyLoading, setEditCompanyLoading] = useState(false);
+  const [editCompanyError, setEditCompanyError]   = useState("");
+  const [actionMenuCompany, setActionMenuCompany] = useState<string | null>(null);
+  const [confirmCompanyAction, setConfirmCompanyAction] = useState<{ type: "delete" | "deactivate" | "activate"; company: Company } | null>(null);
+  const [confirmCompanyLoading, setConfirmCompanyLoading] = useState(false);
   const [newTrip, setNewTrip]         = useState(EMPTY_TRIP);
   const [editTripForm, setEditTripForm] = useState(EMPTY_TRIP);
   const [selectedTrip, setSelectedTrip] = useState<TripItem | null>(null);
@@ -216,9 +226,55 @@ export default function SuperAdminDashboard() {
   }, [token]);
 
   /* ─── Company handlers ─── */
-  const toggleCompanyStatus = async (id: string) => {
-    setCompanies(prev => prev.map(c => c.id === id ? { ...c, status: c.status === "active" ? "inactive" : "active" } : c));
-    if (token) { try { await apiFetch(`/superadmin/companies/${id}/status`, { token, method: "PATCH", body: { status: companies.find(c => c.id === id)?.status === "active" ? "inactive" : "active" } }); } catch {} }
+  const createCompany = async () => {
+    setCompanyError("");
+    if (!newCompany.name.trim()) { setCompanyError("Le nom est requis."); return; }
+    if (!newCompany.email.trim() || !newCompany.email.includes("@")) { setCompanyError("Email invalide."); return; }
+    if (!newCompany.phone.trim()) { setCompanyError("Le téléphone est requis."); return; }
+    setCompanySaving(true);
+    try {
+      const created = await apiFetch<Company>("/superadmin/companies", { token: token || "", method: "POST", body: { name: newCompany.name.trim(), email: newCompany.email.trim().toLowerCase(), phone: newCompany.phone.trim(), city: newCompany.city.trim() } });
+      setCompanies(prev => [created, ...prev]);
+      setStats(s => ({ ...s, totalCompanies: s.totalCompanies + 1 }));
+      setAddCompanyModal(false);
+      setNewCompany({ name: "", email: "", phone: "", city: "" });
+    } catch (err: unknown) { setCompanyError(err instanceof Error ? err.message : "Échec de la création"); } finally { setCompanySaving(false); }
+  };
+  const openEditCompany = (c: Company) => {
+    setSelectedCompany(c);
+    setEditCompanyForm({ name: c.name, email: c.email, phone: c.phone, city: c.city });
+    setEditCompanyError("");
+    setActionMenuCompany(null);
+    setEditCompanyModal(true);
+  };
+  const saveEditCompany = async () => {
+    if (!selectedCompany) return;
+    setEditCompanyError("");
+    if (!editCompanyForm.name.trim()) { setEditCompanyError("Le nom est requis."); return; }
+    if (!editCompanyForm.email.includes("@")) { setEditCompanyError("Email invalide."); return; }
+    setEditCompanyLoading(true);
+    try {
+      const updated = await apiFetch<Company>(`/superadmin/companies/${selectedCompany.id}`, { token: token || "", method: "PATCH", body: { name: editCompanyForm.name.trim(), email: editCompanyForm.email.trim(), phone: editCompanyForm.phone.trim(), city: editCompanyForm.city.trim() } });
+      setCompanies(prev => prev.map(c => c.id === updated.id ? { ...c, ...updated } : c));
+      setEditCompanyModal(false);
+    } catch (err: unknown) { setEditCompanyError(err instanceof Error ? err.message : "Échec"); } finally { setEditCompanyLoading(false); }
+  };
+  const handleCompanyConfirmAction = async () => {
+    if (!confirmCompanyAction) return;
+    const { company, type } = confirmCompanyAction;
+    setConfirmCompanyLoading(true);
+    try {
+      if (type === "delete") {
+        await apiFetch(`/superadmin/companies/${company.id}`, { token: token || "", method: "DELETE" });
+        setCompanies(prev => prev.filter(c => c.id !== company.id));
+        setStats(s => ({ ...s, totalCompanies: Math.max(0, s.totalCompanies - 1) }));
+      } else {
+        const newStatus = type === "deactivate" ? "inactive" : "active";
+        await apiFetch(`/superadmin/companies/${company.id}/status`, { token: token || "", method: "PATCH", body: { status: newStatus } });
+        setCompanies(prev => prev.map(c => c.id === company.id ? { ...c, status: newStatus } : c));
+      }
+      setConfirmCompanyAction(null);
+    } catch { setConfirmCompanyAction(null); } finally { setConfirmCompanyLoading(false); }
   };
 
   /* ─── User handlers ─── */
@@ -433,23 +489,48 @@ export default function SuperAdminDashboard() {
               <Feather name="plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
-          {companies.map(company => (
-            <View key={company.id} style={S.listCard}>
-              <View style={S.companyIcon}><Feather name="briefcase" size={18} color={PURPLE} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={S.listTitle}>{company.name}</Text>
-                <Text style={S.listSub}>{company.email}</Text>
-                <Text style={S.listSub}>{company.city} · {company.phone}</Text>
-              </View>
-              <TouchableOpacity onPress={() => toggleCompanyStatus(company.id)} activeOpacity={0.8}>
-                <View style={[S.badge, { backgroundColor: company.status === "active" ? "#ECFDF5" : "#FEF2F2" }]}>
-                  <Text style={[S.badgeText, { color: company.status === "active" ? "#065F46" : "#DC2626" }]}>
-                    {company.status === "active" ? "Actif" : "Inactif"}
-                  </Text>
+          {companies.map(company => {
+            const isActive = company.status === "active";
+            const menuOpen = actionMenuCompany === company.id;
+            return (
+              <View key={company.id} style={[S.userCard, !isActive && S.userCardInactive]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <View style={[S.companyIcon, { backgroundColor: isActive ? "#F5F3FF" : "#F1F5F9" }]}>
+                    <Feather name="briefcase" size={18} color={isActive ? PURPLE : "#94A3B8"} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={[S.listTitle, !isActive && { color: "#94A3B8" }]}>{company.name}</Text>
+                      <View style={[S.badge, { backgroundColor: isActive ? "#ECFDF5" : "#FEF2F2" }]}>
+                        <Text style={[S.badgeText, { color: isActive ? "#065F46" : "#DC2626" }]}>{isActive ? "Actif" : "Inactif"}</Text>
+                      </View>
+                    </View>
+                    <Text style={S.listSub}>{company.email}</Text>
+                    {(company.city || company.phone) ? <Text style={S.listSub}>{[company.city, company.phone].filter(Boolean).join(" · ")}</Text> : null}
+                  </View>
+                  <TouchableOpacity style={S.actionMenuBtn} onPress={() => setActionMenuCompany(menuOpen ? null : company.id)} activeOpacity={0.7}>
+                    <Feather name="more-vertical" size={18} color="#64748B" />
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
-            </View>
-          ))}
+                {menuOpen && (
+                  <View style={S.actionMenu}>
+                    <TouchableOpacity style={S.actionMenuItem} onPress={() => openEditCompany(company)} activeOpacity={0.7}>
+                      <Feather name="edit-2" size={14} color="#1A56DB" /><Text style={[S.actionMenuText, { color: "#1A56DB" }]}>Modifier</Text>
+                    </TouchableOpacity>
+                    <View style={S.actionMenuDivider} />
+                    <TouchableOpacity style={S.actionMenuItem} onPress={() => { setActionMenuCompany(null); setConfirmCompanyAction({ type: isActive ? "deactivate" : "activate", company }); }} activeOpacity={0.7}>
+                      <Feather name={isActive ? "pause-circle" : "play-circle"} size={14} color={isActive ? "#D97706" : "#059669"} />
+                      <Text style={[S.actionMenuText, { color: isActive ? "#D97706" : "#059669" }]}>{isActive ? "Désactiver" : "Réactiver"}</Text>
+                    </TouchableOpacity>
+                    <View style={S.actionMenuDivider} />
+                    <TouchableOpacity style={S.actionMenuItem} onPress={() => { setActionMenuCompany(null); setConfirmCompanyAction({ type: "delete", company }); }} activeOpacity={0.7}>
+                      <Feather name="trash-2" size={14} color="#DC2626" /><Text style={[S.actionMenuText, { color: "#DC2626" }]}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </>)}
 
         {/* ══ Utilisateurs ════════════════════════════════════════ */}
@@ -797,23 +878,96 @@ export default function SuperAdminDashboard() {
       <Modal visible={addCompanyModal} transparent animationType="slide">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={S.modalOverlay}>
           <View style={S.modalCard}>
-            <Text style={S.modalTitle}>Ajouter une compagnie</Text>
-            <TextInput style={S.modalInput} placeholder="Nom de l'entreprise *" value={newCompany.name} onChangeText={v => setNewCompany(p => ({ ...p, name: v }))} />
-            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Email *" keyboardType="email-address" value={newCompany.email} onChangeText={v => setNewCompany(p => ({ ...p, email: v }))} />
-            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Téléphone" keyboardType="phone-pad" value={newCompany.phone} onChangeText={v => setNewCompany(p => ({ ...p, phone: v }))} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F5F3FF", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="briefcase" size={16} color={PURPLE} />
+              </View>
+              <Text style={S.modalTitle}>Ajouter une compagnie</Text>
+            </View>
+            {!!companyError && (
+              <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 10, flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: "#FECACA" }}>
+                <Feather name="alert-circle" size={13} color="#DC2626" />
+                <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626" }}>{companyError}</Text>
+              </View>
+            )}
+            <TextInput style={S.modalInput} placeholder="Nom de l'entreprise *" value={newCompany.name} onChangeText={v => { setNewCompany(p => ({ ...p, name: v })); setCompanyError(""); }} autoCapitalize="words" />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Email *" keyboardType="email-address" autoCapitalize="none" value={newCompany.email} onChangeText={v => { setNewCompany(p => ({ ...p, email: v })); setCompanyError(""); }} />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Téléphone *" keyboardType="phone-pad" value={newCompany.phone} onChangeText={v => { setNewCompany(p => ({ ...p, phone: v })); setCompanyError(""); }} />
             <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Ville siège" value={newCompany.city} onChangeText={v => setNewCompany(p => ({ ...p, city: v }))} />
-            <View style={S.modalBtns}>
-              <Pressable style={S.modalCancel} onPress={() => setAddCompanyModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
-              <Pressable style={[S.modalConfirm, { backgroundColor: PURPLE }]} onPress={() => {
-                if (!newCompany.name || !newCompany.email) return;
-                setCompanies(prev => [...prev, { id: Date.now().toString(), ...newCompany, status: "active" }]);
-                setStats(s => ({ ...s, totalCompanies: s.totalCompanies + 1 }));
-                setAddCompanyModal(false);
-                setNewCompany({ name: "", email: "", phone: "", city: "" });
-              }}><Text style={S.modalConfirmText}>Créer</Text></Pressable>
+            <View style={[S.modalBtns, { marginTop: 16 }]}>
+              <Pressable style={S.modalCancel} onPress={() => { setAddCompanyModal(false); setCompanyError(""); }}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable style={[S.modalConfirm, { backgroundColor: PURPLE, opacity: companySaving ? 0.7 : 1 }]} onPress={createCompany} disabled={companySaving}>
+                {companySaving ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>Créer</Text>}
+              </Pressable>
             </View>
           </View>
         </ScrollView>
+      </Modal>
+
+      {/* ══ Modal : Modifier une compagnie ══════════════════════════ */}
+      <Modal visible={editCompanyModal} transparent animationType="slide">
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={S.modalOverlay}>
+          <View style={S.modalCard}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F5F3FF", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="edit-2" size={16} color={PURPLE} />
+              </View>
+              <View>
+                <Text style={S.modalTitle}>Modifier la compagnie</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{selectedCompany?.email}</Text>
+              </View>
+            </View>
+            {!!editCompanyError && (
+              <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 10, flexDirection: "row", gap: 8, alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: "#FECACA" }}>
+                <Feather name="alert-circle" size={13} color="#DC2626" />
+                <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: "#DC2626" }}>{editCompanyError}</Text>
+              </View>
+            )}
+            <TextInput style={S.modalInput} placeholder="Nom *" value={editCompanyForm.name} onChangeText={v => { setEditCompanyForm(p => ({ ...p, name: v })); setEditCompanyError(""); }} autoCapitalize="words" />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Email *" keyboardType="email-address" autoCapitalize="none" value={editCompanyForm.email} onChangeText={v => { setEditCompanyForm(p => ({ ...p, email: v })); setEditCompanyError(""); }} />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Téléphone" keyboardType="phone-pad" value={editCompanyForm.phone} onChangeText={v => setEditCompanyForm(p => ({ ...p, phone: v }))} />
+            <TextInput style={[S.modalInput, { marginTop: 10 }]} placeholder="Ville siège" value={editCompanyForm.city} onChangeText={v => setEditCompanyForm(p => ({ ...p, city: v }))} />
+            <View style={[S.modalBtns, { marginTop: 16 }]}>
+              <Pressable style={S.modalCancel} onPress={() => setEditCompanyModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable style={[S.modalConfirm, { backgroundColor: PURPLE, opacity: editCompanyLoading ? 0.7 : 1 }]} onPress={saveEditCompany} disabled={editCompanyLoading}>
+                {editCompanyLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>Enregistrer</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </Modal>
+
+      {/* ══ Modal : Confirmation action compagnie ════════════════════ */}
+      <Modal visible={!!confirmCompanyAction} transparent animationType="fade">
+        <View style={S.modalOverlay}>
+          <View style={[S.modalCard, { maxWidth: 340, alignSelf: "center" }]}>
+            <View style={{ alignItems: "center", marginBottom: 12 }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, justifyContent: "center", alignItems: "center", backgroundColor: confirmCompanyAction?.type === "delete" ? "#FEF2F2" : confirmCompanyAction?.type === "deactivate" ? "#FFFBEB" : "#ECFDF5" }}>
+                <Feather name={confirmCompanyAction?.type === "delete" ? "trash-2" : confirmCompanyAction?.type === "deactivate" ? "pause-circle" : "play-circle"} size={24} color={confirmCompanyAction?.type === "delete" ? "#DC2626" : confirmCompanyAction?.type === "deactivate" ? "#D97706" : "#059669"} />
+              </View>
+            </View>
+            <Text style={[S.modalTitle, { textAlign: "center" }]}>
+              {confirmCompanyAction?.type === "delete" ? "Supprimer la compagnie" : confirmCompanyAction?.type === "deactivate" ? "Désactiver la compagnie" : "Réactiver la compagnie"}
+            </Text>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", marginTop: 6, marginBottom: 20 }}>
+              {confirmCompanyAction?.type === "delete"
+                ? `Supprimer définitivement "${confirmCompanyAction?.company.name}" ? Tous les trajets associés resteront en base.`
+                : confirmCompanyAction?.type === "deactivate"
+                ? `Désactiver "${confirmCompanyAction?.company.name}" ? Les agents de cette compagnie ne pourront plus accéder à la plateforme.`
+                : `Réactiver "${confirmCompanyAction?.company.name}" ?`}
+            </Text>
+            <View style={S.modalBtns}>
+              <Pressable style={S.modalCancel} onPress={() => setConfirmCompanyAction(null)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable
+                style={[S.modalConfirm, { backgroundColor: confirmCompanyAction?.type === "delete" ? "#DC2626" : confirmCompanyAction?.type === "deactivate" ? "#D97706" : "#059669", opacity: confirmCompanyLoading ? 0.7 : 1 }]}
+                onPress={handleCompanyConfirmAction}
+                disabled={confirmCompanyLoading}
+              >
+                {confirmCompanyLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={S.modalConfirmText}>{confirmCompanyAction?.type === "delete" ? "Supprimer" : confirmCompanyAction?.type === "deactivate" ? "Désactiver" : "Réactiver"}</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* ══ Modal : Ajouter un trajet ════════════════════════════════ */}

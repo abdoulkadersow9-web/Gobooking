@@ -421,11 +421,43 @@ router.patch("/companies/:id/status", async (req, res) => {
     const admin = await requireSuperAdmin(req.headers.authorization);
     if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
     const { status } = req.body;
-    if (!status) { res.status(400).json({ error: "status required" }); return; }
-    await db.update(companiesTable).set({ status }).where(eq(companiesTable.id, req.params.id));
-    res.json({ success: true });
+    if (!["active", "inactive"].includes(status)) { res.status(400).json({ error: "status must be active or inactive" }); return; }
+    const [company] = await db.update(companiesTable).set({ status }).where(eq(companiesTable.id, req.params.id)).returning();
+    if (!company) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+    res.json({ id: company.id, status: company.status });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.patch("/companies/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { name, email, phone, city, address } = req.body;
+    const updates: Record<string, string> = {};
+    if (name)    updates.name    = name;
+    if (email)   updates.email   = email;
+    if (phone)   updates.phone   = phone;
+    if (city)    updates.city    = city;
+    if (address) updates.address = address;
+    if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Aucun champ à modifier" }); return; }
+    const [company] = await db.update(companiesTable).set(updates).where(eq(companiesTable.id, req.params.id)).returning();
+    if (!company) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+    res.json(company);
+  } catch (err) {
+    res.status(500).json({ error: "Échec de la modification" });
+  }
+});
+
+router.delete("/companies/:id", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    await db.delete(companiesTable).where(eq(companiesTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Échec de la suppression" });
   }
 });
 
