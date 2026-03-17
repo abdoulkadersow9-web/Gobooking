@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -142,13 +143,52 @@ const FILL_RATE_DATA = [
 
 type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques";
 
+const SIDEBAR_W = 285;
+const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
+  { id: "apercu",       label: "Dashboard",    icon: "grid"       },
+  { id: "utilisateurs", label: "Utilisateurs", icon: "users"      },
+  { id: "trajets",      label: "Trajets",      icon: "navigation" },
+  { id: "reservations", label: "Réservations", icon: "bookmark"   },
+  { id: "entreprises",  label: "Compagnies",   icon: "briefcase"  },
+  { id: "statistiques", label: "Statistiques", icon: "trending-up"},
+];
+const SECTION_LABELS: Record<Tab, string> = {
+  apercu:       "Tableau de bord",
+  utilisateurs: "Utilisateurs",
+  trajets:      "Trajets",
+  reservations: "Réservations",
+  entreprises:  "Compagnies",
+  statistiques: "Statistiques",
+};
+
 const EMPTY_TRIP = { from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busName: "", busType: "Standard", totalSeats: "44", duration: "" };
 
 export default function SuperAdminDashboard() {
   const insets = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+
+  /* ── Sidebar animation ── */
+  const sidebarAnim  = useRef(new Animated.Value(-SIDEBAR_W)).current;
+  const overlayAnim  = useRef(new Animated.Value(0)).current;
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const openSidebar = () => {
+    setSidebarOpen(true);
+    Animated.parallel([
+      Animated.spring(sidebarAnim,  { toValue: 0,   useNativeDriver: true, bounciness: 0, speed: 20 }),
+      Animated.timing(overlayAnim,  { toValue: 1,   useNativeDriver: true, duration: 220 }),
+    ]).start();
+  };
+  const closeSidebar = () => {
+    Animated.parallel([
+      Animated.spring(sidebarAnim,  { toValue: -SIDEBAR_W, useNativeDriver: true, bounciness: 0, speed: 20 }),
+      Animated.timing(overlayAnim,  { toValue: 0,          useNativeDriver: true, duration: 180 }),
+    ]).start(() => setSidebarOpen(false));
+  };
+  const navigateTo = (tab: Tab) => { setActiveTab(tab); closeSidebar(); };
+  const handleLogout = async () => { closeSidebar(); setTimeout(async () => { await logout(); router.replace("/(auth)/login"); }, 200); };
 
   const [activeTab, setActiveTab]     = useState<Tab>("apercu");
   const [stats, setStats]             = useState<GlobalStats>(DEMO_STATS);
@@ -399,39 +439,22 @@ export default function SuperAdminDashboard() {
   const filteredBookings = bookingFilter === "all" ? bookings : bookings.filter(b => b.status === bookingFilter);
   const payTotal = filteredPayments.reduce((s, p) => s + p.amount, 0);
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "apercu",       label: "Aperçu",        icon: "bar-chart-2" },
-    { id: "entreprises",  label: "Compagnies",     icon: "briefcase"   },
-    { id: "utilisateurs", label: "Utilisateurs",   icon: "users"       },
-    { id: "trajets",      label: "Trajets",        icon: "navigation"  },
-    { id: "reservations", label: "Réservations",   icon: "bookmark"    },
-    { id: "statistiques", label: "Statistiques",   icon: "trending-up" },
-  ];
-
   return (
     <View style={[S.container, { paddingTop: topPad }]}>
+      {/* ── Header ────────────────────────────────────────── */}
       <LinearGradient colors={[PURPLE, "#5B21B6"]} style={S.header}>
-        <Pressable onPress={() => router.back()} style={S.backBtn}>
-          <Feather name="arrow-left" size={20} color="white" />
+        <Pressable onPress={openSidebar} style={S.menuBtn}>
+          <Feather name="menu" size={20} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={S.headerTitle}>Tableau de bord administrateur</Text>
+          <Text style={S.headerTitle}>{SECTION_LABELS[activeTab]}</Text>
           <Text style={S.headerSub}>GoBooking · Côte d'Ivoire</Text>
         </View>
         <View style={S.roleBadge}>
           <Feather name="shield" size={13} color="white" />
-          <Text style={S.roleBadgeText}>Super Admin</Text>
+          <Text style={S.roleBadgeText}>Admin</Text>
         </View>
       </LinearGradient>
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabBar} contentContainerStyle={S.tabBarContent}>
-        {TABS.map(tab => (
-          <Pressable key={tab.id} style={[S.tab, activeTab === tab.id && S.tabActive]} onPress={() => setActiveTab(tab.id)}>
-            <Feather name={tab.icon as never} size={13} color={activeTab === tab.id ? PURPLE : "#94A3B8"} />
-            <Text style={[S.tabText, activeTab === tab.id && S.tabTextActive]}>{tab.label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad + 90, gap: 12 }} showsVerticalScrollIndicator={false}>
 
@@ -1267,6 +1290,74 @@ export default function SuperAdminDashboard() {
         </View>
       </Modal>
 
+      {/* ══ Sidebar Drawer ═══════════════════════════════════════════ */}
+      {sidebarOpen && (
+        <Animated.View
+          style={[S.sidebarOverlay, { opacity: overlayAnim }]}
+          pointerEvents={sidebarOpen ? "auto" : "none"}
+        >
+          <Pressable style={{ flex: 1 }} onPress={closeSidebar} />
+        </Animated.View>
+      )}
+
+      <Animated.View style={[S.sidebarDrawer, { transform: [{ translateX: sidebarAnim }] }, { paddingTop: topPad }]}>
+        {/* ── Brand header ── */}
+        <LinearGradient colors={[PURPLE, "#5B21B6"]} style={S.sidebarHeader}>
+          <View style={S.sidebarBrand}>
+            <View style={S.sidebarLogo}>
+              <Feather name="navigation" size={20} color={PURPLE} />
+            </View>
+            <View>
+              <Text style={S.sidebarBrandName}>GoBooking</Text>
+              <Text style={S.sidebarBrandSub}>Côte d'Ivoire</Text>
+            </View>
+          </View>
+          <View style={S.sidebarAdminRow}>
+            <View style={S.sidebarAdminAvatar}>
+              <Feather name="shield" size={14} color={PURPLE} />
+            </View>
+            <View>
+              <Text style={S.sidebarAdminName}>Super Administrateur</Text>
+              <Text style={S.sidebarAdminRole}>Accès complet</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* ── Nav items ── */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={S.sidebarNav} showsVerticalScrollIndicator={false}>
+          {SIDEBAR_ITEMS.map(item => {
+            const isActive = activeTab === item.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[S.sidebarItem, isActive && S.sidebarItemActive]}
+                onPress={() => navigateTo(item.id)}
+                activeOpacity={0.75}
+              >
+                <View style={[S.sidebarItemIcon, isActive && S.sidebarItemIconActive]}>
+                  <Feather name={item.icon as never} size={17} color={isActive ? PURPLE : "#64748B"} />
+                </View>
+                <Text style={[S.sidebarItemLabel, isActive && S.sidebarItemLabelActive]}>
+                  {item.label}
+                </Text>
+                {isActive && <View style={S.sidebarItemDot} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* ── Bottom actions ── */}
+        <View style={[S.sidebarFooter, { paddingBottom: bottomPad + 16 }]}>
+          <View style={S.sidebarDivider} />
+          <TouchableOpacity style={S.sidebarLogout} onPress={handleLogout} activeOpacity={0.75}>
+            <View style={S.sidebarLogoutIcon}>
+              <Feather name="log-out" size={17} color="#DC2626" />
+            </View>
+            <Text style={S.sidebarLogoutText}>Déconnexion</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
     </View>
   );
 }
@@ -1275,17 +1366,36 @@ export default function SuperAdminDashboard() {
 const S = StyleSheet.create({
   container:        { flex: 1, backgroundColor: "#F8FAFC" },
   header:           { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
-  headerTitle:      { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  headerTitle:      { fontSize: 16, fontFamily: "Inter_700Bold", color: "white" },
   headerSub:        { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginTop: 1 },
-  backBtn:          { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
+  menuBtn:          { width: 38, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   roleBadge:        { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
   roleBadgeText:    { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
-  tabBar:           { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#F1F5F9", maxHeight: 46 },
-  tabBarContent:    { paddingHorizontal: 12, gap: 4, alignItems: "center" },
-  tab:              { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabActive:        { borderBottomColor: PURPLE },
-  tabText:          { fontSize: 12, fontFamily: "Inter_500Medium", color: "#94A3B8" },
-  tabTextActive:    { color: PURPLE, fontFamily: "Inter_600SemiBold" },
+  /* sidebar */
+  sidebarOverlay:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(15,23,42,0.55)", zIndex: 100 },
+  sidebarDrawer:    { position: "absolute", top: 0, left: 0, bottom: 0, width: SIDEBAR_W, backgroundColor: "white", zIndex: 101, shadowColor: "#000", shadowOffset: { width: 4, height: 0 }, shadowOpacity: 0.18, shadowRadius: 20, elevation: 20 },
+  sidebarHeader:    { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 24 },
+  sidebarBrand:     { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20 },
+  sidebarLogo:      { width: 42, height: 42, borderRadius: 14, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
+  sidebarBrandName: { fontSize: 18, fontFamily: "Inter_700Bold", color: "white" },
+  sidebarBrandSub:  { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginTop: 1 },
+  sidebarAdminRow:  { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: 10 },
+  sidebarAdminAvatar:{ width: 34, height: 34, borderRadius: 10, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
+  sidebarAdminName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
+  sidebarAdminRole: { fontSize: 10, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.7)", marginTop: 1 },
+  sidebarNav:       { paddingHorizontal: 12, paddingVertical: 16, gap: 4 },
+  sidebarItem:      { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12 },
+  sidebarItemActive:{ backgroundColor: "#F5F3FF" },
+  sidebarItemIcon:  { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
+  sidebarItemIconActive: { backgroundColor: "#EDE9FE" },
+  sidebarItemLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: "#475569" },
+  sidebarItemLabelActive: { color: PURPLE, fontFamily: "Inter_600SemiBold" },
+  sidebarItemDot:   { width: 7, height: 7, borderRadius: 4, backgroundColor: PURPLE },
+  sidebarFooter:    { paddingHorizontal: 12 },
+  sidebarDivider:   { height: 1, backgroundColor: "#F1F5F9", marginBottom: 8 },
+  sidebarLogout:    { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 13, borderRadius: 12, backgroundColor: "#FEF2F2" },
+  sidebarLogoutIcon:{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#FECACA", justifyContent: "center", alignItems: "center" },
+  sidebarLogoutText:{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#DC2626" },
   sectionRow:       { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
   sectionTitle:     { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
   subLabel:         { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 },
