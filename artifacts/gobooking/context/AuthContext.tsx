@@ -9,6 +9,8 @@ import React, {
   useState,
 } from "react";
 
+import { apiFetch } from "@/utils/api";
+
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 
 export interface User {
@@ -47,44 +49,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const currentPath = usePathname();
-  // Capture path at mount time (like DOMContentLoaded — fires once, reads current path)
   const currentPathRef = useRef(currentPath);
 
   useEffect(() => {
     const load = async () => {
       try {
         const storedToken = await AsyncStorage.getItem("auth_token");
-        const storedUser = await AsyncStorage.getItem("auth_user");
-        const lsUser = await AsyncStorage.getItem("user");
+        if (!storedToken) return;
 
-        const rawUser = storedUser
-          ? (JSON.parse(storedUser) as User)
-          : lsUser
-          ? (JSON.parse(lsUser) as Partial<User>)
-          : null;
+        // Verify the token is still valid with the server
+        try {
+          const freshUser = await apiFetch<User>("/auth/me", { token: storedToken });
+          if (!freshUser || !freshUser.role) return;
 
-        if (!rawUser || !rawUser.role) return;
-
-        if (storedToken && storedUser) {
+          // Refresh stored user with server data
+          await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
           setToken(storedToken);
-          setUser(rawUser as User);
-        }
+          setUser(freshUser);
 
-        // Mirrors: if (role === "agent" && currentPath !== "/agent-dashboard") → redirect
-        //          elif (role === "compagnie" && currentPath !== "/company-dashboard") → redirect
-        //          elif (role === "admin" && currentPath !== "/admin-dashboard") → redirect
-        const dashPath = getDashboardPath(rawUser.role);
-        if (dashPath && currentPathRef.current !== dashPath) {
-          router.replace(dashPath as never);
+          const dashPath = getDashboardPath(freshUser.role);
+          if (dashPath && currentPathRef.current !== dashPath) {
+            router.replace(dashPath as never);
+          }
+        } catch {
+          // Token is invalid (server restart or expired) — clear stored auth
+          await AsyncStorage.removeItem("auth_token");
+          await AsyncStorage.removeItem("auth_user");
         }
       } catch {
-        // ignore
+        // ignore storage errors
       } finally {
         setIsLoading(false);
       }
     };
     load();
-  }, []); // Run once on mount — mirrors DOMContentLoaded
+  }, []); // Run once on mount
 
   const login = useCallback(async (newToken: string, newUser: User) => {
     await AsyncStorage.setItem("auth_token", newToken);

@@ -97,9 +97,13 @@ lib/
                        # companies, buses, agents, cities, payments, notifications
 ```
 
-## Demo Accounts
-- Admin: admin@gobooking.com / admin123
-- User: user@gobooking.com / user123
+## Demo Accounts (all password: test123)
+- Entreprise: compagnie@test.com / test123
+- Agent: agent@test.com / test123
+- Admin: admin@test.com / test123
+- Client: user@test.com / test123
+- Legacy admin: admin@gobooking.com (passwordHash SHA256)
+- Legacy user: user@gobooking.com (passwordHash SHA256)
 
 ## Currency & Payments
 - All prices in FCFA (`.toLocaleString() FCFA`)
@@ -109,6 +113,13 @@ lib/
 The Expo app reads `EXPO_PUBLIC_DOMAIN` to build the API URL: `https://{domain}/api`
 
 ## Database
-PostgreSQL via Replit Database. Schema pushed with `pnpm --filter @workspace/db run push-force`.
+PostgreSQL via Replit Database (DATABASE_URL env var).
+Schema pushed with `pnpm --filter @workspace/db run push-force`.
 Tables: users, trips, seats, bookings, parcels, companies, buses, agents, cities, payments, notifications.
-Seeded with Côte d'Ivoire routes (Abidjan, Bouaké, Yamoussoukro, Korhogo, San Pedro, etc.).
+Seeded with Côte d'Ivoire routes (Abidjan, Bouaké, Yamoussoukro, Korhogo, San Pedro, Daloa, Man, etc.).
+Data: ~2708 trips, ~107680 seats, demo companies/buses/agents pre-seeded.
+
+## Auth Token Handling
+In-memory tokenStore (auth.ts) — tokens lost on server restart.
+AuthContext verifies token via GET /auth/me on startup; clears if invalid (forces re-login).
+EXPO_PUBLIC_DOMAIN injected via workflow command (not .env file — already set in workflow startup).
