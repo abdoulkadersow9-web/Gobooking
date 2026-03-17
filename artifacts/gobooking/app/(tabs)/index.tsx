@@ -2,48 +2,121 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-
-const CITIES = [
-  "Abidjan", "Bouaké", "Yamoussoukro", "Korhogo",
-  "San Pedro", "Daloa", "Man", "Gagnoa",
-  "Divo", "Abengourou", "Soubré", "Bondoukou",
-];
+import { apiFetch } from "@/utils/api";
 
 const POPULAR_ROUTES = [
-  { from: "Abidjan", to: "Bouaké", duration: "5h 30m", price: 3500 },
+  { from: "Abidjan", to: "Bouaké",       duration: "5h 30m", price: 3500 },
   { from: "Abidjan", to: "Yamoussoukro", duration: "2h 30m", price: 2000 },
-  { from: "Abidjan", to: "Korhogo", duration: "9h", price: 6000 },
-  { from: "Bouaké", to: "Korhogo", duration: "3h 30m", price: 2500 },
-  { from: "San Pedro", to: "Abidjan", duration: "4h", price: 3000 },
+  { from: "Abidjan", to: "Korhogo",      duration: "9h",     price: 6000 },
+  { from: "Bouaké",  to: "Korhogo",      duration: "3h 30m", price: 2500 },
+  { from: "San Pedro", to: "Abidjan",    duration: "4h",     price: 3000 },
 ];
+
+const PARCEL_STATUS_STYLE: Record<string, { label: string; color: string; bg: string; strip: string }> = {
+  en_attente:     { label: "Colis enregistré", color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B" },
+  pris_en_charge: { label: "Reçu en agence",   color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6" },
+  en_transit:     { label: "En transit",        color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6" },
+  en_livraison:   { label: "En livraison",      color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4" },
+  livre:          { label: "Livré",             color: "#065F46", bg: "#ECFDF5", strip: "#10B981" },
+  annule:         { label: "Annulé",            color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444" },
+};
+
+interface Parcel {
+  id: string; trackingRef: string; fromCity: string; toCity: string;
+  status: string; createdAt: string;
+}
+interface Booking {
+  id: string; from: string; to: string;
+  departureTime: string; status: string; totalAmount: number;
+}
+
+const DEMO_PARCEL: Parcel = {
+  id: "d1", trackingRef: "GBX-A4F2-KM91",
+  fromCity: "Abidjan", toCity: "Bouaké",
+  status: "en_transit", createdAt: new Date(Date.now() - 86400000).toISOString(),
+};
+const DEMO_BOOKING: Booking = {
+  id: "b1", from: "Abidjan", to: "Yamoussoukro",
+  departureTime: new Date(Date.now() + 2 * 86400000).toISOString(),
+  status: "confirmed", totalAmount: 2000,
+};
 
 type Mode = "trajet" | "colis";
 
+function formatDeparture(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = d.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / 86400000);
+  const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 0) return `Aujourd'hui à ${time}`;
+  if (diffDays === 1) return `Demain à ${time}`;
+  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" }) + ` à ${time}`;
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const firstName = user?.name?.split(" ")[0] || "Bienvenue";
+  const firstName = user?.name?.split(" ")[0] || "";
 
   const [mode, setMode] = useState<Mode>("trajet");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [passengers, setPassengers] = useState(1);
+
+  const [latestParcel, setLatestParcel] = useState<Parcel | null>(null);
+  const [upcomingBooking, setUpcomingBooking] = useState<Booking | null>(null);
+  const [loadingActivity, setLoadingActivity] = useState(false);
+
+  const loadActivity = useCallback(async () => {
+    if (!token) {
+      setLatestParcel(DEMO_PARCEL);
+      setUpcomingBooking(DEMO_BOOKING);
+      return;
+    }
+    setLoadingActivity(true);
+    try {
+      const [parcels, bookings] = await Promise.allSettled([
+        apiFetch<Parcel[]>("/parcels", { token }),
+        apiFetch<Booking[]>("/bookings", { token }),
+      ]);
+      if (parcels.status === "fulfilled" && parcels.value.length > 0) {
+        setLatestParcel(parcels.value[0]);
+      } else {
+        setLatestParcel(DEMO_PARCEL);
+      }
+      if (bookings.status === "fulfilled") {
+        const upcoming = bookings.value.find(
+          (b) => new Date(b.departureTime) > new Date() && b.status !== "cancelled"
+        );
+        setUpcomingBooking(upcoming ?? null);
+      }
+    } catch {
+      setLatestParcel(DEMO_PARCEL);
+    } finally {
+      setLoadingActivity(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadActivity(); }, [loadActivity]);
 
   const swap = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -56,6 +129,8 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({ pathname: "/search-results", params: { from, to, date, passengers: passengers.toString() } });
   };
+
+  const parcelStatus = latestParcel ? (PARCEL_STATUS_STYLE[latestParcel.status] ?? PARCEL_STATUS_STYLE.en_attente) : null;
 
   return (
     <ScrollView
@@ -70,7 +145,9 @@ export default function HomeScreen() {
       >
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.greeting}>Bonjour, {firstName} 👋</Text>
+            <Text style={styles.greeting}>
+              {firstName ? `Bonjour, ${firstName} 👋` : "Bonjour 👋"}
+            </Text>
             <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
           </View>
           {user?.role === "admin" && (
@@ -80,7 +157,7 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* ── Mode selector ── */}
+        {/* Mode selector */}
         <View style={styles.modeSelector}>
           <Pressable
             style={[styles.modeBtn, mode === "trajet" && styles.modeBtnActive]}
@@ -102,7 +179,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        {/* ── Search card ── */}
+        {/* Search card */}
         {mode === "trajet" ? (
           <View style={styles.searchCard}>
             <View style={styles.routeRow}>
@@ -136,7 +213,6 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
-
             <View style={styles.bottomRow}>
               <View style={styles.dateWrap}>
                 <Feather name="calendar" size={15} color={Colors.light.textSecondary} />
@@ -159,7 +235,6 @@ export default function HomeScreen() {
                 </Pressable>
               </View>
             </View>
-
             <Pressable
               style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
               onPress={search}
@@ -190,12 +265,169 @@ export default function HomeScreen() {
         )}
       </LinearGradient>
 
-      {/* ── Quick actions ── */}
-      <View style={styles.quickActions}>
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/bookings")}
+      {/* ── Quick CTAs ── */}
+      <View style={styles.ctaRow}>
+        <TouchableOpacity
+          style={[styles.ctaBtn, styles.ctaBtnPrimary]}
+          activeOpacity={0.85}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setMode("trajet"); }}
         >
+          <View style={styles.ctaIcon}>
+            <Feather name="map" size={20} color={Colors.light.primary} />
+          </View>
+          <View style={styles.ctaText}>
+            <Text style={styles.ctaTitle}>Réserver un trajet</Text>
+            <Text style={styles.ctaSub}>Bus interurbains CI</Text>
+          </View>
+          <Feather name="chevron-right" size={16} color={Colors.light.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.ctaBtn, styles.ctaBtnGreen]}
+          activeOpacity={0.85}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/parcel/send"); }}
+        >
+          <View style={[styles.ctaIcon, { backgroundColor: "#DCFCE7" }]}>
+            <Feather name="package" size={20} color="#059669" />
+          </View>
+          <View style={styles.ctaText}>
+            <Text style={[styles.ctaTitle, { color: "#064E3B" }]}>Envoyer un colis</Text>
+            <Text style={[styles.ctaSub, { color: "#065F46" }]}>Livraison sécurisée</Text>
+          </View>
+          <Feather name="chevron-right" size={16} color="#059669" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Activity section ── */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Activité récente</Text>
+          {!token && (
+            <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+              <Text style={styles.sectionLink}>Se connecter</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loadingActivity ? (
+          <View style={styles.activityLoading}>
+            <ActivityIndicator color={Colors.light.primary} />
+          </View>
+        ) : (
+          <View style={styles.activityGrid}>
+            {/* Latest parcel card */}
+            {latestParcel && parcelStatus && (
+              <TouchableOpacity
+                style={styles.activityCard}
+                activeOpacity={0.82}
+                onPress={() => router.push({ pathname: "/(tabs)/suivi", params: { ref: latestParcel.trackingRef } })}
+              >
+                <View style={styles.activityCardHeader}>
+                  <View style={[styles.activityIconWrap, { backgroundColor: parcelStatus.bg }]}>
+                    <Feather name="package" size={18} color={parcelStatus.color} />
+                  </View>
+                  <View style={[styles.statusPill, { backgroundColor: parcelStatus.bg }]}>
+                    <View style={[styles.statusDot, { backgroundColor: parcelStatus.strip }]} />
+                    <Text style={[styles.statusPillText, { color: parcelStatus.color }]}>
+                      {parcelStatus.label}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.activityLabel}>Dernier colis</Text>
+                <Text style={styles.activityRef}>{latestParcel.trackingRef}</Text>
+
+                <View style={styles.activityRoute}>
+                  <Text style={styles.activityCity}>{latestParcel.fromCity}</Text>
+                  <View style={styles.routeLine}>
+                    <View style={styles.routeDash} />
+                    <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                    <View style={styles.routeDash} />
+                  </View>
+                  <Text style={styles.activityCity}>{latestParcel.toCity}</Text>
+                </View>
+
+                <View style={styles.activityFooter}>
+                  <Text style={styles.activityAction}>Voir le suivi</Text>
+                  <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                </View>
+
+                {!token && (
+                  <View style={styles.demoBadge}>
+                    <Text style={styles.demoBadgeText}>Démo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {/* Upcoming trip card */}
+            {upcomingBooking ? (
+              <TouchableOpacity
+                style={styles.activityCard}
+                activeOpacity={0.82}
+                onPress={() => router.push("/(tabs)/bookings")}
+              >
+                <View style={styles.activityCardHeader}>
+                  <View style={[styles.activityIconWrap, { backgroundColor: "#EEF2FF" }]}>
+                    <Feather name="navigation" size={18} color={Colors.light.primary} />
+                  </View>
+                  <View style={[styles.statusPill, { backgroundColor: "#ECFDF5" }]}>
+                    <View style={[styles.statusDot, { backgroundColor: "#10B981" }]} />
+                    <Text style={[styles.statusPillText, { color: "#065F46" }]}>Confirmé</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.activityLabel}>Prochain trajet</Text>
+                <Text style={styles.activityRef}>
+                  {formatDeparture(upcomingBooking.departureTime)}
+                </Text>
+
+                <View style={styles.activityRoute}>
+                  <Text style={styles.activityCity}>{upcomingBooking.from}</Text>
+                  <View style={styles.routeLine}>
+                    <View style={styles.routeDash} />
+                    <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                    <View style={styles.routeDash} />
+                  </View>
+                  <Text style={styles.activityCity}>{upcomingBooking.to}</Text>
+                </View>
+
+                <View style={styles.activityFooter}>
+                  <Text style={styles.activityAction}>Voir le billet</Text>
+                  <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                </View>
+
+                {!token && (
+                  <View style={styles.demoBadge}>
+                    <Text style={styles.demoBadgeText}>Démo</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              /* No upcoming trip placeholder */
+              <TouchableOpacity
+                style={[styles.activityCard, styles.activityCardEmpty]}
+                activeOpacity={0.82}
+                onPress={() => setMode("trajet")}
+              >
+                <View style={[styles.activityIconWrap, { backgroundColor: "#EEF2FF", marginBottom: 12 }]}>
+                  <Feather name="map" size={18} color={Colors.light.primary} />
+                </View>
+                <Text style={styles.activityLabel}>Prochain trajet</Text>
+                <Text style={styles.emptyCardDesc}>Aucun voyage prévu</Text>
+                <View style={styles.activityFooter}>
+                  <Text style={styles.activityAction}>Réserver maintenant</Text>
+                  <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* ── Quick actions grid ── */}
+      <View style={styles.quickActions}>
+        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/bookings")}>
           <LinearGradient colors={["#EEF2FF", "#E0E7FF"]} style={styles.quickIcon}>
             <Feather name="bookmark" size={22} color={Colors.light.primary} />
           </LinearGradient>
@@ -203,10 +435,7 @@ export default function HomeScreen() {
           <Text style={styles.quickSub}>Trajets & billets</Text>
         </Pressable>
 
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/colis")}
-        >
+        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/colis")}>
           <LinearGradient colors={["#ECFDF5", "#D1FAE5"]} style={styles.quickIcon}>
             <Feather name="package" size={22} color="#059669" />
           </LinearGradient>
@@ -214,10 +443,7 @@ export default function HomeScreen() {
           <Text style={styles.quickSub}>Suivi & envois</Text>
         </Pressable>
 
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/notifications")}
-        >
+        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/notifications")}>
           <LinearGradient colors={["#FFF7ED", "#FFEDD5"]} style={styles.quickIcon}>
             <Feather name="bell" size={22} color="#D97706" />
           </LinearGradient>
@@ -225,44 +451,13 @@ export default function HomeScreen() {
           <Text style={styles.quickSub}>Alertes & infos</Text>
         </Pressable>
 
-        <Pressable
-          style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/profile")}
-        >
+        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/profile")}>
           <LinearGradient colors={["#F5F3FF", "#EDE9FE"]} style={styles.quickIcon}>
             <Feather name="user" size={22} color="#7C3AED" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Mon profil</Text>
           <Text style={styles.quickSub}>Compte & paramètres</Text>
         </Pressable>
-      </View>
-
-      {/* ── Services section ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Nos services</Text>
-        <View style={styles.servicesRow}>
-          <Pressable
-            style={styles.serviceCard}
-            onPress={() => { setMode("trajet"); }}
-          >
-            <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.serviceGradient}>
-              <Feather name="map" size={28} color="white" />
-              <Text style={styles.serviceTitle}>Réserver un trajet</Text>
-              <Text style={styles.serviceSub}>Bus interurbains CI</Text>
-            </LinearGradient>
-          </Pressable>
-
-          <Pressable
-            style={styles.serviceCard}
-            onPress={() => router.push("/parcel/send")}
-          >
-            <LinearGradient colors={["#059669", "#047857"]} style={styles.serviceGradient}>
-              <Feather name="package" size={28} color="white" />
-              <Text style={styles.serviceTitle}>Envoyer un colis</Text>
-              <Text style={styles.serviceSub}>Livraison sécurisée</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
       </View>
 
       {/* ── Popular routes ── */}
@@ -284,16 +479,12 @@ export default function HomeScreen() {
                 <Feather name="map-pin" size={14} color={Colors.light.primary} />
               </View>
               <View>
-                <Text style={styles.routeCardRoute}>
-                  {route.from} → {route.to}
-                </Text>
+                <Text style={styles.routeCardRoute}>{route.from} → {route.to}</Text>
                 <Text style={styles.routeCardMeta}>{route.duration}</Text>
               </View>
             </View>
             <View style={styles.routeCardRight}>
-              <Text style={styles.routeCardPrice}>
-                {route.price.toLocaleString()} FCFA
-              </Text>
+              <Text style={styles.routeCardPrice}>{route.price.toLocaleString()} FCFA</Text>
               <Feather name="chevron-right" size={16} color={Colors.light.textMuted} />
             </View>
           </Pressable>
@@ -307,337 +498,118 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
 
   // Header
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 28,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  greeting: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: "white",
-  },
-  headerSub: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.8)",
-    marginTop: 2,
-  },
-  adminBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  header: { paddingHorizontal: 16, paddingBottom: 28 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  greeting: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  adminBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
 
   // Mode selector
-  modeSelector: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 14,
-    padding: 4,
-    marginBottom: 16,
-    gap: 4,
-  },
-  modeBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  modeBtnActive: {
-    backgroundColor: "white",
-  },
-  modeBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "rgba(255,255,255,0.8)",
-  },
-  modeBtnTextActive: {
-    color: Colors.light.primary,
-  },
+  modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 14, padding: 4, marginBottom: 16, gap: 4 },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10 },
+  modeBtnActive: { backgroundColor: "white" },
+  modeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.8)" },
+  modeBtnTextActive: { color: Colors.light.primary },
 
   // Search card
-  searchCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  routeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
+  searchCard: { backgroundColor: "white", borderRadius: 20, padding: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
+  routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   routeInputWrap: { flex: 1 },
-  routeLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginBottom: 4,
-  },
+  routeLabel: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
   dot: { width: 7, height: 7, borderRadius: 4 },
-  routeLabelText: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
-    letterSpacing: 0.5,
-  },
-  routeInput: {
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-    color: "#0F172A",
-    borderBottomWidth: 1.5,
-    borderBottomColor: "#E2E8F0",
-    paddingBottom: 6,
-  },
-  swapBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 12,
-  },
-  bottomRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 14,
-  },
-  dateWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  dateInput: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#0F172A",
-  },
-  paxWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  paxBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  paxCount: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: "#0F172A",
-    minWidth: 16,
-    textAlign: "center",
-  },
-  searchBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  searchBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: "white",
-  },
+  routeLabelText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: Colors.light.textSecondary, letterSpacing: 0.5 },
+  routeInput: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#0F172A", borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", paddingBottom: 6 },
+  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginTop: 12 },
+  bottomRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
+  dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
+  dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#0F172A" },
+  paxWrap: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
+  paxBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  paxCount: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A", minWidth: 16, textAlign: "center" },
+  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 12, paddingVertical: 14, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  searchBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  colisHero: { alignItems: "center", gap: 10, paddingVertical: 8 },
+  colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  colisTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  colisSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 4 },
 
-  // Colis card content
-  colisHero: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 8,
-  },
-  colisIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  colisTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: "#0F172A",
-  },
-  colisSub: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-
-  // Quick actions
-  quickActions: {
+  // Quick CTAs
+  ctaRow: { paddingHorizontal: 16, paddingTop: 20, gap: 10 },
+  ctaBtn: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    padding: 16,
-    paddingTop: 20,
-  },
-  quickCard: {
-    width: "47%",
-    backgroundColor: "white",
+    alignItems: "center",
+    gap: 14,
     borderRadius: 16,
-    padding: 14,
-    gap: 8,
+    padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  quickIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quickLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: "#0F172A",
-  },
-  quickSub: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
+  ctaBtnPrimary: { backgroundColor: "#EEF2FF", borderWidth: 1.5, borderColor: "#C7D2FE" },
+  ctaBtnGreen:   { backgroundColor: "#F0FDF4", borderWidth: 1.5, borderColor: "#BBF7D0" },
+  ctaIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center" },
+  ctaText: { flex: 1 },
+  ctaTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primaryDark },
+  ctaSub:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
 
-  // Services
-  section: { paddingHorizontal: 16, paddingBottom: 8 },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: "#0F172A",
-    marginBottom: 12,
-  },
-  servicesRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 20,
-  },
-  serviceCard: {
+  // Activity section
+  section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 4 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  sectionLink: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+  activityLoading: { height: 140, justifyContent: "center", alignItems: "center" },
+
+  activityGrid: { flexDirection: "row", gap: 12 },
+  activityCard: {
     flex: 1,
-    borderRadius: 18,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  serviceGradient: {
-    padding: 18,
-    gap: 8,
-    minHeight: 130,
-    justifyContent: "flex-end",
-  },
-  serviceTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: "white",
-  },
-  serviceSub: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.8)",
-  },
-
-  // Popular routes
-  routeCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     backgroundColor: "white",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 14,
-    marginBottom: 8,
+    gap: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
     elevation: 2,
+    overflow: "hidden",
   },
+  activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
+  activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 },
+  activityIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusPillText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+
+  activityLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 },
+  activityRef: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  activityRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  routeLine: { flex: 1, flexDirection: "row", alignItems: "center", gap: 2 },
+  routeDash: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
+  activityCity: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#334155" },
+  activityFooter: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
+  activityAction: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+  emptyCardDesc: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+
+  demoBadge: { position: "absolute", top: 10, right: 10, backgroundColor: "#F1F5F9", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
+  demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
+
+  // Quick actions grid
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 10, padding: 16, paddingTop: 20 },
+  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 16, padding: 14, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  quickIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  quickLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+
+  // Popular routes
+  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
   routeCardPressed: { opacity: 0.85 },
-  routeCardLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  routeCardIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: "#EEF2FF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  routeCardRoute: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "#0F172A",
-  },
-  routeCardMeta: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 1,
-  },
-  routeCardRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  routeCardPrice: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.primary,
-  },
+  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  routeCardIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  routeCardRoute: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
+  routeCardMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
+  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 4 },
+  routeCardPrice: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.primary },
 });
