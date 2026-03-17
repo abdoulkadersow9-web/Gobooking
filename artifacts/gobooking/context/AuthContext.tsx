@@ -67,15 +67,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(rawUser as User);
         }
 
-        // Mirrors: if role === "admin" → /admin-dashboard
-        //          elif role === "compagnie" → /company-dashboard
-        //          elif role === "agent" → /agent-dashboard
-        //          else → /home
+        // Mirrors DOMContentLoaded: if role === "admin" → /admin-dashboard
+        //                           elif role === "compagnie" → /company-dashboard
+        //                           elif role === "agent" → /agent-dashboard
+        //                           (no else — other roles stay where they are)
         const dashPath = getDashboardPath(rawUser.role);
         if (dashPath) {
           router.replace(dashPath as never);
-        } else {
-          router.replace("/(tabs)" as never);
         }
       } catch {
         // ignore
