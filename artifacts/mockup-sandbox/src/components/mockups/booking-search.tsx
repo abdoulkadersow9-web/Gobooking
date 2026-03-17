@@ -102,14 +102,29 @@ function CityDropdown({ value, onChange, placeholder, cities }: {
 }
 
 export default function BookingSearch() {
-  const [screen,   setScreen]   = useState<Screen>("search");
-  const [from,     setFrom]     = useState("");
-  const [to,       setTo]       = useState("");
-  const [date,     setDate]     = useState("");
-  const [seats,    setSeats]    = useState(1);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [screen,    setScreen]    = useState<Screen>("search");
+  const [from,      setFrom]      = useState("");
+  const [to,        setTo]        = useState("");
+  const [date,      setDate]      = useState("");
+  const [seats,     setSeats]     = useState(1);
+  const [selected,  setSelected]  = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  const canSearch = from && to && date && from !== to;
+  const canSearch = !!(from && to && date && from !== to && seats >= 1);
+
+  /* Validation errors (shown after first submit attempt) */
+  const errors = submitted ? {
+    from:  !from            ? "Veuillez choisir une ville de départ"          : null,
+    to:    !to              ? "Veuillez choisir une ville d'arrivée"          : null,
+    same:  from && to && from === to ? "Le départ et l'arrivée doivent être différents" : null,
+    date:  !date            ? "Veuillez choisir une date de voyage"           : null,
+    seats: seats < 1        ? "Le nombre de places doit être au moins 1"     : null,
+  } : { from: null, to: null, same: null, date: null, seats: null };
+
+  const handleSearch = () => {
+    setSubmitted(true);
+    if (canSearch) setScreen("results");
+  };
 
   const swapCities = () => { const tmp = from; setFrom(to); setTo(tmp); };
 
@@ -165,16 +180,19 @@ export default function BookingSearch() {
             <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14 }}>
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: errors.from ? "#DC2626" : "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
                     🟢 Départ
                   </label>
-                  <CityDropdown value={from} onChange={setFrom} placeholder="Choisir une ville" cities={CITIES} />
+                  <CityDropdown value={from} onChange={v => { setFrom(v); setSubmitted(false); }} placeholder="Choisir une ville" cities={CITIES} />
+                  {errors.from && <p style={{ margin: "5px 0 0 2px", fontSize: 11, color: "#DC2626", fontWeight: 600 }}>⚠ {errors.from}</p>}
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: (errors.to || errors.same) ? "#DC2626" : "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
                     🔴 Arrivée
                   </label>
-                  <CityDropdown value={to} onChange={setTo} placeholder="Choisir une ville" cities={CITIES} />
+                  <CityDropdown value={to} onChange={v => { setTo(v); setSubmitted(false); }} placeholder="Choisir une ville" cities={CITIES} />
+                  {errors.to   && <p style={{ margin: "5px 0 0 2px", fontSize: 11, color: "#DC2626", fontWeight: 600 }}>⚠ {errors.to}</p>}
+                  {errors.same && <p style={{ margin: "5px 0 0 2px", fontSize: 11, color: "#DC2626", fontWeight: 600 }}>⚠ {errors.same}</p>}
                 </div>
               </div>
               {/* Swap button */}
@@ -193,24 +211,25 @@ export default function BookingSearch() {
             {/* Date + Seats row */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: errors.date ? "#DC2626" : "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   📅 Date du voyage
                 </label>
                 <input
                   type="date"
                   min={today}
                   value={date}
-                  onChange={e => setDate(e.target.value)}
+                  onChange={e => { setDate(e.target.value); setSubmitted(false); }}
                   style={{
                     width: "100%", padding: "12px 12px", borderRadius: 14,
-                    border: `1.5px solid ${date ? PRIMARY : "#E2E8F0"}`,
+                    border: `1.5px solid ${errors.date ? "#DC2626" : date ? PRIMARY : "#E2E8F0"}`,
                     fontSize: 13, fontFamily: "inherit", outline: "none",
                     color: date ? "#0F172A" : "#94A3B8",
-                    background: date ? "#F8FAFF" : "white",
+                    background: errors.date ? "#FEF2F2" : date ? "#F8FAFF" : "white",
                     boxSizing: "border-box", cursor: "pointer",
                     transition: "all 0.15s",
                   }}
                 />
+                {errors.date && <p style={{ margin: "5px 0 0 2px", fontSize: 11, color: "#DC2626", fontWeight: 600 }}>⚠ {errors.date}</p>}
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "#64748B", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
@@ -230,26 +249,16 @@ export default function BookingSearch() {
               </div>
             </div>
 
-            {/* Error hint */}
-            {from && to && from === to && (
-              <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 10, background: "#FEF2F2", border: "1px solid #FECACA" }}>
-                <span style={{ fontSize: 12, color: "#DC2626", fontWeight: 600 }}>⚠ La ville de départ et d'arrivée doivent être différentes</span>
-              </div>
-            )}
-
             {/* Search button */}
             <button
-              onClick={() => canSearch && setScreen("results")}
-              disabled={!canSearch}
+              onClick={handleSearch}
               style={{
                 width: "100%", padding: "16px 0", borderRadius: 16, border: "none",
-                background: canSearch
-                  ? `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`
-                  : "#E2E8F0",
-                color: canSearch ? "white" : "#94A3B8",
-                fontSize: 15, fontWeight: 800, cursor: canSearch ? "pointer" : "default",
+                background: `linear-gradient(135deg, ${PRIMARY} 0%, #1240a8 100%)`,
+                color: "white",
+                fontSize: 15, fontWeight: 800, cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                boxShadow: canSearch ? "0 4px 20px rgba(26,86,219,0.35)" : "none",
+                boxShadow: "0 4px 20px rgba(26,86,219,0.35)",
                 transition: "all 0.2s",
               }}>
               <span style={{ fontSize: 18 }}>🔍</span>
