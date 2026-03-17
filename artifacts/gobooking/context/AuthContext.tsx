@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import React, {
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -45,11 +46,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const currentPath = usePathname();
+  // Capture path at mount time (like DOMContentLoaded — fires once, reads current path)
+  const currentPathRef = useRef(currentPath);
 
   useEffect(() => {
     const load = async () => {
       try {
-        // window.onload equivalent: read stored user, redirect based on role
         const storedToken = await AsyncStorage.getItem("auth_token");
         const storedUser = await AsyncStorage.getItem("auth_user");
         const lsUser = await AsyncStorage.getItem("user");
@@ -67,12 +70,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(rawUser as User);
         }
 
-        // Mirrors DOMContentLoaded: if role === "admin" → /admin-dashboard
-        //                           elif role === "compagnie" → /company-dashboard
-        //                           elif role === "agent" → /agent-dashboard
-        //                           (no else — other roles stay where they are)
+        // Mirrors: if (role === "agent" && currentPath !== "/agent-dashboard") → redirect
+        //          elif (role === "compagnie" && currentPath !== "/company-dashboard") → redirect
+        //          elif (role === "admin" && currentPath !== "/admin-dashboard") → redirect
         const dashPath = getDashboardPath(rawUser.role);
-        if (dashPath) {
+        if (dashPath && currentPathRef.current !== dashPath) {
           router.replace(dashPath as never);
         }
       } catch {
@@ -82,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
     load();
-  }, []);
+  }, []); // Run once on mount — mirrors DOMContentLoaded
 
   const login = useCallback(async (newToken: string, newUser: User) => {
     await AsyncStorage.setItem("auth_token", newToken);
