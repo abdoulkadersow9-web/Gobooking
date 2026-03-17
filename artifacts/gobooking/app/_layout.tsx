@@ -47,6 +47,9 @@ function RootLayoutNav() {
       <Stack.Screen name="parcel/confirmation/[parcelId]" options={{ headerShown: false }} />
       <Stack.Screen name="parcel/tracking/[parcelId]" options={{ headerShown: false }} />
       <Stack.Screen name="parcel/track" options={{ headerShown: false }} />
+      <Stack.Screen name="dashboard/company" options={{ headerShown: false }} />
+      <Stack.Screen name="dashboard/agent" options={{ headerShown: false }} />
+      <Stack.Screen name="dashboard/super-admin" options={{ headerShown: false }} />
     </Stack>
   );
 }

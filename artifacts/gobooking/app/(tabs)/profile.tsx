@@ -152,6 +152,33 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Tableaux de bord</Text>
+        <View style={styles.dashGrid}>
+          <Pressable style={[styles.dashCard, { borderColor: "#C7D2FE" }]} onPress={() => router.push("/dashboard/company")}>
+            <View style={[styles.dashIcon, { backgroundColor: "#EEF2FF" }]}>
+              <Feather name="briefcase" size={20} color={Colors.light.primary} />
+            </View>
+            <Text style={styles.dashLabel}>Entreprise</Text>
+            <Text style={styles.dashSub}>Gestion de flotte</Text>
+          </Pressable>
+          <Pressable style={[styles.dashCard, { borderColor: "#BBF7D0" }]} onPress={() => router.push("/dashboard/agent")}>
+            <View style={[styles.dashIcon, { backgroundColor: "#ECFDF5" }]}>
+              <Feather name="user" size={20} color="#059669" />
+            </View>
+            <Text style={styles.dashLabel}>Agent</Text>
+            <Text style={styles.dashSub}>Embarquement & colis</Text>
+          </Pressable>
+          <Pressable style={[styles.dashCard, { borderColor: "#E9D5FF" }]} onPress={() => router.push("/dashboard/super-admin")}>
+            <View style={[styles.dashIcon, { backgroundColor: "#F5F3FF" }]}>
+              <Feather name="shield" size={20} color="#7C3AED" />
+            </View>
+            <Text style={styles.dashLabel}>Super Admin</Text>
+            <Text style={styles.dashSub}>Global & stats</Text>
+          </Pressable>
+        </View>
+      </View>
+
       {isAdmin && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.administration}</Text>
@@ -365,5 +392,41 @@ const styles = StyleSheet.create({
   },
   langBtnTextActive: {
     color: "white",
+  },
+  dashGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  dashCard: {
+    width: "30%",
+    flex: 1,
+    backgroundColor: Colors.light.card,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  dashIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dashLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.text,
+  },
+  dashSub: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textMuted,
   },
 });

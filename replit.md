@@ -23,15 +23,35 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 
 ## Features Implemented
 1. Login / Registration (token-based auth with SHA256 password hashing)
-2. Home screen with bus search (from/to/date/passengers)
+2. Home screen with bus search (from/to/date/passengers) + recent activity section
 3. Search results with sort options (price/duration/departure)
 4. Trip detail with amenities, stops, policies
 5. Seat selection (visual bus layout with available/booked/selected states)
 6. Passenger information form
-7. Payment page with card, UPI, wallet, netbanking methods
+7. Payment page (Orange Money, MTN MoMo, Wave, Visa/Mastercard)
 8. Booking confirmation with e-ticket view
 9. User dashboard (Bookings tab + Profile tab)
 10. Admin dashboard (Overview/Bookings/Trips/Users tabs)
+11. Parcel delivery (send, track, real-time status — statuses: en_attente/pris_en_charge/en_transit/en_livraison/livre/annule)
+12. Parcel tracking with QR/ref input — tracking ref format: GBX-XXXX-XXXX
+13. Notifications screen (filter chips: Tous/Colis/Trajet/Promo, date separators)
+14. **Company Dashboard** (bus fleet, routes, colis, agents management — blue theme)
+15. **Agent Dashboard** (mission info, passenger boarding validation, parcel pickup/transit/delivery — green theme)
+16. **Super Admin Dashboard** (global stats, companies, users, cities, payment breakdown — purple theme)
+
+## Role-based Dashboards
+- `/dashboard/company` — Company Admin: fleet, routes, parcels, agents
+- `/dashboard/agent` — Agent: daily mission, passenger boarding, parcel actions
+- `/dashboard/super-admin` — Super Admin: global platform view, 42.9M FCFA revenue, 8 companies, 1248 users
+- All 3 show demo data unauthenticated; fetch real API data when logged in with correct role
+- Accessible from Profile tab → "Tableaux de bord" section
+
+## User Roles
+- `user` — regular passenger
+- `admin` — legacy admin
+- `super_admin` — global platform admin
+- `company_admin` — transport company manager
+- `agent` — bus agent (boarding & parcel handling)
 
 ## Project Structure
 ```
@@ -39,17 +59,23 @@ artifacts/
   gobooking/           # Expo mobile app
     app/
       (auth)/          # Login, Register
-      (tabs)/          # Home, Bookings, Profile
+      (tabs)/          # Home, Bookings, Profile, Suivi, Notifications
       trip/[id]        # Trip details
       seats/[tripId]   # Seat selection
       passengers       # Passenger info
       payment          # Payment
       confirmation/[bookingId]  # Booking confirmed
       booking/[id]     # Booking detail
-      admin            # Admin dashboard
+      admin            # Legacy admin dashboard
+      parcel/          # Parcel send/track/confirmation/tracking
+      dashboard/
+        company.tsx    # Company dashboard (blue, #1A56DB)
+        agent.tsx      # Agent dashboard (green, #059669)
+        super-admin.tsx # Super admin dashboard (purple, #7C3AED)
     context/
       AuthContext      # Auth state + AsyncStorage
       BookingContext   # Multi-step booking flow
+      LanguageContext  # FR/EN translations
     utils/api.ts       # apiFetch utility
     constants/colors   # Blue theme tokens
   api-server/          # Express REST API
@@ -58,24 +84,31 @@ artifacts/
       trips.ts         # GET /search, /:id, /:id/seats
       bookings.ts      # POST /, GET /, /:id, POST /:id/cancel
       admin.ts         # GET /stats, /bookings, /trips, /users
+      parcels.ts       # Parcel CRUD + status updates
+      superadmin.ts    # Super admin stats, companies, cities, users
+      company.ts       # Company stats, buses, agents, routes
+      agent.ts         # Agent boarding, parcel pickup/transit/deliver
       index.ts         # Route aggregator
 
 lib/
   db/                  # Shared Drizzle schema + db client
     src/schema/
-      users.ts
-      trips.ts
-      seats.ts
-      bookings.ts
+      index.ts         # users, trips, seats, bookings, parcels,
+                       # companies, buses, agents, cities, payments, notifications
 ```
 
 ## Demo Accounts
 - Admin: admin@gobooking.com / admin123
 - User: user@gobooking.com / user123
 
+## Currency & Payments
+- All prices in FCFA (`.toLocaleString() FCFA`)
+- Payment methods: Orange Money (#FF6B00), MTN MoMo (#FFCB00), Wave (#1BA5E0), Visa/Mastercard (#1A56DB)
+
 ## API Base URL
 The Expo app reads `EXPO_PUBLIC_DOMAIN` to build the API URL: `https://{domain}/api`
 
 ## Database
-PostgreSQL via Replit Database. Schema pushed with `pnpm --filter @workspace/db exec drizzle-kit push`.
-Seeded 8 trips across popular US routes.
+PostgreSQL via Replit Database. Schema pushed with `pnpm --filter @workspace/db run push-force`.
+Tables: users, trips, seats, bookings, parcels, companies, buses, agents, cities, payments, notifications.
+Seeded with Côte d'Ivoire routes (Abidjan, Bouaké, Yamoussoukro, Korhogo, San Pedro, etc.).
