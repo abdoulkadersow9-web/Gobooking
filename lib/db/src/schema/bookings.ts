@@ -23,6 +23,8 @@ export const bookingsTable = pgTable("bookings", {
   seatNumbers: json("seat_numbers").$type<string[]>().notNull().default([]),
   passengers: json("passengers").$type<Passenger[]>().notNull().default([]),
   totalAmount: real("total_amount").notNull(),
+  commissionAmount: real("commission_amount").notNull().default(0),
+  commissionRate: real("commission_rate").notNull().default(0),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull(),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("paid"),
   status: varchar("status", { length: 20 }).notNull().default("confirmed"),

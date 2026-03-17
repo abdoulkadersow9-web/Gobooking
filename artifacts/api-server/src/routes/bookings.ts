@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, bookingsTable, tripsTable, seatsTable, usersTable } from "@workspace/db";
+import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable } from "@workspace/db";
 import { eq, desc, inArray, ne, and } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -123,6 +123,21 @@ router.post("/", async (req, res) => {
     const totalAmount = seatsData.reduce((sum, s) => sum + s.price, 0);
     const seatNumbers = seatsData.map((s) => s.number);
 
+    // ── Commission calculation ─────────────────────────────────────
+    const commSettings = await db.select().from(commissionSettingsTable).where(eq(commissionSettingsTable.id, "default")).limit(1);
+    let commissionAmount = 0;
+    let commissionRate   = 0;
+    if (commSettings.length) {
+      const cfg = commSettings[0];
+      if (cfg.type === "percentage") {
+        commissionAmount = Math.round((totalAmount * cfg.value) / 100);
+        commissionRate   = cfg.value;
+      } else {
+        commissionAmount = cfg.value;
+        commissionRate   = totalAmount > 0 ? (cfg.value / totalAmount) * 100 : 0;
+      }
+    }
+
     const newBookingId = generateId();
     const newBookingRef = generateRef();
 
@@ -137,6 +152,8 @@ router.post("/", async (req, res) => {
         seatNumbers,
         passengers,
         totalAmount,
+        commissionAmount,
+        commissionRate,
         paymentMethod,
         paymentStatus: "pending",
         status: "pending",

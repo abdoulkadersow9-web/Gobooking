@@ -9,3 +9,4 @@ export * from "./agents";
 export * from "./cities";
 export * from "./payments";
 export * from "./notifications_db";
+export * from "./commission_settings";

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable } from "@workspace/db";
+import { eq, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
 
@@ -458,6 +458,105 @@ router.delete("/companies/:id", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Échec de la suppression" });
+  }
+});
+
+/* ─── Commission settings ─────────────────────────────────────────────── */
+
+router.get("/commission", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const rows = await db.select().from(commissionSettingsTable).where(eq(commissionSettingsTable.id, "default")).limit(1);
+    if (!rows.length) {
+      res.json({ id: "default", type: "percentage", value: 10, updatedAt: new Date().toISOString() });
+      return;
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get commission settings" });
+  }
+});
+
+router.put("/commission", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { type, value } = req.body;
+    if (!type || !["percentage", "fixed"].includes(type)) { res.status(400).json({ error: "type must be 'percentage' or 'fixed'" }); return; }
+    const v = parseFloat(value);
+    if (isNaN(v) || v < 0) { res.status(400).json({ error: "value must be a positive number" }); return; }
+    const existing = await db.select().from(commissionSettingsTable).where(eq(commissionSettingsTable.id, "default")).limit(1);
+    let result;
+    if (existing.length) {
+      [result] = await db.update(commissionSettingsTable)
+        .set({ type, value: v, updatedAt: new Date() })
+        .where(eq(commissionSettingsTable.id, "default"))
+        .returning();
+    } else {
+      [result] = await db.insert(commissionSettingsTable)
+        .values({ id: "default", type, value: v, updatedAt: new Date() })
+        .returning();
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update commission settings" });
+  }
+});
+
+/* ─── Revenue / Commission stats ──────────────────────────────────────── */
+
+router.get("/revenue", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [allBookings, allTrips, commSettings] = await Promise.all([
+      db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt)),
+      db.select().from(tripsTable),
+      db.select().from(commissionSettingsTable).where(eq(commissionSettingsTable.id, "default")).limit(1),
+    ]);
+
+    const paidBookings = allBookings.filter(b => b.status !== "cancelled");
+
+    const totalCommission = paidBookings.reduce((s, b) => s + (b.commissionAmount || 0), 0);
+    const totalRevenue    = paidBookings.reduce((s, b) => s + b.totalAmount, 0);
+
+    // Daily commissions — last 30 days
+    const dailyMap = new Map<string, number>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      dailyMap.set(key, 0);
+    }
+    for (const b of paidBookings) {
+      const key = b.createdAt.toISOString().slice(0, 10);
+      if (dailyMap.has(key)) dailyMap.set(key, (dailyMap.get(key) || 0) + (b.commissionAmount || 0));
+    }
+    const dailyCommissions = Array.from(dailyMap.entries()).map(([date, amount]) => ({ date, amount }));
+
+    // Per-company commissions using busName from trips
+    const tripMap = new Map(allTrips.map(t => [t.id, t]));
+    const companyMap = new Map<string, { name: string; commission: number; bookings: number; revenue: number }>();
+    for (const b of paidBookings) {
+      const trip = tripMap.get(b.tripId);
+      const companyName = trip?.busName || "Inconnu";
+      const existing = companyMap.get(companyName) || { name: companyName, commission: 0, bookings: 0, revenue: 0 };
+      existing.commission += (b.commissionAmount || 0);
+      existing.bookings   += 1;
+      existing.revenue    += b.totalAmount;
+      companyMap.set(companyName, existing);
+    }
+    const byCompany = Array.from(companyMap.values())
+      .sort((a, b) => b.commission - a.commission)
+      .slice(0, 10);
+
+    const settings = commSettings.length ? commSettings[0] : { type: "percentage", value: 10 };
+
+    res.json({ totalCommission, totalRevenue, dailyCommissions, byCompany, settings });
+  } catch (err) {
+    console.error("Revenue stats error:", err);
+    res.status(500).json({ error: "Failed to get revenue stats" });
   }
 });
 

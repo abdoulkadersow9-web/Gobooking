@@ -32,6 +32,10 @@ interface CityItem { id: string; name: string; region: string }
 interface PaymentItem { id: string; refId: string; refType: string; amount: number; method: string; status: string; createdAt: string }
 interface TripItem  { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; busType: string; busName: string; totalSeats: number; duration: string; status: string }
 interface BookingItem { id: string; bookingRef: string; tripId: string; totalAmount: number; paymentMethod: string; status: string; contactEmail?: string; contactPhone?: string; passengers?: { name: string }[]; seatNumbers?: string[]; createdAt: string }
+interface CommissionSettings { type: "percentage" | "fixed"; value: number }
+interface DailyCommission { date: string; amount: number }
+interface CompanyCommission { name: string; commission: number; bookings: number; revenue: number }
+interface RevenueData { totalCommission: number; totalRevenue: number; dailyCommissions: DailyCommission[]; byCompany: CompanyCommission[]; settings: CommissionSettings }
 
 /* ─── Demo data ──────────────────────────────────────────────────── */
 const DEMO_STATS: GlobalStats = {
@@ -141,7 +145,7 @@ const FILL_RATE_DATA = [
   { route: "Bouaké → Korhogo",       fillPct: 58, totalSeats: 44, filled: 26 },
 ];
 
-type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques";
+type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission";
 
 const SIDEBAR_W = 285;
 const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
@@ -151,6 +155,7 @@ const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "reservations", label: "Réservations", icon: "bookmark"   },
   { id: "entreprises",  label: "Compagnies",   icon: "briefcase"  },
   { id: "statistiques", label: "Statistiques", icon: "trending-up"},
+  { id: "commission",   label: "Commission",   icon: "dollar-sign"},
 ];
 const SECTION_LABELS: Record<Tab, string> = {
   apercu:       "Tableau de bord",
@@ -159,6 +164,7 @@ const SECTION_LABELS: Record<Tab, string> = {
   reservations: "Réservations",
   entreprises:  "Compagnies",
   statistiques: "Statistiques",
+  commission:   "Commission & Revenus",
 };
 
 const EMPTY_TRIP = { from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busName: "", busType: "Standard", totalSeats: "44", duration: "" };
@@ -198,6 +204,11 @@ export default function SuperAdminDashboard() {
   const [payments, setPayments]       = useState<PaymentItem[]>(DEMO_PAYMENTS);
   const [trips, setTrips]             = useState<TripItem[]>(DEMO_TRIPS);
   const [bookings, setBookings]       = useState<BookingItem[]>(DEMO_BOOKINGS);
+  const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
+  const [commSettings, setCommSettings] = useState<CommissionSettings>({ type: "percentage", value: 10 });
+  const [commForm, setCommForm]       = useState<{ type: "percentage" | "fixed"; value: string }>({ type: "percentage", value: "10" });
+  const [commSaving, setCommSaving]   = useState(false);
+  const [commSaveMsg, setCommSaveMsg] = useState("");
 
   /* ── modals & filters ── */
   const [addCityModal, setAddCityModal]       = useState(false);
@@ -247,14 +258,16 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     if (!token) return;
     Promise.allSettled([
-      apiFetch<GlobalStats>("/superadmin/stats",    { token }),
-      apiFetch<Company[]>("/superadmin/companies",  { token }),
-      apiFetch<UserItem[]>("/superadmin/users",     { token }),
-      apiFetch<CityItem[]>("/superadmin/cities",    { token }),
-      apiFetch<PaymentItem[]>("/superadmin/payments",{ token }),
-      apiFetch<TripItem[]>("/superadmin/trips",     { token }),
-      apiFetch<BookingItem[]>("/superadmin/bookings",{ token }),
-    ]).then(([s, c, u, ci, p, tr, bk]) => {
+      apiFetch<GlobalStats>("/superadmin/stats",      { token }),
+      apiFetch<Company[]>("/superadmin/companies",    { token }),
+      apiFetch<UserItem[]>("/superadmin/users",       { token }),
+      apiFetch<CityItem[]>("/superadmin/cities",      { token }),
+      apiFetch<PaymentItem[]>("/superadmin/payments", { token }),
+      apiFetch<TripItem[]>("/superadmin/trips",       { token }),
+      apiFetch<BookingItem[]>("/superadmin/bookings", { token }),
+      apiFetch<CommissionSettings>("/superadmin/commission", { token }),
+      apiFetch<RevenueData>("/superadmin/revenue",    { token }),
+    ]).then(([s, c, u, ci, p, tr, bk, cs, rv]) => {
       if (s.status  === "fulfilled") setStats(s.value);
       if (c.status  === "fulfilled" && c.value.length  > 0) setCompanies(c.value);
       if (u.status  === "fulfilled" && u.value.length  > 0) setUsers(u.value);
@@ -262,6 +275,11 @@ export default function SuperAdminDashboard() {
       if (p.status  === "fulfilled" && p.value.length  > 0) setPayments(p.value);
       if (tr.status === "fulfilled" && tr.value.length > 0) setTrips(tr.value);
       if (bk.status === "fulfilled" && bk.value.length > 0) setBookings(bk.value);
+      if (cs.status === "fulfilled") {
+        setCommSettings(cs.value);
+        setCommForm({ type: cs.value.type, value: String(cs.value.value) });
+      }
+      if (rv.status === "fulfilled") setRevenueData(rv.value);
     });
   }, [token]);
 
@@ -425,6 +443,25 @@ export default function SuperAdminDashboard() {
       await apiFetch(`/superadmin/bookings/${id}/status`, { token: token || "", method: "PATCH", body: { status: newStatus } });
       setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
     } catch {}
+  };
+
+  /* ─── Commission handlers ─── */
+  const saveCommission = async () => {
+    const v = parseFloat(commForm.value);
+    if (isNaN(v) || v < 0) { setCommSaveMsg("Veuillez entrer un montant valide."); return; }
+    if (commForm.type === "percentage" && v > 100) { setCommSaveMsg("Le pourcentage ne peut pas dépasser 100%."); return; }
+    setCommSaving(true);
+    setCommSaveMsg("");
+    try {
+      const updated = await apiFetch<CommissionSettings>("/superadmin/commission", { token: token || "", method: "PUT", body: { type: commForm.type, value: v } });
+      setCommSettings(updated);
+      setCommForm({ type: updated.type, value: String(updated.value) });
+      setCommSaveMsg("Réglages enregistrés !");
+      const rv = await apiFetch<RevenueData>("/superadmin/revenue", { token: token || "" });
+      setRevenueData(rv);
+    } catch (err) {
+      setCommSaveMsg(err instanceof Error ? err.message : "Échec de la sauvegarde");
+    } finally { setCommSaving(false); setTimeout(() => setCommSaveMsg(""), 3000); }
   };
 
   /* ─── Computed lists ─── */
@@ -872,6 +909,173 @@ export default function SuperAdminDashboard() {
               <Text style={S.routeStatTrips}>{r.trips} trajets</Text>
             </View>
           ))}
+        </>)}
+
+        {/* ══ Commission & Revenus ══════════════════════════════════ */}
+        {activeTab === "commission" && (<>
+          {/* Commission Settings */}
+          <View style={S.commCard}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#FEF3C7", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="sliders" size={18} color="#D97706" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Réglages de commission</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Appliqué à chaque réservation</Text>
+              </View>
+            </View>
+
+            {/* Type selector */}
+            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#475569", marginBottom: 8 }}>Type de commission</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              {([
+                { key: "percentage" as const, label: "Pourcentage (%)", icon: "percent" },
+                { key: "fixed"      as const, label: "Montant fixe (FCFA)", icon: "hash" },
+              ]).map(opt => {
+                const active = commForm.type === opt.key;
+                return (
+                  <TouchableOpacity key={opt.key} style={{ flex: 1, alignItems: "center", borderRadius: 12, paddingVertical: 12, borderWidth: active ? 2 : 1.5, borderColor: active ? "#D97706" : "#E2E8F0", backgroundColor: active ? "#FFFBEB" : "#F8FAFC", gap: 4 }} onPress={() => setCommForm(p => ({ ...p, type: opt.key }))} activeOpacity={0.75}>
+                    <Feather name={opt.icon as never} size={16} color={active ? "#D97706" : "#94A3B8"} />
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: active ? "#D97706" : "#64748B", textAlign: "center" }}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Value input */}
+            <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#475569", marginBottom: 8 }}>
+              {commForm.type === "percentage" ? "Taux (%)" : "Montant fixe (FCFA)"}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "center", borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, backgroundColor: "#F8FAFC", paddingHorizontal: 14 }}>
+                <Feather name={commForm.type === "percentage" ? "percent" : "hash"} size={14} color="#94A3B8" />
+                <TextInput
+                  style={{ flex: 1, paddingVertical: 12, paddingLeft: 8, fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}
+                  value={commForm.value}
+                  onChangeText={v => setCommForm(p => ({ ...p, value: v }))}
+                  keyboardType="decimal-pad"
+                  placeholder={commForm.type === "percentage" ? "Ex: 10" : "Ex: 500"}
+                />
+                <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: "#94A3B8" }}>{commForm.type === "percentage" ? "%" : "FCFA"}</Text>
+              </View>
+              <TouchableOpacity style={{ backgroundColor: "#D97706", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 13, flexDirection: "row", alignItems: "center", gap: 6, opacity: commSaving ? 0.7 : 1 }} onPress={saveCommission} disabled={commSaving} activeOpacity={0.8}>
+                {commSaving ? <ActivityIndicator size="small" color="white" /> : <Feather name="save" size={15} color="white" />}
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" }}>Sauver</Text>
+              </TouchableOpacity>
+            </View>
+            {!!commSaveMsg && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                <Feather name={commSaveMsg.includes("!") ? "check-circle" : "alert-circle"} size={13} color={commSaveMsg.includes("!") ? "#059669" : "#DC2626"} />
+                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: commSaveMsg.includes("!") ? "#059669" : "#DC2626" }}>{commSaveMsg}</Text>
+              </View>
+            )}
+
+            {/* Live preview */}
+            <View style={{ backgroundColor: "#F8FAFC", borderRadius: 12, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#F1F5F9" }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8", marginBottom: 10 }}>APERÇU EN TEMPS RÉEL</Text>
+              {[3500, 5000, 7000, 12000].map(price => {
+                const v = parseFloat(commForm.value) || 0;
+                const comm = commForm.type === "percentage" ? Math.round((price * v) / 100) : v;
+                return (
+                  <View key={price} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#475569" }}>Ticket {price.toLocaleString()} FCFA</Text>
+                    <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#D97706" }}>+{comm.toLocaleString()} FCFA</Text>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>({v}{commForm.type === "percentage" ? "%" : "F"})</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Revenue Summary */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <LinearGradient colors={["#D97706", "#B45309"]} style={S.commRevCard}>
+              <Feather name="trending-up" size={18} color="white" style={{ marginBottom: 6 }} />
+              <Text style={S.commRevValue}>{((revenueData?.totalCommission ?? 0) / 1000).toFixed(1)}K</Text>
+              <Text style={S.commRevLabel}>FCFA commissions</Text>
+            </LinearGradient>
+            <LinearGradient colors={[PURPLE, "#5B21B6"]} style={S.commRevCard}>
+              <Feather name="layers" size={18} color="white" style={{ marginBottom: 6 }} />
+              <Text style={S.commRevValue}>{((revenueData?.totalRevenue ?? 0) / 1000).toFixed(1)}K</Text>
+              <Text style={S.commRevLabel}>FCFA transactions</Text>
+            </LinearGradient>
+          </View>
+          <View style={[S.commCard, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
+            <View>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Taux effectif moyen</Text>
+              <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                {revenueData && revenueData.totalRevenue > 0 ? ((revenueData.totalCommission / revenueData.totalRevenue) * 100).toFixed(1) : commSettings.type === "percentage" ? commSettings.value : "—"}%
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Mode actuel</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 4 }}>
+                <Feather name={commSettings.type === "percentage" ? "percent" : "hash"} size={12} color="#D97706" />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#D97706" }}>
+                  {commSettings.type === "percentage" ? `${commSettings.value}%` : `${commSettings.value.toLocaleString()} FCFA fixe`}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Daily bar chart (last 7 days) */}
+          <View style={S.commCard}>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 14 }}>Commissions — 7 derniers jours</Text>
+            {(() => {
+              const days = revenueData?.dailyCommissions.slice(-7) ?? [];
+              const maxVal = Math.max(...days.map(d => d.amount), 1);
+              const dayLabels = ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"];
+              return (
+                <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 6, height: 100 }}>
+                  {days.map((d, i) => {
+                    const pct = (d.amount / maxVal) * 100;
+                    const dt  = new Date(d.date);
+                    const lbl = dayLabels[dt.getDay()];
+                    return (
+                      <View key={i} style={{ flex: 1, alignItems: "center", gap: 4 }}>
+                        {d.amount > 0 && (
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#D97706" }}>{d.amount >= 1000 ? `${(d.amount/1000).toFixed(1)}k` : d.amount}</Text>
+                        )}
+                        <View style={{ flex: 1, width: "100%", justifyContent: "flex-end" }}>
+                          <View style={{ width: "100%", height: `${Math.max(pct, 4)}%`, backgroundColor: d.amount > 0 ? "#D97706" : "#F1F5F9", borderRadius: 6, minHeight: 4 }} />
+                        </View>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{lbl}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+          </View>
+
+          {/* Per-company commissions */}
+          <View style={S.commCard}>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 14 }}>Commissions par compagnie</Text>
+            {(revenueData?.byCompany.length ?? 0) === 0 ? (
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center", paddingVertical: 20 }}>Aucune donnée disponible</Text>
+            ) : (revenueData?.byCompany ?? []).map((c, idx) => {
+              const pct = revenueData && revenueData.totalCommission > 0 ? (c.commission / revenueData.totalCommission) * 100 : 0;
+              return (
+                <View key={c.name} style={{ marginBottom: 14 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#94A3B8", width: 20 }}>#{idx + 1}</Text>
+                      <View>
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{c.name}</Text>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{c.bookings} réservation{c.bookings > 1 ? "s" : ""}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#D97706" }}>{c.commission.toLocaleString()} FCFA</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" }}>
+                    <View style={{ height: 6, width: `${pct}%`, backgroundColor: "#D97706", borderRadius: 3 }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </>)}
 
       </ScrollView>
@@ -1479,6 +1683,11 @@ const S = StyleSheet.create({
   payMethodIcon:    { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   payRef:           { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
   payAmount:        { fontSize: 14, fontFamily: "Inter_700Bold" },
+  /* commission */
+  commCard:         { backgroundColor: "white", borderRadius: 16, padding: 18, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  commRevCard:      { flex: 1, borderRadius: 16, padding: 18, alignItems: "flex-start", gap: 2 },
+  commRevValue:     { fontSize: 24, fontFamily: "Inter_700Bold", color: "white" },
+  commRevLabel:     { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)" },
   modalOverlay:     { flex: 1, backgroundColor: "rgba(15,23,42,0.5)", justifyContent: "flex-end", padding: 0 },
   modalCard:        { backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 36, maxHeight: "90%" },
   modalTitle:       { fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 16 },
