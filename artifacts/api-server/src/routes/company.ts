@@ -11,7 +11,7 @@ async function requireCompanyAdmin(authHeader: string | undefined) {
   const userId = tokenStore.get(token);
   if (!userId) return null;
   const users = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!users.length || !["admin", "company_admin"].includes(users[0].role)) return null;
+  if (!users.length || !["admin", "company_admin", "compagnie"].includes(users[0].role)) return null;
   return users[0];
 }
 

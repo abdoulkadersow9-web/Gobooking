@@ -29,61 +29,62 @@ interface Trip { id: string; from: string; to: string; date: string; departureTi
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
-interface AgentItem { id: string; agentCode: string; status: string }
+interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string }
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_STATS: Stats = { totalBuses: 12, totalAgents: 18, totalTrips: 284, totalReservations: 1_420, totalParcels: 638, totalRevenue: 8_760_000, activeBuses: 9 };
 
 const DEMO_BUSES: Bus[] = [
-  { id: "b1", busName: "Express Abidjan 01", plateNumber: "0258 AB 01", busType: "Premium", capacity: 44, status: "active" },
-  { id: "b2", busName: "Bouaké Direct 02", plateNumber: "0258 AB 02", busType: "Standard", capacity: 52, status: "active" },
-  { id: "b3", busName: "Yamoussoukro 03", plateNumber: "0258 AB 03", busType: "Standard", capacity: 44, status: "maintenance" },
-  { id: "b4", busName: "Korhogo Express 04", plateNumber: "0258 AB 04", busType: "Premium", capacity: 36, status: "active" },
-  { id: "b5", busName: "San Pedro 05", plateNumber: "0258 AB 05", busType: "Standard", capacity: 52, status: "active" },
+  { id: "b1", busName: "Express Abidjan 01", plateNumber: "0258 AB 01", busType: "Premium", capacity: 49, status: "active" },
+  { id: "b2", busName: "Bouaké Direct 02",   plateNumber: "0258 AB 02", busType: "Standard", capacity: 59, status: "active" },
+  { id: "b3", busName: "Yamoussoukro 03",    plateNumber: "0258 AB 03", busType: "Standard", capacity: 63, status: "maintenance" },
+  { id: "b4", busName: "Korhogo Express 04", plateNumber: "0258 AB 04", busType: "VIP",      capacity: 49, status: "active" },
+  { id: "b5", busName: "San Pedro 05",       plateNumber: "0258 AB 05", busType: "Standard", capacity: 59, status: "active" },
 ];
 
 const DEMO_TRIPS: Trip[] = [
-  { id: "t1", from: "Abidjan", to: "Bouaké", date: "17/03/2026", departureTime: "08h00", arrivalTime: "12h00", price: 3500, totalSeats: 44, busName: "Express Abidjan 01", duration: "4h00" },
-  { id: "t2", from: "Abidjan", to: "Yamoussoukro", date: "17/03/2026", departureTime: "09h00", arrivalTime: "12h30", price: 2000, totalSeats: 52, busName: "Bouaké Direct 02", duration: "3h30" },
-  { id: "t3", from: "Abidjan", to: "Korhogo", date: "18/03/2026", departureTime: "07h00", arrivalTime: "15h00", price: 6000, totalSeats: 36, busName: "Korhogo Express 04", duration: "8h00" },
-  { id: "t4", from: "Bouaké", to: "Korhogo", date: "18/03/2026", departureTime: "10h00", arrivalTime: "14h00", price: 2500, totalSeats: 44, busName: "Express Abidjan 01", duration: "4h00" },
-  { id: "t5", from: "San Pedro", to: "Abidjan", date: "19/03/2026", departureTime: "06h00", arrivalTime: "12h00", price: 3000, totalSeats: 52, busName: "San Pedro 05", duration: "6h00" },
+  { id: "t1", from: "Abidjan", to: "Bouaké",        date: "17/03/2026", departureTime: "08h00", arrivalTime: "12h00", price: 3500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00" },
+  { id: "t2", from: "Abidjan", to: "Yamoussoukro",  date: "17/03/2026", departureTime: "09h00", arrivalTime: "12h30", price: 2000, totalSeats: 59, busName: "Bouaké Direct 02",   duration: "3h30" },
+  { id: "t3", from: "Abidjan", to: "Korhogo",       date: "18/03/2026", departureTime: "07h00", arrivalTime: "15h00", price: 6000, totalSeats: 63, busName: "Yamoussoukro 03",    duration: "8h00" },
+  { id: "t4", from: "Bouaké",  to: "Korhogo",       date: "18/03/2026", departureTime: "10h00", arrivalTime: "14h00", price: 2500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00" },
+  { id: "t5", from: "San Pedro", to: "Abidjan",     date: "19/03/2026", departureTime: "06h00", arrivalTime: "12h00", price: 3000, totalSeats: 59, busName: "San Pedro 05",       duration: "6h00" },
 ];
 
 const DEMO_RESERVATIONS: Reservation[] = [
-  { id: "r1", bookingRef: "GBB5AKZ8DZ", tripId: "t1", totalAmount: 7000, status: "confirmed", paymentMethod: "orange", passengers: [{ name: "Kouassi Ama", seatNumber: "A3" }, { name: "Traoré Youssouf", seatNumber: "A4" }], seatNumbers: ["A3","A4"], createdAt: "2026-03-17T08:00:00Z" },
-  { id: "r2", bookingRef: "GBB9MNX2PL", tripId: "t1", totalAmount: 3500, status: "boarded", paymentMethod: "mtn", passengers: [{ name: "Bamba Koffi", seatNumber: "B1" }], seatNumbers: ["B1"], createdAt: "2026-03-17T07:30:00Z" },
-  { id: "r3", bookingRef: "GBBA1C3RQ7", tripId: "t2", totalAmount: 4000, status: "confirmed", paymentMethod: "wave", passengers: [{ name: "Diallo Mariam", seatNumber: "C2" }, { name: "Diallo Seydou", seatNumber: "C3" }], seatNumbers: ["C2","C3"], createdAt: "2026-03-16T15:00:00Z" },
-  { id: "r4", bookingRef: "GBB7FPV6NM", tripId: "t3", totalAmount: 6000, status: "confirmed", paymentMethod: "orange", passengers: [{ name: "Coulibaly Jean", seatNumber: "D5" }], seatNumbers: ["D5"], createdAt: "2026-03-16T12:00:00Z" },
-  { id: "r5", bookingRef: "GBBC5XK0TZ", tripId: "t2", totalAmount: 2000, status: "cancelled", paymentMethod: "visa", passengers: [{ name: "Assiéta Koné", seatNumber: "E1" }], seatNumbers: ["E1"], createdAt: "2026-03-15T10:00:00Z" },
+  { id: "r1", bookingRef: "GBB5AKZ8DZ", tripId: "t1", totalAmount: 7000, status: "confirmed",  paymentMethod: "orange", passengers: [{ name: "Kouassi Ama", seatNumber: "A3" }, { name: "Traoré Youssouf", seatNumber: "A4" }], seatNumbers: ["A3","A4"], createdAt: "2026-03-17T08:00:00Z" },
+  { id: "r2", bookingRef: "GBB9MNX2PL", tripId: "t1", totalAmount: 3500, status: "boarded",    paymentMethod: "mtn",    passengers: [{ name: "Bamba Koffi", seatNumber: "B1" }], seatNumbers: ["B1"], createdAt: "2026-03-17T07:30:00Z" },
+  { id: "r3", bookingRef: "GBBA1C3RQ7", tripId: "t2", totalAmount: 4000, status: "confirmed",  paymentMethod: "wave",   passengers: [{ name: "Diallo Mariam", seatNumber: "C2" }, { name: "Diallo Seydou", seatNumber: "C3" }], seatNumbers: ["C2","C3"], createdAt: "2026-03-16T15:00:00Z" },
+  { id: "r4", bookingRef: "GBB7FPV6NM", tripId: "t3", totalAmount: 6000, status: "confirmed",  paymentMethod: "orange", passengers: [{ name: "Coulibaly Jean", seatNumber: "D5" }], seatNumbers: ["D5"], createdAt: "2026-03-16T12:00:00Z" },
+  { id: "r5", bookingRef: "GBBC5XK0TZ", tripId: "t2", totalAmount: 2000, status: "cancelled",  paymentMethod: "visa",   passengers: [{ name: "Assiéta Koné", seatNumber: "E1" }], seatNumbers: ["E1"], createdAt: "2026-03-15T10:00:00Z" },
 ];
 
 const DEMO_PARCELS: Parcel[] = [
-  { id: "p1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké", senderName: "Assiéta Koné", receiverName: "Diabaté Oumar", weight: 4.5, status: "en_transit", amount: 4700 },
-  { id: "p2", trackingRef: "GBX-B9C3-PL44", fromCity: "San Pedro", toCity: "Abidjan", senderName: "Traoré Adama", receiverName: "Koffi Ama", weight: 1.2, status: "livre", amount: 6200 },
-  { id: "p3", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan", toCity: "Yamoussoukro", senderName: "Bamba Sali", receiverName: "Coulibaly Jean", weight: 2.1, status: "en_attente", amount: 3500 },
-  { id: "p4", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan", toCity: "Korhogo", senderName: "Koffi Ama", receiverName: "Diallo Jean", weight: 8.0, status: "pris_en_charge", amount: 8100 },
-  { id: "p5", trackingRef: "GBX-E2G9-XY77", fromCity: "Bouaké", toCity: "Abidjan", senderName: "Traoré Mamadou", receiverName: "Coulibaly Sali", weight: 3.0, status: "en_livraison", amount: 5200 },
+  { id: "p1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan",   toCity: "Bouaké",       senderName: "Assiéta Koné",   receiverName: "Diabaté Oumar",  weight: 4.5, status: "en_transit",     amount: 4700 },
+  { id: "p2", trackingRef: "GBX-B9C3-PL44", fromCity: "San Pedro", toCity: "Abidjan",      senderName: "Traoré Adama",   receiverName: "Koffi Ama",      weight: 1.2, status: "livre",          amount: 6200 },
+  { id: "p3", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan",   toCity: "Yamoussoukro", senderName: "Bamba Sali",     receiverName: "Coulibaly Jean", weight: 2.1, status: "en_attente",     amount: 3500 },
+  { id: "p4", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan",   toCity: "Korhogo",      senderName: "Koffi Ama",      receiverName: "Diallo Jean",    weight: 8.0, status: "pris_en_charge", amount: 8100 },
+  { id: "p5", trackingRef: "GBX-E2G9-XY77", fromCity: "Bouaké",    toCity: "Abidjan",      senderName: "Traoré Mamadou", receiverName: "Coulibaly Sali", weight: 3.0, status: "en_livraison",  amount: 5200 },
 ];
 
-const DEMO_AGENTS = [
-  { id: "a1", name: "Kouassi Jean", code: "AGT-001", bus: "Express Abidjan 01", phone: "0707 11 22 33", status: "active" },
-  { id: "a2", name: "Traoré Mamadou", code: "AGT-002", bus: "Bouaké Direct 02", phone: "0505 44 55 66", status: "active" },
-  { id: "a3", name: "Bamba Fatima", code: "AGT-003", bus: "Korhogo Express 04", phone: "0101 77 88 99", status: "active" },
-  { id: "a4", name: "Diallo Seydou", code: "AGT-004", bus: "Non assigné", phone: "0707 22 33 44", status: "inactive" },
-  { id: "a5", name: "Coulibaly Koffi", code: "AGT-005", bus: "Yamoussoukro 03", phone: "0505 55 66 77", status: "active" },
-  { id: "a6", name: "Assiéta Koné", code: "AGT-006", bus: "San Pedro 05", phone: "0101 88 99 00", status: "active" },
+const DEMO_AGENTS: AgentItem[] = [
+  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", status: "active" },
+  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", status: "active" },
+  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", status: "active" },
+  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   status: "inactive" },
+  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", status: "active" },
+  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", status: "active" },
 ];
 
-// Generate a demo seat grid for a 44-seat bus (11 rows × 4 columns)
-function genDemoSeats(tripId: string, booked = 31): SeatItem[] {
+/* ─── Seat grid generator ────────────────────────────────── */
+function genDemoSeats(tripId: string, total: number, booked: number): SeatItem[] {
   const seats: SeatItem[] = [];
-  const rows = 11;
   const letters = ["A", "B", "C", "D"];
+  const rows = Math.ceil(total / 4);
   let idx = 0;
   for (let r = 1; r <= rows; r++) {
     for (let c = 0; c < 4; c++) {
       idx++;
+      if (idx > total) break;
       const num = `${letters[c]}${r}`;
       seats.push({ id: `${tripId}-${num}`, number: num, row: r, column: c, type: c === 1 ? "window" : "aisle", status: idx <= booked ? "booked" : "available", price: 3500 });
     }
@@ -101,16 +102,76 @@ const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }
   annule:         { label: "Annulé",         color: "#DC2626", bg: "#FEF2F2" },
 };
 const BOOKING_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  confirmed:  { label: "Confirmé",    color: PRIMARY,   bg: "#EEF2FF" },
-  boarded:    { label: "Embarqué",    color: "#065F46", bg: "#ECFDF5" },
-  cancelled:  { label: "Annulé",      color: "#DC2626", bg: "#FEF2F2" },
-  pending:    { label: "En attente",  color: "#B45309", bg: "#FFFBEB" },
+  confirmed: { label: "Confirmé",   color: PRIMARY,   bg: "#EEF2FF" },
+  boarded:   { label: "Embarqué",   color: "#065F46", bg: "#ECFDF5" },
+  cancelled: { label: "Annulé",     color: "#DC2626", bg: "#FEF2F2" },
+  pending:   { label: "En attente", color: "#B45309", bg: "#FFFBEB" },
 };
 const PAYMENT_LABELS: Record<string, string> = {
   orange: "Orange Money", mtn: "MTN MoMo", wave: "Wave", visa: "Visa/MC",
 };
+const CI_CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pedro", "Man", "Daloa", "Divo", "Gagnoa", "Abengourou"];
+const BUS_CAPACITIES = [49, 59, 63];
+const BUS_TYPES = ["Standard", "Premium", "VIP"];
 
 type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents";
+
+/* ─── Reusable picker row ─────────────────────────────────── */
+function PickerRow<T>({ label, options, value, onSelect, display }: { label: string; options: T[]; value: T; onSelect: (v: T) => void; display?: (v: T) => string }) {
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={S.pickerLabel}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        {options.map((opt, i) => {
+          const active = opt === value;
+          return (
+            <Pressable key={i} onPress={() => onSelect(opt)} style={[S.pickerChip, active && S.pickerChipActive]}>
+              <Text style={[S.pickerChipText, active && S.pickerChipTextActive]}>{display ? display(opt) : String(opt)}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ─── City quick-select ──────────────────────────────────── */
+function CityPicker({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <TextInput style={S.modalInput} placeholder={label} value={value} onChangeText={onChange} placeholderTextColor="#94A3B8" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 6 }}>
+        {CI_CITIES.map(city => (
+          <Pressable key={city} onPress={() => onChange(city)} style={[S.cityChip, value === city && S.cityChipActive]}>
+            <Text style={[S.cityChipText, value === city && S.cityChipTextActive]}>{city}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/* ─── Bus selector ───────────────────────────────────────── */
+function BusSelector({ buses, selected, onSelect }: { buses: Bus[]; selected: string; onSelect: (bus: Bus) => void }) {
+  return (
+    <View style={{ marginBottom: 10 }}>
+      <Text style={S.pickerLabel}>Bus assigné</Text>
+      {buses.map(bus => {
+        const active = selected === bus.id;
+        return (
+          <Pressable key={bus.id} onPress={() => onSelect(bus)} style={[S.busPickerRow, active && S.busPickerRowActive]}>
+            <View style={[S.busPickerDot, { backgroundColor: active ? PRIMARY : "#E2E8F0" }]} />
+            <View style={{ flex: 1 }}>
+              <Text style={[S.busPickerName, active && { color: PRIMARY }]}>{bus.busName}</Text>
+              <Text style={S.busPickerSub}>{bus.plateNumber} · {bus.busType} · {bus.capacity} places</Text>
+            </View>
+            {active && <Feather name="check-circle" size={16} color={PRIMARY} />}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 /* ─── Component ─────────────────────────────────────────── */
 export default function CompanyDashboard() {
@@ -125,13 +186,21 @@ export default function CompanyDashboard() {
   const [trips, setTrips] = useState<Trip[]>(DEMO_TRIPS);
   const [reservations, setReservations] = useState<Reservation[]>(DEMO_RESERVATIONS);
   const [parcels, setParcels] = useState<Parcel[]>(DEMO_PARCELS);
+  const [agents, setAgents] = useState<AgentItem[]>(DEMO_AGENTS);
   const [selectedTripForSeats, setSelectedTripForSeats] = useState<Trip>(DEMO_TRIPS[0]);
-  const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 31));
+  const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 49, 31));
+  const [reservationFilter, setReservationFilter] = useState<"all" | "confirmed" | "boarded" | "cancelled">("all");
+
+  /* modal states */
   const [addBusModal, setAddBusModal] = useState(false);
   const [addTripModal, setAddTripModal] = useState(false);
-  const [newBus, setNewBus] = useState({ busName: "", plateNumber: "", busType: "Standard", capacity: "44" });
-  const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", price: "", busName: "", totalSeats: "44" });
-  const [reservationFilter, setReservationFilter] = useState<"all" | "confirmed" | "boarded" | "cancelled">("all");
+  const [addAgentModal, setAddAgentModal] = useState(false);
+  const [assignAgentModal, setAssignAgentModal] = useState<AgentItem | null>(null);
+
+  /* form states */
+  const [newBus, setNewBus] = useState({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
+  const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
+  const [newAgent, setNewAgent] = useState({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
 
   useEffect(() => {
     if (!token) return;
@@ -150,31 +219,67 @@ export default function CompanyDashboard() {
     });
   }, [token]);
 
-  const loadSeats = async (trip: Trip) => {
+  const loadSeats = (trip: Trip) => {
     setSelectedTripForSeats(trip);
     setActiveTab("sieges");
-    setSeats(genDemoSeats(trip.id, Math.floor(trip.totalSeats * 0.7)));
+    setSeats(genDemoSeats(trip.id, trip.totalSeats, Math.floor(trip.totalSeats * 0.65)));
     if (token) {
-      try {
-        const s = await apiFetch<SeatItem[]>(`/company/seats/${trip.id}`, { token });
-        if (s.length > 0) setSeats(s);
-      } catch {}
+      apiFetch<SeatItem[]>(`/company/seats/${trip.id}`, { token })
+        .then(s => { if (s.length > 0) setSeats(s); })
+        .catch(() => {});
     }
   };
 
+  const handleAddBus = () => {
+    if (!newBus.busName || !newBus.plateNumber) return;
+    const bus: Bus = { id: Date.now().toString(), busName: newBus.busName, plateNumber: newBus.plateNumber, busType: newBus.busType, capacity: newBus.capacity, status: "active" };
+    setBuses(p => [...p, bus]);
+    setStats(s => ({ ...s, totalBuses: s.totalBuses + 1, activeBuses: s.activeBuses + 1 }));
+    setAddBusModal(false);
+    setNewBus({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
+    if (token) apiFetch("/company/buses", { token, method: "POST", body: { ...bus, companyId: "demo" } }).catch(() => {});
+  };
+
+  const handleAddTrip = () => {
+    if (!newTrip.from || !newTrip.to || !newTrip.date || !newTrip.price) return;
+    const t: Trip = { id: Date.now().toString(), from: newTrip.from, to: newTrip.to, date: newTrip.date, departureTime: newTrip.departureTime || "08h00", arrivalTime: newTrip.arrivalTime || "12h00", price: Number(newTrip.price), totalSeats: newTrip.totalSeats, busName: newTrip.busName || "Bus GoBooking", duration: "4h00" };
+    setTrips(p => [t, ...p]);
+    setStats(s => ({ ...s, totalTrips: s.totalTrips + 1 }));
+    setAddTripModal(false);
+    setNewTrip({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
+    if (token) apiFetch("/company/trips", { token, method: "POST", body: { ...t } }).catch(() => {});
+  };
+
+  const handleAddAgent = () => {
+    if (!newAgent.name || !newAgent.phone) return;
+    const code = newAgent.agentCode || `AGT-${String(agents.length + 1).padStart(3, "0")}`;
+    const busLabel = newAgent.busName || "Non assigné";
+    const ag: AgentItem = { id: Date.now().toString(), name: newAgent.name, agentCode: code, phone: newAgent.phone, bus: busLabel, busId: newAgent.busId, status: "active" };
+    setAgents(p => [...p, ag]);
+    setStats(s => ({ ...s, totalAgents: s.totalAgents + 1 }));
+    setAddAgentModal(false);
+    setNewAgent({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
+  };
+
+  const handleAssignAgent = (agent: AgentItem, bus: Bus) => {
+    setAgents(p => p.map(a => a.id === agent.id ? { ...a, bus: bus.busName, busId: bus.id, status: "active" } : a));
+    setAssignAgentModal(null);
+  };
+
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "apercu", label: "Aperçu", icon: "bar-chart-2" },
-    { id: "trajets", label: "Trajets", icon: "navigation" },
+    { id: "apercu",       label: "Aperçu",       icon: "bar-chart-2" },
+    { id: "trajets",      label: "Trajets",      icon: "navigation" },
     { id: "reservations", label: "Réservations", icon: "bookmark" },
-    { id: "sieges", label: "Sièges", icon: "grid" },
-    { id: "bus", label: "Bus", icon: "truck" },
-    { id: "colis", label: "Colis", icon: "package" },
-    { id: "agents", label: "Agents", icon: "users" },
+    { id: "sieges",       label: "Sièges",       icon: "grid" },
+    { id: "bus",          label: "Bus",          icon: "truck" },
+    { id: "colis",        label: "Colis",        icon: "package" },
+    { id: "agents",       label: "Agents",       icon: "users" },
   ];
 
   const filteredRes = reservationFilter === "all" ? reservations : reservations.filter(r => r.status === reservationFilter);
   const seatBooked = seats.filter(s => s.status === "booked").length;
-  const seatAvail = seats.filter(s => s.status === "available").length;
+  const seatAvail  = seats.filter(s => s.status === "available").length;
+  const seatRows   = Math.ceil(seats.length / 4);
 
   return (
     <View style={[S.container, { paddingTop: topPad }]}>
@@ -210,12 +315,12 @@ export default function CompanyDashboard() {
           <Text style={S.sectionTitle}>Vue d'ensemble</Text>
           <View style={S.statsGrid}>
             {[
-              { icon: "truck", label: "Bus actifs", value: `${stats.activeBuses}/${stats.totalBuses}`, color: "#1D4ED8", bg: "#EFF6FF" },
-              { icon: "users", label: "Agents", value: stats.totalAgents, color: "#7C3AED", bg: "#F5F3FF" },
-              { icon: "navigation", label: "Trajets", value: stats.totalTrips, color: PRIMARY, bg: "#EEF2FF" },
-              { icon: "bookmark", label: "Réservations", value: stats.totalReservations.toLocaleString(), color: "#059669", bg: "#ECFDF5" },
-              { icon: "package", label: "Colis", value: stats.totalParcels, color: "#D97706", bg: "#FFFBEB" },
-              { icon: "trending-up", label: "Revenus", value: `${(stats.totalRevenue / 1_000_000).toFixed(1)} M FCFA`, color: "#0891B2", bg: "#ECFEFF" },
+              { icon: "truck",       label: "Bus actifs",    value: `${stats.activeBuses}/${stats.totalBuses}`, color: "#1D4ED8", bg: "#EFF6FF" },
+              { icon: "users",       label: "Agents",        value: stats.totalAgents,                         color: "#7C3AED", bg: "#F5F3FF" },
+              { icon: "navigation",  label: "Trajets",       value: stats.totalTrips,                          color: PRIMARY,   bg: "#EEF2FF" },
+              { icon: "bookmark",    label: "Réservations",  value: stats.totalReservations.toLocaleString(),  color: "#059669", bg: "#ECFDF5" },
+              { icon: "package",     label: "Colis",         value: stats.totalParcels,                        color: "#D97706", bg: "#FFFBEB" },
+              { icon: "trending-up", label: "Revenus",       value: `${(stats.totalRevenue / 1_000_000).toFixed(1)} M FCFA`, color: "#0891B2", bg: "#ECFEFF" },
             ].map((c, i) => (
               <View key={i} style={[S.statCard, { borderLeftColor: c.color }]}>
                 <View style={[S.statIcon, { backgroundColor: c.bg }]}><Feather name={c.icon as never} size={16} color={c.color} /></View>
@@ -228,12 +333,12 @@ export default function CompanyDashboard() {
           <Text style={[S.sectionTitle, { marginTop: 8 }]}>Accès rapide</Text>
           <View style={S.quickGrid}>
             {([
-              { icon: "navigation", label: "Trajets", tab: "trajets" as Tab, color: "#1D4ED8", bg: "#EFF6FF" },
-              { icon: "bookmark", label: "Réservations", tab: "reservations" as Tab, color: "#059669", bg: "#ECFDF5" },
-              { icon: "grid", label: "Sièges", tab: "sieges" as Tab, color: "#6D28D9", bg: "#F5F3FF" },
-              { icon: "truck", label: "Bus", tab: "bus" as Tab, color: PRIMARY, bg: "#EEF2FF" },
-              { icon: "package", label: "Colis", tab: "colis" as Tab, color: "#D97706", bg: "#FFFBEB" },
-              { icon: "users", label: "Agents", tab: "agents" as Tab, color: "#0891B2", bg: "#ECFEFF" },
+              { icon: "navigation", label: "Trajets",      tab: "trajets"      as Tab, color: "#1D4ED8", bg: "#EFF6FF" },
+              { icon: "bookmark",   label: "Réservations", tab: "reservations" as Tab, color: "#059669", bg: "#ECFDF5" },
+              { icon: "grid",       label: "Sièges",       tab: "sieges"       as Tab, color: "#6D28D9", bg: "#F5F3FF" },
+              { icon: "truck",      label: "Bus",          tab: "bus"          as Tab, color: PRIMARY,   bg: "#EEF2FF" },
+              { icon: "package",    label: "Colis",        tab: "colis"        as Tab, color: "#D97706", bg: "#FFFBEB" },
+              { icon: "users",      label: "Agents",       tab: "agents"       as Tab, color: "#0891B2", bg: "#ECFEFF" },
             ] as const).map(item => (
               <TouchableOpacity key={item.tab} style={S.quickCard} onPress={() => setActiveTab(item.tab)} activeOpacity={0.8}>
                 <View style={[S.quickIcon, { backgroundColor: item.bg }]}><Feather name={item.icon as never} size={20} color={item.color} /></View>
@@ -241,6 +346,25 @@ export default function CompanyDashboard() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Seats overview per bus */}
+          <Text style={[S.sectionTitle, { marginTop: 8 }]}>Disponibilité par bus</Text>
+          {buses.filter(b => b.status === "active").slice(0, 4).map(bus => {
+            const pct = Math.round(Math.random() * 40 + 45);
+            const booked = Math.round(bus.capacity * pct / 100);
+            return (
+              <View key={bus.id} style={S.busAvailRow}>
+                <View style={S.busAvailLeft}>
+                  <Text style={S.busAvailName}>{bus.busName}</Text>
+                  <Text style={S.busAvailSub}>{booked}/{bus.capacity} réservés · {bus.capacity - booked} libres</Text>
+                </View>
+                <View style={S.busAvailBar}>
+                  <View style={[S.busAvailFill, { width: `${pct}%` as never, backgroundColor: pct > 80 ? "#DC2626" : pct > 60 ? "#D97706" : PRIMARY }]} />
+                </View>
+                <Text style={S.busAvailPct}>{pct}%</Text>
+              </View>
+            );
+          })}
         </>)}
 
         {/* ── Trajets ── */}
@@ -315,7 +439,7 @@ export default function CompanyDashboard() {
         {/* ── Sièges ── */}
         {activeTab === "sieges" && (<>
           <Text style={S.sectionTitle}>Sièges — {selectedTripForSeats.from} → {selectedTripForSeats.to}</Text>
-          <Text style={[S.subLabel, { marginBottom: 4 }]}>{selectedTripForSeats.date} · {selectedTripForSeats.departureTime}</Text>
+          <Text style={[S.subLabel, { marginBottom: 4 }]}>{selectedTripForSeats.date} · {selectedTripForSeats.departureTime} · {selectedTripForSeats.busName}</Text>
 
           <View style={S.seatSummaryRow}>
             <View style={[S.seatSummaryCard, { borderColor: "#BBF7D0" }]}>
@@ -341,10 +465,21 @@ export default function CompanyDashboard() {
             <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#FEF2F2", borderColor: "#DC2626" }]} /><Text style={S.legendText}>Réservé</Text></View>
           </View>
 
+          {/* Also show other trips to switch */}
+          <Text style={[S.pickerLabel, { marginBottom: 6 }]}>Changer de trajet</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 12 }}>
+            {trips.map(trip => (
+              <Pressable key={trip.id} onPress={() => loadSeats(trip)} style={[S.tripChip, selectedTripForSeats.id === trip.id && S.tripChipActive]}>
+                <Text style={[S.tripChipText, selectedTripForSeats.id === trip.id && S.tripChipTextActive]}>{trip.from} → {trip.to}</Text>
+                <Text style={[S.tripChipSub, selectedTripForSeats.id === trip.id && { color: PRIMARY }]}>{trip.totalSeats} places</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
           <View style={S.seatBusFrame}>
             <View style={S.busNose}><Feather name="truck" size={18} color="#94A3B8" /></View>
             <View style={S.seatGrid}>
-              {Array.from({ length: 11 }, (_, rowIdx) => (
+              {Array.from({ length: seatRows }, (_, rowIdx) => (
                 <View key={rowIdx} style={S.seatRow}>
                   {[0, 1].map(col => {
                     const s = seats.find(s => s.row === rowIdx + 1 && s.column === col);
@@ -367,8 +502,6 @@ export default function CompanyDashboard() {
               ))}
             </View>
           </View>
-
-          <Text style={[S.subLabel, { textAlign: "center", marginTop: 4 }]}>Touchez un trajet dans l'onglet Trajets pour voir ses sièges</Text>
         </>)}
 
         {/* ── Bus ── */}
@@ -386,7 +519,13 @@ export default function CompanyDashboard() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={S.listTitle}>{bus.busName}</Text>
-                <Text style={S.listSub}>{bus.plateNumber} · {bus.busType} · {bus.capacity} places</Text>
+                <Text style={S.listSub}>{bus.plateNumber} · {bus.busType}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <View style={S.capacityBadge}>
+                    <Feather name="users" size={10} color={PRIMARY} />
+                    <Text style={S.capacityText}>{bus.capacity} places</Text>
+                  </View>
+                </View>
               </View>
               <View style={[S.badge, { backgroundColor: bus.status === "active" ? "#ECFDF5" : "#FFFBEB" }]}>
                 <Text style={[S.badgeText, { color: bus.status === "active" ? "#065F46" : "#B45309" }]}>
@@ -422,23 +561,32 @@ export default function CompanyDashboard() {
         {/* ── Agents ── */}
         {activeTab === "agents" && (<>
           <View style={S.sectionRow}>
-            <Text style={S.sectionTitle}>Agents ({DEMO_AGENTS.length})</Text>
-            <TouchableOpacity style={S.addBtn} activeOpacity={0.8}>
-              <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Inviter</Text>
+            <Text style={S.sectionTitle}>Agents ({agents.length})</Text>
+            <TouchableOpacity style={S.addBtn} onPress={() => setAddAgentModal(true)} activeOpacity={0.8}>
+              <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
-          {DEMO_AGENTS.map(agent => (
+          {agents.map(agent => (
             <View key={agent.id} style={S.listCard}>
               <View style={S.agentAvatar}><Text style={S.agentAvatarText}>{agent.name.charAt(0)}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={S.listTitle}>{agent.name}</Text>
-                <Text style={S.listSub}>{agent.code} · {agent.phone}</Text>
-                <Text style={S.listSub}>{agent.bus}</Text>
+                <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                  <Feather name="truck" size={10} color={agent.busId ? PRIMARY : "#94A3B8"} />
+                  <Text style={[S.listSub, { color: agent.busId ? PRIMARY : "#94A3B8" }]}>{agent.bus}</Text>
+                </View>
               </View>
-              <View style={[S.badge, { backgroundColor: agent.status === "active" ? "#ECFDF5" : "#F1F5F9" }]}>
-                <Text style={[S.badgeText, { color: agent.status === "active" ? "#065F46" : "#64748B" }]}>
-                  {agent.status === "active" ? "Actif" : "Inactif"}
-                </Text>
+              <View style={{ alignItems: "flex-end", gap: 6 }}>
+                <View style={[S.badge, { backgroundColor: agent.status === "active" ? "#ECFDF5" : "#F1F5F9" }]}>
+                  <Text style={[S.badgeText, { color: agent.status === "active" ? "#065F46" : "#64748B" }]}>
+                    {agent.status === "active" ? "Actif" : "Inactif"}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setAssignAgentModal(agent)} style={S.assignBtn}>
+                  <Feather name="link" size={10} color="#7C3AED" />
+                  <Text style={S.assignBtnText}>Assigner</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ))}
@@ -446,144 +594,256 @@ export default function CompanyDashboard() {
 
       </ScrollView>
 
-      {/* Add Bus Modal */}
+      {/* ─────────── Add Bus Modal ─────────── */}
       <Modal visible={addBusModal} transparent animationType="slide">
         <View style={S.modalOverlay}>
-          <View style={S.modalCard}>
-            <Text style={S.modalTitle}>Ajouter un bus</Text>
-            <TextInput style={S.modalInput} placeholder="Nom du bus" value={newBus.busName} onChangeText={v => setNewBus(p => ({ ...p, busName: v }))} />
-            <TextInput style={S.modalInput} placeholder="Plaque d'immatriculation" value={newBus.plateNumber} onChangeText={v => setNewBus(p => ({ ...p, plateNumber: v }))} />
-            <TextInput style={S.modalInput} placeholder="Capacité (ex: 44)" keyboardType="numeric" value={newBus.capacity} onChangeText={v => setNewBus(p => ({ ...p, capacity: v }))} />
+          <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Ajouter un bus</Text>
+              <Pressable onPress={() => setAddBusModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+            </View>
+            <TextInput style={S.modalInput} placeholder="Nom du bus" value={newBus.busName} onChangeText={v => setNewBus(p => ({ ...p, busName: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Plaque d'immatriculation" value={newBus.plateNumber} onChangeText={v => setNewBus(p => ({ ...p, plateNumber: v }))} placeholderTextColor="#94A3B8" />
+            <PickerRow label="Type de bus" options={BUS_TYPES} value={newBus.busType} onSelect={v => setNewBus(p => ({ ...p, busType: v }))} />
+            <PickerRow<number> label="Capacité (places)" options={BUS_CAPACITIES} value={newBus.capacity} onSelect={v => setNewBus(p => ({ ...p, capacity: v }))} display={v => `${v} places`} />
+            <View style={S.modalCapacityNote}>
+              <Feather name="info" size={12} color="#64748B" />
+              <Text style={S.modalCapacityNoteText}>Capacités disponibles : 49, 59 ou 63 sièges</Text>
+            </View>
             <View style={S.modalBtns}>
               <Pressable style={S.modalCancel} onPress={() => setAddBusModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
-              <Pressable style={S.modalConfirm} onPress={() => {
-                if (!newBus.busName || !newBus.plateNumber) return;
-                setBuses(p => [...p, { id: Date.now().toString(), busName: newBus.busName, plateNumber: newBus.plateNumber, busType: "Standard", capacity: Number(newBus.capacity) || 44, status: "active" }]);
-                setStats(s => ({ ...s, totalBuses: s.totalBuses + 1 }));
-                setAddBusModal(false);
-                setNewBus({ busName: "", plateNumber: "", busType: "Standard", capacity: "44" });
-              }}><Text style={S.modalConfirmText}>Ajouter</Text></Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Add Trip Modal */}
-      <Modal visible={addTripModal} transparent animationType="slide">
-        <View style={S.modalOverlay}>
-          <ScrollView contentContainerStyle={S.modalCard}>
-            <Text style={S.modalTitle}>Nouveau trajet</Text>
-            <TextInput style={S.modalInput} placeholder="Ville de départ" value={newTrip.from} onChangeText={v => setNewTrip(p => ({ ...p, from: v }))} />
-            <TextInput style={S.modalInput} placeholder="Ville d'arrivée" value={newTrip.to} onChangeText={v => setNewTrip(p => ({ ...p, to: v }))} />
-            <TextInput style={S.modalInput} placeholder="Date (ex: 20/03/2026)" value={newTrip.date} onChangeText={v => setNewTrip(p => ({ ...p, date: v }))} />
-            <TextInput style={S.modalInput} placeholder="Heure de départ (ex: 08h00)" value={newTrip.departureTime} onChangeText={v => setNewTrip(p => ({ ...p, departureTime: v }))} />
-            <TextInput style={S.modalInput} placeholder="Prix par place (FCFA)" keyboardType="numeric" value={newTrip.price} onChangeText={v => setNewTrip(p => ({ ...p, price: v }))} />
-            <TextInput style={S.modalInput} placeholder="Nom du bus" value={newTrip.busName} onChangeText={v => setNewTrip(p => ({ ...p, busName: v }))} />
-            <TextInput style={S.modalInput} placeholder="Nombre de places (ex: 44)" keyboardType="numeric" value={newTrip.totalSeats} onChangeText={v => setNewTrip(p => ({ ...p, totalSeats: v }))} />
-            <View style={S.modalBtns}>
-              <Pressable style={S.modalCancel} onPress={() => setAddTripModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
-              <Pressable style={S.modalConfirm} onPress={() => {
-                if (!newTrip.from || !newTrip.to || !newTrip.date || !newTrip.price) return;
-                const t: Trip = { id: Date.now().toString(), from: newTrip.from, to: newTrip.to, date: newTrip.date, departureTime: newTrip.departureTime || "08h00", arrivalTime: "12h00", price: Number(newTrip.price), totalSeats: Number(newTrip.totalSeats) || 44, busName: newTrip.busName || "Bus GoBooking", duration: "4h00" };
-                setTrips(p => [t, ...p]);
-                setStats(s => ({ ...s, totalTrips: s.totalTrips + 1 }));
-                setAddTripModal(false);
-                setNewTrip({ from: "", to: "", date: "", departureTime: "", price: "", busName: "", totalSeats: "44" });
-              }}><Text style={S.modalConfirmText}>Créer</Text></Pressable>
+              <Pressable style={[S.modalConfirm, (!newBus.busName || !newBus.plateNumber) && S.modalConfirmDisabled]} onPress={handleAddBus}>
+                <Text style={S.modalConfirmText}>Ajouter</Text>
+              </Pressable>
             </View>
           </ScrollView>
         </View>
       </Modal>
+
+      {/* ─────────── Add Trip Modal ─────────── */}
+      <Modal visible={addTripModal} transparent animationType="slide">
+        <View style={S.modalOverlay}>
+          <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Nouveau trajet</Text>
+              <Pressable onPress={() => setAddTripModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+            </View>
+            <CityPicker label="Ville de départ" value={newTrip.from} onChange={v => setNewTrip(p => ({ ...p, from: v }))} />
+            <CityPicker label="Ville d'arrivée" value={newTrip.to}   onChange={v => setNewTrip(p => ({ ...p, to: v }))} />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TextInput style={[S.modalInput, { flex: 1 }]} placeholder="Date (20/03/2026)" value={newTrip.date} onChangeText={v => setNewTrip(p => ({ ...p, date: v }))} placeholderTextColor="#94A3B8" />
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TextInput style={[S.modalInput, { flex: 1 }]} placeholder="Départ (08h00)" value={newTrip.departureTime} onChangeText={v => setNewTrip(p => ({ ...p, departureTime: v }))} placeholderTextColor="#94A3B8" />
+              <TextInput style={[S.modalInput, { flex: 1 }]} placeholder="Arrivée (12h00)" value={newTrip.arrivalTime} onChangeText={v => setNewTrip(p => ({ ...p, arrivalTime: v }))} placeholderTextColor="#94A3B8" />
+            </View>
+            <TextInput style={S.modalInput} placeholder="Prix par place (FCFA)" keyboardType="numeric" value={newTrip.price} onChangeText={v => setNewTrip(p => ({ ...p, price: v }))} placeholderTextColor="#94A3B8" />
+            <BusSelector buses={buses} selected={newTrip.busId} onSelect={bus => setNewTrip(p => ({ ...p, busId: bus.id, busName: bus.busName, totalSeats: bus.capacity }))} />
+            {newTrip.busId && (
+              <View style={S.tripBusInfo}>
+                <Feather name="check-circle" size={14} color="#059669" />
+                <Text style={S.tripBusInfoText}>{newTrip.totalSeats} places · {buses.find(b => b.id === newTrip.busId)?.busType}</Text>
+              </View>
+            )}
+            <View style={S.modalBtns}>
+              <Pressable style={S.modalCancel} onPress={() => setAddTripModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable style={[S.modalConfirm, (!newTrip.from || !newTrip.to || !newTrip.date || !newTrip.price) && S.modalConfirmDisabled]} onPress={handleAddTrip}>
+                <Text style={S.modalConfirmText}>Créer</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ─────────── Add Agent Modal ─────────── */}
+      <Modal visible={addAgentModal} transparent animationType="slide">
+        <View style={S.modalOverlay}>
+          <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Ajouter un agent</Text>
+              <Pressable onPress={() => setAddAgentModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+            </View>
+            <TextInput style={S.modalInput} placeholder="Nom complet" value={newAgent.name} onChangeText={v => setNewAgent(p => ({ ...p, name: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Téléphone (07 XX XX XX XX)" keyboardType="phone-pad" value={newAgent.phone} onChangeText={v => setNewAgent(p => ({ ...p, phone: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder={`Code agent (auto: AGT-${String(agents.length + 1).padStart(3,"0")})`} value={newAgent.agentCode} onChangeText={v => setNewAgent(p => ({ ...p, agentCode: v }))} placeholderTextColor="#94A3B8" />
+            <BusSelector buses={buses} selected={newAgent.busId} onSelect={bus => setNewAgent(p => ({ ...p, busId: bus.id, busName: bus.busName }))} />
+            <View style={S.modalBtns}>
+              <Pressable style={S.modalCancel} onPress={() => setAddAgentModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
+              <Pressable style={[S.modalConfirm, (!newAgent.name || !newAgent.phone) && S.modalConfirmDisabled]} onPress={handleAddAgent}>
+                <Text style={S.modalConfirmText}>Ajouter</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ─────────── Assign Agent to Bus Modal ─────────── */}
+      {assignAgentModal && (
+        <Modal visible={true} transparent animationType="slide">
+          <View style={S.modalOverlay}>
+            <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+              <View style={S.modalHeader}>
+                <Text style={S.modalTitle}>Assigner {assignAgentModal.name}</Text>
+                <Pressable onPress={() => setAssignAgentModal(null)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+              </View>
+              <Text style={[S.subLabel, { marginBottom: 12 }]}>Choisissez le bus à assigner à cet agent :</Text>
+              <BusSelector buses={buses} selected={assignAgentModal.busId} onSelect={bus => handleAssignAgent(assignAgentModal, bus)} />
+              <Pressable style={[S.modalCancel, { marginTop: 8 }]} onPress={() => setAssignAgentModal(null)}>
+                <Text style={S.modalCancelText}>Fermer</Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
 
 /* ─── Styles ─────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 20 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 1 },
-  roleBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  roleBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
-  tabBar: { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#E2E8F0", maxHeight: 52 },
-  tabBarContent: { paddingHorizontal: 10, gap: 2, alignItems: "center" },
-  tab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabActive: { borderBottomColor: PRIMARY },
-  tabText: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#94A3B8" },
-  tabTextActive: { color: PRIMARY, fontFamily: "Inter_700Bold" },
-  sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  subLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  statCard: { width: "47%", backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2, gap: 4 },
-  statIcon: { width: 34, height: 34, borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 4 },
-  statValue: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  statLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" },
-  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  quickCard: { width: "30%", flex: 1, backgroundColor: "white", borderRadius: 16, padding: 14, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  quickIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  quickLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
-  addBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: PRIMARY, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  addBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
-  listCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 14, padding: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1 },
-  listIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  listTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  listSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 1 },
-  badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  badgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-  agentAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: PRIMARY, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  agentAvatarText: { fontSize: 18, fontFamily: "Inter_700Bold", color: "white" },
-  tripCard: { flexDirection: "row", alignItems: "center", backgroundColor: "white", borderRadius: 14, padding: 14, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1 },
-  tripLeft: { flex: 1, flexDirection: "row", gap: 10, alignItems: "flex-start" },
-  tripIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  tripRoute: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  tripMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 1 },
-  tripRight: { alignItems: "flex-end", gap: 6 },
-  tripPrice: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" },
-  seatBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  seatBtnText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: PRIMARY },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: "#E2E8F0", backgroundColor: "white" },
-  filterChipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  filterChipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B" },
-  filterChipTextActive: { color: "white", fontFamily: "Inter_700Bold" },
-  reservCard: { backgroundColor: "white", borderRadius: 14, padding: 14, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 1 },
-  reservTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  reservRef: { fontSize: 13, fontFamily: "Inter_700Bold", color: PRIMARY },
-  reservMid: { gap: 6 },
-  paxRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  seatTag: { width: 32, height: 28, borderRadius: 8, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  seatTagText: { fontSize: 10, fontFamily: "Inter_700Bold", color: PRIMARY },
-  paxName: { fontSize: 13, fontFamily: "Inter_500Medium", color: "#0F172A" },
-  reservBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
-  reservPay: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  reservAmount: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" },
+  container:      { flex: 1, backgroundColor: "#F1F5F9" },
+  header:         { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 12 },
+  backBtn:        { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
+  headerTitle:    { color: "white", fontWeight: "700", fontSize: 16 },
+  headerSub:      { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 },
+  roleBadge:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  roleBadgeText:  { color: "white", fontSize: 12, fontWeight: "600" },
+
+  tabBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#E2E8F0", maxHeight: 50 },
+  tabBarContent:  { paddingHorizontal: 12, gap: 4, alignItems: "center" },
+  tab:            { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 12 },
+  tabActive:      { borderBottomWidth: 2, borderBottomColor: PRIMARY },
+  tabText:        { fontSize: 12, color: "#94A3B8", fontWeight: "500" },
+  tabTextActive:  { color: PRIMARY, fontWeight: "700" },
+
+  sectionTitle:   { fontSize: 15, fontWeight: "700", color: "#1E293B" },
+  sectionRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  subLabel:       { fontSize: 12, color: "#64748B" },
+
+  statsGrid:      { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statCard:       { backgroundColor: "white", borderRadius: 12, padding: 12, flex: 1, minWidth: "44%", borderLeftWidth: 3, gap: 4, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  statIcon:       { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 2 },
+  statValue:      { fontSize: 18, fontWeight: "800", color: "#1E293B" },
+  statLabel:      { fontSize: 11, color: "#64748B" },
+
+  quickGrid:      { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  quickCard:      { backgroundColor: "white", borderRadius: 12, padding: 14, flex: 1, minWidth: "28%", alignItems: "center", gap: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  quickIcon:      { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  quickLabel:     { fontSize: 11, fontWeight: "600", color: "#475569" },
+
+  busAvailRow:    { backgroundColor: "white", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
+  busAvailLeft:   { flex: 1 },
+  busAvailName:   { fontSize: 13, fontWeight: "600", color: "#1E293B" },
+  busAvailSub:    { fontSize: 11, color: "#64748B", marginTop: 2 },
+  busAvailBar:    { width: 70, height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" },
+  busAvailFill:   { height: "100%", borderRadius: 3 },
+  busAvailPct:    { fontSize: 12, fontWeight: "700", color: "#475569", width: 36, textAlign: "right" },
+
+  addBtn:         { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: PRIMARY, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8 },
+  addBtnText:     { color: "white", fontSize: 12, fontWeight: "600" },
+
+  tripCard:       { backgroundColor: "white", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "flex-start", gap: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  tripLeft:       { flex: 1, flexDirection: "row", gap: 10, alignItems: "flex-start" },
+  tripIconWrap:   { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
+  tripRoute:      { fontSize: 14, fontWeight: "700", color: "#1E293B" },
+  tripMeta:       { fontSize: 11, color: "#64748B", marginTop: 2 },
+  tripRight:      { alignItems: "flex-end", gap: 6 },
+  tripPrice:      { fontSize: 14, fontWeight: "700", color: PRIMARY },
+  seatBtn:        { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  seatBtnText:    { fontSize: 11, color: PRIMARY, fontWeight: "600" },
+
+  filterChip:     { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
+  filterChipActive:    { backgroundColor: "#EEF2FF", borderColor: PRIMARY },
+  filterChipText:      { fontSize: 12, color: "#64748B" },
+  filterChipTextActive:{ color: PRIMARY, fontWeight: "600" },
+
+  reservCard:     { backgroundColor: "white", borderRadius: 12, padding: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  reservTop:      { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  reservRef:      { fontWeight: "700", color: "#1E293B", fontSize: 13 },
+  reservMid:      { gap: 6, marginBottom: 10 },
+  paxRow:         { flexDirection: "row", alignItems: "center", gap: 8 },
+  seatTag:        { backgroundColor: "#EEF2FF", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  seatTagText:    { fontSize: 11, fontWeight: "700", color: PRIMARY },
+  paxName:        { fontSize: 13, color: "#334155" },
+  reservBottom:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, borderTopColor: "#F1F5F9", paddingTop: 8 },
+  reservPay:      { fontSize: 12, color: "#64748B" },
+  reservAmount:   { fontSize: 14, fontWeight: "700", color: "#059669" },
+
   seatSummaryRow: { flexDirection: "row", gap: 8 },
-  seatSummaryCard: { flex: 1, backgroundColor: "white", borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1.5 },
-  seatSummaryNum: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  seatSummaryLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" },
-  seatLegend: { flexDirection: "row", gap: 16, justifyContent: "center" },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  legendDot: { width: 16, height: 16, borderRadius: 5, borderWidth: 1.5 },
-  legendText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" },
-  seatBusFrame: { backgroundColor: "white", borderRadius: 20, padding: 16, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  busNose: { alignItems: "center", marginBottom: 4 },
-  seatGrid: { gap: 6 },
-  seatRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 },
-  seat: { width: 38, height: 38, borderRadius: 8, justifyContent: "center", alignItems: "center", borderWidth: 1.5 },
-  seatAvail: { backgroundColor: "#F0FDF4", borderColor: "#059669" },
-  seatBooked: { backgroundColor: "#FEF2F2", borderColor: "#DC2626" },
-  seatEmpty: { width: 38, height: 38 },
-  seatAisle: { width: 12 },
-  seatNum: { fontSize: 9, fontFamily: "Inter_700Bold" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalCard: { backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginBottom: 4 },
-  modalInput: { borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: "Inter_400Regular", color: "#0F172A" },
-  modalBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
-  modalCancel: { flex: 1, borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, paddingVertical: 13, alignItems: "center" },
-  modalCancelText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#64748B" },
-  modalConfirm: { flex: 1, backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
-  modalConfirmText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
+  seatSummaryCard:{ flex: 1, backgroundColor: "white", borderRadius: 10, padding: 10, alignItems: "center", borderWidth: 1 },
+  seatSummaryNum: { fontSize: 20, fontWeight: "800" },
+  seatSummaryLabel:{ fontSize: 10, color: "#64748B", marginTop: 2 },
+
+  seatLegend:     { flexDirection: "row", gap: 16, justifyContent: "center" },
+  legendItem:     { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendDot:      { width: 14, height: 14, borderRadius: 3, borderWidth: 1.5 },
+  legendText:     { fontSize: 12, color: "#64748B" },
+
+  tripChip:       { backgroundColor: "#F1F5F9", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#E2E8F0", minWidth: 120, alignItems: "center" },
+  tripChipActive: { backgroundColor: "#EEF2FF", borderColor: PRIMARY },
+  tripChipText:   { fontSize: 12, fontWeight: "600", color: "#475569" },
+  tripChipTextActive: { color: PRIMARY },
+  tripChipSub:    { fontSize: 10, color: "#94A3B8", marginTop: 2 },
+
+  seatBusFrame:   { backgroundColor: "white", borderRadius: 16, padding: 16, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 3 },
+  busNose:        { marginBottom: 12, alignItems: "center" },
+  seatGrid:       { gap: 6, width: "100%" },
+  seatRow:        { flexDirection: "row", gap: 4, justifyContent: "center" },
+  seat:           { width: 40, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+  seatBooked:     { backgroundColor: "#FEF2F2", borderColor: "#FCA5A5" },
+  seatAvail:      { backgroundColor: "#ECFDF5", borderColor: "#86EFAC" },
+  seatEmpty:      { width: 40, height: 36 },
+  seatAisle:      { width: 12 },
+  seatNum:        { fontSize: 10, fontWeight: "700" },
+
+  listCard:       { backgroundColor: "white", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  listIcon:       { width: 42, height: 42, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  listTitle:      { fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  listSub:        { fontSize: 12, color: "#64748B", marginTop: 2 },
+  capacityBadge:  { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  capacityText:   { fontSize: 11, fontWeight: "600", color: PRIMARY },
+
+  badge:          { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  badgeText:      { fontSize: 11, fontWeight: "600" },
+
+  agentAvatar:    { width: 42, height: 42, borderRadius: 21, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
+  agentAvatarText:{ fontSize: 16, fontWeight: "700", color: PRIMARY },
+  assignBtn:      { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F5F3FF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  assignBtnText:  { fontSize: 11, color: "#7C3AED", fontWeight: "600" },
+
+  /* Modal */
+  modalOverlay:   { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  modalCard:      { backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, gap: 0 },
+  modalHeader:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  modalTitle:     { fontSize: 17, fontWeight: "700", color: "#1E293B" },
+  modalInput:     { backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: "#1E293B", marginBottom: 10 },
+  modalBtns:      { flexDirection: "row", gap: 10, marginTop: 8 },
+  modalCancel:    { flex: 1, backgroundColor: "#F1F5F9", borderRadius: 10, paddingVertical: 13, alignItems: "center" },
+  modalCancelText:{ fontSize: 14, fontWeight: "600", color: "#64748B" },
+  modalConfirm:   { flex: 1, backgroundColor: PRIMARY, borderRadius: 10, paddingVertical: 13, alignItems: "center" },
+  modalConfirmDisabled: { opacity: 0.45 },
+  modalConfirmText:{ fontSize: 14, fontWeight: "700", color: "white" },
+  modalCapacityNote:{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 10, marginBottom: 10 },
+  modalCapacityNoteText:{ fontSize: 11, color: "#64748B" },
+
+  /* Pickers */
+  pickerLabel:    { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 8 },
+  pickerChip:     { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
+  pickerChipActive:    { backgroundColor: "#EEF2FF", borderColor: PRIMARY },
+  pickerChipText:      { fontSize: 13, color: "#64748B", fontWeight: "500" },
+  pickerChipTextActive:{ color: PRIMARY, fontWeight: "700" },
+
+  cityChip:       { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" },
+  cityChipActive: { backgroundColor: "#EEF2FF", borderColor: PRIMARY },
+  cityChipText:   { fontSize: 11, color: "#64748B" },
+  cityChipTextActive: { color: PRIMARY, fontWeight: "600" },
+
+  busPickerRow:   { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#F8FAFC", borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: "#E2E8F0" },
+  busPickerRowActive: { borderColor: PRIMARY, backgroundColor: "#EEF2FF" },
+  busPickerDot:   { width: 10, height: 10, borderRadius: 5 },
+  busPickerName:  { fontSize: 13, fontWeight: "600", color: "#1E293B" },
+  busPickerSub:   { fontSize: 11, color: "#64748B", marginTop: 2 },
+
+  tripBusInfo:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#ECFDF5", borderRadius: 8, padding: 10, marginBottom: 10 },
+  tripBusInfoText:{ fontSize: 12, color: "#059669", fontWeight: "600" },
 });
