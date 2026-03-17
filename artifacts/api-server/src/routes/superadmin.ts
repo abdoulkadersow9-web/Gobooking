@@ -146,4 +146,56 @@ router.get("/parcels", async (req, res) => {
   }
 });
 
+router.get("/payments", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const payments = await db.select().from(paymentsTable).orderBy(desc(paymentsTable.createdAt));
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.get("/bookings", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
+    res.json(bookings.map(b => ({
+      id: b.id, bookingRef: b.bookingRef, tripId: b.tripId,
+      totalAmount: b.totalAmount, status: b.status, paymentMethod: b.paymentMethod,
+      passengers: b.passengers, seatNumbers: b.seatNumbers, createdAt: b.createdAt?.toISOString(),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.patch("/users/:id/role", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { role } = req.body;
+    if (!role) { res.status(400).json({ error: "role required" }); return; }
+    await db.update(usersTable).set({ role }).where(eq(usersTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.patch("/companies/:id/status", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { status } = req.body;
+    if (!status) { res.status(400).json({ error: "status required" }); return; }
+    await db.update(companiesTable).set({ status }).where(eq(companiesTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 export default router;

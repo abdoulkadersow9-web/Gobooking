@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -109,6 +109,50 @@ router.get("/parcels", async (req, res) => {
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
     const parcels = await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt));
     res.json(parcels);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.post("/trips", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { from, to, date, departureTime, arrivalTime, price, busName, busType, totalSeats, duration } = req.body;
+    if (!from || !to || !date || !departureTime || !price) { res.status(400).json({ error: "Required fields missing" }); return; }
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+    const trip = await db.insert(tripsTable).values({
+      id, from, to, date, departureTime: departureTime || "08:00", arrivalTime: arrivalTime || "12:00",
+      price: Number(price), busName: busName || "Bus GoBooking", busType: busType || "Standard",
+      totalSeats: totalSeats || 44, duration: duration || "4h00", amenities: [], stops: [], policies: [],
+    }).returning();
+    res.json(trip[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to create trip" });
+  }
+});
+
+router.get("/reservations", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
+    res.json(bookings.map(b => ({
+      id: b.id, bookingRef: b.bookingRef, tripId: b.tripId, totalAmount: b.totalAmount,
+      status: b.status, paymentMethod: b.paymentMethod, passengers: b.passengers,
+      seatNumbers: b.seatNumbers, createdAt: b.createdAt?.toISOString(),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.get("/seats/:tripId", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId));
+    res.json(seats);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

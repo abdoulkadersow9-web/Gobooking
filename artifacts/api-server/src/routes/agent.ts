@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -111,6 +111,28 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
     await db.update(parcelsTable).set({ status: "livre" }).where(eq(parcelsTable.id, req.params.parcelId));
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.get("/seats/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId));
+    res.json(seats);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.get("/trips", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const trips = await db.select().from(tripsTable).orderBy(desc(tripsTable.date)).limit(10);
+    res.json(trips);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
