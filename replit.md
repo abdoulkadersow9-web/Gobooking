@@ -22,7 +22,7 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Clean card-based UI, Airbnb/Coinbase-inspired
 
 ## Features Implemented
-1. Login / Registration (token-based auth with SHA256 password hashing)
+1. Login / Registration (token-based auth with SHA256 password hashing, role-based registration, inline error messages)
 2. Home screen with bus search (from/to/date/passengers) + recent activity section
 3. Search results with sort options (price/duration/departure)
 4. Trip detail with amenities, stops, policies
@@ -47,11 +47,18 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Accessible from Profile tab → "Tableaux de bord" section
 
 ## User Roles
-- `user` — regular passenger
-- `admin` — legacy admin
-- `super_admin` — global platform admin
-- `company_admin` — transport company manager
-- `agent` — bus agent (boarding & parcel handling)
+- `client` / `user` — regular passenger → /(tabs)
+- `admin` / `super_admin` — platform admin → /dashboard/super-admin
+- `compagnie` / `company_admin` — transport company manager → /dashboard/company
+- `agent` — bus agent (boarding & parcel handling) → /dashboard/agent
+
+## Auth System
+- Backend: `POST /auth/register` accepts `role` field (client/agent/compagnie/admin)
+- Registration redirects to appropriate dashboard based on role
+- Inline error messages (no popup Alerts) for validation + server errors
+- Login screen: inline banner for empty fields (yellow) + server errors (red)
+- Register screen: role selector grid (4 colored cards), password strength indicator, security note
+- Demo accounts: compagnie@test.com, agent@test.com, admin@test.com, user@test.com (all: test123)
 
 ## Project Structure
 ```

@@ -18,47 +18,52 @@ function generateToken_simple(): string {
 
 const tokenStore = new Map<string, string>();
 
+const ALLOWED_ROLES = ["client", "agent", "compagnie", "admin"] as const;
+type RegisterRole = typeof ALLOWED_ROLES[number];
+
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, role } = req.body;
 
-    if (!name || !email || !phone || !password) {
-      res.status(400).json({ error: "All fields are required" });
+    if (!name || !email || !password) {
+      res.status(400).json({ error: "Nom, email et mot de passe sont requis" });
       return;
     }
+
+    const mappedRole: RegisterRole = ALLOWED_ROLES.includes(role) ? role : "client";
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (existing.length > 0) {
-      res.status(400).json({ error: "Email already registered" });
+      res.status(400).json({ error: "Cet email est déjà utilisé" });
       return;
     }
 
-    const user = await db.insert(usersTable).values({
+    const [user] = await db.insert(usersTable).values({
       id: generateId(),
       name,
       email,
-      phone,
+      phone: phone || "",
       passwordHash: hashPassword(password),
-      role: "user",
+      role: mappedRole,
     }).returning();
 
     const token = generateToken_simple();
-    tokenStore.set(token, user[0].id);
+    tokenStore.set(token, user.id);
 
     res.json({
       token,
       user: {
-        id: user[0].id,
-        name: user[0].name,
-        email: user[0].email,
-        phone: user[0].phone,
-        role: user[0].role,
-        createdAt: user[0].createdAt?.toISOString() || new Date().toISOString(),
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
     });
   } catch (err) {
     console.error("Register error:", err);
-    res.status(500).json({ error: "Registration failed" });
+    res.status(500).json({ error: "Inscription échouée" });
   }
 });
 

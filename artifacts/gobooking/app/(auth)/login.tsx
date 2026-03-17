@@ -5,7 +5,6 @@ import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -35,20 +34,22 @@ interface AuthResponse {
 }
 
 const DEMO_ACCOUNTS = [
-  { label: "Entreprise",  email: "compagnie@test.com", password: "test123", color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"   as const },
-  { label: "Agent",       email: "agent@test.com",     password: "test123", color: "#059669", bg: "#ECFDF5", icon: "user"         as const },
-  { label: "Admin",       email: "admin@test.com",     password: "test123", color: "#7C3AED", bg: "#F5F3FF", icon: "shield"       as const },
-  { label: "Client",      email: "user@test.com",      password: "test123", color: "#0891B2", bg: "#ECFEFF", icon: "home"         as const },
+  { label: "Entreprise", email: "compagnie@test.com", password: "test123", color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase" as const },
+  { label: "Agent",      email: "agent@test.com",     password: "test123", color: "#059669", bg: "#ECFDF5", icon: "user"      as const },
+  { label: "Admin",      email: "admin@test.com",      password: "test123", color: "#7C3AED", bg: "#F5F3FF", icon: "shield"    as const },
+  { label: "Client",     email: "user@test.com",       password: "test123", color: "#0891B2", bg: "#ECFEFF", icon: "home"      as const },
 ];
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail]               = useState("");
+  const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [loading, setLoading]           = useState(false);
+  const [demoLoading, setDemoLoading]   = useState<string | null>(null);
+  const [fieldError, setFieldError]     = useState("");
+  const [serverError, setServerError]   = useState("");
 
   const doLogin = async (em: string, pw: string) => {
     const res = await apiFetch<AuthResponse>("/auth/login", {
@@ -67,31 +68,48 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Erreur", "Veuillez remplir tous les champs");
+    setFieldError("");
+    setServerError("");
+
+    if (!email.trim() && !password.trim()) {
+      setFieldError("Veuillez remplir tous les champs.");
       return;
     }
+    if (!email.trim()) {
+      setFieldError("L'adresse email est requise.");
+      return;
+    }
+    if (!password.trim()) {
+      setFieldError("Le mot de passe est requis.");
+      return;
+    }
+
     setLoading(true);
     try {
       await doLogin(email, password);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Connexion échouée";
-      Alert.alert("Connexion échouée", msg);
+      const msg = err instanceof Error ? err.message : "Connexion échouée. Vérifiez vos identifiants.";
+      setServerError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDemoLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
+    setFieldError("");
+    setServerError("");
     setDemoLoading(account.label);
     try {
       await doLogin(account.email, account.password);
     } catch {
-      Alert.alert("Erreur", "Impossible de se connecter avec ce compte démo");
+      setServerError("Impossible de se connecter avec ce compte démo.");
     } finally {
       setDemoLoading(null);
     }
   };
+
+  const errorMessage = fieldError || serverError;
+  const isServerErr = !!serverError && !fieldError;
 
   return (
     <KeyboardAvoidingView
@@ -109,11 +127,12 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Header gradient ── */}
         <LinearGradient
           colors={[Colors.light.primary, Colors.light.primaryDark]}
           style={styles.headerGradient}
         >
-          <View style={styles.busIcon}>
+          <View style={styles.logoCircle}>
             <Feather name="navigation" size={32} color="white" />
           </View>
           <Text style={styles.appName}>GoBooking</Text>
@@ -121,14 +140,14 @@ export default function LoginScreen() {
         </LinearGradient>
 
         <View style={styles.formCard}>
-          {/* ── Quick demo access ── */}
+          {/* ── Accès rapide démo ── */}
           <View style={styles.demoBox}>
             <View style={styles.demoHeader}>
               <Feather name="zap" size={14} color="#D97706" />
               <Text style={styles.demoTitle}>Accès rapide (démo)</Text>
             </View>
             <View style={styles.demoGrid}>
-              {DEMO_ACCOUNTS.map(acc => (
+              {DEMO_ACCOUNTS.map((acc) => (
                 <TouchableOpacity
                   key={acc.label}
                   style={[styles.demoBtn, { backgroundColor: acc.bg, borderColor: acc.color + "33" }]}
@@ -153,20 +172,38 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* ── Email / password form ── */}
+          {/* ── Titre ── */}
           <Text style={styles.welcomeTitle}>Connexion</Text>
-          <Text style={styles.welcomeSubtitle}>Entrez vos identifiants</Text>
+          <Text style={styles.welcomeSubtitle}>Entrez vos identifiants GoBooking</Text>
 
+          {/* ── Message d'erreur inline ── */}
+          {!!errorMessage && (
+            <View style={[styles.errorBanner, isServerErr && styles.errorBannerServer]}>
+              <Feather
+                name={isServerErr ? "alert-circle" : "alert-triangle"}
+                size={15}
+                color={isServerErr ? "#B91C1C" : "#92400E"}
+              />
+              <Text style={[styles.errorText, isServerErr && styles.errorTextServer]}>
+                {errorMessage}
+              </Text>
+            </View>
+          )}
+
+          {/* ── Email ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
-            <View style={styles.inputContainer}>
+            <View style={[
+              styles.inputContainer,
+              fieldError && !email.trim() && styles.inputError,
+            ]}>
               <Feather name="mail" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="vous@exemple.com"
                 placeholderTextColor={Colors.light.textMuted}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(t) => { setEmail(t); setFieldError(""); setServerError(""); }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -174,16 +211,20 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          {/* ── Mot de passe ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Mot de passe</Text>
-            <View style={styles.inputContainer}>
+            <View style={[
+              styles.inputContainer,
+              fieldError && !password.trim() && styles.inputError,
+            ]}>
               <Feather name="lock" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder="Votre mot de passe"
                 placeholderTextColor={Colors.light.textMuted}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(t) => { setPassword(t); setFieldError(""); setServerError(""); }}
                 secureTextEntry={!showPassword}
               />
               <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
@@ -192,11 +233,12 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          {/* ── Bouton Se connecter ── */}
           <Pressable
             style={({ pressed }) => [
               styles.loginButton,
               pressed && styles.loginButtonPressed,
-              loading && styles.loginButtonDisabled,
+              (loading || demoLoading !== null) && styles.loginButtonDisabled,
             ]}
             onPress={handleLogin}
             disabled={loading || demoLoading !== null}
@@ -204,10 +246,14 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.loginButtonText}>Se connecter</Text>
+              <>
+                <Feather name="log-in" size={18} color="white" />
+                <Text style={styles.loginButtonText}>Se connecter</Text>
+              </>
             )}
           </Pressable>
 
+          {/* ── Lien inscription ── */}
           <View style={styles.registerRow}>
             <Text style={styles.registerText}>Pas encore de compte ?</Text>
             <Pressable onPress={() => router.push("/(auth)/register")}>
@@ -227,11 +273,11 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingTop: 50,
-    paddingBottom: 60,
+    paddingBottom: 64,
     alignItems: "center",
     gap: 8,
   },
-  busIcon: {
+  logoCircle: {
     width: 72,
     height: 72,
     borderRadius: 24,
@@ -242,11 +288,12 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontWeight: "800",
+    fontFamily: "Inter_700Bold",
     color: "white",
   },
   tagline: {
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.85)",
   },
   formCard: {
@@ -259,7 +306,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
   },
 
-  /* Demo quick access */
+  /* Demo */
   demoBox: {
     backgroundColor: "#FFFBEB",
     borderRadius: 16,
@@ -276,7 +323,7 @@ const styles = StyleSheet.create({
   },
   demoTitle: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     color: "#92400E",
   },
   demoGrid: {
@@ -298,9 +345,10 @@ const styles = StyleSheet.create({
   },
   demoBtnText: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
   },
 
+  /* Divider */
   divider: {
     flexDirection: "row",
     alignItems: "center",
@@ -314,26 +362,58 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 12,
+    fontFamily: "Inter_400Regular",
     color: Colors.light.textMuted,
   },
 
+  /* Title */
   welcomeTitle: {
     fontSize: 22,
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     color: Colors.light.text,
     marginBottom: 2,
   },
   welcomeSubtitle: {
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
-    marginBottom: 20,
+    marginBottom: 16,
   },
+
+  /* Error banner */
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF3C7",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  errorBannerServer: {
+    backgroundColor: "#FEF2F2",
+    borderColor: "#FECACA",
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#92400E",
+  },
+  errorTextServer: {
+    color: "#B91C1C",
+  },
+
+  /* Inputs */
   inputGroup: {
     marginBottom: 14,
   },
   label: {
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     color: Colors.light.text,
     marginBottom: 6,
   },
@@ -346,6 +426,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.border,
     paddingHorizontal: 14,
   },
+  inputError: {
+    borderColor: "#EF4444",
+    backgroundColor: "#FFF5F5",
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -353,16 +437,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 15,
+    fontFamily: "Inter_400Regular",
     color: Colors.light.text,
   },
   eyeButton: {
     padding: 4,
   },
+
+  /* Button */
   loginButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
     paddingVertical: 15,
-    alignItems: "center",
     marginTop: 6,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -380,8 +470,10 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "white",
     fontSize: 16,
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
   },
+
+  /* Footer */
   registerRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -390,11 +482,12 @@ const styles = StyleSheet.create({
   },
   registerText: {
     fontSize: 14,
+    fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
   },
   registerLink: {
     fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.light.primary,
-    fontWeight: "600",
   },
 });
