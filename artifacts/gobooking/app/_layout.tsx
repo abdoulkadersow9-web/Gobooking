@@ -34,7 +34,7 @@ const DASHBOARD_ROLES: Record<string, string[]> = {
 const DASHBOARD_ONLY_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
 
 /* ─── Routes publiques (pas besoin d'être connecté) ────────── */
-const PUBLIC_ROOTS = ["index", "(auth)"];
+const PUBLIC_ROOTS = ["index", "(auth)", "live-tracking"];
 
 function AuthGuard() {
   const { user, isLoading } = useAuth();

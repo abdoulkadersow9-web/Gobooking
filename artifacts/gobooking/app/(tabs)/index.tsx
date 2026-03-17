@@ -313,6 +313,27 @@ export default function HomeScreen() {
           </View>
           <Feather name="chevron-right" size={16} color="#059669" />
         </TouchableOpacity>
+
+        {/* ── Live tracking CTA ── */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/live-tracking"); }}
+          style={styles.liveTrackingBtn}
+        >
+          <View style={styles.liveTrackingLeft}>
+            <View style={styles.liveTrackingIcon}>
+              <Feather name="truck" size={20} color="white" />
+            </View>
+            <View style={styles.ctaText}>
+              <Text style={styles.liveTrackingTitle}>Voir les cars en route</Text>
+              <Text style={styles.liveTrackingSub}>Positions en temps réel · CI</Text>
+            </View>
+          </View>
+          <View style={styles.livePill}>
+            <View style={styles.liveDot2} />
+            <Text style={styles.livePillText}>LIVE</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* ── Activity section ── */}
@@ -597,6 +618,19 @@ const styles = StyleSheet.create({
   ctaText: { flex: 1 },
   ctaTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primaryDark },
   ctaSub:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
+
+  liveTrackingBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: "#0B1628", borderRadius: 16, padding: 14, gap: 12,
+    shadowColor: "#0B1628", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
+  },
+  liveTrackingLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
+  liveTrackingIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
+  liveTrackingTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
+  liveTrackingSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.55)", marginTop: 1 },
+  livePill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(239,68,68,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "rgba(239,68,68,0.4)" },
+  liveDot2: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444" },
+  livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Activity section
   section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 4 },
