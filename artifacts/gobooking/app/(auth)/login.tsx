@@ -13,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,6 +34,13 @@ interface AuthResponse {
   };
 }
 
+const DEMO_ACCOUNTS = [
+  { label: "Entreprise",  email: "compagnie@test.com", password: "test123", color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"   as const },
+  { label: "Agent",       email: "agent@test.com",     password: "test123", color: "#059669", bg: "#ECFDF5", icon: "user"         as const },
+  { label: "Admin",       email: "admin@test.com",     password: "test123", color: "#7C3AED", bg: "#F5F3FF", icon: "shield"       as const },
+  { label: "Client",      email: "user@test.com",      password: "test123", color: "#0891B2", bg: "#ECFEFF", icon: "home"         as const },
+];
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
@@ -40,32 +48,48 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<string | null>(null);
+
+  const doLogin = async (em: string, pw: string) => {
+    const res = await apiFetch<AuthResponse>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email: em.trim(), password: pw }),
+    });
+    await login(res.token, res.user);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.dismissAll();
+    const dashPath = getDashboardPath(res.user.role);
+    if (dashPath) {
+      router.replace(dashPath as never);
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      Alert.alert("Erreur", "Veuillez remplir tous les champs");
       return;
     }
     setLoading(true);
     try {
-      const res = await apiFetch<AuthResponse>("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-      await login(res.token, res.user);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.dismissAll();
-      const dashPath = getDashboardPath(res.user.role);
-      if (dashPath) {
-        router.replace(dashPath as never);
-      } else {
-        router.replace("/(tabs)");
-      }
+      await doLogin(email, password);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      Alert.alert("Login Failed", msg);
+      const msg = err instanceof Error ? err.message : "Connexion échouée";
+      Alert.alert("Connexion échouée", msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
+    setDemoLoading(account.label);
+    try {
+      await doLogin(account.email, account.password);
+    } catch {
+      Alert.alert("Erreur", "Impossible de se connecter avec ce compte démo");
+    } finally {
+      setDemoLoading(null);
     }
   };
 
@@ -93,12 +117,45 @@ export default function LoginScreen() {
             <Feather name="navigation" size={32} color="white" />
           </View>
           <Text style={styles.appName}>GoBooking</Text>
-          <Text style={styles.tagline}>Your journey starts here</Text>
+          <Text style={styles.tagline}>Voyagez partout en Côte d'Ivoire</Text>
         </LinearGradient>
 
         <View style={styles.formCard}>
-          <Text style={styles.welcomeTitle}>Welcome back</Text>
-          <Text style={styles.welcomeSubtitle}>Sign in to your account</Text>
+          {/* ── Quick demo access ── */}
+          <View style={styles.demoBox}>
+            <View style={styles.demoHeader}>
+              <Feather name="zap" size={14} color="#D97706" />
+              <Text style={styles.demoTitle}>Accès rapide (démo)</Text>
+            </View>
+            <View style={styles.demoGrid}>
+              {DEMO_ACCOUNTS.map(acc => (
+                <TouchableOpacity
+                  key={acc.label}
+                  style={[styles.demoBtn, { backgroundColor: acc.bg, borderColor: acc.color + "33" }]}
+                  onPress={() => handleDemoLogin(acc)}
+                  activeOpacity={0.75}
+                  disabled={demoLoading !== null || loading}
+                >
+                  {demoLoading === acc.label ? (
+                    <ActivityIndicator size="small" color={acc.color} />
+                  ) : (
+                    <Feather name={acc.icon} size={16} color={acc.color} />
+                  )}
+                  <Text style={[styles.demoBtnText, { color: acc.color }]}>{acc.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou connexion manuelle</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* ── Email / password form ── */}
+          <Text style={styles.welcomeTitle}>Connexion</Text>
+          <Text style={styles.welcomeSubtitle}>Entrez vos identifiants</Text>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
@@ -106,7 +163,7 @@ export default function LoginScreen() {
               <Feather name="mail" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="you@example.com"
+                placeholder="vous@exemple.com"
                 placeholderTextColor={Colors.light.textMuted}
                 value={email}
                 onChangeText={setEmail}
@@ -118,12 +175,12 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>Mot de passe</Text>
             <View style={styles.inputContainer}>
               <Feather name="lock" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="Your password"
+                placeholder="Votre mot de passe"
                 placeholderTextColor={Colors.light.textMuted}
                 value={password}
                 onChangeText={setPassword}
@@ -142,25 +199,19 @@ export default function LoginScreen() {
               loading && styles.loginButtonDisabled,
             ]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={loading || demoLoading !== null}
           >
             {loading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Text style={styles.loginButtonText}>Se connecter</Text>
             )}
           </Pressable>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
           <View style={styles.registerRow}>
-            <Text style={styles.registerText}>Don&apos;t have an account?</Text>
+            <Text style={styles.registerText}>Pas encore de compte ?</Text>
             <Pressable onPress={() => router.push("/(auth)/register")}>
-              <Text style={styles.registerLink}>Sign Up</Text>
+              <Text style={styles.registerLink}>S'inscrire</Text>
             </Pressable>
           </View>
         </View>
@@ -175,7 +226,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
   },
   headerGradient: {
-    paddingTop: 60,
+    paddingTop: 50,
     paddingBottom: 60,
     alignItems: "center",
     gap: 8,
@@ -191,13 +242,12 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 32,
-    fontFamily: "Inter_700Bold",
+    fontWeight: "800",
     color: "white",
   },
   tagline: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.85)",
   },
   formCard: {
     backgroundColor: Colors.light.card,
@@ -206,26 +256,84 @@ const styles = StyleSheet.create({
     marginTop: -20,
     flex: 1,
     padding: 24,
-    paddingTop: 32,
+    paddingTop: 28,
   },
-  welcomeTitle: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+
+  /* Demo quick access */
+  demoBox: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
     marginBottom: 4,
+  },
+  demoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  demoTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#92400E",
+  },
+  demoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  demoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    minWidth: "45%",
+    flex: 1,
+    justifyContent: "center",
+  },
+  demoBtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+    gap: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.light.border,
+  },
+  dividerText: {
+    fontSize: 12,
+    color: Colors.light.textMuted,
+  },
+
+  welcomeTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: Colors.light.text,
+    marginBottom: 2,
   },
   welcomeSubtitle: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
-    marginBottom: 28,
+    marginBottom: 20,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
     color: Colors.light.text,
     marginBottom: 6,
   },
@@ -245,7 +353,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 15,
-    fontFamily: "Inter_400Regular",
     color: Colors.light.text,
   },
   eyeButton: {
@@ -254,9 +361,9 @@ const styles = StyleSheet.create({
   loginButton: {
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
-    paddingVertical: 16,
+    paddingVertical: 15,
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 6,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -273,37 +380,21 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "white",
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-    gap: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.light.border,
-  },
-  dividerText: {
-    fontSize: 13,
-    color: Colors.light.textMuted,
-    fontFamily: "Inter_400Regular",
+    fontWeight: "600",
   },
   registerRow: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 6,
+    marginTop: 20,
   },
   registerText: {
     fontSize: 14,
     color: Colors.light.textSecondary,
-    fontFamily: "Inter_400Regular",
   },
   registerLink: {
     fontSize: 14,
     color: Colors.light.primary,
-    fontFamily: "Inter_600SemiBold",
+    fontWeight: "600",
   },
 });
