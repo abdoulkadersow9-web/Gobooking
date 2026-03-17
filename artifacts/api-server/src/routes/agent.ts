@@ -365,12 +365,42 @@ router.post("/requests/:id/accept", async (req, res) => {
     if (!req_) { res.status(404).json({ error: "Demande introuvable" }); return; }
     if (req_.status !== "pending") { res.status(409).json({ error: "Demande déjà traitée" }); return; }
 
+    /* ── Deduct seats from DB in real time ── */
+    const n = req_.seatsRequested ?? 1;
+    const isDemoTrip = req_.tripId.startsWith("t-") || req_.tripId.startsWith("live-");
+    let seatsBooked = 0;
+
+    if (!isDemoTrip) {
+      const availableSeats = await db
+        .select({ id: seatsTable.id })
+        .from(seatsTable)
+        .where(and(eq(seatsTable.tripId, req_.tripId), eq(seatsTable.status, "available")))
+        .limit(n);
+
+      if (availableSeats.length < n) {
+        res.status(409).json({ error: "Plus assez de sièges disponibles", code: "NOT_ENOUGH_SEATS" });
+        return;
+      }
+
+      /* Mark those seats as booked */
+      if (availableSeats.length > 0) {
+        await db
+          .update(seatsTable)
+          .set({ status: "booked" })
+          .where(inArray(seatsTable.id, availableSeats.map(s => s.id)));
+        seatsBooked = availableSeats.length;
+      }
+    } else {
+      seatsBooked = n; /* demo trips: count as booked without DB update */
+    }
+
     req_.status      = "accepted";
     req_.respondedAt = Date.now();
     requestStore.set(req_.id, req_);
 
-    res.json({ success: true, request: req_ });
+    res.json({ success: true, request: req_, seatsBooked });
   } catch (err) {
+    console.error("Accept request error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
