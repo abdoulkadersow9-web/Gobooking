@@ -138,4 +138,50 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ─── Ticket scan by booking reference ─────────────────── */
+router.get("/scan/:ref", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const ref = req.params.ref.trim().toUpperCase();
+    const bookings = await db.select().from(bookingsTable)
+      .where(eq(bookingsTable.bookingRef, ref))
+      .limit(1);
+
+    if (!bookings.length) {
+      res.status(404).json({ error: "Aucun billet trouvé pour cette référence", code: "NOT_FOUND" });
+      return;
+    }
+
+    const booking = bookings[0];
+
+    let trip = null;
+    if (booking.tripId) {
+      const trips = await db.select().from(tripsTable)
+        .where(eq(tripsTable.id, booking.tripId))
+        .limit(1);
+      trip = trips[0] ?? null;
+    }
+
+    res.json({
+      id: booking.id,
+      bookingRef: booking.bookingRef,
+      status: booking.status,
+      passengers: booking.passengers ?? [],
+      seatNumbers: booking.seatNumbers ?? [],
+      totalAmount: booking.totalAmount,
+      paymentMethod: booking.paymentMethod,
+      createdAt: booking.createdAt?.toISOString(),
+      trip: trip ? {
+        from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName,
+      } : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;

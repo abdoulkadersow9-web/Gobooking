@@ -1,13 +1,17 @@
 import { Feather } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -18,16 +22,24 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 const PRIMARY = Colors.light.primary;
+const GREEN   = "#059669";
+const GREEN_D  = "#047857";
 
 /* ─── Types ─────────────────────────────────────────────── */
-interface Passenger { name: string; age: number; gender: string; seatNumber: string }
+interface Passenger  { name: string; age: number; gender: string; seatNumber: string }
 interface BoardingEntry { id: string; bookingRef: string; passengers: Passenger[]; seatNumbers: string[]; status: string; totalAmount: number }
-interface ParcelEntry { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; receiverPhone: string; weight: number; status: string; amount: number }
-interface SeatItem { id: string; number: string; row: number; column: number; status: string }
+interface ParcelEntry   { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; receiverPhone: string; weight: number; status: string; amount: number }
+interface SeatItem      { id: string; number: string; row: number; column: number; status: string }
+interface ScanResult {
+  id: string; bookingRef: string; status: string;
+  passengers: Passenger[]; seatNumbers: string[];
+  totalAmount: number; paymentMethod: string;
+  trip: { from: string; to: string; date: string; departureTime: string; busName: string } | null;
+}
 
 /* ─── Demo data ─────────────────────────────────────────── */
-const DEMO_BUS = { busName: "Express Abidjan 01", plateNumber: "0258 AB 01", busType: "Premium", capacity: 44 };
-const DEMO_TRIP = { id: "t-demo", from: "Abidjan", to: "Bouaké", date: "17/03/2026", departureTime: "08h00", totalSeats: 44, bookedSeats: 31 };
+const DEMO_BUS   = { busName: "Express Abidjan 01", plateNumber: "0258 AB 01", busType: "Premium", capacity: 44 };
+const DEMO_TRIP  = { id: "t-demo", from: "Abidjan", to: "Bouaké", date: "17/03/2026", departureTime: "08h00", totalSeats: 44, bookedSeats: 31 };
 
 function genDemoSeats(capacity: number, booked: number): SeatItem[] {
   const seats: SeatItem[] = [];
@@ -38,27 +50,26 @@ function genDemoSeats(capacity: number, booked: number): SeatItem[] {
     for (let c = 0; c < 4; c++) {
       idx++;
       if (idx > capacity) break;
-      const num = `${letters[c]}${r}`;
-      seats.push({ id: `s-${num}`, number: num, row: r, column: c, status: idx <= booked ? "booked" : "available" });
+      seats.push({ id: `s-${letters[c]}${r}`, number: `${letters[c]}${r}`, row: r, column: c, status: idx <= booked ? "booked" : "available" });
     }
   }
   return seats;
 }
 
 const DEMO_BOARDING: BoardingEntry[] = [
-  { id: "bk1", bookingRef: "GBB5AKZ8DZ", passengers: [{ name: "Kouassi Ama", age: 34, gender: "F", seatNumber: "A3" }], seatNumbers: ["A3"], status: "confirmed", totalAmount: 3500 },
-  { id: "bk2", bookingRef: "GBB9MNX2PL", passengers: [{ name: "Traoré Youssouf", age: 28, gender: "M", seatNumber: "B1" }, { name: "Traoré Fatoumata", age: 25, gender: "F", seatNumber: "B2" }], seatNumbers: ["B1","B2"], status: "confirmed", totalAmount: 7000 },
-  { id: "bk3", bookingRef: "GBBA1C3RQ7", passengers: [{ name: "Bamba Koffi", age: 45, gender: "M", seatNumber: "C4" }], seatNumbers: ["C4"], status: "boarded", totalAmount: 3500 },
-  { id: "bk4", bookingRef: "GBB7FPV6NM", passengers: [{ name: "Diallo Mariam", age: 22, gender: "F", seatNumber: "D2" }], seatNumbers: ["D2"], status: "confirmed", totalAmount: 3500 },
-  { id: "bk5", bookingRef: "GBBC5XK0TZ", passengers: [{ name: "Coulibaly Seydou", age: 38, gender: "M", seatNumber: "E1" }], seatNumbers: ["E1"], status: "boarded", totalAmount: 3500 },
-  { id: "bk6", bookingRef: "GBB3RKZ9QW", passengers: [{ name: "Assiéta Koné", age: 29, gender: "F", seatNumber: "F3" }], seatNumbers: ["F3"], status: "confirmed", totalAmount: 3500 },
+  { id: "bk1", bookingRef: "GBB5AKZ8DZ", passengers: [{ name: "Kouassi Ama",        age: 34, gender: "F", seatNumber: "A3" }], seatNumbers: ["A3"], status: "confirmed", totalAmount: 3500 },
+  { id: "bk2", bookingRef: "GBB9MNX2PL", passengers: [{ name: "Traoré Youssouf",    age: 28, gender: "M", seatNumber: "B1" }, { name: "Traoré Fatoumata", age: 25, gender: "F", seatNumber: "B2" }], seatNumbers: ["B1","B2"], status: "confirmed", totalAmount: 7000 },
+  { id: "bk3", bookingRef: "GBBA1C3RQ7", passengers: [{ name: "Bamba Koffi",        age: 45, gender: "M", seatNumber: "C4" }], seatNumbers: ["C4"], status: "boarded",   totalAmount: 3500 },
+  { id: "bk4", bookingRef: "GBB7FPV6NM", passengers: [{ name: "Diallo Mariam",      age: 22, gender: "F", seatNumber: "D2" }], seatNumbers: ["D2"], status: "confirmed", totalAmount: 3500 },
+  { id: "bk5", bookingRef: "GBBC5XK0TZ", passengers: [{ name: "Coulibaly Seydou",   age: 38, gender: "M", seatNumber: "E1" }], seatNumbers: ["E1"], status: "boarded",   totalAmount: 3500 },
+  { id: "bk6", bookingRef: "GBB3RKZ9QW", passengers: [{ name: "Assiéta Koné",       age: 29, gender: "F", seatNumber: "F3" }], seatNumbers: ["F3"], status: "confirmed", totalAmount: 3500 },
 ];
 
 const DEMO_PARCELS: ParcelEntry[] = [
-  { id: "p1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké", senderName: "Assiéta Koné", receiverName: "Diabaté Oumar", receiverPhone: "0707 11 22 33", weight: 4.5, status: "en_attente", amount: 4700 },
-  { id: "p2", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan", toCity: "Yamoussoukro", senderName: "Bamba Sali", receiverName: "Traoré Adama", receiverPhone: "0505 44 55 66", weight: 2.1, status: "pris_en_charge", amount: 3500 },
-  { id: "p3", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan", toCity: "Korhogo", senderName: "Koffi Ama", receiverName: "Coulibaly Jean", receiverPhone: "0101 77 88 99", weight: 8.0, status: "en_transit", amount: 8100 },
-  { id: "p4", trackingRef: "GBX-E2G9-XY77", fromCity: "Bouaké", toCity: "Abidjan", senderName: "Traoré Mamadou", receiverName: "Coulibaly Sali", receiverPhone: "0101 33 44 55", weight: 3.0, status: "en_livraison", amount: 5200 },
+  { id: "p1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké",       senderName: "Assiéta Koné",  receiverName: "Diabaté Oumar",  receiverPhone: "0707 11 22 33", weight: 4.5, status: "en_attente",     amount: 4700 },
+  { id: "p2", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan", toCity: "Yamoussoukro", senderName: "Bamba Sali",    receiverName: "Traoré Adama",   receiverPhone: "0505 44 55 66", weight: 2.1, status: "pris_en_charge", amount: 3500 },
+  { id: "p3", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan", toCity: "Korhogo",      senderName: "Koffi Ama",     receiverName: "Coulibaly Jean", receiverPhone: "0101 77 88 99", weight: 8.0, status: "en_transit",     amount: 8100 },
+  { id: "p4", trackingRef: "GBX-E2G9-XY77", fromCity: "Bouaké",  toCity: "Abidjan",      senderName: "Traoré Mamadou",receiverName: "Coulibaly Sali", receiverPhone: "0101 33 44 55", weight: 3.0, status: "en_livraison",  amount: 5200 },
 ];
 
 const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }> = {
@@ -69,19 +80,324 @@ const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }
   livre:          { label: "Livré",          color: "#065F46", bg: "#ECFDF5" },
 };
 
-type Tab = "mission" | "sieges" | "embarquement" | "colis";
+type Tab = "mission" | "sieges" | "embarquement" | "colis" | "scanner";
 
-/* ─── Component ─────────────────────────────────────────── */
+/* ─── Scan Result Card ───────────────────────────────────── */
+function ScanResultCard({
+  result, onValidate, validating, onClear,
+}: {
+  result: ScanResult;
+  onValidate: () => void;
+  validating: boolean;
+  onClear: () => void;
+}) {
+  const isBoarded   = result.status === "boarded";
+  const isCancelled = result.status === "cancelled";
+  const canBoard    = !isBoarded && !isCancelled;
+
+  const STATUS_CFG = {
+    confirmed: { label: "Confirmé",  bg: "#EFF6FF", color: PRIMARY,   icon: "check-circle" as const },
+    boarded:   { label: "Embarqué",  bg: "#ECFDF5", color: "#065F46", icon: "user-check"   as const },
+    cancelled: { label: "Annulé",    bg: "#FEF2F2", color: "#DC2626", icon: "x-circle"     as const },
+    pending:   { label: "En attente",bg: "#FFFBEB", color: "#B45309", icon: "clock"        as const },
+  };
+  const st = STATUS_CFG[result.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.pending;
+
+  return (
+    <View style={SC.resultCard}>
+      {/* header */}
+      <View style={SC.resultHeader}>
+        <View style={[SC.statusPill, { backgroundColor: st.bg }]}>
+          <Feather name={st.icon} size={14} color={st.color} />
+          <Text style={[SC.statusText, { color: st.color }]}>{st.label}</Text>
+        </View>
+        <TouchableOpacity onPress={onClear} style={SC.clearBtn}>
+          <Feather name="x" size={16} color="#94A3B8" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ref + amount */}
+      <Text style={SC.refText}>#{result.bookingRef}</Text>
+      {result.trip && (
+        <View style={SC.tripPill}>
+          <Feather name="navigation" size={11} color={GREEN} />
+          <Text style={SC.tripPillText}>{result.trip.from} → {result.trip.to}</Text>
+          <Text style={SC.tripPillDate}>{result.trip.date} · {result.trip.departureTime}</Text>
+        </View>
+      )}
+
+      {/* passengers */}
+      <Text style={SC.paxTitle}>Passagers ({result.passengers.length})</Text>
+      {result.passengers.map((p, i) => (
+        <View key={i} style={SC.paxRow}>
+          <View style={SC.seatTag}><Text style={SC.seatTagText}>{p.seatNumber}</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={SC.paxName}>{p.name}</Text>
+            <Text style={SC.paxMeta}>{p.age} ans · {p.gender === "M" ? "Homme" : "Femme"}</Text>
+          </View>
+        </View>
+      ))}
+
+      <View style={SC.amountRow}>
+        <Text style={SC.amountLabel}>Montant payé</Text>
+        <Text style={SC.amountVal}>{result.totalAmount.toLocaleString()} FCFA</Text>
+      </View>
+
+      {canBoard && (
+        <TouchableOpacity
+          style={[SC.validateBtn, validating && { opacity: 0.7 }]}
+          onPress={onValidate}
+          disabled={validating}
+          activeOpacity={0.85}
+        >
+          {validating
+            ? <ActivityIndicator size="small" color="white" />
+            : <Feather name="check-circle" size={18} color="white" />
+          }
+          <Text style={SC.validateText}>{validating ? "Validation…" : "Valider l'embarquement"}</Text>
+        </TouchableOpacity>
+      )}
+
+      {isBoarded && (
+        <View style={SC.boardedBanner}>
+          <Feather name="check-circle" size={16} color="#065F46" />
+          <Text style={SC.boardedBannerText}>Passager déjà embarqué</Text>
+        </View>
+      )}
+      {isCancelled && (
+        <View style={[SC.boardedBanner, { backgroundColor: "#FEF2F2" }]}>
+          <Feather name="alert-triangle" size={16} color="#DC2626" />
+          <Text style={[SC.boardedBannerText, { color: "#DC2626" }]}>Billet annulé — Accès refusé</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ─── Scanner Tab ───────────────────────────────────────── */
+function ScannerTab({
+  boarding, setBoarding, token,
+}: {
+  boarding: BoardingEntry[];
+  setBoarding: React.Dispatch<React.SetStateAction<BoardingEntry[]>>;
+  token: string | null;
+}) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanning,   setScanning]   = useState(false);
+  const [manualRef,  setManualRef]  = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [result,     setResult]     = useState<ScanResult | null>(null);
+  const [error,      setError]      = useState("");
+  const lastScanned  = useRef("");
+  const scanCooldown = useRef(false);
+
+  const lookup = useCallback(async (ref: string) => {
+    const clean = ref.trim().toUpperCase();
+    if (!clean) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const data = await apiFetch<ScanResult>(`/agent/scan/${encodeURIComponent(clean)}`, { token: token ?? undefined });
+      setResult(data);
+    } catch (e: any) {
+      setError(e?.message ?? "Référence introuvable");
+    } finally {
+      setLoading(false);
+      setScanning(false);
+    }
+  }, [token]);
+
+  const handleBarcode = useCallback(({ data }: { data: string }) => {
+    if (scanCooldown.current || data === lastScanned.current) return;
+    lastScanned.current   = data;
+    scanCooldown.current  = true;
+    setTimeout(() => { scanCooldown.current = false; }, 3000);
+    lookup(data);
+  }, [lookup]);
+
+  const handleValidate = async () => {
+    if (!result) return;
+    setValidating(true);
+    try {
+      await apiFetch(`/agent/boarding/${result.id}/validate`, { token: token ?? undefined, method: "POST" });
+      setResult(r => r ? { ...r, status: "boarded" } : r);
+      setBoarding(prev => prev.map(b => b.id === result.id ? { ...b, status: "boarded" } : b));
+    } catch {
+      setError("Impossible de valider. Réessayez.");
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const reset = () => { setResult(null); setError(""); setManualRef(""); lastScanned.current = ""; };
+
+  /* ── Web fallback: manual entry ── */
+  if (Platform.OS === "web") {
+    return (
+      <View style={{ gap: 14 }}>
+        <View style={SC.webBanner}>
+          <Feather name="info" size={14} color={PRIMARY} />
+          <Text style={SC.webBannerText}>Sur mobile, le scanner utilise l'appareil photo. Entrez la référence manuellement ci-dessous.</Text>
+        </View>
+
+        {!result ? (
+          <>
+            <View style={SC.manualCard}>
+              <Text style={SC.manualLabel}>Référence du billet</Text>
+              <View style={SC.manualInputRow}>
+                <TextInput
+                  style={SC.manualInput}
+                  placeholder="Ex: GBB5AKZ8DZ"
+                  value={manualRef}
+                  onChangeText={v => setManualRef(v.toUpperCase())}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  placeholderTextColor="#94A3B8"
+                />
+                <TouchableOpacity
+                  style={[SC.lookupBtn, (!manualRef.trim() || loading) && { opacity: 0.6 }]}
+                  onPress={() => lookup(manualRef)}
+                  disabled={!manualRef.trim() || loading}
+                  activeOpacity={0.8}
+                >
+                  {loading ? <ActivityIndicator size="small" color="white" /> : <Feather name="search" size={18} color="white" />}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={SC.demoHint}>Références de démo :</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {DEMO_BOARDING.slice(0, 5).map(b => (
+                <Pressable key={b.id} onPress={() => { setManualRef(b.bookingRef); lookup(b.bookingRef); }} style={SC.demoChip}>
+                  <Text style={SC.demoChipText}>{b.bookingRef}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {error ? (
+              <View style={SC.errorBanner}>
+                <Feather name="alert-circle" size={14} color="#DC2626" />
+                <Text style={SC.errorText}>{error}</Text>
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <ScanResultCard result={result} onValidate={handleValidate} validating={validating} onClear={reset} />
+        )}
+      </View>
+    );
+  }
+
+  /* ── Native: camera scanner ── */
+  if (!permission) {
+    return <View style={SC.permCenter}><ActivityIndicator color={GREEN} /></View>;
+  }
+
+  if (!permission.granted) {
+    return (
+      <View style={SC.permCenter}>
+        <View style={SC.permCard}>
+          <Feather name="camera-off" size={40} color="#CBD5E1" />
+          <Text style={SC.permTitle}>Accès caméra requis</Text>
+          <Text style={SC.permSub}>Pour scanner les QR codes des billets GoBooking</Text>
+          <TouchableOpacity style={SC.permBtn} onPress={requestPermission} activeOpacity={0.85}>
+            <Feather name="camera" size={16} color="white" />
+            <Text style={SC.permBtnText}>Autoriser la caméra</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: 14 }}>
+      {!result && !scanning && (
+        <TouchableOpacity style={SC.scanOpenBtn} onPress={() => { setScanning(true); setError(""); }} activeOpacity={0.85}>
+          <Feather name="maximize" size={22} color="white" />
+          <Text style={SC.scanOpenText}>Scanner un billet QR</Text>
+        </TouchableOpacity>
+      )}
+
+      {scanning && !result && (
+        <View style={SC.cameraWrap}>
+          <CameraView
+            style={SC.camera}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ["qr", "code128", "code39"] }}
+            onBarcodeScanned={handleBarcode}
+          />
+          <View style={SC.cameraOverlay} pointerEvents="none">
+            <View style={SC.scanFrame} />
+            <Text style={SC.scanHint}>Pointez vers le QR code du billet</Text>
+          </View>
+          {loading && (
+            <View style={SC.cameraLoading}>
+              <ActivityIndicator size="large" color="white" />
+              <Text style={SC.cameraLoadingText}>Vérification…</Text>
+            </View>
+          )}
+          <TouchableOpacity style={SC.cancelScanBtn} onPress={() => setScanning(false)}>
+            <Feather name="x" size={18} color="white" />
+            <Text style={SC.cancelScanText}>Fermer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Manual input on native too */}
+      {!result && !scanning && (
+        <>
+          <View style={SC.dividerRow}>
+            <View style={SC.divider} /><Text style={SC.dividerText}>ou entrer manuellement</Text><View style={SC.divider} />
+          </View>
+          <View style={SC.manualInputRow}>
+            <TextInput
+              style={SC.manualInput}
+              placeholder="Référence billet (GBB…)"
+              value={manualRef}
+              onChangeText={v => setManualRef(v.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholderTextColor="#94A3B8"
+            />
+            <TouchableOpacity
+              style={[SC.lookupBtn, (!manualRef.trim() || loading) && { opacity: 0.6 }]}
+              onPress={() => lookup(manualRef)}
+              disabled={!manualRef.trim() || loading}
+            >
+              {loading ? <ActivityIndicator size="small" color="white" /> : <Feather name="search" size={18} color="white" />}
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {error && !result && (
+        <View style={SC.errorBanner}>
+          <Feather name="alert-circle" size={14} color="#DC2626" />
+          <Text style={SC.errorText}>{error}</Text>
+          <TouchableOpacity onPress={reset}><Text style={{ color: PRIMARY, fontSize: 12 }}>Réessayer</Text></TouchableOpacity>
+        </View>
+      )}
+
+      {result && (
+        <ScanResultCard result={result} onValidate={handleValidate} validating={validating} onClear={reset} />
+      )}
+    </View>
+  );
+}
+
+/* ─── Main Component ─────────────────────────────────────── */
 export default function AgentDashboard() {
-  const insets = useSafeAreaInsets();
+  const insets    = useSafeAreaInsets();
   const { token } = useAuth();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const [activeTab, setActiveTab] = useState<Tab>("mission");
-  const [boarding, setBoarding] = useState<BoardingEntry[]>(DEMO_BOARDING);
-  const [parcels, setParcels] = useState<ParcelEntry[]>(DEMO_PARCELS);
-  const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
+  const [boarding,  setBoarding]  = useState<BoardingEntry[]>(DEMO_BOARDING);
+  const [parcels,   setParcels]   = useState<ParcelEntry[]>(DEMO_PARCELS);
+  const [seats,     setSeats]     = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
 
   useEffect(() => {
     if (!token) return;
@@ -106,21 +422,22 @@ export default function AgentDashboard() {
     if (token) { try { await apiFetch(`/agent/parcels/${parcelId}/${action}`, { token, method: "POST" }); } catch {} }
   };
 
-  const boarded = boarding.filter(b => b.status === "boarded").length;
-  const waiting = boarding.filter(b => b.status === "confirmed").length;
+  const boarded    = boarding.filter(b => b.status === "boarded").length;
+  const waiting    = boarding.filter(b => b.status === "confirmed").length;
   const seatBooked = seats.filter(s => s.status === "booked").length;
-  const seatAvail = seats.filter(s => s.status === "available").length;
+  const seatAvail  = seats.filter(s => s.status === "available").length;
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: "mission", label: "Mission", icon: "navigation" },
-    { id: "sieges", label: "Sièges", icon: "grid" },
-    { id: "embarquement", label: "Embarquement", icon: "users" },
-    { id: "colis", label: "Colis", icon: "package" },
+    { id: "mission",       label: "Mission",     icon: "navigation"  },
+    { id: "scanner",       label: "Scanner",     icon: "maximize"    },
+    { id: "embarquement",  label: "Embarquement",icon: "users"       },
+    { id: "sieges",        label: "Sièges",      icon: "grid"        },
+    { id: "colis",         label: "Colis",       icon: "package"     },
   ];
 
   return (
     <View style={[S.container, { paddingTop: topPad }]}>
-      <LinearGradient colors={["#059669", "#047857"]} style={S.header}>
+      <LinearGradient colors={[GREEN, GREEN_D]} style={S.header}>
         <Pressable onPress={() => router.back()} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
@@ -137,8 +454,9 @@ export default function AgentDashboard() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabBar} contentContainerStyle={S.tabBarContent}>
         {TABS.map(tab => (
           <Pressable key={tab.id} style={[S.tab, activeTab === tab.id && S.tabActive]} onPress={() => setActiveTab(tab.id)}>
-            <Feather name={tab.icon as never} size={14} color={activeTab === tab.id ? "#059669" : "#94A3B8"} />
+            <Feather name={tab.icon as never} size={14} color={activeTab === tab.id ? GREEN : "#94A3B8"} />
             <Text style={[S.tabText, activeTab === tab.id && S.tabTextActive]}>{tab.label}</Text>
+            {tab.id === "scanner" && <View style={S.tabDot} />}
           </Pressable>
         ))}
       </ScrollView>
@@ -185,7 +503,7 @@ export default function AgentDashboard() {
           <Text style={S.sectionTitle}>Résumé de mission</Text>
           <View style={S.summaryGrid}>
             <View style={S.summaryCard}>
-              <Text style={[S.summaryNum, { color: "#059669" }]}>{boarded}</Text>
+              <Text style={[S.summaryNum, { color: GREEN }]}>{boarded}</Text>
               <Text style={S.summaryLabel}>Embarqués</Text>
             </View>
             <View style={[S.summaryCard, { borderColor: "#FDE68A" }]}>
@@ -203,9 +521,9 @@ export default function AgentDashboard() {
           </View>
 
           <View style={S.quickActionsRow}>
-            <TouchableOpacity style={[S.quickAction, { backgroundColor: "#ECFDF5" }]} onPress={() => setActiveTab("sieges")} activeOpacity={0.8}>
-              <Feather name="grid" size={20} color="#059669" />
-              <Text style={[S.quickActionText, { color: "#059669" }]}>Voir sièges</Text>
+            <TouchableOpacity style={[S.quickAction, { backgroundColor: "#F0FDF4" }]} onPress={() => setActiveTab("scanner")} activeOpacity={0.8}>
+              <Feather name="maximize" size={20} color={GREEN} />
+              <Text style={[S.quickActionText, { color: GREEN }]}>Scanner</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[S.quickAction, { backgroundColor: "#EEF2FF" }]} onPress={() => setActiveTab("embarquement")} activeOpacity={0.8}>
               <Feather name="users" size={20} color={PRIMARY} />
@@ -218,6 +536,19 @@ export default function AgentDashboard() {
           </View>
         </>)}
 
+        {/* ── Scanner ── */}
+        {activeTab === "scanner" && (<>
+          <View style={S.sectionRow}>
+            <Text style={S.sectionTitle}>Scanner un billet</Text>
+            <View style={[S.badge, { backgroundColor: "#F0FDF4" }]}>
+              <Feather name="maximize" size={11} color={GREEN} />
+              <Text style={[S.badgeText, { color: GREEN }]}>QR · Code-barres</Text>
+            </View>
+          </View>
+          <Text style={S.subLabel}>Scannez le QR code du billet ou entrez la référence manuellement</Text>
+          <ScannerTab boarding={boarding} setBoarding={setBoarding} token={token} />
+        </>)}
+
         {/* ── Sièges ── */}
         {activeTab === "sieges" && (<>
           <Text style={S.sectionTitle}>Plan des sièges</Text>
@@ -225,7 +556,7 @@ export default function AgentDashboard() {
 
           <View style={S.seatSummaryRow}>
             <View style={[S.seatSummaryCard, { borderColor: "#BBF7D0" }]}>
-              <Text style={[S.seatSummaryNum, { color: "#059669" }]}>{seatAvail}</Text>
+              <Text style={[S.seatSummaryNum, { color: GREEN }]}>{seatAvail}</Text>
               <Text style={S.seatSummaryLabel}>Disponibles</Text>
             </View>
             <View style={[S.seatSummaryCard, { borderColor: "#FECACA" }]}>
@@ -243,7 +574,7 @@ export default function AgentDashboard() {
           </View>
 
           <View style={S.seatLegend}>
-            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#F0FDF4", borderColor: "#059669" }]} /><Text style={S.legendText}>Disponible</Text></View>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#F0FDF4", borderColor: GREEN }]} /><Text style={S.legendText}>Disponible</Text></View>
             <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: "#FEF2F2", borderColor: "#DC2626" }]} /><Text style={S.legendText}>Réservé</Text></View>
           </View>
 
@@ -257,7 +588,7 @@ export default function AgentDashboard() {
                     const s = seats.find(s => s.row === rowIdx + 1 && s.column === col);
                     return s ? (
                       <View key={col} style={[S.seat, s.status === "booked" ? S.seatBooked : S.seatAvail]}>
-                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : "#059669" }]}>{s.number}</Text>
+                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : GREEN }]}>{s.number}</Text>
                       </View>
                     ) : <View key={col} style={S.seatEmpty} />;
                   })}
@@ -266,7 +597,7 @@ export default function AgentDashboard() {
                     const s = seats.find(s => s.row === rowIdx + 1 && s.column === col);
                     return s ? (
                       <View key={col} style={[S.seat, s.status === "booked" ? S.seatBooked : S.seatAvail]}>
-                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : "#059669" }]}>{s.number}</Text>
+                        <Text style={[S.seatNum, { color: s.status === "booked" ? "#DC2626" : GREEN }]}>{s.number}</Text>
                       </View>
                     ) : <View key={col} style={S.seatEmpty} />;
                   })}
@@ -335,9 +666,9 @@ export default function AgentDashboard() {
                 </View>
                 <View style={S.parcelDetails}>
                   {[
-                    ["Expéditeur", parcel.senderName],
+                    ["Expéditeur",   parcel.senderName],
                     ["Destinataire", parcel.receiverName],
-                    ["Téléphone", parcel.receiverPhone],
+                    ["Téléphone",    parcel.receiverPhone],
                     ["Poids / Prix", `${parcel.weight} kg · ${parcel.amount.toLocaleString()} FCFA`],
                   ].map(([label, val]) => (
                     <View key={label} style={S.detailRow}>
@@ -359,7 +690,7 @@ export default function AgentDashboard() {
                   )}
                   {parcel.status === "en_transit" && (
                     <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#ECFDF5" }]} onPress={() => updateParcel(parcel.id, "livre", "deliver")} activeOpacity={0.8}>
-                      <Feather name="check-circle" size={14} color="#059669" /><Text style={[S.actionText, { color: "#059669" }]}>Confirmer livraison</Text>
+                      <Feather name="check-circle" size={14} color={GREEN} /><Text style={[S.actionText, { color: GREEN }]}>Confirmer livraison</Text>
                     </TouchableOpacity>
                   )}
                   {parcel.status === "en_livraison" && (
@@ -394,85 +725,153 @@ const S = StyleSheet.create({
   roleBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
   tabBar: { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#E2E8F0", maxHeight: 52 },
   tabBarContent: { paddingHorizontal: 16, gap: 4, alignItems: "center" },
-  tab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabActive: { borderBottomColor: "#059669" },
+  tab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  tabActive: { borderBottomColor: GREEN },
   tabText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#94A3B8" },
-  tabTextActive: { color: "#059669", fontFamily: "Inter_700Bold" },
+  tabTextActive: { color: GREEN, fontFamily: "Inter_700Bold" },
+  tabDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: GREEN, marginLeft: 2 },
   sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" },
   subLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  boardedCount: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" },
+  boardedCount: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: GREEN },
+  badge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   busCard: { borderRadius: 20, overflow: "hidden" },
   busGradient: { padding: 20, gap: 8 },
   busTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   busIconWrap: { width: 50, height: 50, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
-  onlinePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#34D399" },
+  onlinePill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#4ADE80" },
   onlineText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "white" },
   busName: { fontSize: 20, fontFamily: "Inter_700Bold", color: "white" },
-  busPlate: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)" },
-  tripCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  tripRow: { flexDirection: "row", alignItems: "center" },
-  cityBlock: { gap: 2 },
-  cityDot: { width: 8, height: 8, borderRadius: 4, marginBottom: 2 },
-  cityName: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  cityTime: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" },
-  tripArrow: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  dashedLine: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
-  summaryGrid: { flexDirection: "row", gap: 8 },
-  summaryCard: { flex: 1, backgroundColor: "white", borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1.5, borderColor: "#E2E8F0" },
-  summaryNum: { fontSize: 20, fontFamily: "Inter_700Bold", color: PRIMARY },
-  summaryLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", marginTop: 2 },
-  quickActionsRow: { flexDirection: "row", gap: 8 },
-  quickAction: { flex: 1, borderRadius: 14, padding: 14, alignItems: "center", gap: 6 },
+  busPlate: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)" },
+  tripCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  tripRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cityBlock: { flex: 1, gap: 4 },
+  cityDot: { width: 10, height: 10, borderRadius: 5 },
+  cityName: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  cityTime: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" },
+  tripArrow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  dashedLine: { flex: 1, height: 1, borderStyle: "dashed", borderWidth: 1, borderColor: "#CBD5E1" },
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  summaryCard: { flex: 1, minWidth: "44%", backgroundColor: "white", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#DBEAFE", shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
+  summaryNum: { fontSize: 26, fontFamily: "Inter_800ExtraBold" },
+  summaryLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
+  quickActionsRow: { flexDirection: "row", gap: 10 },
+  quickAction: { flex: 1, alignItems: "center", gap: 6, padding: 14, borderRadius: 14 },
   quickActionText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   seatSummaryRow: { flexDirection: "row", gap: 8 },
-  seatSummaryCard: { flex: 1, backgroundColor: "white", borderRadius: 14, padding: 12, alignItems: "center", borderWidth: 1.5 },
-  seatSummaryNum: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  seatSummaryLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" },
-  seatLegend: { flexDirection: "row", gap: 20, justifyContent: "center" },
+  seatSummaryCard: { flex: 1, backgroundColor: "white", borderRadius: 12, padding: 12, borderWidth: 1.5, alignItems: "center" },
+  seatSummaryNum: { fontSize: 20, fontFamily: "Inter_800ExtraBold" },
+  seatSummaryLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
+  seatLegend: { flexDirection: "row", gap: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  legendDot: { width: 16, height: 16, borderRadius: 5, borderWidth: 1.5 },
-  legendText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" },
-  seatBusFrame: { backgroundColor: "white", borderRadius: 20, padding: 16, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  busNoseWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  busNoseText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  seatGridWrap: { gap: 5 },
-  seatRowWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 },
-  rowNum: { fontSize: 9, fontFamily: "Inter_400Regular", color: "#CBD5E1", width: 14, textAlign: "right" },
-  seat: { width: 36, height: 36, borderRadius: 8, justifyContent: "center", alignItems: "center", borderWidth: 1.5 },
-  seatAvail: { backgroundColor: "#F0FDF4", borderColor: "#059669" },
+  legendDot: { width: 14, height: 14, borderRadius: 4, borderWidth: 1.5 },
+  legendText: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#475569" },
+  seatBusFrame: { backgroundColor: "white", borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  busNoseWrap: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 },
+  busNoseText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#94A3B8" },
+  seatGridWrap: { alignItems: "center", gap: 6 },
+  seatRowWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  rowNum: { width: 16, fontSize: 10, fontFamily: "Inter_400Regular", color: "#CBD5E1", textAlign: "center" },
+  seat: { width: 36, height: 32, borderRadius: 8, justifyContent: "center", alignItems: "center", borderWidth: 1.5 },
+  seatAvail: { backgroundColor: "#F0FDF4", borderColor: GREEN },
   seatBooked: { backgroundColor: "#FEF2F2", borderColor: "#DC2626" },
-  seatEmpty: { width: 36, height: 36 },
-  seatAisle: { width: 10 },
-  seatNum: { fontSize: 9, fontFamily: "Inter_700Bold" },
-  boardingCard: { backgroundColor: "white", borderRadius: 16, padding: 14, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
+  seatEmpty: { width: 36, height: 32 },
+  seatNum: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  seatAisle: { width: 14 },
+  boardingCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   boardingDone: { backgroundColor: "#F0FDF4", borderWidth: 1, borderColor: "#BBF7D0" },
   boardingTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bookingRefRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   bookingRef: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  badgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   paxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  seatTag: { width: 34, height: 32, borderRadius: 8, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  seatTagText: { fontSize: 10, fontFamily: "Inter_700Bold", color: PRIMARY },
-  paxName: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
-  paxMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  validateBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#059669", borderRadius: 12, paddingVertical: 12 },
-  validateText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
-  totalLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  totalAmount: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" },
-  parcelCard: { backgroundColor: "white", borderRadius: 16, padding: 14, gap: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 },
+  seatTag: { backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  seatTagText: { fontSize: 13, fontFamily: "Inter_700Bold", color: PRIMARY },
+  paxName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
+  paxMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 1 },
+  validateBtn: { backgroundColor: GREEN, borderRadius: 12, padding: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  validateText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#F1F5F9", paddingTop: 8 },
+  totalLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  totalAmount: { fontSize: 14, fontFamily: "Inter_700Bold", color: GREEN },
+  parcelCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   parcelTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-  parcelIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  parcelIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   parcelRef: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  parcelRoute: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 1 },
-  parcelDetails: { backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, gap: 6 },
+  parcelRoute: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 1 },
+  parcelDetails: { gap: 6 },
   detailRow: { flexDirection: "row", justifyContent: "space-between" },
-  detailLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
-  detailValue: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
-  parcelActions: {},
-  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 11 },
-  actionText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  detailLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  detailValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#334155" },
+  parcelActions: { flexDirection: "row", gap: 8 },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
+  actionText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+});
+
+/* ─── Scanner Styles ──────────────────────────────────────── */
+const SC = StyleSheet.create({
+  /* web banner */
+  webBanner: { flexDirection: "row", gap: 8, backgroundColor: "#EEF2FF", borderRadius: 12, padding: 12, alignItems: "flex-start" },
+  webBannerText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: "#3730A3", lineHeight: 18 },
+  /* manual card */
+  manualCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  manualLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#334155" },
+  manualInputRow: { flexDirection: "row", gap: 10, alignItems: "center" },
+  manualInput: { flex: 1, borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0F172A", backgroundColor: "#FAFAFA", letterSpacing: 1.5 },
+  lookupBtn: { width: 48, height: 48, borderRadius: 12, backgroundColor: GREEN, justifyContent: "center", alignItems: "center" },
+  /* demo chips */
+  demoHint: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  demoChip: { backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  demoChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#475569", letterSpacing: 0.5 },
+  /* open scan */
+  scanOpenBtn: { backgroundColor: GREEN, borderRadius: 16, padding: 20, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12 },
+  scanOpenText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "white" },
+  /* camera */
+  cameraWrap: { borderRadius: 20, overflow: "hidden", height: 340, position: "relative" },
+  camera: { flex: 1 },
+  cameraOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" },
+  scanFrame: { width: 220, height: 220, borderWidth: 3, borderColor: "white", borderRadius: 20, marginBottom: 16, opacity: 0.9 },
+  scanHint: { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold", textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  cameraLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", gap: 12 },
+  cameraLoadingText: { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  cancelScanBtn: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  cancelScanText: { color: "white", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  /* divider */
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  divider: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
+  dividerText: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  /* permission */
+  permCenter: { flex: 1, justifyContent: "center", alignItems: "center", paddingVertical: 60 },
+  permCard: { alignItems: "center", gap: 14, padding: 32 },
+  permTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  permSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center" },
+  permBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: GREEN, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 14, marginTop: 8 },
+  permBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
+  /* error */
+  errorBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderRadius: 12, padding: 12 },
+  errorText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#DC2626" },
+  /* result card */
+  resultCard: { backgroundColor: "white", borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
+  resultHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  statusText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  clearBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
+  refText: { fontSize: 20, fontFamily: "Inter_800ExtraBold", color: "#0F172A", letterSpacing: 1 },
+  tripPill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#ECFDF5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  tripPillText: { fontSize: 13, fontFamily: "Inter_700Bold", color: GREEN },
+  tripPillDate: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" },
+  paxTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#334155" },
+  paxRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  seatTag: { backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, minWidth: 36, alignItems: "center" },
+  seatTagText: { fontSize: 13, fontFamily: "Inter_700Bold", color: PRIMARY },
+  paxName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
+  paxMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 1 },
+  amountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, borderTopColor: "#F1F5F9", paddingTop: 10 },
+  amountLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  amountVal: { fontSize: 18, fontFamily: "Inter_800ExtraBold", color: GREEN },
+  validateBtn: { backgroundColor: GREEN, borderRadius: 14, padding: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  validateText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  boardedBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12 },
+  boardedBannerText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#065F46" },
 });
