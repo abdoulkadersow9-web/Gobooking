@@ -358,20 +358,35 @@ export default function LiveTrackingScreen() {
     return () => { active = false; };
   }, []);
 
-  /* Fetch buses (and re-fetch every 10s) — pass auth token for live GPS */
+  /* ── Live countdown ticker (5s → 0, reset on each fetch) ── */
+  const REFRESH_SEC = 5;
+  const [countdown, setCountdown] = useState(REFRESH_SEC);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const resetCountdown = useCallback(() => setCountdown(REFRESH_SEC), []);
+
+  useEffect(() => {
+    countdownRef.current = setInterval(() => {
+      setCountdown(c => (c <= 1 ? REFRESH_SEC : c - 1));
+    }, 1000);
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
+  }, []);
+
+  /* Fetch buses (and re-fetch every 5s) — pass auth token for live GPS */
   const fetchBuses = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const token = authToken ?? (await AsyncStorage.getItem("auth_token")) ?? undefined;
       const data = await apiFetch<LiveBus[]>("/trips/live", { token: token ?? undefined });
       if (data?.length) setRawBuses(data);
+      resetCountdown();
     } catch { /* keep demo data */ }
     finally { if (!silent) setLoading(false); }
-  }, [authToken]);
+  }, [authToken, resetCountdown]);
 
   useEffect(() => {
     fetchBuses();
-    refreshTimerRef.current = setInterval(() => fetchBuses(true), 10_000);
+    refreshTimerRef.current = setInterval(() => fetchBuses(true), REFRESH_SEC * 1000);
     return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current); };
   }, [fetchBuses]);
 
@@ -736,87 +751,149 @@ export default function LiveTrackingScreen() {
         </View>
       </View>
 
-      {/* Bus list */}
+      {/* ── Bus list header ── */}
       <View style={S.listHeader}>
-        <View>
-          <Text style={S.listTitle}>{buses.length} cars en route maintenant</Text>
-          {clientPos && (
-            <Text style={{ color: "#22D3EE", fontSize: 11, marginTop: 1 }}>
-              Triés par distance depuis vous
+        <View style={{ flex: 1 }}>
+          {/* Title row */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={S.listTitle}>
+              {clientPos
+                ? `Bus à proximité`
+                : `${buses.length} cars en route`}
             </Text>
-          )}
-          {gpsLoading && (
-            <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 1 }}>
-              Localisation en cours…
+            {clientPos && buses.filter(b => (b.distanceKm ?? 9999) < 50).length > 0 && (
+              <View style={{ backgroundColor: "#22D3EE22", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={{ color: "#22D3EE", fontSize: 12, fontWeight: "700" }}>
+                  {buses.filter(b => (b.distanceKm ?? 9999) < 50).length} à &lt;50 km
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Sub-info row */}
+          {clientPos && buses[0]?.distanceKm != null ? (
+            <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>
+              Le plus proche : <Text style={{ color: "#22D3EE", fontWeight: "600" }}>{fmtDist(buses[0].distanceKm)}</Text>
+              {" · "}
+              <Text style={{ color: "#1A56DB" }}>{buses[0].busName}</Text>
             </Text>
-          )}
+          ) : gpsLoading ? (
+            <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>Localisation en cours…</Text>
+          ) : !clientPos ? (
+            <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>Activez le GPS pour voir les distances</Text>
+          ) : null}
         </View>
-        {loading && <Text style={S.loadingText}>Actualisation…</Text>}
+
+        {/* Countdown badge */}
+        <View style={{ alignItems: "center", gap: 2 }}>
+          <View style={{
+            width: 36, height: 36, borderRadius: 18,
+            borderWidth: 2,
+            borderColor: countdown <= 1 ? "#22C55E" : "#1E3A5F",
+            justifyContent: "center", alignItems: "center",
+          }}>
+            <Text style={{ color: countdown <= 1 ? "#22C55E" : "#64748B", fontSize: 13, fontWeight: "700" }}>
+              {countdown}s
+            </Text>
+          </View>
+          <Text style={{ color: "#64748B", fontSize: 9 }}>actualise</Text>
+        </View>
       </View>
+
       <ScrollView style={S.list} contentContainerStyle={{ paddingBottom: 32, gap: 10 }} showsVerticalScrollIndicator={false}>
-        {buses.map((bus) => (
-          <TouchableOpacity
-            key={bus.id}
-            style={[S.busCard, selected?.id === bus.id && { borderColor: bus.color, borderWidth: 2 }]}
-            activeOpacity={0.85}
-            onPress={() => openDetail(bus)}
-          >
-            <View style={[S.busCardStrip, { backgroundColor: bus.color }]} />
-            <View style={S.busCardBody}>
-              <View style={S.busCardTop}>
-                <View style={[S.companyBadge, { backgroundColor: bus.color + "20" }]}>
-                  <Text style={[S.companyName, { color: bus.color }]}>{bus.companyName}</Text>
+        {buses.map((bus, idx) => {
+          const isNearest = clientPos && idx === 0 && bus.distanceKm != null;
+          const isVeryClose = (bus.distanceKm ?? 9999) < 20;
+          return (
+            <TouchableOpacity
+              key={bus.id}
+              style={[
+                S.busCard,
+                selected?.id === bus.id && { borderColor: bus.color, borderWidth: 2 },
+                isVeryClose && { borderColor: "#22D3EE55", borderWidth: 1.5 },
+              ]}
+              activeOpacity={0.85}
+              onPress={() => openDetail(bus)}
+            >
+              <View style={[S.busCardStrip, { backgroundColor: bus.color }]} />
+              <View style={S.busCardBody}>
+                <View style={S.busCardTop}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View style={[S.companyBadge, { backgroundColor: bus.color + "20" }]}>
+                      <Text style={[S.companyName, { color: bus.color }]}>{bus.companyName}</Text>
+                    </View>
+                    {isNearest && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#22D3EE15", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22D3EE" }} />
+                        <Text style={{ fontSize: 10, color: "#22D3EE", fontWeight: "700" }}>Le plus proche</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {bus.distanceKm != null && (
+                      <View style={[S.seatsBadge, {
+                        backgroundColor: isVeryClose ? "#22D3EE20" : "#22D3EE10",
+                        borderWidth: isVeryClose ? 1 : 0,
+                        borderColor: "#22D3EE44",
+                      }]}>
+                        <Feather name="navigation" size={11} color="#22D3EE" />
+                        <Text style={[S.seatsText, { color: "#22D3EE", fontWeight: isVeryClose ? "700" : "500" }]}>
+                          {fmtDist(bus.distanceKm)}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={S.seatsBadge}>
+                      <Feather name="users" size={11} color={bus.availableSeats <= 5 ? "#DC2626" : "#059669"} />
+                      <Text style={[S.seatsText, { color: bus.availableSeats <= 5 ? "#DC2626" : "#059669" }]}>
+                        {bus.availableSeats} places
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  {bus.distanceKm != null && (
-                    <View style={[S.seatsBadge, { backgroundColor: "#22D3EE18" }]}>
-                      <Feather name="navigation" size={11} color="#22D3EE" />
-                      <Text style={[S.seatsText, { color: "#22D3EE" }]}>
-                        {fmtDist(bus.distanceKm)}
+
+                <View style={S.routeRow}>
+                  <Text style={S.cityText}>{bus.fromCity}</Text>
+                  <View style={S.routeArrow}>
+                    <View style={S.routeLine2} />
+                    <Feather name="arrow-right" size={12} color="#1A56DB" />
+                    <View style={S.routeLine2} />
+                  </View>
+                  <Text style={S.cityText}>{bus.toCity}</Text>
+                </View>
+
+                <View style={S.busCardMeta}>
+                  <View style={S.metaItem}>
+                    <Feather name="map-pin" size={11} color="#94A3B8" />
+                    <Text style={S.metaText}>{bus.currentCity}</Text>
+                  </View>
+                  <View style={S.metaItem}>
+                    <Feather name="clock" size={11} color="#94A3B8" />
+                    <Text style={S.metaText}>Arrivée {bus.estimatedArrival}</Text>
+                  </View>
+                  <View style={S.metaItem}>
+                    <Feather name="tag" size={11} color="#94A3B8" />
+                    <Text style={S.metaText}>{bus.price.toLocaleString()} F</Text>
+                  </View>
+                  {bus.speed != null && bus.speed > 0 && (
+                    <View style={[S.metaItem, { backgroundColor: "#F59E0B18", borderRadius: 4, paddingHorizontal: 4 }]}>
+                      <Feather name="wind" size={10} color="#F59E0B" />
+                      <Text style={[S.metaText, { color: "#F59E0B" }]}>
+                        {Math.round((bus.speed ?? 0) * (bus.gpsLive ? 3.6 : 1))} km/h
                       </Text>
                     </View>
                   )}
-                  <View style={S.seatsBadge}>
-                    <Feather name="users" size={11} color={bus.availableSeats <= 5 ? "#DC2626" : "#059669"} />
-                    <Text style={[S.seatsText, { color: bus.availableSeats <= 5 ? "#DC2626" : "#059669" }]}>
-                      {bus.availableSeats} places
-                    </Text>
-                  </View>
+                  {bus.gpsLive && (
+                    <View style={[S.metaItem, { backgroundColor: "#22C55E18", borderRadius: 4, paddingHorizontal: 4 }]}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" }} />
+                      <Text style={[S.metaText, { color: "#22C55E" }]}>GPS live</Text>
+                    </View>
+                  )}
                 </View>
               </View>
-              <View style={S.routeRow}>
-                <Text style={S.cityText}>{bus.fromCity}</Text>
-                <View style={S.routeArrow}>
-                  <View style={S.routeLine2} />
-                  <Feather name="arrow-right" size={12} color="#1A56DB" />
-                  <View style={S.routeLine2} />
-                </View>
-                <Text style={S.cityText}>{bus.toCity}</Text>
-              </View>
-              <View style={S.busCardMeta}>
-                <View style={S.metaItem}>
-                  <Feather name="map-pin" size={11} color="#94A3B8" />
-                  <Text style={S.metaText}>{bus.currentCity}</Text>
-                </View>
-                <View style={S.metaItem}>
-                  <Feather name="clock" size={11} color="#94A3B8" />
-                  <Text style={S.metaText}>Arrivée {bus.estimatedArrival}</Text>
-                </View>
-                <View style={S.metaItem}>
-                  <Feather name="tag" size={11} color="#94A3B8" />
-                  <Text style={S.metaText}>{bus.price.toLocaleString()} F</Text>
-                </View>
-                {bus.gpsLive && (
-                  <View style={[S.metaItem, { backgroundColor: "#22C55E18", borderRadius: 4, paddingHorizontal: 4 }]}>
-                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" }} />
-                    <Text style={[S.metaText, { color: "#22C55E" }]}>GPS live</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            <Feather name="chevron-right" size={16} color="#CBD5E1" style={{ marginRight: 4 }} />
-          </TouchableOpacity>
-        ))}
+              <Feather name="chevron-right" size={16} color="#CBD5E1" style={{ marginRight: 4 }} />
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {/* Detail modal */}
