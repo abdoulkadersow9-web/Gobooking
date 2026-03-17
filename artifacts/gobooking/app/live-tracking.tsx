@@ -1302,43 +1302,67 @@ export default function LiveTrackingScreen() {
                       <Text style={{ fontSize: 12, color: "#475569" }}>{selected.agentPhone}</Text>
                     </View>
                   </View>
-                  {/* Call & SMS buttons */}
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    <Pressable
-                      style={({ pressed }) => [{
-                        flex: 1, height: 44, borderRadius: 12,
-                        backgroundColor: "#059669",
-                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                        opacity: pressed ? 0.85 : 1,
-                      }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        Linking.openURL(`tel:${selected.agentPhone.replace(/\s/g, "")}`);
-                      }}
-                    >
-                      <Feather name="phone" size={16} color="white" />
-                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
-                        Appeler l'agent
+                  {/* Call button */}
+                  <Pressable
+                    style={({ pressed }) => [{
+                      height: 44, borderRadius: 12,
+                      backgroundColor: "#059669",
+                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                      opacity: pressed ? 0.85 : 1,
+                    }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      Linking.openURL(`tel:${selected.agentPhone.replace(/\s/g, "")}`);
+                    }}
+                  >
+                    <Feather name="phone" size={16} color="white" />
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
+                      Appeler l'agent
+                    </Text>
+                  </Pressable>
+
+                  {/* Quick messages section */}
+                  <View style={{ gap: 6 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Feather name="zap" size={12} color="#059669" />
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#059669", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Messages rapides
                       </Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [{
-                        flex: 1, height: 44, borderRadius: 12,
-                        backgroundColor: "#1A56DB",
-                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                        opacity: pressed ? 0.85 : 1,
-                      }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        const msg = `Bonjour ${selected.agentName}, je vous attends pour ${parseInt(reqSeats)||1} place(s).`;
-                        Linking.openURL(`sms:${selected.agentPhone.replace(/\s/g, "")}?body=${encodeURIComponent(msg)}`);
-                      }}
-                    >
-                      <Feather name="message-circle" size={16} color="white" />
-                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
-                        Envoyer message
-                      </Text>
-                    </Pressable>
+                    </View>
+                    {[
+                      { text: "Je suis au carrefour",     icon: "map-pin"  as const },
+                      { text: "Je suis à la gare",        icon: "navigation" as const },
+                      { text: "Je suis en route",         icon: "truck"    as const },
+                      { text: "Attendez-moi 5 minutes",   icon: "clock"    as const },
+                    ].map(({ text, icon }) => (
+                      <Pressable
+                        key={text}
+                        style={({ pressed }) => [{
+                          flexDirection: "row", alignItems: "center", gap: 10,
+                          backgroundColor: pressed ? "#D1FAE5" : "white",
+                          borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12,
+                          borderWidth: 1, borderColor: "#BBF7D0",
+                        }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          const body = `${text} — ${selected.agentName}`;
+                          Linking.openURL(
+                            `sms:${selected.agentPhone.replace(/\s/g, "")}?body=${encodeURIComponent(body)}`
+                          );
+                        }}
+                      >
+                        <View style={{
+                          width: 30, height: 30, borderRadius: 15,
+                          backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center",
+                        }}>
+                          <Feather name={icon} size={14} color="#059669" />
+                        </View>
+                        <Text style={{ flex: 1, fontSize: 13, color: "#065F46", fontFamily: "Inter_600SemiBold" }}>
+                          {text}
+                        </Text>
+                        <Feather name="send" size={13} color="#10B981" />
+                      </Pressable>
+                    ))}
                   </View>
                 </View>
               </View>
