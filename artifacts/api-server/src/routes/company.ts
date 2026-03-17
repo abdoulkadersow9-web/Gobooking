@@ -56,15 +56,45 @@ router.get("/buses", async (req, res) => {
   }
 });
 
+async function getOrCreateCompany(user: { id: string; name: string; email: string; phone: string }) {
+  const existing = await db.select().from(companiesTable).where(eq(companiesTable.email, user.email)).limit(1);
+  if (existing.length > 0) return existing[0];
+  const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+  const created = await db.insert(companiesTable).values({
+    id, name: user.name, email: user.email, phone: user.phone,
+    address: "Abidjan, Côte d'Ivoire", city: "Abidjan", status: "active",
+  }).returning();
+  return created[0];
+}
+
 router.post("/buses", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const { plateNumber, busName, busType, capacity, companyId } = req.body;
-    if (!plateNumber || !busName || !companyId) { res.status(400).json({ error: "Required fields missing" }); return; }
+    const { plateNumber, busName, busType, capacity } = req.body;
+    if (!plateNumber || !busName) { res.status(400).json({ error: "plateNumber and busName are required" }); return; }
+    const company = await getOrCreateCompany(user);
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-    const bus = await db.insert(busesTable).values({ id, companyId, plateNumber, busName, busType: busType || "Standard", capacity: capacity || 44, status: "active" }).returning();
+    const bus = await db.insert(busesTable).values({
+      id, companyId: company.id, plateNumber, busName,
+      busType: busType || "Standard", capacity: Number(capacity) || 49, status: "active",
+    }).returning();
     res.json(bus[0]);
+  } catch (err: any) {
+    if (err?.message?.includes("unique")) {
+      res.status(409).json({ error: "Cette plaque est déjà enregistrée" });
+    } else {
+      res.status(500).json({ error: String(err?.message || "Erreur serveur") });
+    }
+  }
+});
+
+router.delete("/buses/:id", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    await db.delete(busesTable).where(eq(busesTable.id, req.params.id));
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

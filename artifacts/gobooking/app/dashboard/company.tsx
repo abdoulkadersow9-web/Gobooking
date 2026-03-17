@@ -202,6 +202,10 @@ export default function CompanyDashboard() {
   const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
   const [newAgent, setNewAgent] = useState({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
 
+  /* submission states */
+  const [busSubmitting, setBusSubmitting] = useState(false);
+  const [busError, setBusError] = useState("");
+
   useEffect(() => {
     if (!token) return;
     Promise.allSettled([
@@ -230,14 +234,30 @@ export default function CompanyDashboard() {
     }
   };
 
-  const handleAddBus = () => {
+  const handleAddBus = async () => {
     if (!newBus.busName || !newBus.plateNumber) return;
-    const bus: Bus = { id: Date.now().toString(), busName: newBus.busName, plateNumber: newBus.plateNumber, busType: newBus.busType, capacity: newBus.capacity, status: "active" };
-    setBuses(p => [...p, bus]);
-    setStats(s => ({ ...s, totalBuses: s.totalBuses + 1, activeBuses: s.activeBuses + 1 }));
-    setAddBusModal(false);
-    setNewBus({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
-    if (token) apiFetch("/company/buses", { token, method: "POST", body: { ...bus, companyId: "demo" } }).catch(() => {});
+    setBusSubmitting(true);
+    setBusError("");
+    try {
+      const created = await apiFetch<Bus>("/company/buses", {
+        token: token ?? undefined,
+        method: "POST",
+        body: {
+          busName: newBus.busName,
+          plateNumber: newBus.plateNumber,
+          busType: newBus.busType,
+          capacity: newBus.capacity,
+        },
+      });
+      setBuses(prev => [created, ...prev]);
+      setStats(s => ({ ...s, totalBuses: s.totalBuses + 1, activeBuses: s.activeBuses + 1 }));
+      setAddBusModal(false);
+      setNewBus({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
+    } catch (err: any) {
+      setBusError(err?.message ?? "Erreur lors de l'enregistrement");
+    } finally {
+      setBusSubmitting(false);
+    }
   };
 
   const handleAddTrip = () => {
@@ -595,25 +615,46 @@ export default function CompanyDashboard() {
       </ScrollView>
 
       {/* ─────────── Add Bus Modal ─────────── */}
-      <Modal visible={addBusModal} transparent animationType="slide">
+      <Modal visible={addBusModal} transparent animationType="slide" onRequestClose={() => { if (!busSubmitting) { setAddBusModal(false); setBusError(""); } }}>
         <View style={S.modalOverlay}>
           <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
             <View style={S.modalHeader}>
               <Text style={S.modalTitle}>Ajouter un bus</Text>
-              <Pressable onPress={() => setAddBusModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+              <Pressable onPress={() => { if (!busSubmitting) { setAddBusModal(false); setBusError(""); } }}><Feather name="x" size={20} color="#64748B" /></Pressable>
             </View>
-            <TextInput style={S.modalInput} placeholder="Nom du bus" value={newBus.busName} onChangeText={v => setNewBus(p => ({ ...p, busName: v }))} placeholderTextColor="#94A3B8" />
-            <TextInput style={S.modalInput} placeholder="Plaque d'immatriculation" value={newBus.plateNumber} onChangeText={v => setNewBus(p => ({ ...p, plateNumber: v }))} placeholderTextColor="#94A3B8" />
+
+            <TextInput style={S.modalInput} placeholder="Nom du bus" value={newBus.busName} onChangeText={v => setNewBus(p => ({ ...p, busName: v }))} placeholderTextColor="#94A3B8" editable={!busSubmitting} />
+            <TextInput style={S.modalInput} placeholder="Plaque d'immatriculation" value={newBus.plateNumber} onChangeText={v => setNewBus(p => ({ ...p, plateNumber: v }))} placeholderTextColor="#94A3B8" editable={!busSubmitting} />
             <PickerRow label="Type de bus" options={BUS_TYPES} value={newBus.busType} onSelect={v => setNewBus(p => ({ ...p, busType: v }))} />
             <PickerRow<number> label="Capacité (places)" options={BUS_CAPACITIES} value={newBus.capacity} onSelect={v => setNewBus(p => ({ ...p, capacity: v }))} display={v => `${v} places`} />
+
             <View style={S.modalCapacityNote}>
               <Feather name="info" size={12} color="#64748B" />
               <Text style={S.modalCapacityNoteText}>Capacités disponibles : 49, 59 ou 63 sièges</Text>
             </View>
+
+            <View style={[S.modalCapacityNote, { backgroundColor: "#F0F9FF", borderRadius: 8, padding: 8, marginBottom: 10 }]}>
+              <Feather name="database" size={12} color="#0369A1" />
+              <Text style={[S.modalCapacityNoteText, { color: "#0369A1" }]}>Sauvegardé en base de données · Visible instantanément</Text>
+            </View>
+
+            {busError ? (
+              <View style={{ backgroundColor: "#FEF2F2", borderRadius: 8, padding: 10, marginBottom: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Feather name="alert-circle" size={14} color="#DC2626" />
+                <Text style={{ color: "#DC2626", fontSize: 13, flex: 1 }}>{busError}</Text>
+              </View>
+            ) : null}
+
             <View style={S.modalBtns}>
-              <Pressable style={S.modalCancel} onPress={() => setAddBusModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
-              <Pressable style={[S.modalConfirm, (!newBus.busName || !newBus.plateNumber) && S.modalConfirmDisabled]} onPress={handleAddBus}>
-                <Text style={S.modalConfirmText}>Ajouter</Text>
+              <Pressable style={S.modalCancel} onPress={() => { if (!busSubmitting) { setAddBusModal(false); setBusError(""); } }} disabled={busSubmitting}>
+                <Text style={S.modalCancelText}>Annuler</Text>
+              </Pressable>
+              <Pressable
+                style={[S.modalConfirm, (!newBus.busName || !newBus.plateNumber || busSubmitting) && S.modalConfirmDisabled]}
+                onPress={handleAddBus}
+                disabled={!newBus.busName || !newBus.plateNumber || busSubmitting}
+              >
+                <Text style={S.modalConfirmText}>{busSubmitting ? "Enregistrement…" : "Ajouter"}</Text>
               </Pressable>
             </View>
           </ScrollView>
