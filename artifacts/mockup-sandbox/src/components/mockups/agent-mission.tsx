@@ -258,16 +258,19 @@ export default function AgentMission() {
           ))}
         </div>
 
-        {/* Quick actions */}
-        <div className="flex gap-2">
+        {/* Quick actions — 2×2 grid */}
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { icon:"📷", label:"Scanner",      bg:"#F0FDF4", color:"#059669" },
-            { icon:"👥", label:"Embarquement", bg:"#EEF2FF", color:"#1A56DB" },
-            { icon:"📦", label:"Colis",        bg:"#FFFBEB", color:"#D97706" },
+            { icon:"📷", label:"Scanner ticket",      bg:"#F0FDF4", color:"#059669", border:"#BBF7D0" },
+            { icon:"👥", label:"Voir les voyageurs",  bg:"#EEF2FF", color:"#1A56DB", border:"#C7D2FE" },
+            { icon:"🪑", label:"Gérer les sièges",    bg:"#F5F3FF", color:"#7C3AED", border:"#DDD6FE" },
+            { icon:"📦", label:"Colis",               bg:"#FFFBEB", color:"#D97706", border:"#FDE68A" },
           ].map(a=>(
-            <div key={a.label} className="flex-1 flex flex-col items-center gap-1.5 p-3 rounded-2xl cursor-pointer hover:opacity-80 transition-opacity" style={{backgroundColor:a.bg}}>
-              <span className="text-xl">{a.icon}</span>
-              <span className="text-[11px] font-semibold" style={{color:a.color}}>{a.label}</span>
+            <div key={a.label}
+              className="flex flex-col items-center gap-2 p-3.5 rounded-2xl cursor-pointer hover:opacity-80 transition-opacity"
+              style={{backgroundColor:a.bg, border:`1.5px solid ${a.border}`}}>
+              <span className="text-2xl">{a.icon}</span>
+              <span className="text-[11px] font-bold text-center leading-tight" style={{color:a.color}}>{a.label}</span>
             </div>
           ))}
         </div>

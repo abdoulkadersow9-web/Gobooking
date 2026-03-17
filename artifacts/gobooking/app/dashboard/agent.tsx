@@ -757,11 +757,15 @@ export default function AgentDashboard() {
           <View style={S.quickActionsRow}>
             <TouchableOpacity style={[S.quickAction, { backgroundColor: "#F0FDF4" }]} onPress={() => setActiveTab("scanner")} activeOpacity={0.8}>
               <Feather name="maximize" size={20} color={GREEN} />
-              <Text style={[S.quickActionText, { color: GREEN }]}>Scanner</Text>
+              <Text style={[S.quickActionText, { color: GREEN }]}>Scanner ticket</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[S.quickAction, { backgroundColor: "#EEF2FF" }]} onPress={() => setActiveTab("embarquement")} activeOpacity={0.8}>
               <Feather name="users" size={20} color={PRIMARY} />
-              <Text style={[S.quickActionText, { color: PRIMARY }]}>Embarquement</Text>
+              <Text style={[S.quickActionText, { color: PRIMARY }]}>Voir les voyageurs</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[S.quickAction, { backgroundColor: "#F5F3FF" }]} onPress={() => setActiveTab("sieges")} activeOpacity={0.8}>
+              <Feather name="grid" size={20} color="#7C3AED" />
+              <Text style={[S.quickActionText, { color: "#7C3AED" }]}>Gérer les sièges</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[S.quickAction, { backgroundColor: "#FFFBEB" }]} onPress={() => setActiveTab("colis")} activeOpacity={0.8}>
               <Feather name="package" size={20} color="#D97706" />
@@ -1002,9 +1006,9 @@ const S = StyleSheet.create({
   summaryCard: { flex: 1, minWidth: "44%", backgroundColor: "white", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#DBEAFE", shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6, elevation: 1 },
   summaryNum: { fontSize: 26, fontFamily: "Inter_800ExtraBold" },
   summaryLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
-  quickActionsRow: { flexDirection: "row", gap: 10 },
-  quickAction: { flex: 1, alignItems: "center", gap: 6, padding: 14, borderRadius: 14 },
-  quickActionText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  quickActionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  quickAction: { width: "47%", alignItems: "center", gap: 6, padding: 14, borderRadius: 14 },
+  quickActionText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   seatSummaryRow: { flexDirection: "row", gap: 8 },
   seatSummaryCard: { flex: 1, backgroundColor: "white", borderRadius: 12, padding: 12, borderWidth: 1.5, alignItems: "center" },
   seatSummaryNum: { fontSize: 20, fontFamily: "Inter_800ExtraBold" },
