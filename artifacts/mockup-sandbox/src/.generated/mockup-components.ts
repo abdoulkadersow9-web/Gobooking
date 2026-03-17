@@ -8,5 +8,6 @@ export const modules: ModuleMap = {
   "./components/mockups/company-seats.tsx": () => import("../components/mockups/company-seats.tsx"),
   "./components/mockups/passenger-list.tsx": () => import("../components/mockups/passenger-list.tsx"),
   "./components/mockups/seat-manager.tsx": () => import("../components/mockups/seat-manager.tsx"),
-  "./components/mockups/ticket-scanner.tsx": () => import("../components/mockups/ticket-scanner.tsx")
+  "./components/mockups/ticket-scanner.tsx": () => import("../components/mockups/ticket-scanner.tsx"),
+  "./components/mockups/trip-results.tsx": () => import("../components/mockups/trip-results.tsx")
 };
