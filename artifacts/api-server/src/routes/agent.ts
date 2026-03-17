@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
+import { locationStore, pruneStale } from "../locationStore";
 
 const router: IRouter = Router();
 
@@ -173,6 +174,51 @@ router.post("/trip/:tripId/arrive", async (req, res) => {
       .where(eq(tripsTable.id, req.params.tripId));
 
     res.json({ success: true, status: "arrived", arrivedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GPS position push (agent → server) ───────────────── */
+router.post("/trip/:tripId/location", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { lat, lon, accuracy, speed, heading } = req.body as {
+      lat: number; lon: number;
+      accuracy?: number; speed?: number; heading?: number;
+    };
+
+    if (typeof lat !== "number" || typeof lon !== "number") {
+      res.status(400).json({ error: "lat et lon requis" }); return;
+    }
+
+    pruneStale();
+
+    locationStore.set(req.params.tripId, {
+      tripId:    req.params.tripId,
+      lat, lon,
+      accuracy:  accuracy ?? undefined,
+      speed:     speed    ?? undefined,
+      heading:   heading  ?? undefined,
+      updatedAt: Date.now(),
+      agentId:   user.id,
+    });
+
+    res.json({ success: true, updatedAt: Date.now() });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GPS position read for agent ─────────────────────── */
+router.get("/trip/:tripId/location", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const loc = locationStore.get(req.params.tripId);
+    res.json(loc ?? null);
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }

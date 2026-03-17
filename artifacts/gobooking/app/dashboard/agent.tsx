@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -469,7 +470,12 @@ export default function AgentDashboard() {
   const [tripStarting,     setTripStarting]     = useState(false);
   const [tripArriving,     setTripArriving]     = useState(false);
   const [tripError,        setTripError]        = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* GPS tracking state */
+  const [gpsStatus,   setGpsStatus]   = useState<"idle"|"active"|"error"|"denied">("idle");
+  const [gpsCoords,   setGpsCoords]   = useState<{ lat: number; lon: number; speed: number | null } | null>(null);
 
   /* elapsed timer */
   useEffect(() => {
@@ -482,6 +488,54 @@ export default function AgentDashboard() {
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [tripStatus, tripStartedAt]);
+
+  /* GPS position broadcast — runs every 10s while en_route */
+  useEffect(() => {
+    if (tripStatus !== "en_route") {
+      if (gpsIntervalRef.current) { clearInterval(gpsIntervalRef.current); gpsIntervalRef.current = null; }
+      if (tripStatus === "arrived") setGpsStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+
+    const sendPosition = async () => {
+      if (cancelled) return;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") { setGpsStatus("denied"); return; }
+
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelled) return;
+
+        const { latitude: lat, longitude: lon, speed } = pos.coords;
+        const kmh = speed != null && speed >= 0 ? Math.round(speed * 3.6) : null;
+        setGpsCoords({ lat, lon, speed: kmh });
+        setGpsStatus("active");
+
+        if (token) {
+          try {
+            await apiFetch(`/agent/trip/${DEMO_TRIP.id}/location`, {
+              token,
+              method: "POST",
+              body: JSON.stringify({ lat, lon, speed: kmh ?? undefined, accuracy: pos.coords.accuracy ?? undefined }),
+            });
+          } catch { /* non-blocking */ }
+        }
+      } catch {
+        if (!cancelled) setGpsStatus("error");
+      }
+    };
+
+    sendPosition();
+    gpsIntervalRef.current = setInterval(sendPosition, 10_000);
+    return () => {
+      cancelled = true;
+      if (gpsIntervalRef.current) { clearInterval(gpsIntervalRef.current); gpsIntervalRef.current = null; }
+    };
+  }, [tripStatus, token]);
 
   useEffect(() => {
     if (!token) return;
@@ -679,6 +733,28 @@ export default function AgentDashboard() {
                 <View style={S.elapsedRow}>
                   <Feather name="clock" size={13} color="rgba(255,255,255,0.85)" />
                   <Text style={S.elapsedText}>En route depuis {fmtElapsed(elapsed)}</Text>
+                </View>
+              )}
+              {/* GPS indicator */}
+              {tripStatus === "en_route" && (
+                <View style={[S.elapsedRow, { marginTop: 4 }]}>
+                  <View style={{
+                    width: 7, height: 7, borderRadius: 3.5,
+                    backgroundColor: gpsStatus === "active" ? "#4ADE80"
+                      : gpsStatus === "denied"  ? "#F87171"
+                      : gpsStatus === "error"   ? "#FB923C"
+                      : "#FCD34D",
+                    marginRight: 5,
+                  }} />
+                  <Text style={S.elapsedText}>
+                    {gpsStatus === "active"
+                      ? `GPS actif${gpsCoords?.speed != null ? ` · ${gpsCoords.speed} km/h` : ""}`
+                      : gpsStatus === "denied"
+                      ? "GPS refusé — position non partagée"
+                      : gpsStatus === "error"
+                      ? "GPS — erreur localisation"
+                      : "Acquisition GPS…"}
+                  </Text>
                 </View>
               )}
               {tripStatus === "arrived" && (

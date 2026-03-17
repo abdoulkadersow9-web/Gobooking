@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -35,6 +36,8 @@ interface LiveBus {
   currentCity: string;
   mapX: number;
   mapY: number;
+  lat?: number;
+  lon?: number;
   availableSeats: number;
   totalSeats: number;
   departureTime: string;
@@ -44,6 +47,33 @@ interface LiveBus {
   price: number;
   color: string;
   boardingPoints: string[];
+  gpsLive?: boolean;
+  speed?: number | null;
+  distanceKm?: number;  /* computed client-side */
+}
+
+interface ClientPosition { lat: number; lon: number }
+
+/* ─── Haversine distance (km) ─────────────────────────────────────────────── */
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/* Convert mapX%/mapY% to approx lat/lon (same formula as server) */
+function mapToLatLon(mapX: number, mapY: number) {
+  return { lat: 10.7 - (mapY / 100) * 6.4, lon: -8.4 + (mapX / 100) * 5.2 };
+}
+
+function fmtDist(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
 }
 
 /* ─── City nodes on the CI map ─────────────────────────────────────────── */
@@ -183,20 +213,76 @@ function BusMarker({ bus, mapW, mapH: mapHeight, selected, onPress }: {
 export default function LiveTrackingScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const [buses, setBuses] = useState<LiveBus[]>(DEMO_BUSES);
+  const [rawBuses, setRawBuses] = useState<LiveBus[]>(DEMO_BUSES);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<LiveBus | null>(null);
   const [boardingPoint, setBoardingPoint] = useState<string | null>(null);
   const [mapSize, setMapSize] = useState({ w: SW, h: MAP_H });
   const slideAnim = useRef(new Animated.Value(600)).current;
 
+  /* ── Client GPS ── */
+  const [clientPos,    setClientPos]    = useState<ClientPosition | null>(null);
+  const [gpsGranted,   setGpsGranted]   = useState<boolean | null>(null);
+  const [gpsLoading,   setGpsLoading]   = useState(false);
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* Request client location once on mount */
   useEffect(() => {
-    setLoading(true);
-    apiFetch<LiveBus[]>("/trips/live", {})
-      .then((data) => { if (data?.length) setBuses(data); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    let active = true;
+    (async () => {
+      setGpsLoading(true);
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (!active) return;
+        if (status !== "granted") { setGpsGranted(false); setGpsLoading(false); return; }
+        setGpsGranted(true);
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (!active) return;
+        setClientPos({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+      } catch { if (active) setGpsGranted(false); }
+      finally   { if (active) setGpsLoading(false); }
+    })();
+    return () => { active = false; };
   }, []);
+
+  /* Fetch buses (and re-fetch every 10s) */
+  const fetchBuses = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const data = await apiFetch<LiveBus[]>("/trips/live", {});
+      if (data?.length) setRawBuses(data);
+    } catch { /* keep demo data */ }
+    finally { if (!silent) setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchBuses();
+    refreshTimerRef.current = setInterval(() => fetchBuses(true), 10_000);
+    return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current); };
+  }, [fetchBuses]);
+
+  /* Compute distances and sort buses by proximity */
+  const buses = useMemo<LiveBus[]>(() => {
+    if (!clientPos) return rawBuses;
+    return rawBuses
+      .map(bus => {
+        const busCoords = bus.lat != null && bus.lon != null
+          ? { lat: bus.lat, lon: bus.lon }
+          : mapToLatLon(bus.mapX, bus.mapY);
+        return { ...bus, distanceKm: haversine(clientPos.lat, clientPos.lon, busCoords.lat, busCoords.lon) };
+      })
+      .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+  }, [rawBuses, clientPos]);
+
+  /* Client position on map (mapX/mapY %) — clamped to CI bounding box */
+  const clientMapPos = useMemo<{ x: number; y: number } | null>(() => {
+    if (!clientPos) return null;
+    const x = Math.max(1, Math.min(99, ((clientPos.lon - (-8.4)) / 5.2) * 100));
+    const y = Math.max(1, Math.min(99, ((10.7 - clientPos.lat) / 6.4) * 100));
+    /* If outside CI bounds, don't show on map */
+    if (clientPos.lat < 4 || clientPos.lat > 11 || clientPos.lon < -8.6 || clientPos.lon > -3) return null;
+    return { x, y };
+  }, [clientPos]);
 
   const openDetail = useCallback((bus: LiveBus) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -301,12 +387,41 @@ export default function LiveTrackingScreen() {
           />
         ))}
 
+        {/* Client position marker */}
+        {clientMapPos && (
+          <View
+            style={{
+              position: "absolute",
+              left: (clientMapPos.x / 100) * mapSize.w - 10,
+              top:  (clientMapPos.y / 100) * mapSize.h - 10,
+              width: 20, height: 20,
+              borderRadius: 10,
+              backgroundColor: "#22D3EE",
+              borderWidth: 3,
+              borderColor: "white",
+              justifyContent: "center",
+              alignItems: "center",
+              shadowColor: "#22D3EE",
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.9,
+              shadowRadius: 6,
+              elevation: 10,
+            }}
+          />
+        )}
+
         {/* Legend bottom-left */}
         <View style={S.legend}>
           <View style={S.legendItem}>
             <View style={[S.legendDot, { backgroundColor: "#F59E0B" }]} />
             <Text style={S.legendText}>{buses.length} cars en route</Text>
           </View>
+          {clientPos && (
+            <View style={[S.legendItem, { marginTop: 3 }]}>
+              <View style={[S.legendDot, { backgroundColor: "#22D3EE" }]} />
+              <Text style={S.legendText}>Votre position</Text>
+            </View>
+          )}
         </View>
 
         {/* Map label */}
@@ -318,7 +433,19 @@ export default function LiveTrackingScreen() {
 
       {/* Bus list */}
       <View style={S.listHeader}>
-        <Text style={S.listTitle}>{buses.length} cars en route maintenant</Text>
+        <View>
+          <Text style={S.listTitle}>{buses.length} cars en route maintenant</Text>
+          {clientPos && (
+            <Text style={{ color: "#22D3EE", fontSize: 11, marginTop: 1 }}>
+              Triés par distance depuis vous
+            </Text>
+          )}
+          {gpsLoading && (
+            <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 1 }}>
+              Localisation en cours…
+            </Text>
+          )}
+        </View>
         {loading && <Text style={S.loadingText}>Actualisation…</Text>}
       </View>
       <ScrollView style={S.list} contentContainerStyle={{ paddingBottom: 32, gap: 10 }} showsVerticalScrollIndicator={false}>
@@ -335,11 +462,21 @@ export default function LiveTrackingScreen() {
                 <View style={[S.companyBadge, { backgroundColor: bus.color + "20" }]}>
                   <Text style={[S.companyName, { color: bus.color }]}>{bus.companyName}</Text>
                 </View>
-                <View style={S.seatsBadge}>
-                  <Feather name="users" size={11} color={bus.availableSeats <= 5 ? "#DC2626" : "#059669"} />
-                  <Text style={[S.seatsText, { color: bus.availableSeats <= 5 ? "#DC2626" : "#059669" }]}>
-                    {bus.availableSeats} places
-                  </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  {bus.distanceKm != null && (
+                    <View style={[S.seatsBadge, { backgroundColor: "#22D3EE18" }]}>
+                      <Feather name="navigation" size={11} color="#22D3EE" />
+                      <Text style={[S.seatsText, { color: "#22D3EE" }]}>
+                        {fmtDist(bus.distanceKm)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={S.seatsBadge}>
+                    <Feather name="users" size={11} color={bus.availableSeats <= 5 ? "#DC2626" : "#059669"} />
+                    <Text style={[S.seatsText, { color: bus.availableSeats <= 5 ? "#DC2626" : "#059669" }]}>
+                      {bus.availableSeats} places
+                    </Text>
+                  </View>
                 </View>
               </View>
               <View style={S.routeRow}>
@@ -364,6 +501,12 @@ export default function LiveTrackingScreen() {
                   <Feather name="tag" size={11} color="#94A3B8" />
                   <Text style={S.metaText}>{bus.price.toLocaleString()} F</Text>
                 </View>
+                {bus.gpsLive && (
+                  <View style={[S.metaItem, { backgroundColor: "#22C55E18", borderRadius: 4, paddingHorizontal: 4 }]}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" }} />
+                    <Text style={[S.metaText, { color: "#22C55E" }]}>GPS live</Text>
+                  </View>
+                )}
               </View>
             </View>
             <Feather name="chevron-right" size={16} color="#CBD5E1" style={{ marginRight: 4 }} />
@@ -420,6 +563,20 @@ export default function LiveTrackingScreen() {
                   <Text style={S.infoCellLabel}>Prix par place</Text>
                   <Text style={S.infoCellVal}>{selected.price.toLocaleString()} FCFA</Text>
                 </View>
+                {selected.distanceKm != null && (
+                  <View style={S.infoCell}>
+                    <Feather name="navigation" size={16} color="#22D3EE" />
+                    <Text style={S.infoCellLabel}>Distance depuis vous</Text>
+                    <Text style={[S.infoCellVal, { color: "#22D3EE" }]}>{fmtDist(selected.distanceKm)}</Text>
+                  </View>
+                )}
+                {selected.speed != null && (
+                  <View style={S.infoCell}>
+                    <Feather name="wind" size={16} color={selected.color} />
+                    <Text style={S.infoCellLabel}>Vitesse actuelle</Text>
+                    <Text style={S.infoCellVal}>{selected.speed} km/h</Text>
+                  </View>
+                )}
               </View>
 
               {/* Seat fill bar */}

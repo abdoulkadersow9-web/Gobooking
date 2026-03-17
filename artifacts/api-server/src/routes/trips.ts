@@ -1,6 +1,15 @@
 import { Router, type IRouter } from "express";
 import { db, tripsTable, seatsTable } from "@workspace/db";
 import { eq, and, ilike, inArray } from "drizzle-orm";
+import { locationStore, pruneStale } from "../locationStore";
+
+/* Convert mapX%/mapY% back to approximate real-world lat/lon for demo buses.
+   Bounding box: lat 4.3–10.7N, lon 8.4W–3.2W */
+function mapXYtoLatLon(mapX: number, mapY: number) {
+  const lat = 10.7 - (mapY / 100) * 6.4;
+  const lon = -8.4 + (mapX / 100) * 5.2;
+  return { lat, lon };
+}
 
 const router: IRouter = Router();
 
@@ -170,11 +179,13 @@ router.get("/:tripId/seats", async (req, res) => {
 /* ── Cars en route (live positions) ─────────────────────────────────────── */
 router.get("/live", async (_req, res) => {
   try {
-    /* Try to fetch trips that are currently "in_progress" from DB */
+    pruneStale();
+
+    /* Try DB trips with status "en_route" first */
     const dbTrips = await db
       .select()
       .from(tripsTable)
-      .where(eq(tripsTable.status, "in_progress"));
+      .where(eq(tripsTable.status, "en_route"));
 
     if (dbTrips.length > 0) {
       const result = await Promise.all(
@@ -183,25 +194,38 @@ router.get("/live", async (_req, res) => {
             .select()
             .from(seatsTable)
             .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
+
+          /* Merge real GPS if agent is broadcasting */
+          const gps = locationStore.get(trip.id);
+          const defaultCoords = mapXYtoLatLon(50, 50);
+          const lat = gps?.lat ?? defaultCoords.lat;
+          const lon = gps?.lon ?? defaultCoords.lon;
+          const mapX = ((lon - (-8.4)) / 5.2) * 100;
+          const mapY = ((10.7 - lat) / 6.4) * 100;
+
           return {
-            id: trip.id,
-            companyName: "GoBooking",
-            busName: trip.busName,
-            busType: trip.busType,
-            fromCity: trip.from,
-            toCity: trip.to,
-            currentCity: trip.from,
-            mapX: 50,
-            mapY: 50,
-            availableSeats: availSeats.length,
-            totalSeats: trip.totalSeats,
-            departureTime: trip.departureTime,
-            estimatedArrival: trip.arrivalTime,
-            agentPhone: "+225 07 00 00 00 00",
-            agentName: "Agent GoBooking",
-            price: trip.price,
-            color: "#1A56DB",
-            boardingPoints: [trip.from],
+            id:               trip.id,
+            companyName:      "GoBooking",
+            busName:          trip.busName,
+            busType:          trip.busType,
+            fromCity:         trip.from,
+            toCity:           trip.to,
+            currentCity:      trip.from,
+            lat,  lon,
+            mapX: Math.max(2, Math.min(98, mapX)),
+            mapY: Math.max(2, Math.min(98, mapY)),
+            availableSeats:   availSeats.length,
+            totalSeats:       trip.totalSeats,
+            departureTime:    trip.departureTime,
+            estimatedArrival: trip.arrivalTime ?? "—",
+            agentPhone:       "+225 07 00 00 00 00",
+            agentName:        "Agent GoBooking",
+            price:            trip.price,
+            color:            "#1A56DB",
+            boardingPoints:   [trip.from],
+            gpsLive:          !!gps,
+            lastGpsUpdate:    gps?.updatedAt ?? null,
+            speed:            gps?.speed ?? null,
           };
         })
       );
@@ -212,108 +236,32 @@ router.get("/live", async (_req, res) => {
     /* Demo data — realistic buses en route in Côte d'Ivoire */
     const now = new Date();
     const hhmm = (h: number, m: number) => `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
-    const demo = [
-      {
-        id: "live-1",
-        companyName: "SOTRAL",
-        busName: "SOTRAL Express 04",
-        busType: "Premium",
-        fromCity: "Abidjan",
-        toCity: "Bouaké",
-        currentCity: "Yamoussoukro",
-        mapX: 72,
-        mapY: 70,
-        availableSeats: 12,
-        totalSeats: 59,
-        departureTime: hhmm(now.getHours() - 3, 15),
-        estimatedArrival: hhmm(now.getHours() + 2, 30),
-        agentPhone: "+225 07 12 34 56 78",
-        agentName: "Kouassi Rémi",
-        price: 3500,
-        color: "#1A56DB",
-        boardingPoints: ["Abidjan (Gare Adjamé)", "Divo", "Yamoussoukro", "Bouaké"],
-      },
-      {
-        id: "live-2",
-        companyName: "UTB",
-        busName: "UTB Comfort 12",
-        busType: "Standard",
-        fromCity: "Abidjan",
-        toCity: "Yamoussoukro",
-        currentCity: "Agboville",
-        mapX: 78,
-        mapY: 76,
-        availableSeats: 5,
-        totalSeats: 49,
-        departureTime: hhmm(now.getHours() - 1, 45),
-        estimatedArrival: hhmm(now.getHours() + 1, 0),
-        agentPhone: "+225 05 98 76 54 32",
-        agentName: "Diomandé Salif",
-        price: 2000,
-        color: "#059669",
-        boardingPoints: ["Abidjan (Gare Bassam)", "Agboville", "Tiébissou", "Yamoussoukro"],
-      },
-      {
-        id: "live-3",
-        companyName: "TSR",
-        busName: "TSR Rapide 07",
-        busType: "VIP",
-        fromCity: "Bouaké",
-        toCity: "Korhogo",
-        currentCity: "Katiola",
-        mapX: 59,
-        mapY: 33,
-        availableSeats: 18,
-        totalSeats: 63,
-        departureTime: hhmm(now.getHours() - 2, 0),
-        estimatedArrival: hhmm(now.getHours() + 3, 45),
-        agentPhone: "+225 01 56 78 90 12",
-        agentName: "Traoré Moussa",
-        price: 2500,
-        color: "#7C3AED",
-        boardingPoints: ["Bouaké (Gare Nord)", "Katiola", "Niakaramandougou", "Korhogo"],
-      },
-      {
-        id: "live-4",
-        companyName: "SOTRA CI",
-        busName: "SOTRA 501",
-        busType: "Standard",
-        fromCity: "Abidjan",
-        toCity: "San-Pédro",
-        currentCity: "Lakota",
-        mapX: 48,
-        mapY: 83,
-        availableSeats: 23,
-        totalSeats: 59,
-        departureTime: hhmm(now.getHours() - 4, 0),
-        estimatedArrival: hhmm(now.getHours() + 1, 20),
-        agentPhone: "+225 07 45 67 89 01",
-        agentName: "Aka Jean-Marie",
-        price: 3000,
-        color: "#D97706",
-        boardingPoints: ["Abidjan (Gare Yopougon)", "Gagnoa", "Lakota", "Soubré", "San-Pédro"],
-      },
-      {
-        id: "live-5",
-        companyName: "CTM",
-        busName: "CTM Man 03",
-        busType: "Premium",
-        fromCity: "Man",
-        toCity: "Abidjan",
-        currentCity: "Daloa",
-        mapX: 38,
-        mapY: 60,
-        availableSeats: 8,
-        totalSeats: 49,
-        departureTime: hhmm(now.getHours() - 5, 30),
-        estimatedArrival: hhmm(now.getHours() + 4, 0),
-        agentPhone: "+225 05 23 45 67 89",
-        agentName: "Bamba Sékou",
-        price: 5500,
-        color: "#DC2626",
-        boardingPoints: ["Man (Gare centrale)", "Danané", "Daloa", "Divo", "Abidjan (Adjamé)"],
-      },
+    /* Build demo entries — compute real lat/lon from mapX/mapY */
+    const demoRaw = [
+      { id:"live-1", companyName:"SOTRAL",   busName:"SOTRAL Express 04", busType:"Premium",  fromCity:"Abidjan",  toCity:"Bouaké",      currentCity:"Yamoussoukro", mapX:72, mapY:70, availableSeats:12, totalSeats:59, departureTime:hhmm(now.getHours()-3,15), estimatedArrival:hhmm(now.getHours()+2,30), agentPhone:"+22507123456", agentName:"Kouassi Rémi",    price:3500, color:"#1A56DB", boardingPoints:["Abidjan (Gare Adjamé)","Divo","Yamoussoukro","Bouaké"],                          speed:87 },
+      { id:"live-2", companyName:"UTB",      busName:"UTB Comfort 12",    busType:"Standard", fromCity:"Abidjan",  toCity:"Yamoussoukro",currentCity:"Agboville",     mapX:78, mapY:76, availableSeats:5,  totalSeats:49, departureTime:hhmm(now.getHours()-1,45), estimatedArrival:hhmm(now.getHours()+1, 0), agentPhone:"+22505987654", agentName:"Diomandé Salif", price:2000, color:"#059669", boardingPoints:["Abidjan (Gare Bassam)","Agboville","Tiébissou","Yamoussoukro"],          speed:72 },
+      { id:"live-3", companyName:"TSR",      busName:"TSR Rapide 07",     busType:"VIP",      fromCity:"Bouaké",   toCity:"Korhogo",     currentCity:"Katiola",      mapX:59, mapY:33, availableSeats:18, totalSeats:63, departureTime:hhmm(now.getHours()-2, 0), estimatedArrival:hhmm(now.getHours()+3,45), agentPhone:"+22501567890", agentName:"Traoré Moussa",  price:2500, color:"#7C3AED", boardingPoints:["Bouaké (Gare Nord)","Katiola","Niakaramandougou","Korhogo"],          speed:95 },
+      { id:"live-4", companyName:"SOTRA CI", busName:"SOTRA 501",         busType:"Standard", fromCity:"Abidjan",  toCity:"San-Pédro",   currentCity:"Lakota",       mapX:48, mapY:83, availableSeats:23, totalSeats:59, departureTime:hhmm(now.getHours()-4, 0), estimatedArrival:hhmm(now.getHours()+1,20), agentPhone:"+22507456789", agentName:"Aka Jean-Marie", price:3000, color:"#D97706", boardingPoints:["Abidjan (Gare Yopougon)","Gagnoa","Lakota","Soubré","San-Pédro"],       speed:68 },
+      { id:"live-5", companyName:"CTM",      busName:"CTM Man 03",        busType:"Premium",  fromCity:"Man",      toCity:"Abidjan",     currentCity:"Daloa",        mapX:38, mapY:60, availableSeats:8,  totalSeats:49, departureTime:hhmm(now.getHours()-5,30), estimatedArrival:hhmm(now.getHours()+4, 0), agentPhone:"+22505234567", agentName:"Bamba Sékou",    price:5500, color:"#DC2626", boardingPoints:["Man (Gare centrale)","Danané","Daloa","Divo","Abidjan (Adjamé)"],        speed:80 },
     ];
+
+    const demo = demoRaw.map(d => {
+      /* Check for real GPS from locationStore */
+      const gps = locationStore.get(d.id);
+      const coords = gps ? { lat: gps.lat, lon: gps.lon } : mapXYtoLatLon(d.mapX, d.mapY);
+      const mapX   = gps ? Math.max(2, Math.min(98, ((coords.lon - (-8.4)) / 5.2) * 100)) : d.mapX;
+      const mapY   = gps ? Math.max(2, Math.min(98, ((10.7 - coords.lat) / 6.4) * 100))   : d.mapY;
+      return {
+        ...d,
+        lat:          coords.lat,
+        lon:          coords.lon,
+        mapX,
+        mapY,
+        gpsLive:      !!gps,
+        lastGpsUpdate: gps?.updatedAt ?? null,
+        speed:        gps?.speed ?? d.speed,
+      };
+    });
     res.json(demo);
   } catch (err) {
     console.error("Live trips error:", err);
