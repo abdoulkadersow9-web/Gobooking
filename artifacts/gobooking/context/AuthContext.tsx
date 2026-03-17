@@ -60,6 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (dashPath) {
             router.replace(dashPath as never);
           }
+        } else {
+          // Fallback: check localStorage "user" key (e.g. set via browser console)
+          const lsUser = await AsyncStorage.getItem("user");
+          if (lsUser) {
+            const parsed = JSON.parse(lsUser) as { role?: UserRole };
+            if (parsed.role) {
+              const dashPath = getDashboardPath(parsed.role);
+              if (dashPath) {
+                router.replace(dashPath as never);
+              }
+            }
+          }
         }
       } catch {
         // ignore
