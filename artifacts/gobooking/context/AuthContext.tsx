@@ -8,13 +8,22 @@ import React, {
   useState,
 } from "react";
 
+export type UserRole = "user" | "admin" | "super_admin" | "company_admin" | "agent";
+
 export interface User {
   id: string;
   name: string;
   email: string;
   phone: string;
-  role: "user" | "admin";
+  role: UserRole;
   createdAt: string;
+}
+
+export function getDashboardPath(role: UserRole): string | null {
+  if (role === "company_admin") return "/dashboard/company";
+  if (role === "agent") return "/dashboard/agent";
+  if (role === "admin" || role === "super_admin") return "/dashboard/super-admin";
+  return null;
 }
 
 interface AuthContextType {
@@ -24,6 +33,10 @@ interface AuthContextType {
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
+  isCompanyAdmin: boolean;
+  isAgent: boolean;
+  isSuperAdmin: boolean;
+  dashboardPath: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -74,7 +87,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
-        isAdmin: user?.role === "admin",
+        isAdmin: user?.role === "admin" || user?.role === "super_admin",
+        isCompanyAdmin: user?.role === "company_admin",
+        isAgent: user?.role === "agent",
+        isSuperAdmin: user?.role === "admin" || user?.role === "super_admin",
+        dashboardPath: user ? getDashboardPath(user.role) : null,
       }}
     >
       {children}

@@ -18,7 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { useAuth } from "@/context/AuthContext";
+import { getDashboardPath, useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 interface AuthResponse {
@@ -28,7 +28,7 @@ interface AuthResponse {
     name: string;
     email: string;
     phone: string;
-    role: "user" | "admin";
+    role: "user" | "admin" | "super_admin" | "company_admin" | "agent";
     createdAt: string;
   };
 }
@@ -55,7 +55,12 @@ export default function LoginScreen() {
       await login(res.token, res.user);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.dismissAll();
-      router.replace("/(tabs)");
+      const dashPath = getDashboardPath(res.user.role);
+      if (dashPath) {
+        router.replace(dashPath as never);
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed";
       Alert.alert("Login Failed", msg);

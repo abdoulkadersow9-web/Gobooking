@@ -20,6 +20,12 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
+const DASHBOARD_CARDS = [
+  { label: "Espace compagnie", sub: "Gérer bus, trajets & agents", icon: "briefcase", color: Colors.light.primary, bg: "#EEF2FF", path: "/dashboard/company" },
+  { label: "Espace agent", sub: "Mission, sièges & colis", icon: "user", color: "#059669", bg: "#ECFDF5", path: "/dashboard/agent" },
+  { label: "Espace admin", sub: "Plateforme GoBooking CI", icon: "shield", color: "#7C3AED", bg: "#F5F3FF", path: "/dashboard/super-admin" },
+] as const;
+
 const POPULAR_ROUTES = [
   { from: "Abidjan", to: "Bouaké",       duration: "5h 30m", price: 3500 },
   { from: "Abidjan", to: "Yamoussoukro", duration: "2h 30m", price: 2000 },
@@ -72,7 +78,7 @@ function formatDeparture(iso: string): string {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { user, token } = useAuth();
+  const { user, token, dashboardPath } = useAuth();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const firstName = user?.name?.split(" ")[0] || "";
 
@@ -150,11 +156,22 @@ export default function HomeScreen() {
             </Text>
             <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
           </View>
-          {user?.role === "admin" && (
-            <Pressable style={styles.adminBtn} onPress={() => router.push("/admin")}>
-              <Feather name="settings" size={18} color="white" />
+          {dashboardPath ? (
+            <Pressable
+              style={[styles.adminBtn, {
+                backgroundColor: user?.role === "company_admin" ? "rgba(255,255,255,0.25)"
+                  : user?.role === "agent" ? "rgba(16,185,129,0.35)"
+                  : "rgba(124,58,237,0.35)",
+              }]}
+              onPress={() => router.push(dashboardPath as never)}
+            >
+              <Feather
+                name={user?.role === "company_admin" ? "briefcase" : user?.role === "agent" ? "user" : "shield"}
+                size={17}
+                color="white"
+              />
             </Pressable>
-          )}
+          ) : null}
         </View>
 
         {/* Mode selector */}
@@ -460,6 +477,33 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
+      {/* ── Professional Spaces ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Espaces professionnels</Text>
+        {DASHBOARD_CARDS.map((card) => (
+          <TouchableOpacity
+            key={card.path}
+            style={[styles.dashCard, dashboardPath === card.path && { borderWidth: 2, borderColor: card.color }]}
+            activeOpacity={0.85}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(card.path as never); }}
+          >
+            <View style={[styles.dashCardIcon, { backgroundColor: card.bg }]}>
+              <Feather name={card.icon as never} size={20} color={card.color} />
+            </View>
+            <View style={styles.dashCardText}>
+              <Text style={[styles.dashCardTitle, { color: card.color }]}>{card.label}</Text>
+              <Text style={styles.dashCardSub}>{card.sub}</Text>
+            </View>
+            {dashboardPath === card.path && (
+              <View style={[styles.dashCardBadge, { backgroundColor: card.bg }]}>
+                <Text style={[styles.dashCardBadgeText, { color: card.color }]}>Mon espace</Text>
+              </View>
+            )}
+            <Feather name="chevron-right" size={16} color={card.color} />
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* ── Popular routes ── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trajets populaires</Text>
@@ -602,6 +646,15 @@ const styles = StyleSheet.create({
   quickIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   quickLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
   quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+
+  // Dashboard shortcut cards
+  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  dashCardIcon: { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  dashCardText: { flex: 1 },
+  dashCardTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  dashCardSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
+  dashCardBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
+  dashCardBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
 
   // Popular routes
   routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
