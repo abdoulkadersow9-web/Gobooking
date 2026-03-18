@@ -30,57 +30,25 @@ function requireFirebase(req: Request, res: Response, next: Function) {
 // POST /firebase/reserver
 router.post("/reserver", requireFirebase, async (req: Request, res: Response) => {
   try {
-    const { user_id, trajet_id, siege_numero } = req.body;
-
-    if (!user_id || !trajet_id || siege_numero === undefined) {
-      return res.status(400).json({ error: "user_id, trajet_id et siege_numero sont requis" });
-    }
-
-    const trajetRef = db!.collection("trajets").doc(trajet_id);
-    const trajetDoc = await trajetRef.get();
-
-    if (!trajetDoc.exists) {
-      return res.status(404).json({ error: "Trajet introuvable" });
-    }
-
-    const trajet = trajetDoc.data()!;
-
-    if (trajet.places_disponibles <= 0) {
-      return res.status(400).json({ error: "Plus de places disponibles" });
-    }
-
-    const check = await db!.collection("reservations")
-      .where("trajet_id", "==", trajet_id)
-      .where("siege_numero", "==", siege_numero)
-      .get();
-
-    if (!check.empty) {
-      return res.status(400).json({ error: "Siège déjà réservé" });
-    }
+    const { user_id, trajet_id, siege_numero, prix } = req.body;
 
     const reservationRef = await db!.collection("reservations").add({
       user_id,
       trajet_id,
-      bus_id: trajet.bus_id,
-      compagnie_id: trajet.compagnie_id,
       siege_numero,
-      prix: trajet.prix,
-      statut: "en_attente",
+      prix,
+      statut: "confirmé",
       date_reservation: new Date(),
     });
 
-    await trajetRef.update({
-      places_disponibles: trajet.places_disponibles - 1,
-    });
-
-    res.json({
+    res.send({
       success: true,
       reservation_id: reservationRef.id,
-      message: "Réservation créée",
+      message: "Réservation créée avec succès",
     });
   } catch (error) {
     console.error("[Firebase /reserver]", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).send("Erreur serveur");
   }
 });
 
