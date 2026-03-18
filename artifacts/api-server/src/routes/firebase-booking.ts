@@ -10,7 +10,7 @@ router.get("/test-db", async (_req: Request, res: Response) => {
   }
   try {
     const snapshot = await db.collection("trajets").get();
-    res.send("Nombre de trajets: " + snapshot.size);
+    res.send("Trajets: " + snapshot.size);
   } catch (error) {
     console.error("[Firebase /test-db]", error);
     res.status(500).send("Erreur connexion Firestore");
