@@ -3,6 +3,7 @@ import cors from "cors";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import router from "./routes";
+import db from "./firebase.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,11 +19,18 @@ app.get("/", (_req, res) => {
   res.sendFile(join(__dirname, "../public/index.html"));
 });
 
-app.get("/api/trajets", (_req, res) => {
-  res.json([
-    { ville_depart: "Abidjan", ville_arrivee: "Yamoussoukro", prix: 5000 },
-    { ville_depart: "Bouaké", ville_arrivee: "Korhogo", prix: 7000 },
-  ]);
+app.get("/api/trajets", async (_req, res) => {
+  try {
+    const snapshot = await db!.collection("trajets").get();
+    const trajets = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    res.json(trajets);
+  } catch (error) {
+    console.error("Erreur récupération trajets:", error);
+    res.status(500).json({ error: "Impossible de récupérer les trajets" });
+  }
 });
 
 app.use("/api", router);
