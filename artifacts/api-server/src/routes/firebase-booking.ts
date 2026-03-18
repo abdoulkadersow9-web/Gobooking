@@ -172,4 +172,21 @@ router.post("/valider-ticket", requireFirebase, async (req: Request, res: Respon
   }
 });
 
+// GET /firebase/trajets
+router.get("/trajets", requireFirebase, async (_req: Request, res: Response) => {
+  try {
+    const snapshot = await db!.collection("trajets").get();
+
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.send(data);
+  } catch (error) {
+    console.error("[Firebase GET /trajets]", error);
+    res.status(500).send("Erreur récupération trajets");
+  }
+});
+
 export default router;
