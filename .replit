@@ -66,4 +66,4 @@ isqDRTmWyfuls8izs0cFGTo+1hTk1g4ImmjfmCBLuiAQa/TjDyv8GKtLWrdquOcX
 
 [[ports]]
 localPort = 3000
-externalPort = 3000
+externalPort = 8080
