@@ -63,3 +63,7 @@ isqDRTmWyfuls8izs0cFGTo+1hTk1g4ImmjfmCBLuiAQa/TjDyv8GKtLWrdquOcX
 8IaySczeTMe9oMXLz8W7zFpI2g==
 -----END PRIVATE KEY-----
 """
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
