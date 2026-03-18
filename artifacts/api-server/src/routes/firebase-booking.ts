@@ -139,4 +139,37 @@ router.get("/ticket/:id", requireFirebase, async (req: Request, res: Response) =
   }
 });
 
+// POST /firebase/valider-ticket
+router.post("/valider-ticket", requireFirebase, async (req: Request, res: Response) => {
+  try {
+    const { ticket_id } = req.body;
+
+    const ticketRef = db!.collection("tickets").doc(ticket_id);
+    const ticket = await ticketRef.get();
+
+    if (!ticket.exists) {
+      return res.status(404).send("Ticket non trouvé");
+    }
+
+    const data = ticket.data()!;
+
+    if (data.statut === "utilisé") {
+      return res.send({
+        success: false,
+        message: "Ticket déjà utilisé ❌",
+      });
+    }
+
+    await ticketRef.update({ statut: "utilisé" });
+
+    res.send({
+      success: true,
+      message: "Ticket valide ✅ accès autorisé",
+    });
+  } catch (error) {
+    console.error("[Firebase /valider-ticket]", error);
+    res.status(500).send("Erreur validation");
+  }
+});
+
 export default router;
