@@ -27,3 +27,9 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+FIREBASE_PROJECT_ID = "go-b-o-oking-fl40mj"
+FIREBASE_CLIENT_EMAIL = "firebase-adminsdk-fbsvc@go-b-o-oking-fl40mj.iam.gserviceaccount.com"
