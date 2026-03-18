@@ -55,54 +55,29 @@ router.post("/reserver", requireFirebase, async (req: Request, res: Response) =>
 // POST /firebase/payer
 router.post("/payer", requireFirebase, async (req: Request, res: Response) => {
   try {
-    const { reservation_id, methode } = req.body;
+    const { reservation_id, user_id, montant, methode } = req.body;
 
-    if (!reservation_id || !methode) {
-      return res.status(400).json({ error: "reservation_id et methode sont requis" });
-    }
-
-    const reservationRef = db!.collection("reservations").doc(reservation_id);
-    const reservationDoc = await reservationRef.get();
-
-    if (!reservationDoc.exists) {
-      return res.status(404).json({ error: "Réservation introuvable" });
-    }
-
-    const reservation = reservationDoc.data()!;
-
-    await db!.collection("paiements").add({
+    const paiementRef = await db!.collection("paiements").add({
       reservation_id,
-      user_id: reservation.user_id,
-      montant: reservation.prix,
+      user_id,
+      montant,
       methode,
       statut: "payé",
       date_paiement: new Date(),
     });
 
-    await reservationRef.update({ statut: "confirmé" });
-
-    const codeTicket = "GB-" + Date.now();
-
-    await db!.collection("tickets").add({
-      reservation_id,
-      user_id: reservation.user_id,
-      trajet_id: reservation.trajet_id,
-      bus_id: reservation.bus_id,
-      compagnie_id: reservation.compagnie_id,
-      siege_numero: reservation.siege_numero,
-      code_ticket: codeTicket,
-      statut: "valide",
-      date_creation: new Date(),
+    await db!.collection("reservations").doc(reservation_id).update({
+      statut: "payé",
     });
 
-    res.json({
+    res.send({
       success: true,
-      message: "Paiement effectué et ticket généré",
-      code_ticket: codeTicket,
+      paiement_id: paiementRef.id,
+      message: "Paiement effectué avec succès",
     });
   } catch (error) {
     console.error("[Firebase /payer]", error);
-    res.status(500).json({ error: "Erreur serveur" });
+    res.status(500).send("Erreur paiement");
   }
 });
 
