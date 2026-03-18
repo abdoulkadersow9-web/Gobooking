@@ -81,4 +81,32 @@ router.post("/payer", requireFirebase, async (req: Request, res: Response) => {
   }
 });
 
+// POST /firebase/ticket
+router.post("/ticket", requireFirebase, async (req: Request, res: Response) => {
+  try {
+    const { reservation_id, user_id, trajet_id, siege_numero } = req.body;
+
+    const code_ticket = "TICK-" + Date.now();
+
+    const ticketRef = await db!.collection("tickets").add({
+      reservation_id,
+      user_id,
+      trajet_id,
+      siege_numero,
+      code_ticket,
+      statut: "valide",
+      date_creation: new Date(),
+    });
+
+    res.send({
+      success: true,
+      ticket_id: ticketRef.id,
+      code_ticket,
+    });
+  } catch (error) {
+    console.error("[Firebase /ticket]", error);
+    res.status(500).send("Erreur ticket");
+  }
+});
+
 export default router;
