@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import db from "../firebase.js";
+import QRCode from "qrcode";
 
 const router = Router();
 
@@ -87,6 +88,7 @@ router.post("/ticket", requireFirebase, async (req: Request, res: Response) => {
     const { reservation_id, user_id, trajet_id, siege_numero } = req.body;
 
     const code_ticket = "TICK-" + Date.now();
+    const qr_code = await QRCode.toDataURL(code_ticket);
 
     const ticketRef = await db!.collection("tickets").add({
       reservation_id,
@@ -94,6 +96,7 @@ router.post("/ticket", requireFirebase, async (req: Request, res: Response) => {
       trajet_id,
       siege_numero,
       code_ticket,
+      qr_code,
       statut: "valide",
       date_creation: new Date(),
     });
@@ -102,6 +105,7 @@ router.post("/ticket", requireFirebase, async (req: Request, res: Response) => {
       success: true,
       ticket_id: ticketRef.id,
       code_ticket,
+      qr_code,
     });
   } catch (error) {
     console.error("[Firebase /ticket]", error);
