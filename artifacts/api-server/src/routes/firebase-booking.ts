@@ -113,4 +113,30 @@ router.post("/ticket", requireFirebase, async (req: Request, res: Response) => {
   }
 });
 
+// GET /firebase/ticket/:id
+router.get("/ticket/:id", requireFirebase, async (req: Request, res: Response) => {
+  try {
+    const ticket = await db!.collection("tickets").doc(req.params.id).get();
+
+    if (!ticket.exists) {
+      return res.status(404).send("Ticket non trouvé");
+    }
+
+    const data = ticket.data()!;
+
+    const qr = await QRCode.toDataURL(JSON.stringify({
+      ticket_id: req.params.id,
+      code: data.code_ticket,
+    }));
+
+    res.send({
+      ...data,
+      qr_code: qr,
+    });
+  } catch (error) {
+    console.error("[Firebase GET /ticket/:id]", error);
+    res.status(500).send("Erreur QR");
+  }
+});
+
 export default router;
