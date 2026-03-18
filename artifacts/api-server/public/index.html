@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoBooking API</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f4f6f9; color: #333; }
+    header { background: #1A56DB; color: white; padding: 20px 30px; }
+    header h1 { font-size: 24px; }
+    header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .container { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+    .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .card h2 { font-size: 15px; color: #1A56DB; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: bold; }
+    .get { background: #e0f2fe; color: #0369a1; }
+    .post { background: #dcfce7; color: #166534; }
+    input, select { width: 100%; padding: 8px 10px; margin: 6px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+    button { background: #1A56DB; color: white; border: none; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; margin-top: 8px; }
+    button:hover { background: #1447b7; }
+    .result { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; margin-top: 10px; font-size: 12px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; display: none; }
+    .status-ok { color: #16a34a; font-weight: bold; }
+    .status-err { color: #dc2626; font-weight: bold; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>🚌 GoBooking API — Firebase</h1>
+  <p>Interface de test des routes Firestore</p>
+</header>
+<div class="container">
+
+  <!-- Test DB -->
+  <div class="card">
+    <h2><span class="badge get">GET</span> /api/firebase/test-db</h2>
+    <button onclick="call('GET','test-db',null,'r1')">Tester la connexion Firestore</button>
+    <div class="result" id="r1"></div>
+  </div>
+
+  <!-- Trajets -->
+  <div class="card">
+    <h2><span class="badge get">GET</span> /api/firebase/trajets</h2>
+    <button onclick="call('GET','trajets',null,'r2')">Voir tous les trajets</button>
+    <div class="result" id="r2"></div>
+  </div>
+
+  <!-- Réserver -->
+  <div class="card">
+    <h2><span class="badge post">POST</span> /api/firebase/reserver</h2>
+    <input id="res_user" placeholder="user_id" value="user123" />
+    <input id="res_trajet" placeholder="trajet_id" value="ID_TRAJET" />
+    <input id="res_siege" placeholder="siege_numero" type="number" value="5" />
+    <input id="res_prix" placeholder="prix (FCFA)" type="number" value="5000" />
+    <button onclick="reserver()">Réserver</button>
+    <div class="result" id="r3"></div>
+  </div>
+
+  <!-- Payer -->
+  <div class="card">
+    <h2><span class="badge post">POST</span> /api/firebase/payer</h2>
+    <input id="pay_res" placeholder="reservation_id" />
+    <input id="pay_user" placeholder="user_id" value="user123" />
+    <input id="pay_montant" placeholder="montant" type="number" value="5000" />
+    <select id="pay_methode">
+      <option>Orange Money</option>
+      <option>MTN MoMo</option>
+      <option>Wave</option>
+      <option>Visa</option>
+    </select>
+    <button onclick="payer()">Payer</button>
+    <div class="result" id="r4"></div>
+  </div>
+
+  <!-- Générer ticket -->
+  <div class="card">
+    <h2><span class="badge post">POST</span> /api/firebase/ticket</h2>
+    <input id="tick_res" placeholder="reservation_id" />
+    <input id="tick_user" placeholder="user_id" value="user123" />
+    <input id="tick_trajet" placeholder="trajet_id" value="ID_TRAJET" />
+    <input id="tick_siege" placeholder="siege_numero" type="number" value="5" />
+    <button onclick="genTicket()">Générer ticket</button>
+    <div class="result" id="r5"></div>
+  </div>
+
+  <!-- Voir ticket -->
+  <div class="card">
+    <h2><span class="badge get">GET</span> /api/firebase/ticket/:id</h2>
+    <input id="view_ticket" placeholder="ticket_id" />
+    <button onclick="getTicket()">Voir ticket + QR</button>
+    <div class="result" id="r6"></div>
+    <img id="qr_img" style="margin-top:10px;display:none;width:150px;" />
+  </div>
+
+  <!-- Valider ticket -->
+  <div class="card">
+    <h2><span class="badge post">POST</span> /api/firebase/valider-ticket</h2>
+    <input id="val_ticket" placeholder="ticket_id" />
+    <button onclick="valider()">Scanner / Valider</button>
+    <div class="result" id="r7"></div>
+  </div>
+
+  <!-- Réservations user -->
+  <div class="card">
+    <h2><span class="badge get">GET</span> /api/firebase/reservations/:user_id</h2>
+    <input id="res_uid" placeholder="user_id" value="user123" />
+    <button onclick="call('GET','reservations/'+document.getElementById('res_uid').value,null,'r8')">Voir réservations</button>
+    <div class="result" id="r8"></div>
+  </div>
+
+  <!-- Tickets user -->
+  <div class="card">
+    <h2><span class="badge get">GET</span> /api/firebase/tickets/:user_id</h2>
+    <input id="tick_uid" placeholder="user_id" value="user123" />
+    <button onclick="call('GET','tickets/'+document.getElementById('tick_uid').value,null,'r9')">Voir tickets</button>
+    <div class="result" id="r9"></div>
+  </div>
+
+</div>
+<script>
+  const BASE = "/api/firebase";
+
+  async function call(method, path, body, resultId) {
+    const el = document.getElementById(resultId);
+    el.style.display = "block";
+    el.textContent = "Chargement...";
+    try {
+      const opts = { method, headers: { "Content-Type": "application/json" } };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(`${BASE}/${path}`, opts);
+      const text = await res.text();
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { parsed = text; }
+      el.textContent = typeof parsed === "string" ? parsed : JSON.stringify(parsed, null, 2);
+      el.className = "result " + (res.ok ? "status-ok" : "status-err");
+    } catch (e) {
+      el.textContent = "Erreur: " + e.message;
+      el.className = "result status-err";
+    }
+  }
+
+  function reserver() {
+    call("POST", "reserver", {
+      user_id: document.getElementById("res_user").value,
+      trajet_id: document.getElementById("res_trajet").value,
+      siege_numero: +document.getElementById("res_siege").value,
+      prix: +document.getElementById("res_prix").value
+    }, "r3");
+  }
+
+  function payer() {
+    call("POST", "payer", {
+      reservation_id: document.getElementById("pay_res").value,
+      user_id: document.getElementById("pay_user").value,
+      montant: +document.getElementById("pay_montant").value,
+      methode: document.getElementById("pay_methode").value
+    }, "r4");
+  }
+
+  function genTicket() {
+    call("POST", "ticket", {
+      reservation_id: document.getElementById("tick_res").value,
+      user_id: document.getElementById("tick_user").value,
+      trajet_id: document.getElementById("tick_trajet").value,
+      siege_numero: +document.getElementById("tick_siege").value
+    }, "r5");
+  }
+
+  async function getTicket() {
+    const id = document.getElementById("view_ticket").value;
+    await call("GET", "ticket/" + id, null, "r6");
+    try {
+      const el = document.getElementById("r6");
+      const data = JSON.parse(el.textContent);
+      if (data.qr_code) {
+        const img = document.getElementById("qr_img");
+        img.src = data.qr_code;
+        img.style.display = "block";
+      }
+    } catch {}
+  }
+
+  function valider() {
+    call("POST", "valider-ticket", {
+      ticket_id: document.getElementById("val_ticket").value
+    }, "r7");
+  }
+</script>
+</body>
+</html>
