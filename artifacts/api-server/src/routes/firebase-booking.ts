@@ -189,4 +189,23 @@ router.get("/trajets", requireFirebase, async (_req: Request, res: Response) => 
   }
 });
 
+// GET /firebase/reservations/:user_id
+router.get("/reservations/:user_id", requireFirebase, async (req: Request, res: Response) => {
+  try {
+    const snapshot = await db!.collection("reservations")
+      .where("user_id", "==", req.params.user_id)
+      .get();
+
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    res.send(data);
+  } catch (error) {
+    console.error("[Firebase GET /reservations/:user_id]", error);
+    res.status(500).send("Erreur récupération réservations");
+  }
+});
+
 export default router;
