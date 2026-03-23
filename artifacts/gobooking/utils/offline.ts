@@ -1,27 +1,37 @@
 /**
- * Offline queue utility for GoBooking agents
+ * Offline queue utility — GoBooking agents
  *
- * Stores pending actions in AsyncStorage when offline and replays
- * them automatically when connectivity is restored.
+ * - Each item has a unique `id` and a `synced` flag
+ * - Synced items are kept for history (max 100 items, auto-trimmed)
+ * - Duplicate scan codes are blocked via a persistent scanned-set
+ * - Sync continues on individual failures (partial sync safe)
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import { useEffect, useRef, useState } from "react";
 
-const QUEUE_KEY = "gobooking_offline_queue";
+const QUEUE_KEY   = "gobooking_offline_queue";
+const SCANNED_KEY = "gobooking_scanned_codes";
+const MAX_HISTORY = 100;
 
-/* ─── Queue item types ────────────────────────────────────────── */
+/* ─── Types ────────────────────────────────────────────────────── */
 
 export type OfflineItemType = "scan" | "reservation" | "colis_arrive" | "en_route_board";
 
-export interface OfflineScan {
-  type: "scan";
-  payload: { reservationId: string };
-  token: string;
+interface OfflineBase {
+  id: string;
+  synced: boolean;
+  syncedAt?: number;
   createdAt: number;
+  token: string;
 }
 
-export interface OfflineReservation {
+export interface OfflineScan extends OfflineBase {
+  type: "scan";
+  payload: { reservationId: string };
+}
+
+export interface OfflineReservation extends OfflineBase {
   type: "reservation";
   payload: {
     tripId: string;
@@ -30,22 +40,16 @@ export interface OfflineReservation {
     passengerCount: number;
     paymentMethod: string;
   };
-  token: string;
-  createdAt: number;
 }
 
-export interface OfflineColisArrive {
+export interface OfflineColisArrive extends OfflineBase {
   type: "colis_arrive";
   payload: { colisId: string; trackingRef: string };
-  token: string;
-  createdAt: number;
 }
 
-export interface OfflineEnRouteBoard {
+export interface OfflineEnRouteBoard extends OfflineBase {
   type: "en_route_board";
   payload: { requestId: string };
-  token: string;
-  createdAt: number;
 }
 
 export type OfflineItem =
@@ -54,7 +58,13 @@ export type OfflineItem =
   | OfflineColisArrive
   | OfflineEnRouteBoard;
 
-/* ─── Read / write queue ──────────────────────────────────────── */
+/* ─── ID generator ─────────────────────────────────────────────── */
+
+export function generateOfflineId(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/* ─── Queue read / write ────────────────────────────────────────── */
 
 export async function getOfflineQueue(): Promise<OfflineItem[]> {
   try {
@@ -66,21 +76,90 @@ export async function getOfflineQueue(): Promise<OfflineItem[]> {
   }
 }
 
-export async function saveOffline(item: OfflineItem): Promise<void> {
+async function persistQueue(items: OfflineItem[]): Promise<void> {
+  /* Keep at most MAX_HISTORY items; prefer dropping old synced ones first */
+  let trimmed = items;
+  if (items.length > MAX_HISTORY) {
+    const synced   = items.filter(i => i.synced);
+    const pending  = items.filter(i => !i.synced);
+    trimmed = [...pending, ...synced].slice(-MAX_HISTORY);
+  }
+  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
+}
+
+/**
+ * Add a new offline item to the queue.
+ * If an item with the same `id` already exists it is ignored (idempotent).
+ */
+export async function saveOffline(item: Omit<OfflineItem, "id" | "synced" | "syncedAt"> & { id?: string }): Promise<string> {
   try {
+    const id = item.id ?? generateOfflineId();
     const queue = await getOfflineQueue();
-    queue.push(item);
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    if (queue.some(q => q.id === id)) return id; /* idempotent — no duplicate */
+    const full = { ...item, id, synced: false } as OfflineItem;
+    await persistQueue([...queue, full]);
+    return id;
   } catch {
-    /* silently ignore storage errors */
+    return item.id ?? "";
   }
 }
 
-async function clearOfflineQueue(): Promise<void> {
-  await AsyncStorage.removeItem(QUEUE_KEY);
+/** Return the full history (pending + synced). */
+export async function getHistory(): Promise<OfflineItem[]> {
+  return getOfflineQueue();
 }
 
-/* ─── Sync helpers ────────────────────────────────────────────── */
+/** Remove all synced items from history. */
+export async function clearSyncedHistory(): Promise<void> {
+  try {
+    const queue = await getOfflineQueue();
+    await persistQueue(queue.filter(i => !i.synced));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Count only pending (unsynced) items. */
+export async function getPendingCount(): Promise<number> {
+  const queue = await getOfflineQueue();
+  return queue.filter(i => !i.synced).length;
+}
+
+/* ─── Duplicate scan protection ─────────────────────────────────── */
+
+async function getScannedSet(): Promise<Set<string>> {
+  try {
+    const raw = await AsyncStorage.getItem(SCANNED_KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+async function saveScannedSet(set: Set<string>): Promise<void> {
+  await AsyncStorage.setItem(SCANNED_KEY, JSON.stringify([...set]));
+}
+
+/** Returns true if the code was already scanned (and this scan is a duplicate). */
+export async function isAlreadyScanned(code: string): Promise<boolean> {
+  const set = await getScannedSet();
+  return set.has(code);
+}
+
+/** Mark a QR/barcode as scanned to prevent duplicate processing. */
+export async function markAsScanned(code: string): Promise<void> {
+  const set = await getScannedSet();
+  set.add(code);
+  await saveScannedSet(set);
+}
+
+/** Clear the scanned-codes memory (e.g. when a new shift starts). */
+export async function clearScannedCodes(): Promise<void> {
+  await AsyncStorage.removeItem(SCANNED_KEY);
+}
+
+/* ─── Sync ──────────────────────────────────────────────────────── */
 
 async function replayItem(item: OfflineItem, baseUrl: string): Promise<boolean> {
   const headers: Record<string, string> = {
@@ -89,34 +168,22 @@ async function replayItem(item: OfflineItem, baseUrl: string): Promise<boolean> 
   };
 
   try {
-    let url = "";
-    let body: string | undefined;
-
     if (item.type === "scan") {
-      url = `${baseUrl}/agent/reservation/${item.payload.reservationId}/board`;
-      const res = await fetch(url, { method: "POST", headers });
+      const res = await fetch(`${baseUrl}/agent/reservation/${item.payload.reservationId}/board`, { method: "POST", headers });
       return res.ok;
     }
-
     if (item.type === "reservation") {
-      url = `${baseUrl}/reservations`;
-      body = JSON.stringify(item.payload);
-      const res = await fetch(url, { method: "POST", headers, body });
+      const res = await fetch(`${baseUrl}/reservations`, { method: "POST", headers, body: JSON.stringify(item.payload) });
       return res.ok;
     }
-
     if (item.type === "colis_arrive") {
-      url = `${baseUrl}/agent/parcels/${item.payload.colisId}/arrive`;
-      const res = await fetch(url, { method: "POST", headers });
+      const res = await fetch(`${baseUrl}/agent/parcels/${item.payload.colisId}/arrive`, { method: "POST", headers });
       return res.ok;
     }
-
     if (item.type === "en_route_board") {
-      url = `${baseUrl}/agent/requests/${item.payload.requestId}/board`;
-      const res = await fetch(url, { method: "POST", headers });
+      const res = await fetch(`${baseUrl}/agent/requests/${item.payload.requestId}/board`, { method: "POST", headers });
       return res.ok;
     }
-
     return false;
   } catch {
     return false;
@@ -125,54 +192,60 @@ async function replayItem(item: OfflineItem, baseUrl: string): Promise<boolean> 
 
 /**
  * Replay all pending offline items.
- * Successfully synced items are removed; failed items are kept for next attempt.
+ *
+ * - Each item is tried independently (partial sync safe — one failure won't block others)
+ * - Successful items are marked `synced: true` and kept in history
+ * - Failed items remain `synced: false` for the next attempt
  */
 export async function syncOfflineQueue(baseUrl: string): Promise<{ synced: number; failed: number }> {
   const queue = await getOfflineQueue();
-  if (queue.length === 0) return { synced: 0, failed: 0 };
+  const pending = queue.filter(i => !i.synced);
+  if (pending.length === 0) return { synced: 0, failed: 0 };
 
-  const remaining: OfflineItem[] = [];
   let synced = 0;
   let failed = 0;
 
-  for (const item of queue) {
+  const now = Date.now();
+  const updated = [...queue];
+
+  for (const item of pending) {
     const ok = await replayItem(item, baseUrl);
+    const idx = updated.findIndex(q => q.id === item.id);
     if (ok) {
       synced++;
+      if (idx !== -1) {
+        updated[idx] = { ...updated[idx], synced: true, syncedAt: now };
+      }
     } else {
-      remaining.push(item);
       failed++;
+      /* keep item as-is for next retry */
     }
   }
 
-  if (remaining.length === 0) {
-    await clearOfflineQueue();
-  } else {
-    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(remaining));
-  }
-
+  await persistQueue(updated);
   return { synced, failed };
 }
 
-/* ─── Hook: network status + auto-sync ───────────────────────── */
+/* ─── Hook: network status + auto-sync ──────────────────────────── */
 
 export interface NetworkStatus {
   isOnline: boolean;
   pendingCount: number;
   syncNow: () => Promise<void>;
   isSyncing: boolean;
+  lastSyncResult: { synced: number; failed: number } | null;
 }
 
 export function useNetworkStatus(baseUrl: string): NetworkStatus {
-  const [isOnline, setIsOnline]       = useState(true);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [isSyncing, setIsSyncing]     = useState(false);
+  const [isOnline, setIsOnline]             = useState(true);
+  const [pendingCount, setPendingCount]     = useState(0);
+  const [isSyncing, setIsSyncing]           = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<{ synced: number; failed: number } | null>(null);
   const syncingRef = useRef(false);
 
-  /* Count pending items on mount and whenever state changes */
   const refreshCount = async () => {
-    const q = await getOfflineQueue();
-    setPendingCount(q.length);
+    const count = await getPendingCount();
+    setPendingCount(count);
   };
 
   const syncNow = async () => {
@@ -180,8 +253,11 @@ export function useNetworkStatus(baseUrl: string): NetworkStatus {
     syncingRef.current = true;
     setIsSyncing(true);
     try {
-      await syncOfflineQueue(baseUrl);
+      const result = await syncOfflineQueue(baseUrl);
+      setLastSyncResult(result);
       await refreshCount();
+    } catch {
+      /* network error — will retry next time */
     } finally {
       syncingRef.current = false;
       setIsSyncing(false);
@@ -194,15 +270,11 @@ export function useNetworkStatus(baseUrl: string): NetworkStatus {
     const unsub = NetInfo.addEventListener(state => {
       const online = !!(state.isConnected && state.isInternetReachable !== false);
       setIsOnline(online);
-
-      if (online) {
-        /* Auto-sync when connection restored */
-        syncNow();
-      }
+      if (online) syncNow();
     });
 
     return () => unsub();
   }, [baseUrl]);
 
-  return { isOnline, pendingCount, syncNow, isSyncing };
+  return { isOnline, pendingCount, syncNow, isSyncing, lastSyncResult };
 }

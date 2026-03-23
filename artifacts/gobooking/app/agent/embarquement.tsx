@@ -8,7 +8,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
-import { saveOffline, useNetworkStatus } from "@/utils/offline";
+import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
 
 const G       = "#059669";
@@ -193,9 +193,19 @@ export default function EmbarquementScreen() {
   /* ── Existing billet flow ─────────────────────────── */
   const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
     if (scanned) return;
+    const code = data.trim();
+    /* Anti-duplicate: block if already scanned this session */
+    const duplicate = await isAlreadyScanned(code);
+    if (duplicate) {
+      Alert.alert("Déjà scanné", "Ce billet a déjà été validé dans cette session.", [
+        { text: "OK", onPress: () => setScanned(false) }
+      ]);
+      return;
+    }
     setScanned(true);
     setScanMode(false);
-    await lookupPassenger(data);
+    await markAsScanned(code);
+    await lookupPassenger(code);
   }, [scanned]);
 
   const lookupPassenger = async (ref: string) => {

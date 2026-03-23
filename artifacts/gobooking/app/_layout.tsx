@@ -37,7 +37,7 @@ const DASHBOARD_ONLY_ROLES = ["agent", "compagnie", "company_admin", "admin", "s
 const AGENT_ROUTES = ["embarquement", "reception-colis", "vente", "validation"];
 
 /* ─── Routes publiques (pas besoin d'être connecté) ────────── */
-const PUBLIC_ROOTS = ["index", "(auth)", "live-tracking", "cars-en-route-map"];
+const PUBLIC_ROOTS = ["index", "(auth)", "live-tracking", "cars-en-route-map", "offline"];
 
 function AuthGuard() {
   const { user, isLoading } = useAuth();
