@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import DashboardCharts from "@/components/DashboardCharts";
 
 const PRIMARY = Colors.light.primary;
 const PURPLE  = "#7C3AED";
@@ -649,6 +650,14 @@ export default function SuperAdminDashboard() {
               </View>
             ))}
           </View>
+
+          {/* ── Graphiques activité plateforme ── */}
+          <DashboardCharts
+            dailyBookings={adminAnalytics.dailyBookings}
+            accentColor="#7C3AED"
+            showRevenue
+          />
+
           <Text style={[S.sectionTitle, { marginTop: 4 }]}>Derniers inscrits</Text>
           {stats.recentUsers.map(u => {
             const rs = ROLE_STYLE[u.role] ?? ROLE_STYLE.user;

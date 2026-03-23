@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import DashboardCharts from "@/components/DashboardCharts";
 
 const PRIMARY = Colors.light.primary;
 const DARK = Colors.light.primaryDark;
@@ -635,6 +636,13 @@ export default function CompanyDashboard() {
               </View>
             ))}
           </View>
+
+          {/* ── Graphiques activité ── */}
+          <DashboardCharts
+            dailyBookings={analytics.dailyBookings}
+            accentColor={Colors.light.accent ?? "#FF6B00"}
+            showRevenue
+          />
 
           <Text style={[S.sectionTitle, { marginTop: 8 }]}>Accès rapide</Text>
           <View style={S.quickGrid}>
