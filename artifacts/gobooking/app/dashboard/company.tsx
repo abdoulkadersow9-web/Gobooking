@@ -97,12 +97,16 @@ function genDemoSeats(tripId: string, total: number, booked: number): SeatItem[]
 
 /* ─── Status helpers ─────────────────────────────────────── */
 const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  en_attente:     { label: "En attente",     color: "#B45309", bg: "#FFFBEB" },
-  pris_en_charge: { label: "Pris en charge", color: "#1D4ED8", bg: "#EFF6FF" },
-  en_transit:     { label: "En transit",     color: "#6D28D9", bg: "#F5F3FF" },
-  en_livraison:   { label: "En livraison",   color: "#0E7490", bg: "#ECFEFF" },
-  livre:          { label: "Livré",          color: "#065F46", bg: "#ECFDF5" },
-  annule:         { label: "Annulé",         color: "#DC2626", bg: "#FEF2F2" },
+  en_attente:          { label: "En attente",      color: "#B45309", bg: "#FFFBEB" },
+  confirme:            { label: "Confirmé",         color: "#1D4ED8", bg: "#EFF6FF" },
+  en_cours_ramassage:  { label: "Ramassage",        color: "#7C3AED", bg: "#F5F3FF" },
+  arrive_gare_depart:  { label: "Gare départ",      color: "#0E7490", bg: "#ECFEFF" },
+  pris_en_charge:      { label: "Pris en charge",   color: "#1D4ED8", bg: "#EFF6FF" },
+  en_transit:          { label: "En transit",       color: "#6D28D9", bg: "#F5F3FF" },
+  arrive_destination:  { label: "Arrivé dest.",     color: "#D97706", bg: "#FEF3C7" },
+  en_livraison:        { label: "En livraison",     color: "#0E7490", bg: "#ECFEFF" },
+  livre:               { label: "Livré",            color: "#065F46", bg: "#ECFDF5" },
+  annule:              { label: "Annulé",           color: "#DC2626", bg: "#FEF2F2" },
 };
 const BOOKING_STATUS: Record<string, { label: string; color: string; bg: string }> = {
   confirmed: { label: "Confirmé",   color: PRIMARY,   bg: "#EEF2FF" },
@@ -300,6 +304,55 @@ export default function CompanyDashboard() {
         },
       },
     ]);
+  };
+
+  const updateParcelStatus = async (parcelId: string, newStatus: string) => {
+    setParcels(prev => prev.map(p => p.id === parcelId ? { ...p, status: newStatus } : p));
+    if (token) {
+      try { await apiFetch(`/parcels/${parcelId}/status`, { token, method: "PATCH", body: { status: newStatus } }); } catch {}
+    }
+  };
+
+  const handleCreateReservation = async () => {
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod } = newReservation;
+    if (!clientName.trim()) { setReservationError("Le nom du client est obligatoire."); return; }
+    if (!tripId) { setReservationError("Veuillez sélectionner un trajet."); return; }
+    setReservationError("");
+    setReservationSubmitting(true);
+    try {
+      const created = await apiFetch<Reservation>("/company/reservations", {
+        token: token!, method: "POST",
+        body: { clientName: clientName.trim(), clientPhone: clientPhone.trim(), tripId, seatCount: Number(seatCount) || 1, paymentMethod },
+      });
+      setReservations(prev => [created, ...prev]);
+      setAddReservationModal(false);
+      setNewReservation({ clientName: "", clientPhone: "", tripId: "", seatCount: "1", paymentMethod: "cash" });
+      Alert.alert("Réservation créée", `Réf : ${created.bookingRef}`);
+    } catch (e: any) {
+      setReservationError(e?.message || "Échec de la création. Vérifiez les données.");
+    } finally { setReservationSubmitting(false); }
+  };
+
+  const handleCreateParcel = async () => {
+    const { senderName, senderPhone, receiverName, receiverPhone, fromCity, toCity, weight, paymentMethod } = newParcel;
+    if (!senderName.trim()) { setParcelError("Le nom de l'expéditeur est obligatoire."); return; }
+    if (!receiverName.trim()) { setParcelError("Le nom du destinataire est obligatoire."); return; }
+    if (!fromCity || !toCity) { setParcelError("Villes de départ et d'arrivée obligatoires."); return; }
+    if (fromCity === toCity) { setParcelError("Les villes de départ et d'arrivée doivent être différentes."); return; }
+    setParcelError("");
+    setParcelSubmitting(true);
+    try {
+      const created = await apiFetch<Parcel>("/company/parcels", {
+        token: token!, method: "POST",
+        body: { senderName: senderName.trim(), senderPhone: senderPhone.trim(), receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(), fromCity, toCity, weight, paymentMethod },
+      });
+      setParcels(prev => [created, ...prev]);
+      setAddParcelModal(false);
+      setNewParcel({ senderName: "", senderPhone: "", receiverName: "", receiverPhone: "", fromCity: "Abidjan", toCity: "Bouaké", weight: "1", paymentMethod: "cash" });
+      Alert.alert("Colis enregistré", `Ref : ${created.trackingRef}`);
+    } catch (e: any) {
+      setParcelError(e?.message || "Échec de la création. Vérifiez les données.");
+    } finally { setParcelSubmitting(false); }
   };
 
   const loadSeats = (trip: Trip) => {
@@ -620,6 +673,9 @@ export default function CompanyDashboard() {
         {activeTab === "reservations" && (<>
           <View style={S.sectionRow}>
             <Text style={S.sectionTitle}>Réservations ({reservations.length})</Text>
+            <TouchableOpacity style={S.addBtn} onPress={() => setAddReservationModal(true)} activeOpacity={0.8}>
+              <Feather name="plus" size={14} color="white" /><Text style={S.addBtnText}>Créer</Text>
+            </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
             {(["all", "confirmed", "boarded", "cancelled"] as const).map(f => (
@@ -823,21 +879,76 @@ export default function CompanyDashboard() {
 
         {/* ── Colis ── */}
         {activeTab === "colis" && (<>
-          <Text style={S.sectionTitle}>Expéditions ({parcels.length})</Text>
+          <View style={S.sectionRow}>
+            <Text style={S.sectionTitle}>Expéditions ({parcels.length})</Text>
+            <TouchableOpacity style={S.addBtn} onPress={() => setAddParcelModal(true)} activeOpacity={0.8}>
+              <Feather name="plus" size={14} color="white" /><Text style={S.addBtnText}>Créer</Text>
+            </TouchableOpacity>
+          </View>
           {parcels.map(parcel => {
             const st = PARCEL_STATUS[parcel.status] ?? PARCEL_STATUS.en_attente;
             return (
-              <View key={parcel.id} style={S.listCard}>
-                <View style={[S.listIcon, { backgroundColor: st.bg }]}><Feather name="package" size={16} color={st.color} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={S.listTitle}>{parcel.trackingRef}</Text>
-                  <Text style={S.listSub}>{parcel.fromCity} → {parcel.toCity} · {parcel.weight} kg</Text>
-                  <Text style={S.listSub}>{parcel.senderName} → {parcel.receiverName}</Text>
+              <View key={parcel.id} style={S.reservCard}>
+                <View style={S.reservTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={S.reservRef}>{parcel.trackingRef}</Text>
+                    <Text style={S.listSub}>{parcel.fromCity} → {parcel.toCity} · {parcel.weight} kg</Text>
+                    <Text style={S.listSub}>{parcel.senderName} → {parcel.receiverName}</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 5 }}>
+                    <View style={[S.badge, { backgroundColor: st.bg }]}><Text style={[S.badgeText, { color: st.color }]}>{st.label}</Text></View>
+                    <Text style={[S.badgeText, { color: PRIMARY }]}>{parcel.amount.toLocaleString()} F</Text>
+                  </View>
                 </View>
-                <View style={{ alignItems: "flex-end", gap: 5 }}>
-                  <View style={[S.badge, { backgroundColor: st.bg }]}><Text style={[S.badgeText, { color: st.color }]}>{st.label}</Text></View>
-                  <Text style={[S.badgeText, { color: PRIMARY }]}>{parcel.amount.toLocaleString()} F</Text>
-                </View>
+                {/* Workflow actions */}
+                {parcel.status === "en_attente" && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE" }}
+                    onPress={() => updateParcelStatus(parcel.id, "confirme")} activeOpacity={0.8}>
+                    <Feather name="check-circle" size={13} color="#1D4ED8" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#1D4ED8" }}>Confirmer le colis</Text>
+                  </TouchableOpacity>
+                )}
+                {parcel.status === "confirme" && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#F5F3FF", borderWidth: 1, borderColor: "#DDD6FE" }}
+                    onPress={() => updateParcelStatus(parcel.id, "en_cours_ramassage")} activeOpacity={0.8}>
+                    <Feather name="map-pin" size={13} color="#7C3AED" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" }}>Lancer ramassage</Text>
+                  </TouchableOpacity>
+                )}
+                {parcel.status === "en_cours_ramassage" && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#ECFEFF", borderWidth: 1, borderColor: "#A5F3FC" }}
+                    onPress={() => updateParcelStatus(parcel.id, "arrive_gare_depart")} activeOpacity={0.8}>
+                    <Feather name="home" size={13} color="#0E7490" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#0E7490" }}>Arrivé en gare départ</Text>
+                  </TouchableOpacity>
+                )}
+                {(parcel.status === "arrive_gare_depart" || parcel.status === "pris_en_charge") && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#F5F3FF", borderWidth: 1, borderColor: "#DDD6FE" }}
+                    onPress={() => updateParcelStatus(parcel.id, "en_transit")} activeOpacity={0.8}>
+                    <Feather name="truck" size={13} color="#6D28D9" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#6D28D9" }}>Mettre en transit</Text>
+                  </TouchableOpacity>
+                )}
+                {parcel.status === "en_transit" && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF3C7", borderWidth: 1, borderColor: "#FDE68A" }}
+                    onPress={() => updateParcelStatus(parcel.id, "arrive_destination")} activeOpacity={0.8}>
+                    <Feather name="flag" size={13} color="#D97706" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#D97706" }}>Arrivé à destination</Text>
+                  </TouchableOpacity>
+                )}
+                {parcel.status === "arrive_destination" && (
+                  <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" }}
+                    onPress={() => updateParcelStatus(parcel.id, "livre")} activeOpacity={0.8}>
+                    <Feather name="gift" size={13} color="#065F46" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#065F46" }}>Confirmer livraison</Text>
+                  </TouchableOpacity>
+                )}
+                {parcel.status === "livre" && (
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#F1F5F9" }}>
+                    <Feather name="check" size={13} color="#94A3B8" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#94A3B8" }}>Livré ✓</Text>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -1100,6 +1211,139 @@ export default function CompanyDashboard() {
           </View>
         </Modal>
       )}
+
+      {/* ─────────── Modal : Créer une réservation guichet ─────────── */}
+      <Modal visible={addReservationModal} transparent animationType="slide" onRequestClose={() => setAddReservationModal(false)}>
+        <View style={S.modalOverlay}>
+          <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Nouvelle réservation</Text>
+              <Pressable onPress={() => { setAddReservationModal(false); setReservationError(""); }}>
+                <Feather name="x" size={20} color="#64748B" />
+              </Pressable>
+            </View>
+            <Text style={S.subLabel}>Client</Text>
+            <TextInput style={S.modalInput} placeholder="Nom complet du client *" value={newReservation.clientName}
+              onChangeText={v => setNewReservation(p => ({ ...p, clientName: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Téléphone du client" keyboardType="phone-pad"
+              value={newReservation.clientPhone} onChangeText={v => setNewReservation(p => ({ ...p, clientPhone: v }))} placeholderTextColor="#94A3B8" />
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Trajet *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {trips.map(t => (
+                <Pressable key={t.id} onPress={() => setNewReservation(p => ({ ...p, tripId: t.id }))}
+                  style={[S.filterChip, newReservation.tripId === t.id && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newReservation.tripId === t.id && S.filterChipTextActive]}>
+                    {t.from} → {t.to} · {t.departureTime}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Nombre de places</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {["1","2","3","4","5"].map(n => (
+                <Pressable key={n} onPress={() => setNewReservation(p => ({ ...p, seatCount: n }))}
+                  style={[S.filterChip, newReservation.seatCount === n && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newReservation.seatCount === n && S.filterChipTextActive]}>{n}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Mode de paiement</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {[["cash","Cash"],["orange","Orange Money"],["mtn","MTN MoMo"],["wave","Wave"]].map(([val,lbl]) => (
+                <Pressable key={val} onPress={() => setNewReservation(p => ({ ...p, paymentMethod: val }))}
+                  style={[S.filterChip, newReservation.paymentMethod === val && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newReservation.paymentMethod === val && S.filterChipTextActive]}>{lbl}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {newReservation.tripId !== "" && (
+              <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: "#F8FAFC" }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>
+                  {(() => { const t = trips.find(x => x.id === newReservation.tripId); return t ? `${t.from} → ${t.to} · ${t.price.toLocaleString()} FCFA/place × ${newReservation.seatCount} = ${(t.price * Number(newReservation.seatCount)).toLocaleString()} FCFA` : ""; })()}
+                </Text>
+              </View>
+            )}
+            {reservationError !== "" && <Text style={{ color: "#DC2626", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 8 }}>{reservationError}</Text>}
+            <View style={[S.modalBtns, { marginTop: 14 }]}>
+              <Pressable style={S.modalCancel} onPress={() => { setAddReservationModal(false); setReservationError(""); }}>
+                <Text style={S.modalCancelText}>Annuler</Text>
+              </Pressable>
+              <Pressable style={[S.modalConfirm, reservationSubmitting && S.modalConfirmDisabled]} onPress={handleCreateReservation} disabled={reservationSubmitting}>
+                <Text style={S.modalConfirmText}>{reservationSubmitting ? "Création…" : "Créer"}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ─────────── Modal : Créer un colis ─────────── */}
+      <Modal visible={addParcelModal} transparent animationType="slide" onRequestClose={() => setAddParcelModal(false)}>
+        <View style={S.modalOverlay}>
+          <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Nouveau colis</Text>
+              <Pressable onPress={() => { setAddParcelModal(false); setParcelError(""); }}>
+                <Feather name="x" size={20} color="#64748B" />
+              </Pressable>
+            </View>
+            <Text style={S.subLabel}>Expéditeur</Text>
+            <TextInput style={S.modalInput} placeholder="Nom de l'expéditeur *" value={newParcel.senderName}
+              onChangeText={v => setNewParcel(p => ({ ...p, senderName: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Téléphone expéditeur" keyboardType="phone-pad"
+              value={newParcel.senderPhone} onChangeText={v => setNewParcel(p => ({ ...p, senderPhone: v }))} placeholderTextColor="#94A3B8" />
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Destinataire</Text>
+            <TextInput style={S.modalInput} placeholder="Nom du destinataire *" value={newParcel.receiverName}
+              onChangeText={v => setNewParcel(p => ({ ...p, receiverName: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Téléphone destinataire" keyboardType="phone-pad"
+              value={newParcel.receiverPhone} onChangeText={v => setNewParcel(p => ({ ...p, receiverPhone: v }))} placeholderTextColor="#94A3B8" />
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Ville de départ *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {CI_CITIES.map(c => (
+                <Pressable key={c} onPress={() => setNewParcel(p => ({ ...p, fromCity: c }))}
+                  style={[S.filterChip, newParcel.fromCity === c && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newParcel.fromCity === c && S.filterChipTextActive]}>{c}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Ville d'arrivée *</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {CI_CITIES.filter(c => c !== newParcel.fromCity).map(c => (
+                <Pressable key={c} onPress={() => setNewParcel(p => ({ ...p, toCity: c }))}
+                  style={[S.filterChip, newParcel.toCity === c && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newParcel.toCity === c && S.filterChipTextActive]}>{c}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Poids (kg)</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {["0.5","1","2","3","5","10","15","20"].map(w => (
+                <Pressable key={w} onPress={() => setNewParcel(p => ({ ...p, weight: w }))}
+                  style={[S.filterChip, newParcel.weight === w && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newParcel.weight === w && S.filterChipTextActive]}>{w} kg</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Text style={[S.subLabel, { marginTop: 8 }]}>Mode de paiement</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {[["cash","Cash"],["orange","Orange Money"],["mtn","MTN MoMo"],["wave","Wave"]].map(([val,lbl]) => (
+                <Pressable key={val} onPress={() => setNewParcel(p => ({ ...p, paymentMethod: val }))}
+                  style={[S.filterChip, newParcel.paymentMethod === val && S.filterChipActive]}>
+                  <Text style={[S.filterChipText, newParcel.paymentMethod === val && S.filterChipTextActive]}>{lbl}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {parcelError !== "" && <Text style={{ color: "#DC2626", fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 8 }}>{parcelError}</Text>}
+            <View style={[S.modalBtns, { marginTop: 14 }]}>
+              <Pressable style={S.modalCancel} onPress={() => { setAddParcelModal(false); setParcelError(""); }}>
+                <Text style={S.modalCancelText}>Annuler</Text>
+              </Pressable>
+              <Pressable style={[S.modalConfirm, parcelSubmitting && S.modalConfirmDisabled]} onPress={handleCreateParcel} disabled={parcelSubmitting}>
+                <Text style={S.modalConfirmText}>{parcelSubmitting ? "Création…" : "Enregistrer"}</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }

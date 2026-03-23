@@ -38,16 +38,20 @@ interface Parcel {
 
 type Filter = "tous" | "en_cours" | "livres";
 
-const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string }> = {
-  en_attente:     { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B" },
-  pris_en_charge: { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6" },
-  en_transit:     { color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6" },
-  en_livraison:   { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4" },
-  livre:          { color: "#065F46", bg: "#ECFDF5", strip: "#10B981" },
-  annule:         { color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444" },
+const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string; label: string }> = {
+  en_attente:          { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B", label: "En attente" },
+  confirme:            { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Confirmé" },
+  en_cours_ramassage:  { color: "#7C3AED", bg: "#F5F3FF", strip: "#8B5CF6", label: "Ramassage" },
+  arrive_gare_depart:  { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "Gare départ" },
+  pris_en_charge:      { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Pris en charge" },
+  en_transit:          { color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6", label: "En transit" },
+  arrive_destination:  { color: "#D97706", bg: "#FEF3C7", strip: "#F59E0B", label: "Arrivé dest." },
+  en_livraison:        { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "En livraison" },
+  livre:               { color: "#065F46", bg: "#ECFDF5", strip: "#10B981", label: "Livré" },
+  annule:              { color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444", label: "Annulé" },
 };
 
-const IN_PROGRESS = ["en_attente", "pris_en_charge", "en_transit", "en_livraison"];
+const IN_PROGRESS = ["en_attente", "confirme", "en_cours_ramassage", "arrive_gare_depart", "pris_en_charge", "en_transit", "arrive_destination", "en_livraison"];
 
 const DEMO_PARCELS: Parcel[] = [
   { id: "d1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké",
@@ -84,12 +88,16 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
   const { t, lang } = useLanguage();
   const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.en_attente;
   const statusLabels: Record<string, string> = {
-    en_attente: t.statusEnAttente,
-    pris_en_charge: t.statusPrisEnCharge,
-    en_transit: t.statusEnTransit,
-    en_livraison: t.statusEnLivraison,
-    livre: t.statusLivre,
-    annule: t.statusAnnule,
+    en_attente:          t.statusEnAttente   ?? "En attente",
+    confirme:            "Confirmé",
+    en_cours_ramassage:  "Ramassage",
+    arrive_gare_depart:  "Gare départ",
+    pris_en_charge:      t.statusPrisEnCharge ?? "Pris en charge",
+    en_transit:          t.statusEnTransit   ?? "En transit",
+    arrive_destination:  "Arrivé dest.",
+    en_livraison:        t.statusEnLivraison  ?? "En livraison",
+    livre:               t.statusLivre        ?? "Livré",
+    annule:              t.statusAnnule       ?? "Annulé",
   };
   return (
     <TouchableOpacity style={styles.row} activeOpacity={0.75} onPress={onPress}>

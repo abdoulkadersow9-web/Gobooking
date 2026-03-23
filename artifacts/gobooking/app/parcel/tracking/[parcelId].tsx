@@ -32,12 +32,21 @@ interface Parcel {
 }
 
 const STATUS_STEPS = [
-  { id: "en_attente", label: "Colis enregistré", desc: "Votre colis a été pris en compte", icon: "check-circle" },
-  { id: "pris_en_charge", label: "Pris en charge", desc: "L'agent a récupéré votre colis", icon: "package" },
-  { id: "en_transit", label: "En transit", desc: "Votre colis est en cours de transport", icon: "truck" },
-  { id: "en_livraison", label: "En livraison", desc: "Le colis est chez l'agent de livraison", icon: "map-pin" },
-  { id: "livre", label: "Livré", desc: "Votre colis a été livré avec succès", icon: "gift" },
+  { id: "en_attente",         label: "Enregistré",        desc: "Votre colis a bien été enregistré",              icon: "check-circle"  },
+  { id: "confirme",           label: "Confirmé",          desc: "La compagnie a confirmé votre colis",             icon: "clipboard"     },
+  { id: "en_cours_ramassage", label: "Ramassage",         desc: "L'agent vient récupérer votre colis",             icon: "map-pin"       },
+  { id: "arrive_gare_depart", label: "Gare de départ",    desc: "Colis arrivé en gare de départ",                  icon: "home"          },
+  { id: "pris_en_charge",     label: "Pris en charge",    desc: "L'agent a pris en charge votre colis",            icon: "package"       },
+  { id: "en_transit",         label: "En transit",        desc: "Votre colis est en cours de transport",           icon: "truck"         },
+  { id: "arrive_destination", label: "Arrivé",            desc: "Votre colis est arrivé à destination",            icon: "flag"          },
+  { id: "en_livraison",       label: "En livraison",      desc: "Le livreur est en route avec votre colis",        icon: "navigation"    },
+  { id: "livre",              label: "Livré",             desc: "Votre colis a été livré avec succès ! 🎉",        icon: "gift"          },
 ];
+
+/* Map each status to its step index for progress calculation */
+const STATUS_INDEX: Record<string, number> = Object.fromEntries(
+  STATUS_STEPS.map((s, i) => [s.id, i])
+);
 
 const DELIVERY_LABELS: Record<string, string> = {
   depot_agence: "Dépôt en agence",

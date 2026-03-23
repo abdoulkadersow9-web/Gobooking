@@ -194,7 +194,11 @@ router.patch("/:parcelId/status", async (req, res) => {
     }
 
     const { status } = req.body;
-    const validStatuses = ["en_attente", "pris_en_charge", "en_transit", "en_livraison", "livre", "annule"];
+    const validStatuses = [
+      "en_attente", "confirme", "en_cours_ramassage",
+      "arrive_gare_depart", "pris_en_charge", "en_transit",
+      "arrive_destination", "en_livraison", "livre", "annule",
+    ];
     if (!validStatuses.includes(status)) {
       res.status(400).json({ error: "Statut invalide" });
       return;

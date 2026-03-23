@@ -76,11 +76,16 @@ const DEMO_PARCELS: ParcelEntry[] = [
 ];
 
 const PARCEL_STATUS: Record<string, { label: string; color: string; bg: string }> = {
-  en_attente:     { label: "En attente",     color: "#B45309", bg: "#FFFBEB" },
-  pris_en_charge: { label: "Pris en charge", color: "#1D4ED8", bg: "#EFF6FF" },
-  en_transit:     { label: "En transit",     color: "#6D28D9", bg: "#F5F3FF" },
-  en_livraison:   { label: "En livraison",   color: "#0E7490", bg: "#ECFEFF" },
-  livre:          { label: "Livré",          color: "#065F46", bg: "#ECFDF5" },
+  en_attente:          { label: "En attente",      color: "#B45309", bg: "#FFFBEB" },
+  confirme:            { label: "Confirmé",         color: "#1D4ED8", bg: "#EFF6FF" },
+  en_cours_ramassage:  { label: "Ramassage",        color: "#7C3AED", bg: "#F5F3FF" },
+  arrive_gare_depart:  { label: "Gare départ",      color: "#0E7490", bg: "#ECFEFF" },
+  pris_en_charge:      { label: "Pris en charge",   color: "#1D4ED8", bg: "#EFF6FF" },
+  en_transit:          { label: "En transit",       color: "#6D28D9", bg: "#F5F3FF" },
+  arrive_destination:  { label: "Arrivé dest.",     color: "#D97706", bg: "#FEF3C7" },
+  en_livraison:        { label: "En livraison",     color: "#0E7490", bg: "#ECFEFF" },
+  livre:               { label: "Livré",            color: "#065F46", bg: "#ECFDF5" },
+  annule:              { label: "Annulé",           color: "#DC2626", bg: "#FEF2F2" },
 };
 
 type Tab = "mission" | "demandes" | "sieges" | "embarquement" | "colis" | "scanner";
@@ -1536,17 +1541,27 @@ export default function AgentDashboard() {
                   ))}
                 </View>
                 <View style={S.parcelActions}>
-                  {parcel.status === "en_attente" && (
-                    <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#EFF6FF" }]} onPress={() => updateParcel(parcel.id, "pris_en_charge", "pickup")} activeOpacity={0.8}>
-                      <Feather name="package" size={14} color="#1D4ED8" /><Text style={[S.actionText, { color: "#1D4ED8" }]}>Prise en charge</Text>
+                  {(parcel.status === "en_attente" || parcel.status === "confirme" || parcel.status === "en_cours_ramassage") && (
+                    <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#EFF6FF" }]} onPress={() => updateParcel(parcel.id, "arrive_gare_depart", "pickup")} activeOpacity={0.8}>
+                      <Feather name="package" size={14} color="#1D4ED8" /><Text style={[S.actionText, { color: "#1D4ED8" }]}>Arrivé en gare départ</Text>
                     </TouchableOpacity>
                   )}
                   {parcel.status === "pris_en_charge" && (
+                    <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#EFF6FF" }]} onPress={() => updateParcel(parcel.id, "arrive_gare_depart", "pickup")} activeOpacity={0.8}>
+                      <Feather name="package" size={14} color="#1D4ED8" /><Text style={[S.actionText, { color: "#1D4ED8" }]}>Arrivé en gare départ</Text>
+                    </TouchableOpacity>
+                  )}
+                  {parcel.status === "arrive_gare_depart" && (
                     <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#F5F3FF" }]} onPress={() => updateParcel(parcel.id, "en_transit", "transit")} activeOpacity={0.8}>
                       <Feather name="truck" size={14} color="#6D28D9" /><Text style={[S.actionText, { color: "#6D28D9" }]}>Mettre en transit</Text>
                     </TouchableOpacity>
                   )}
                   {parcel.status === "en_transit" && (
+                    <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#FEF3C7" }]} onPress={() => updateParcel(parcel.id, "arrive_destination", "deliver")} activeOpacity={0.8}>
+                      <Feather name="flag" size={14} color="#D97706" /><Text style={[S.actionText, { color: "#D97706" }]}>Arrivé à destination</Text>
+                    </TouchableOpacity>
+                  )}
+                  {parcel.status === "arrive_destination" && (
                     <TouchableOpacity style={[S.actionBtn, { backgroundColor: "#ECFDF5" }]} onPress={() => updateParcel(parcel.id, "livre", "deliver")} activeOpacity={0.8}>
                       <Feather name="check-circle" size={14} color={GREEN} /><Text style={[S.actionText, { color: GREEN }]}>Confirmer livraison</Text>
                     </TouchableOpacity>
