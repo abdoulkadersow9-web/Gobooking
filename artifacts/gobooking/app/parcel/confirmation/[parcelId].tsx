@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useParcel } from "@/context/ParcelContext";
+import { generateQRData } from "@/utils/qr";
 
 function makeQrMatrix(seed: string, size = 21): boolean[][] {
   const matrix: boolean[][] = Array.from({ length: size }, () =>
@@ -302,7 +303,7 @@ export default function ParcelConfirmationScreen() {
           <View style={styles.qrSection}>
             <Text style={styles.qrHint}>SCANNER POUR SUIVRE LE COLIS</Text>
             <View style={styles.qrWrapper}>
-              <QRCode value={trackingRef} size={164} />
+              <QRCode value={generateQRData(trackingRef, "colis")} size={164} />
               <View style={styles.qrLogoOverlay}>
                 <LinearGradient
                   colors={["#059669", "#047857"]}

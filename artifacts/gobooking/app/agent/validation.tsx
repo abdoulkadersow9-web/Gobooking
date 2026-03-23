@@ -8,6 +8,8 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import { validateQR, qrErrorMessage } from "@/utils/qr";
+import { isAlreadyScanned, markAsScanned } from "@/utils/offline";
 
 const G = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -47,6 +49,8 @@ export default function ValidationScreen() {
   const [reservation, setReservation] = useState<ReservationInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [validated, setValidated] = useState(false);
+  const [invalidQR, setInvalidQR] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   if (user && user.role !== "agent") {
     return (
@@ -59,9 +63,24 @@ export default function ValidationScreen() {
 
   const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
     if (scanned) return;
-    setScanned(true);
     setScanMode(false);
-    await lookupReservation(data);
+
+    const qrResult = validateQR(data.trim());
+    if (!qrResult.valid) {
+      setInvalidQR(qrErrorMessage(qrResult.reason));
+      return;
+    }
+    const ref = qrResult.ref;
+
+    const duplicate = await isAlreadyScanned(ref);
+    if (duplicate) {
+      setIsDuplicate(true);
+      return;
+    }
+
+    setScanned(true);
+    await markAsScanned(ref);
+    await lookupReservation(ref);
   }, [scanned]);
 
   const lookupReservation = async (ref: string) => {
@@ -107,6 +126,8 @@ export default function ValidationScreen() {
     setValidated(false);
     setScanned(false);
     setSearch("");
+    setInvalidQR(null);
+    setIsDuplicate(false);
   };
 
   const openCamera = async () => {
@@ -198,6 +219,28 @@ export default function ValidationScreen() {
             <View style={styles.centerBox}>
               <ActivityIndicator size="large" color={G} />
               <Text style={styles.loadingText}>Recherche…</Text>
+            </View>
+          )}
+
+          {invalidQR && (
+            <View style={[styles.resultCard, { borderColor: "#F87171", borderWidth: 1.5, alignItems: "center" }]}>
+              <Ionicons name="qr-code-outline" size={32} color="#EF4444" />
+              <Text style={[styles.notFoundText, { color: "#EF4444" }]}>QR invalide</Text>
+              <Text style={styles.notFoundSub}>{invalidQR}</Text>
+              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={reset}>
+                <Text style={[styles.retryBtnText, { color: "#DC2626" }]}>Recommencer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isDuplicate && (
+            <View style={[styles.resultCard, { borderColor: "#FCD34D", borderWidth: 1.5, alignItems: "center" }]}>
+              <Ionicons name="alert-circle" size={32} color="#D97706" />
+              <Text style={[styles.notFoundText, { color: "#D97706" }]}>Déjà utilisé</Text>
+              <Text style={styles.notFoundSub}>Ce billet a déjà été validé dans cette session.</Text>
+              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: "#FEF3C7", borderColor: "#FDE68A" }]} onPress={reset}>
+                <Text style={[styles.retryBtnText, { color: "#B45309" }]}>Recommencer</Text>
+              </TouchableOpacity>
             </View>
           )}
 

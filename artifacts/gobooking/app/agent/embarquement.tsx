@@ -9,6 +9,7 @@ import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
+import { validateQR, qrErrorMessage } from "@/utils/qr";
 import OfflineBanner from "@/components/OfflineBanner";
 
 const G       = "#059669";
@@ -55,6 +56,8 @@ export default function EmbarquementScreen() {
   const [found, setFound]         = useState<Passenger | null>(null);
   const [notFound, setNotFound]   = useState(false);
   const [validated, setValidated] = useState(false);
+  const [invalidQR, setInvalidQR] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   /* ── Tab ──────────────────────────────────────────── */
   const [activeTab, setActiveTab] = useState<MainTab>("billets");
@@ -193,19 +196,29 @@ export default function EmbarquementScreen() {
   /* ── Existing billet flow ─────────────────────────── */
   const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
     if (scanned) return;
-    const code = data.trim();
-    /* Anti-duplicate: block if already scanned this session */
-    const duplicate = await isAlreadyScanned(code);
-    if (duplicate) {
-      Alert.alert("Déjà scanné", "Ce billet a déjà été validé dans cette session.", [
-        { text: "OK", onPress: () => setScanned(false) }
-      ]);
+    setScanMode(false);
+
+    /* 1. Validate QR signature */
+    const qrResult = validateQR(data.trim());
+    if (!qrResult.valid) {
+      setInvalidQR(qrErrorMessage(qrResult.reason));
+      setScanned(false);
       return;
     }
+
+    const ref = qrResult.ref;
+
+    /* 2. Anti-duplicate: block if already scanned this session */
+    const duplicate = await isAlreadyScanned(ref);
+    if (duplicate) {
+      setIsDuplicate(true);
+      setScanned(false);
+      return;
+    }
+
     setScanned(true);
-    setScanMode(false);
-    await markAsScanned(code);
-    await lookupPassenger(code);
+    await markAsScanned(ref);
+    await lookupPassenger(ref);
   }, [scanned]);
 
   const lookupPassenger = async (ref: string) => {
@@ -262,6 +275,8 @@ export default function EmbarquementScreen() {
     setValidated(false);
     setScanned(false);
     setSearch("");
+    setInvalidQR(null);
+    setIsDuplicate(false);
   };
 
   const openCamera = async () => {
@@ -403,6 +418,30 @@ export default function EmbarquementScreen() {
             <View style={styles.centerBox}>
               <ActivityIndicator size="large" color={G} />
               <Text style={styles.loadingText}>Recherche en cours…</Text>
+            </View>
+          )}
+
+          {/* ── QR invalide ── */}
+          {invalidQR && (
+            <View style={[styles.resultCard, { borderColor: "#F87171", borderWidth: 1.5 }]}>
+              <Ionicons name="qr-code-outline" size={32} color="#EF4444" />
+              <Text style={[styles.notFoundText, { color: "#EF4444" }]}>QR invalide</Text>
+              <Text style={styles.notFoundSub}>{invalidQR}</Text>
+              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={reset}>
+                <Text style={[styles.retryBtnText, { color: "#DC2626" }]}>Recommencer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Déjà utilisé ── */}
+          {isDuplicate && (
+            <View style={[styles.resultCard, { borderColor: "#FCD34D", borderWidth: 1.5 }]}>
+              <Ionicons name="alert-circle" size={32} color="#D97706" />
+              <Text style={[styles.notFoundText, { color: "#D97706" }]}>Déjà utilisé</Text>
+              <Text style={styles.notFoundSub}>Ce billet a déjà été validé dans cette session.</Text>
+              <TouchableOpacity style={[styles.retryBtn, { backgroundColor: "#FEF3C7", borderColor: "#FDE68A" }]} onPress={reset}>
+                <Text style={[styles.retryBtnText, { color: "#B45309" }]}>Recommencer</Text>
+              </TouchableOpacity>
             </View>
           )}
 

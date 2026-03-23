@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import { generateQRData } from "@/utils/qr";
 
 interface Booking {
   id: string;
@@ -333,7 +334,7 @@ export default function ConfirmationScreen() {
           <View style={styles.qrSection}>
             <Text style={styles.qrHint}>Scanner pour valider à l'embarquement</Text>
             <View style={styles.qrFrame}>
-              <QRCode value={booking.bookingRef} size={160} />
+              <QRCode value={generateQRData(booking.bookingRef, "billet")} size={160} />
               <View style={styles.qrLogoBox}>
                 <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.qrLogo}>
                   <Text style={styles.qrLogoText}>GB</Text>
