@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -19,6 +20,43 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+
+/* ─── Matching intelligent — types & helpers ──────────────────────────── */
+interface LiveBus {
+  id: string;
+  companyName: string;
+  busName: string;
+  fromCity: string;
+  toCity: string;
+  availableSeats: number;
+  price: number;
+  lat?: number;
+  lon?: number;
+  mapX?: number;
+  mapY?: number;
+  gpsLive?: boolean;
+  speed?: number | null;
+  estimatedArrival?: string;
+  distanceKm?: number;
+}
+
+function haversine(la1: number, lo1: number, la2: number, lo2: number): number {
+  const R = 6371;
+  const dL = (la2 - la1) * Math.PI / 180;
+  const dO = (lo2 - lo1) * Math.PI / 180;
+  const a = Math.sin(dL / 2) ** 2 + Math.cos(la1 * Math.PI / 180) * Math.cos(la2 * Math.PI / 180) * Math.sin(dO / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function mapToLatLon(mx: number, my: number) {
+  return { lat: 10.7 - (my / 100) * 6.4, lon: -8.4 + (mx / 100) * 5.2 };
+}
+
+function fmtDist(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  if (km < 10) return `${km.toFixed(1)} km`;
+  return `${Math.round(km)} km`;
+}
 
 const DASHBOARD_CARDS = [
   { label: "Espace compagnie", sub: "Gérer bus, trajets & agents", icon: "briefcase", color: Colors.light.primary, bg: "#EEF2FF", path: "/dashboard/company" },
@@ -92,6 +130,12 @@ export default function HomeScreen() {
   const [upcomingBooking, setUpcomingBooking] = useState<Booking | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(false);
 
+  /* ── Matching intelligent ── */
+  const [nearestBuses, setNearestBuses] = useState<LiveBus[]>([]);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const matchIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const loadActivity = useCallback(async () => {
     if (!token) {
       setLatestParcel(DEMO_PARCEL);
@@ -123,6 +167,51 @@ export default function HomeScreen() {
   }, [token]);
 
   useEffect(() => { loadActivity(); }, [loadActivity]);
+
+  /* ── Matching: fetch + GPS sort ── */
+  const loadNearestBuses = useCallback(async () => {
+    setMatchLoading(true);
+    try {
+      let lat: number | null = null;
+      let lon: number | null = null;
+      if (Platform.OS !== "web") {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            lat = pos.coords.latitude;
+            lon = pos.coords.longitude;
+            setUserCoords({ lat, lon });
+          }
+        } catch { /* GPS failed — use distance-agnostic sort */ }
+      }
+      const data = await apiFetch<LiveBus[]>("/trips/live");
+      const arr: LiveBus[] = (data || []).map((b: LiveBus) => {
+        let bLat = b.lat, bLon = b.lon;
+        if (!bLat || !bLon) {
+          const ll = mapToLatLon(b.mapX ?? 50, b.mapY ?? 50);
+          bLat = ll.lat; bLon = ll.lon;
+        }
+        const distKm = lat !== null && lon !== null ? haversine(lat, lon, bLat!, bLon!) : 9999;
+        return { ...b, lat: bLat, lon: bLon, distanceKm: distKm };
+      });
+      /* Sort: seats first, then by distance */
+      const sorted = arr
+        .filter(b => b.availableSeats > 0)
+        .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+      setNearestBuses(sorted.slice(0, 5));
+    } catch {
+      /* Silently fail — section simply stays empty */
+    } finally {
+      setMatchLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNearestBuses();
+    matchIntervalRef.current = setInterval(loadNearestBuses, 30000);
+    return () => { if (matchIntervalRef.current) clearInterval(matchIntervalRef.current); };
+  }, [loadNearestBuses]);
 
   const swap = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -335,6 +424,175 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
       </View>
+
+      {/* ── Matching intelligent ── */}
+      {(matchLoading || nearestBuses.length > 0) && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 24 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+            <View>
+              <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>Car recommandé</Text>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary }}>
+                {userCoords ? "Trié par distance GPS" : "Cars en route actuellement"}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push("/cars-en-route-map" as never)}>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.light.primary }}>Voir tous →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {matchLoading && nearestBuses.length === 0 ? (
+            <View style={{ height: 100, backgroundColor: "white", borderRadius: 16, justifyContent: "center", alignItems: "center", gap: 8, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+              <ActivityIndicator color={Colors.light.primary} />
+              <Text style={{ fontSize: 12, color: Colors.light.textSecondary }}>Recherche des cars proches…</Text>
+            </View>
+          ) : nearestBuses.length > 0 ? (
+            <>
+              {/* ── Carte vedette (meilleur match) ── */}
+              {(() => {
+                const best = nearestBuses[0];
+                const isNearby  = (best.distanceKm ?? 9999) < 10;
+                const hasGps    = !!best.gpsLive;
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/cars-en-route-map" as never); }}
+                    style={{
+                      backgroundColor: "#0B1628", borderRadius: 20, padding: 18, marginBottom: 10,
+                      shadowColor: "#0B1628", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+                    }}
+                  >
+                    {/* Badges */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                      <View style={{ backgroundColor: "rgba(26,86,219,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>⭐ Recommandé</Text>
+                      </View>
+                      {isNearby && (
+                        <View style={{ backgroundColor: "rgba(5,150,105,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>📍 À proximité</Text>
+                        </View>
+                      )}
+                      {hasGps && (
+                        <View style={{ backgroundColor: "rgba(52,211,153,0.18)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#34D399" }}>
+                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#34D399" }}>🟢 GPS Live</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Compagnie + Route */}
+                    <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "Inter_500Medium", marginBottom: 2 }}>{best.companyName}</Text>
+                    <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: "white", marginBottom: 12 }}>
+                      {best.fromCity} → {best.toCity}
+                    </Text>
+
+                    {/* Stats */}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14, marginBottom: 16 }}>
+                      {(best.distanceKm ?? 9999) < 9990 && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" }}>
+                            <Feather name="map-pin" size={12} color="#94A3B8" />
+                          </View>
+                          <Text style={{ fontSize: 12, color: "#94A3B8", fontFamily: "Inter_500Medium" }}>
+                            {fmtDist(best.distanceKm!)} de vous
+                          </Text>
+                        </View>
+                      )}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" }}>
+                          <Feather name="users" size={12} color="#94A3B8" />
+                        </View>
+                        <Text style={{ fontSize: 12, color: "#94A3B8", fontFamily: "Inter_500Medium" }}>
+                          {best.availableSeats} sièges libres
+                        </Text>
+                      </View>
+                      {best.speed && best.speed > 0 ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" }}>
+                            <Feather name="zap" size={12} color="#94A3B8" />
+                          </View>
+                          <Text style={{ fontSize: 12, color: "#94A3B8", fontFamily: "Inter_500Medium" }}>
+                            {Math.round(best.speed)} km/h
+                          </Text>
+                        </View>
+                      ) : null}
+                      {best.price > 0 && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" }}>
+                            <Feather name="tag" size={12} color="#94A3B8" />
+                          </View>
+                          <Text style={{ fontSize: 12, color: "#94A3B8", fontFamily: "Inter_500Medium" }}>
+                            {best.price.toLocaleString()} FCFA
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* CTA réserver */}
+                    <Pressable
+                      style={({ pressed }) => [{
+                        backgroundColor: Colors.light.primary, borderRadius: 12, paddingVertical: 13,
+                        alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8,
+                        opacity: pressed ? 0.88 : 1,
+                      }]}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/cars-en-route-map" as never); }}
+                    >
+                      <Feather name="check-circle" size={16} color="white" />
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>Réserver ce car</Text>
+                    </Pressable>
+                  </TouchableOpacity>
+                );
+              })()}
+
+              {/* ── Autres cars proches ── */}
+              {nearestBuses.slice(1, 4).map(bus => {
+                const isClose = (bus.distanceKm ?? 9999) < 10;
+                return (
+                  <TouchableOpacity
+                    key={bus.id}
+                    activeOpacity={0.85}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push("/cars-en-route-map" as never); }}
+                    style={{
+                      backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8,
+                      flexDirection: "row", alignItems: "center", gap: 12,
+                      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+                    }}
+                  >
+                    <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: bus.gpsLive ? "#ECFDF5" : "#EEF2FF", justifyContent: "center", alignItems: "center" }}>
+                      <Feather name="truck" size={19} color={bus.gpsLive ? "#059669" : Colors.light.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }} numberOfLines={1}>
+                        {bus.fromCity} → {bus.toCity}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: Colors.light.textSecondary, marginTop: 1 }}>
+                        {bus.companyName}
+                        {(bus.distanceKm ?? 9999) < 9990 ? ` · ${fmtDist(bus.distanceKm!)}` : ""}
+                        {bus.availableSeats ? ` · ${bus.availableSeats} places` : ""}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 5 }}>
+                      {bus.price > 0 && (
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: Colors.light.primary }}>
+                          {bus.price.toLocaleString()} F
+                        </Text>
+                      )}
+                      {isClose && (
+                        <View style={{ backgroundColor: "#ECFDF5", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#059669" }}>Proche</Text>
+                        </View>
+                      )}
+                      {bus.gpsLive && !isClose && (
+                        <View style={{ backgroundColor: "#F0FDF4", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#059669" }}>GPS</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          ) : null}
+        </View>
+      )}
 
       {/* ── Activity section ── */}
       <View style={styles.section}>
