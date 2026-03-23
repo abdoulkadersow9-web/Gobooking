@@ -38,7 +38,8 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 14. **Company Dashboard** (bus fleet, routes, colis, agents management — amber theme)
 15. **Agent Dashboard** (mission info, passenger boarding validation, parcel pickup/transit/delivery — green theme)
 16. **Super Admin Dashboard** (global stats, companies, users, cities, payment breakdown — purple theme)
-17. **Commission system** (10% on bookings configurable via admin, 5% on parcels; breakdown on booking confirmation; super admin revenue ventilation bars)
+17. **Animated Splash Screen** (`app/index.tsx`) — fond sombre #0B1D3A, logo-bus dessiné en primitives RN, animation séquentielle (spring + fade + slide), shimmer en boucle, nom "GoBooking" avec point accent ambre, tagline, dots de chargement pulsés, 2.6 s minimum puis redirection auth-aware
+18. **Commission system** (10% on bookings configurable via admin, 5% on parcels; breakdown on booking confirmation; super admin revenue ventilation bars)
 18. **Billing/Invoicing system** — `invoices` table (period YYYY-MM, totalGross, totalCommission, totalNet, transactionCount, status pending/paid, paidAt); company dashboard "Factures" tab with generate + share buttons; super admin "Factures" tab with pay + share actions; backend endpoints: GET/POST /company/invoices, GET /superadmin/invoices, PUT /superadmin/invoices/:id/pay
 
 ## Role-based Dashboards
