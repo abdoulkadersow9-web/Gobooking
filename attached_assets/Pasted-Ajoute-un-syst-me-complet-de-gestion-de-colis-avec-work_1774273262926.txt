@@ -1,0 +1,167 @@
+Ajoute un système complet de gestion de colis avec workflow dans GoBooking.
+
+OBJECTIF :
+Implémenter le cycle complet d’un colis du client jusqu’à la livraison.
+
+---
+
+### 1. Création colis côté CLIENT
+
+Créer page :
+/client/create-colis
+
+Champs :
+- entrepriseId (choix compagnie)
+- reference_colis (générée ou saisie)
+- nom_expediteur
+- telephone_expediteur
+- nom_destinataire
+- telephone_destinataire
+- ville_depart
+- ville_arrivee
+- option_livraison (gare ou domicile)
+
+À la création :
+
+await addDoc(collection(db, "colis"), {
+  entrepriseId,
+  reference,
+  nom_expediteur,
+  telephone_expediteur,
+  nom_destinataire,
+  telephone_destinataire,
+  ville_depart,
+  ville_arrivee,
+  option_livraison,
+  status: "en_attente",
+  createdBy: "client",
+  createdAt: new Date()
+});
+
+Afficher message :
+"Patientez, la compagnie va confirmer votre colis"
+
+---
+
+### 2. Statuts du colis
+
+Utiliser ces statuts :
+
+- en_attente
+- confirmé
+- en_cours_ramassage
+- arrivé_gare_depart
+- en_transit
+- arrivé_destination
+- en_livraison
+- livré
+
+---
+
+### 3. ENTREPRISE (compagnie)
+
+Peut :
+
+- confirmer colis :
+
+updateDoc(colisRef, {
+  status: "confirmé"
+});
+
+- lancer ramassage :
+
+status = "en_cours_ramassage"
+
+---
+
+### 4. AGENT (gare départ)
+
+Quand colis arrive :
+
+status = "arrivé_gare_depart"
+
+(Bouton scanner QR ou entrer code)
+
+---
+
+### 5. TRANSIT
+
+Entreprise ou système :
+
+status = "en_transit"
+
+---
+
+### 6. AGENT DESTINATION
+
+Quand colis arrive destination :
+
+status = "arrivé_destination"
+
+Envoyer notification client :
+"Votre colis est arrivé"
+
+---
+
+### 7. LIVRAISON
+
+Si option = domicile :
+
+status = "en_livraison"
+
+---
+
+### 8. CONFIRMATION CLIENT
+
+Quand client reçoit :
+
+Scanner code ou bouton :
+
+status = "livré"
+
+---
+
+### 9. QR CODE
+
+Générer QR code basé sur :
+reference_colis
+
+Utiliser pour :
+- scan agent
+- validation client
+
+---
+
+### 10. FILTRAGE
+
+Entreprise :
+
+colis.filter(c => c.entrepriseId === user.id)
+
+Client :
+
+colis.filter(c => c.createdBy === user.id)
+
+---
+
+### 11. UI
+
+Afficher timeline :
+
+- En attente
+- Confirmé
+- Ramassage
+- Gare départ
+- Transit
+- Arrivé
+- Livraison
+- Livré
+
+---
+
+RÉSULTAT ATTENDU :
+
+- Tracking complet colis
+- Scan QR à chaque étape
+- Notifications client
+- Logistique professionnelle

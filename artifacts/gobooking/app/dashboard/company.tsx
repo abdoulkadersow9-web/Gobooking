@@ -230,15 +230,23 @@ export default function CompanyDashboard() {
   const [addTripModal, setAddTripModal] = useState(false);
   const [addAgentModal, setAddAgentModal] = useState(false);
   const [assignAgentModal, setAssignAgentModal] = useState<AgentItem | null>(null);
+  const [addReservationModal, setAddReservationModal] = useState(false);
+  const [addParcelModal, setAddParcelModal] = useState(false);
 
   /* form states */
   const [newBus, setNewBus] = useState({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
   const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
   const [newAgent, setNewAgent] = useState({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
+  const [newReservation, setNewReservation] = useState({ clientName: "", clientPhone: "", tripId: "", seatCount: "1", paymentMethod: "cash" });
+  const [newParcel, setNewParcel] = useState({ senderName: "", senderPhone: "", receiverName: "", receiverPhone: "", fromCity: "Abidjan", toCity: "Bouaké", weight: "1", paymentMethod: "cash" });
 
   /* submission states */
   const [busSubmitting, setBusSubmitting] = useState(false);
   const [busError, setBusError] = useState("");
+  const [reservationSubmitting, setReservationSubmitting] = useState(false);
+  const [reservationError, setReservationError] = useState("");
+  const [parcelSubmitting, setParcelSubmitting] = useState(false);
+  const [parcelError, setParcelError] = useState("");
 
   useEffect(() => {
     if (!token) return;

@@ -182,6 +182,125 @@ router.get("/reservations", async (req, res) => {
   }
 });
 
+/* ── Créer une réservation manuelle en gare (compagnie uniquement) ────────
+   POST /company/reservations
+   Permet à la compagnie d'enregistrer une réservation pour un client
+   qui se présente directement au guichet.
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/reservations", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    if (!["compagnie", "admin", "company_admin"].includes(user.role)) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod } = req.body as {
+      clientName: string; clientPhone: string; tripId: string;
+      seatCount: number; paymentMethod: string;
+    };
+
+    if (!clientName?.trim() || !tripId || !seatCount) {
+      res.status(400).json({ error: "Champs obligatoires manquants (clientName, tripId, seatCount)" }); return;
+    }
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const count   = Math.max(1, Math.min(10, Number(seatCount) || 1));
+    const amount  = trip.price * count;
+    const ref     = "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
+    const id      = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const passengers = Array.from({ length: count }, (_, i) =>
+      i === 0 ? { name: clientName.trim() } : { name: `Passager ${i + 1}` }
+    );
+
+    const [booking] = await db.insert(bookingsTable).values({
+      id,
+      bookingRef:    ref,
+      userId:        user.id,
+      tripId,
+      passengers,
+      seatIds:       [],
+      seatNumbers:   [],
+      totalAmount:   amount,
+      paymentMethod: paymentMethod || "cash",
+      paymentStatus: "paid",
+      status:        "confirmed",
+      contactPhone:  clientPhone || null,
+      commissionAmount: Math.round(amount * 0.10),
+    }).returning();
+
+    res.status(201).json({
+      id: booking.id, bookingRef: booking.bookingRef, tripId: booking.tripId,
+      totalAmount: booking.totalAmount, status: booking.status,
+      paymentMethod: booking.paymentMethod, passengers: booking.passengers,
+      seatNumbers: booking.seatNumbers, createdAt: booking.createdAt?.toISOString(),
+    });
+  } catch (err) {
+    console.error("Company create reservation error:", err);
+    res.status(500).json({ error: "Échec de la création de la réservation" });
+  }
+});
+
+/* ── Créer un colis (compagnie uniquement) ────────────────────────────────
+   POST /company/parcels
+   Permet à la compagnie d'enregistrer un colis au guichet.
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/parcels", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    if (!["compagnie", "admin", "company_admin"].includes(user.role)) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+
+    const { senderName, senderPhone, receiverName, receiverPhone, fromCity, toCity, weight, paymentMethod } = req.body as {
+      senderName: string; senderPhone: string; receiverName: string; receiverPhone: string;
+      fromCity: string; toCity: string; weight: string | number; paymentMethod?: string;
+    };
+
+    if (!senderName?.trim() || !receiverName?.trim() || !fromCity || !toCity || !weight) {
+      res.status(400).json({ error: "Champs obligatoires manquants" }); return;
+    }
+
+    const kg = parseFloat(String(weight)) || 1;
+    const base = 1500;
+    const weightExtra = Math.ceil(kg) * 400;
+    const amount = base + weightExtra + 1500;
+
+    const trackingRef = "GBX-" +
+      Math.random().toString(36).toUpperCase().substr(2, 4) + "-" +
+      Math.random().toString(36).toUpperCase().substr(2, 4);
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    const [parcel] = await db.insert(parcelsTable).values({
+      id,
+      trackingRef,
+      userId:        user.id,
+      senderName:    senderName.trim(),
+      senderPhone:   senderPhone || "",
+      receiverName:  receiverName.trim(),
+      receiverPhone: receiverPhone || "",
+      fromCity,
+      toCity,
+      parcelType:    "standard",
+      weight:        kg,
+      deliveryType:  "en_gare",
+      amount,
+      paymentMethod: paymentMethod || "cash",
+      paymentStatus: "paid",
+      status:        "en_attente",
+    }).returning();
+
+    res.status(201).json(parcel);
+  } catch (err) {
+    console.error("Company create parcel error:", err);
+    res.status(500).json({ error: "Échec de la création du colis" });
+  }
+});
+
 router.get("/seats/:tripId", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);

@@ -1,0 +1,111 @@
+88241"}
+Ajoute la création de réservations et colis par l'entreprise dans GoBooking.
+
+Objectif :
+Permettre à la compagnie (entreprise) de créer directement des réservations et colis pour les clients en gare.
+
+Règles :
+
+1. ENTREPRISE peut :
+- Créer réservation manuelle
+- Créer colis
+- Associer réservation à un trajet
+
+2. CLIENT continue de :
+- Créer réservation via app
+
+3. ADMIN ne crée pas réservation
+
+---
+
+IMPLÉMENTATION :
+
+### 1. Formulaire réservation entreprise
+
+Créer une page :
+/entreprise/create-reservation
+
+Champs :
+- nom_client
+- téléphone
+- trajetId
+- nombre_places
+- montant
+- mode_paiement (cash / mobile)
+
+Code exemple :
+
+const createReservation = async () => {
+  await addDoc(collection(db, "reservations"), {
+    nom_client,
+    telephone,
+    trajetId,
+    nombre_places,
+    montant,
+    entrepriseId: user.id,
+    status: "confirmé",
+    createdBy: "entreprise",
+    createdAt: new Date()
+  });
+};
+
+---
+
+### 2. Formulaire colis
+
+Créer page :
+/entreprise/create-colis
+
+Champs :
+- nom_expediteur
+- telephone_expediteur
+- nom_destinataire
+- telephone_destinataire
+- ville_depart
+- ville_arrivee
+- prix
+
+Code :
+
+const createColis = async () => {
+  await addDoc(collection(db, "colis"), {
+    nom_expediteur,
+    telephone_expediteur,
+    nom_destinataire,
+    telephone_destinataire,
+    ville_depart,
+    ville_arrivee,
+    prix,
+    entrepriseId: user.id,
+    status: "en_attente",
+    createdAt: new Date()
+  });
+};
+
+---
+
+### 3. Boutons dans dashboard entreprise
+
+Ajouter :
+
+<Button title="Créer réservation" onPress={() => router.push("/entreprise/create-reservation")} />
+
+<Button title="Créer colis" onPress={() => router.push("/entreprise/create-colis")} />
+
+---
+
+### 4. Filtrage
+
+Entreprise voit seulement ses données :
+
+reservations.filter(r => r.entrepriseId === user.id)
+colis.filter(c => c.entrepriseId === user.id)
+
+---
+
+Résultat attendu :
+
+- Entreprise peut créer réservation en gare
+- Entreprise peut créer colis
+- Données liées à chaque compagnie
+- Structure professionnelle transport re
