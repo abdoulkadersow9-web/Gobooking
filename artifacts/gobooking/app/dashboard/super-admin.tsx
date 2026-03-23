@@ -673,12 +673,9 @@ export default function SuperAdminDashboard() {
         {activeTab === "trajets" && (<>
           <View style={S.sectionRow}>
             <View>
-              <Text style={S.sectionTitle}>Gestion des trajets</Text>
-              <Text style={S.subLabel}>{trips.length} trajet{trips.length > 1 ? "s" : ""} au total</Text>
+              <Text style={S.sectionTitle}>Supervision des trajets</Text>
+              <Text style={S.subLabel}>{trips.length} trajet{trips.length > 1 ? "s" : ""} au total · lecture seule</Text>
             </View>
-            <TouchableOpacity style={S.addBtn} onPress={() => { setAddTripModal(true); setNewTrip(EMPTY_TRIP); setTripError(""); }} activeOpacity={0.8}>
-              <Feather name="plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
-            </TouchableOpacity>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
@@ -711,13 +708,8 @@ export default function SuperAdminDashboard() {
                     <Text style={S.listSub}>{t.busName} · {t.busType} · {t.totalSeats} places</Text>
                     <Text style={[S.listTitle, { fontSize: 13, color: "#059669", marginTop: 2 }]}>{t.price.toLocaleString()} FCFA</Text>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 6 }}>
-                    <TouchableOpacity style={S.iconBtn} onPress={() => openEditTrip(t)} activeOpacity={0.7}>
-                      <Feather name="edit-2" size={14} color="#1A56DB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[S.iconBtn, { backgroundColor: "#FEF2F2" }]} onPress={() => setConfirmDeleteTrip(t)} activeOpacity={0.7}>
-                      <Feather name="trash-2" size={14} color="#DC2626" />
-                    </TouchableOpacity>
+                  <View style={[S.badge, { backgroundColor: "#F1F5F9", alignSelf: "flex-start" }]}>
+                    <Feather name="eye" size={11} color="#64748B" />
                   </View>
                 </View>
               </View>

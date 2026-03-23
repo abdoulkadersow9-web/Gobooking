@@ -168,65 +168,16 @@ router.get("/trips", async (req, res) => {
   }
 });
 
-router.post("/trips", async (req, res) => {
-  try {
-    const admin = await requireSuperAdmin(req.headers.authorization);
-    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const { from, to, date, departureTime, arrivalTime, price, busType, busName, totalSeats, duration } = req.body;
-    if (!from || !to || !date || !departureTime || !arrivalTime || !price || !busName) {
-      res.status(400).json({ error: "Champs obligatoires manquants" }); return;
-    }
-    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
-    const [trip] = await db.insert(tripsTable).values({
-      id, from, to, date, departureTime, arrivalTime,
-      price: parseFloat(price),
-      busType: busType || "Standard",
-      busName,
-      totalSeats: parseInt(totalSeats) || 44,
-      duration: duration || "",
-      status: "scheduled",
-    }).returning();
-    res.json(trip);
-  } catch (err) {
-    console.error("Create trip error:", err);
-    res.status(500).json({ error: "Échec de la création du trajet" });
-  }
+/* Routes POST /superadmin/trips, PATCH /superadmin/trips/:id et DELETE /superadmin/trips/:id
+   supprimées — la gestion des trajets est réservée aux compagnies (/company/trips). */
+router.post("/trips", async (_req, res) => {
+  res.status(403).json({ error: "Accès refusé — la création de trajets est réservée aux compagnies" });
 });
-
-router.patch("/trips/:id", async (req, res) => {
-  try {
-    const admin = await requireSuperAdmin(req.headers.authorization);
-    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const { from, to, date, departureTime, arrivalTime, price, busType, busName, totalSeats, duration, status } = req.body;
-    const updates: Record<string, unknown> = {};
-    if (from)          updates.from          = from;
-    if (to)            updates.to            = to;
-    if (date)          updates.date          = date;
-    if (departureTime) updates.departureTime = departureTime;
-    if (arrivalTime)   updates.arrivalTime   = arrivalTime;
-    if (price)         updates.price         = parseFloat(price);
-    if (busType)       updates.busType       = busType;
-    if (busName)       updates.busName       = busName;
-    if (totalSeats)    updates.totalSeats    = parseInt(totalSeats);
-    if (duration)      updates.duration      = duration;
-    if (status)        updates.status        = status;
-    const [trip] = await db.update(tripsTable).set(updates).where(eq(tripsTable.id, req.params.id)).returning();
-    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
-    res.json(trip);
-  } catch (err) {
-    res.status(500).json({ error: "Échec de la modification" });
-  }
+router.patch("/trips/:id", async (_req, res) => {
+  res.status(403).json({ error: "Accès refusé — la modification de trajets est réservée aux compagnies" });
 });
-
-router.delete("/trips/:id", async (req, res) => {
-  try {
-    const admin = await requireSuperAdmin(req.headers.authorization);
-    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
-    await db.delete(tripsTable).where(eq(tripsTable.id, req.params.id));
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: "Échec de la suppression" });
-  }
+router.delete("/trips/:id", async (_req, res) => {
+  res.status(403).json({ error: "Accès refusé — la suppression de trajets est réservée aux compagnies" });
 });
 
 router.get("/parcels", async (req, res) => {

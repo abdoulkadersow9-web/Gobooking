@@ -149,6 +149,10 @@ router.post("/trips", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    if (user.role !== "compagnie") {
+      res.status(403).json({ error: "Accès refusé — seules les compagnies peuvent créer des trajets" });
+      return;
+    }
     const { from, to, date, departureTime, arrivalTime, price, busName, busType, totalSeats, duration } = req.body;
     if (!from || !to || !date || !departureTime || !price) { res.status(400).json({ error: "Required fields missing" }); return; }
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
