@@ -11,6 +11,7 @@ import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import { validateQR, qrErrorMessage } from "@/utils/qr";
 import OfflineBanner from "@/components/OfflineBanner";
+import { useAgentGps } from "@/utils/useAgentGps";
 
 const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -43,6 +44,10 @@ type MainTab = "billets" | "en_route";
 export default function EmbarquementScreen() {
   const { user, token } = useAuth();
   const networkStatus   = useNetworkStatus(BASE_URL);
+
+  /* ── Agent GPS broadcasting ─────────────────────────── */
+  const [activeTripIdForGps, setActiveTripIdForGps] = useState<string | null>(null);
+  const gps = useAgentGps(activeTripIdForGps, token);
 
   /* ── Camera / QR scan ─────────────────────────────── */
   const [permission, requestPermission] = useCameraPermissions();
@@ -85,7 +90,7 @@ export default function EmbarquementScreen() {
     try {
       const info = await apiFetch<{ agent: { busId?: string }; bus: any }>("/agent/info", { token: token ?? undefined });
       const busId = info?.agent?.busId;
-      if (!busId) { setActiveTripId(null); return null; }
+      if (!busId) { setActiveTripId(null); setActiveTripIdForGps(null); return null; }
 
       const trips = await apiFetch<any[]>("/agent/trips", { token: token ?? undefined });
       const active = (trips || []).find((t: any) =>
@@ -93,6 +98,7 @@ export default function EmbarquementScreen() {
       );
       const id = active?.id || null;
       setActiveTripId(id);
+      setActiveTripIdForGps(id);
       return id;
     } catch {
       return null;
@@ -352,10 +358,29 @@ export default function EmbarquementScreen() {
           <View style={styles.headerIcon}>
             <Ionicons name="bus" size={22} color="#fff" />
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Embarquement</Text>
             <Text style={styles.headerSub}>Valider les billets voyageurs</Text>
           </View>
+          {/* GPS status chip */}
+          {activeTripIdForGps && (
+            <View style={{
+              flexDirection: "row", alignItems: "center", gap: 5,
+              backgroundColor: gps.active ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.1)",
+              borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,
+              borderWidth: 1, borderColor: gps.active ? "#34D399" : "rgba(255,255,255,0.2)",
+            }}>
+              <View style={{
+                width: 7, height: 7, borderRadius: 4,
+                backgroundColor: gps.active ? "#34D399" : "#FCA5A5",
+              }} />
+              <Text style={{ fontSize: 11, color: gps.active ? "#34D399" : "#FCA5A5", fontWeight: "700" }}>
+                {gps.active
+                  ? `GPS ${gps.speed ? `${Math.round(gps.speed)} km/h` : "actif"}`
+                  : gps.error ? "GPS refusé" : "GPS…"}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Tab toggle */}

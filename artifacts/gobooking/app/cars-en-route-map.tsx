@@ -32,6 +32,7 @@ import WebView from "react-native-webview";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetch } from "@/utils/api";
+import { scheduleLocalNotification } from "@/utils/notifications";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 
@@ -61,6 +62,39 @@ interface LiveBus {
 }
 
 interface ClientPos { lat: number; lon: number }
+
+/* ─── City coords (Côte d'Ivoire) for ETA calculation ───────────────────── */
+const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
+  "Abidjan":       { lat: 5.3600, lon: -4.0083 },
+  "Bouaké":        { lat: 7.6972, lon: -5.0183 },
+  "Yamoussoukro":  { lat: 6.8276, lon: -5.2893 },
+  "Korhogo":       { lat: 9.4524, lon: -5.6253 },
+  "San-Pédro":     { lat: 4.7481, lon: -6.6360 },
+  "Man":           { lat: 7.4123, lon: -7.5554 },
+  "Daloa":         { lat: 6.8740, lon: -6.4502 },
+  "Divo":          { lat: 5.8380, lon: -5.3573 },
+  "Gagnoa":        { lat: 6.1330, lon: -5.9483 },
+  "Agboville":     { lat: 5.9240, lon: -4.2183 },
+  "Bondoukou":     { lat: 8.0392, lon: -2.8009 },
+  "Abengourou":    { lat: 6.7319, lon: -3.4964 },
+  "Soubré":        { lat: 5.7913, lon: -6.5992 },
+  "Odienné":       { lat: 9.5070, lon: -7.5651 },
+};
+
+function calcEta(bus: LiveBus): { distKm: number | null; etaStr: string | null } {
+  const dest = CITY_COORDS[bus.toCity];
+  if (!dest || !bus.lat || !bus.lon) return { distKm: null, etaStr: null };
+  const distKm = haversine(bus.lat, bus.lon, dest.lat, dest.lon);
+  if (bus.gpsLive && bus.speed && bus.speed > 5) {
+    const etaH = distKm / bus.speed;
+    const now = new Date();
+    now.setTime(now.getTime() + etaH * 3600 * 1000);
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    return { distKm, etaStr: `${hh}:${mm} (${Math.round(etaH * 60)} min)` };
+  }
+  return { distKm, etaStr: null };
+}
 
 /* ─── Boarding landmarks (Côte d'Ivoire) ────────────────────────────────── */
 const BOARDING_POINTS = [
@@ -199,6 +233,11 @@ function makeUserIcon(){
   });
 }
 
+function fmtDist(km){
+  if(km<1) return Math.round(km*1000)+' m';
+  if(km<10) return km.toFixed(1)+' km';
+  return Math.round(km)+' km';
+}
 function updateBuses(buses){
   var ids={};
   buses.forEach(function(b){
@@ -206,8 +245,11 @@ function updateBuses(buses){
     var popup='<div class="popup-title">'+b.companyName+'</div>'+
       '<div class="popup-sub">'+b.fromCity+' → '+b.toCity+'</div>'+
       '<div class="popup-sub">Agent: '+b.agentName+'</div>'+
-      (b.speed?'<div class="popup-sub">'+Math.round(b.speed)+' km/h</div>':'')+
-      '<span class="popup-badge">'+b.availableSeats+' sièges</span>'+
+      (b.speed&&b.speed>0?'<div class="popup-sub">⚡ '+Math.round(b.speed)+' km/h</div>':'')+
+      (b.distToDestKm?'<div class="popup-sub">📍 '+fmtDist(b.distToDestKm)+' restants</div>':'')+
+      (b.etaStr?'<div class="popup-sub">🕐 Arrivée ~'+b.etaStr+'</div>':'')+
+      (b.gpsLive?'<span class="popup-badge" style="background:#059669">🟢 GPS Live</span>':'<span class="popup-badge">'+b.availableSeats+' sièges</span>')+
+      (!b.gpsLive?'':'<span class="popup-badge" style="margin-left:4px;background:#1A56DB">'+b.availableSeats+' sièges</span>')+
       '<button class="popup-btn" onclick="rn({type:\'selectBus\',busId:\''+b.id+'\'})">Réserver ce bus</button>';
     if(busMarkers[b.id]){
       busMarkers[b.id].setLatLng([b.lat,b.lon]);
@@ -298,6 +340,7 @@ export default function CarsEnRouteMap() {
   const firstLoad     = useRef(true);
   const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const reqPollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const nearbyNotifiedRef = useRef<Set<string>>(new Set());
 
   /* ── Load stored user info ── */
   useEffect(()=>{
@@ -341,13 +384,32 @@ export default function CarsEnRouteMap() {
         return { ...b, lat, lon, distanceKm:dist };
       });
       arr.sort((a,b)=>(a.distanceKm??9999)-(b.distanceKm??9999));
+
+      /* ── Proximity notifications (< 1 km) ── */
+      if (Platform.OS !== "web") {
+        arr.forEach(bus => {
+          const dist = bus.distanceKm ?? 9999;
+          if (dist < 1.0 && !nearbyNotifiedRef.current.has(bus.id)) {
+            nearbyNotifiedRef.current.add(bus.id);
+            scheduleLocalNotification(
+              "🚌 Car à proximité !",
+              `${bus.companyName} (${bus.fromCity} → ${bus.toCity}) est à ${fmtDist(dist)} de vous`,
+            );
+          }
+        });
+      }
+
       setBuses(arr);
       setLoading(false);
-      sendToMap({ type:"buses", payload:arr.map(b=>({
-        id:b.id, companyName:b.companyName, fromCity:b.fromCity, toCity:b.toCity,
-        agentName:b.agentName, availableSeats:b.availableSeats,
-        lat:b.lat!, lon:b.lon!, gpsLive:b.gpsLive, speed:b.speed
-      }))});
+      sendToMap({ type:"buses", payload:arr.map(b=>{
+        const eta = calcEta(b);
+        return {
+          id:b.id, companyName:b.companyName, fromCity:b.fromCity, toCity:b.toCity,
+          agentName:b.agentName, availableSeats:b.availableSeats,
+          lat:b.lat!, lon:b.lon!, gpsLive:b.gpsLive, speed:b.speed,
+          distToDestKm: eta.distKm, etaStr: eta.etaStr,
+        };
+      })});
       if(firstLoad.current && arr.length>0){
         firstLoad.current=false;
         /* Show all buses on initial load */
@@ -739,12 +801,40 @@ export default function CarsEnRouteMap() {
             </View>
 
             {/* Meta */}
-            <View style={styles.sheetMeta}>
-              <MetaItem icon="clock" label="Départ" value={selectedBus.departureTime}/>
-              <MetaItem icon="flag" label="Arrivée prévue" value={selectedBus.estimatedArrival}/>
-              <MetaItem icon="user" label="Agent" value={selectedBus.agentName}/>
-              {selectedBus.speed ? <MetaItem icon="zap" label="Vitesse" value={`${Math.round(selectedBus.speed)} km/h`}/> : null}
-            </View>
+            {(() => {
+              const eta = calcEta(selectedBus);
+              return (
+                <View style={styles.sheetMeta}>
+                  <MetaItem icon="clock" label="Départ" value={selectedBus.departureTime}/>
+                  <MetaItem
+                    icon="flag"
+                    label="Arrivée prévue"
+                    value={eta.etaStr ?? selectedBus.estimatedArrival}
+                  />
+                  {eta.distKm !== null && (
+                    <MetaItem
+                      icon="map-pin"
+                      label="Distance restante"
+                      value={fmtDist(eta.distKm)}
+                    />
+                  )}
+                  {selectedBus.speed && selectedBus.speed > 0 ? (
+                    <MetaItem icon="zap" label="Vitesse" value={`${Math.round(selectedBus.speed)} km/h`}/>
+                  ) : null}
+                  <MetaItem icon="user" label="Agent" value={selectedBus.agentName}/>
+                  {selectedBus.gpsLive && (
+                    <View style={{ flexDirection:"row", alignItems:"center", gap:6,
+                      backgroundColor:"#ECFDF5", borderRadius:8, paddingHorizontal:10,
+                      paddingVertical:6, marginTop:2 }}>
+                      <View style={{ width:8, height:8, borderRadius:4, backgroundColor:"#059669" }}/>
+                      <Text style={{ fontSize:12, color:"#065F46", fontWeight:"700" }}>
+                        Position GPS en direct
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
 
             {/* Actions */}
             <View style={styles.sheetActions}>
