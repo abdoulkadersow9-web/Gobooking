@@ -1,0 +1,31 @@
+import { router, Stack, useSegments } from "expo-router";
+import React, { useEffect } from "react";
+
+import { useAuth } from "@/context/AuthContext";
+
+const ALLOWED = ["compagnie", "company_admin"];
+
+export default function EntrepriseLayout() {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/(auth)/login");
+      return;
+    }
+    if (!ALLOWED.includes(user.role)) {
+      router.replace("/(auth)/login");
+    }
+  }, [user, isLoading, segments]);
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="dashboard" />
+      <Stack.Screen name="reservations" />
+      <Stack.Screen name="trajets" />
+      <Stack.Screen name="colis" />
+    </Stack>
+  );
+}

@@ -135,7 +135,7 @@ export default function OfflineHistoryScreen() {
 
       {/* Header */}
       <View style={S.header}>
-        <TouchableOpacity onPress={() => router.back()} style={S.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={S.backBtn} activeOpacity={0.7}>
           <Feather name="arrow-left" size={20} color="#111827" />
         </TouchableOpacity>
         <View style={S.headerCenter}>

@@ -130,7 +130,7 @@ export default function BookingDetailScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Détail de la réservation</Text>

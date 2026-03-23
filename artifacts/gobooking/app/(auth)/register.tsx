@@ -306,7 +306,7 @@ export default function RegisterScreen() {
           {/* ── Lien connexion ── */}
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>Déjà un compte ?</Text>
-            <Pressable onPress={() => router.back()}>
+            <Pressable onPress={() => router.replace("/(auth)/login")}>
               <Text style={styles.loginLink}>Se connecter</Text>
             </Pressable>
           </View>

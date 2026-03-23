@@ -100,7 +100,7 @@ export default function AdminScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPadValue }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(auth)/login")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </Pressable>
         <View>

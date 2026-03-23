@@ -24,20 +24,16 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-/* ─── Rôle → segments dashboard autorisés ────────────────── */
-const DASHBOARD_ROLES: Record<string, string[]> = {
-  company:       ["compagnie", "company_admin"],
-  agent:         ["agent"],
-  "super-admin": ["admin", "super_admin"],
+/* ─── Rôles autorisés par groupe de routes ───────────────── */
+const ROUTE_ROLES: Record<string, string[]> = {
+  entreprise: ["compagnie", "company_admin"],
+  admin:      ["admin", "super_admin"],
 };
 
-/* ─── Rôles qui n'ont accès QU'à leur dashboard (jamais /(tabs)) ─── */
+/* ─── Rôles qui n'ont accès QU'à leur espace (jamais /(tabs)) ─── */
 const DASHBOARD_ONLY_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
 
-/* ─── Routes spécialisées agent ─────────────────────────── */
-const AGENT_ROUTES = ["embarquement", "reception-colis", "vente", "validation"];
-
-/* ─── Routes publiques (pas besoin d'être connecté) ────────── */
+/* ─── Routes publiques ────────────────────────────────────── */
 const PUBLIC_ROOTS = ["index", "(auth)", "live-tracking", "cars-en-route-map", "offline"];
 
 function AuthGuard() {
@@ -50,43 +46,64 @@ function AuthGuard() {
     const root = segments[0] as string | undefined;
     const isPublic = !root || PUBLIC_ROOTS.includes(root);
 
-    /* Utilisateur non connecté → page de login si route protégée */
+    /* Non connecté → login si route protégée */
     if (!user) {
-      if (!isPublic) {
-        router.replace("/(auth)/login");
-      }
+      if (!isPublic) router.replace("/(auth)/login");
       return;
     }
 
-    /* Utilisateur connecté sur un écran d'auth → son dashboard */
+    /* Connecté sur écran d'auth → son espace */
     if (root === "(auth)") {
       router.replace(getDashboardPath(user.role, user.agentRole) as never);
       return;
     }
 
-    /* Agent / Compagnie / Admin → ne peuvent PAS accéder à /(tabs) */
+    /* Client ne peut pas accéder aux espaces pro */
     if (root === "(tabs)" && DASHBOARD_ONLY_ROLES.includes(user.role)) {
       router.replace(getDashboardPath(user.role, user.agentRole) as never);
       return;
     }
 
-    /* Routes agent spécialisées → réservées aux agents */
+    /* Protection espace /entreprise */
+    if (root === "entreprise") {
+      const allowed = ROUTE_ROLES.entreprise ?? [];
+      if (!allowed.includes(user.role)) {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+      }
+      return;
+    }
+
+    /* Protection espace /admin */
+    if (root === "admin") {
+      const allowed = ROUTE_ROLES.admin ?? [];
+      if (!allowed.includes(user.role)) {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+      }
+      return;
+    }
+
+    /* Protection espace /agent */
     if (root === "agent") {
       if (user.role !== "agent") {
         router.replace(getDashboardPath(user.role, user.agentRole) as never);
-        return;
       }
+      return;
     }
 
-    /* Contrôle d'accès aux dashboards selon le rôle */
+    /* Accès dashboard legacy → redirige vers le bon espace */
     if (root === "dashboard") {
       const requestedDash = segments[1] as string | undefined;
-      if (requestedDash) {
-        const allowedRoles = DASHBOARD_ROLES[requestedDash] ?? [];
-        if (!allowedRoles.includes(user.role)) {
-          router.replace(getDashboardPath(user.role, user.agentRole) as never);
-          return;
-        }
+      if (requestedDash === "company" && !["compagnie", "company_admin"].includes(user.role)) {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+        return;
+      }
+      if (requestedDash === "super-admin" && !["admin", "super_admin"].includes(user.role)) {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+        return;
+      }
+      if (requestedDash === "agent" && user.role !== "agent") {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+        return;
       }
     }
 
@@ -102,37 +119,64 @@ function AuthGuard() {
 function RootLayoutNav() {
   return (
     <>
-    <AuthGuard />
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="(auth)"
-        options={{
-          presentation: "modal",
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen name="trip/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="seats/[tripId]" options={{ headerShown: false }} />
-      <Stack.Screen name="passengers" options={{ headerShown: false }} />
-      <Stack.Screen name="payment" options={{ headerShown: false }} />
-      <Stack.Screen name="confirmation/[bookingId]" options={{ headerShown: false }} />
-      <Stack.Screen name="booking/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="admin" options={{ headerShown: false }} />
-      <Stack.Screen name="parcel/send" options={{ headerShown: false }} />
-      <Stack.Screen name="parcel/payment" options={{ headerShown: false }} />
-      <Stack.Screen name="parcel/confirmation/[parcelId]" options={{ headerShown: false }} />
-      <Stack.Screen name="parcel/tracking/[parcelId]" options={{ headerShown: false }} />
-      <Stack.Screen name="parcel/track" options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard/company" options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard/agent" options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard/super-admin" options={{ headerShown: false }} />
-      <Stack.Screen name="agent/embarquement" options={{ headerShown: false }} />
-      <Stack.Screen name="agent/reception-colis" options={{ headerShown: false }} />
-      <Stack.Screen name="agent/vente" options={{ headerShown: false }} />
-      <Stack.Screen name="agent/validation" options={{ headerShown: false }} />
-    </Stack>
+      <AuthGuard />
+      <Stack screenOptions={{ headerShown: false }}>
+        {/* Splash */}
+        <Stack.Screen name="index" />
+
+        {/* Auth */}
+        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
+
+        {/* Client */}
+        <Stack.Screen name="(tabs)" />
+
+        {/* Entreprise */}
+        <Stack.Screen name="entreprise/dashboard" />
+        <Stack.Screen name="entreprise/reservations" />
+        <Stack.Screen name="entreprise/trajets" />
+        <Stack.Screen name="entreprise/colis" />
+
+        {/* Agent */}
+        <Stack.Screen name="agent/home" />
+        <Stack.Screen name="agent/scan" />
+        <Stack.Screen name="agent/embarquement" />
+        <Stack.Screen name="agent/reception-colis" />
+        <Stack.Screen name="agent/vente" />
+        <Stack.Screen name="agent/validation" />
+
+        {/* Admin */}
+        <Stack.Screen name="admin/dashboard" />
+        <Stack.Screen name="admin/stats" />
+
+        {/* Dashboards legacy (toujours accessibles via redirect) */}
+        <Stack.Screen name="dashboard/company" />
+        <Stack.Screen name="dashboard/agent" />
+        <Stack.Screen name="dashboard/super-admin" />
+
+        {/* Flux réservation */}
+        <Stack.Screen name="trip/[id]" />
+        <Stack.Screen name="seats/[tripId]" />
+        <Stack.Screen name="passengers" />
+        <Stack.Screen name="payment" />
+        <Stack.Screen name="confirmation/[bookingId]" />
+        <Stack.Screen name="booking/[id]" />
+        <Stack.Screen name="search-results" />
+
+        {/* Flux colis */}
+        <Stack.Screen name="parcel/send" />
+        <Stack.Screen name="parcel/payment" />
+        <Stack.Screen name="parcel/confirmation/[parcelId]" />
+        <Stack.Screen name="parcel/tracking/[parcelId]" />
+        <Stack.Screen name="parcel/track" />
+        <Stack.Screen name="parcel/mes-colis" />
+
+        {/* Divers */}
+        <Stack.Screen name="admin" />
+        <Stack.Screen name="live-tracking" />
+        <Stack.Screen name="cars-en-route-map" />
+        <Stack.Screen name="offline/history" />
+        <Stack.Screen name="preview/company" />
+      </Stack>
     </>
   );
 }

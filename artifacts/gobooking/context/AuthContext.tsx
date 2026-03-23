@@ -33,13 +33,13 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
   if (agentRole === "reception_colis") return "/agent/reception-colis";
   if (agentRole === "vente")           return "/agent/vente";
   if (agentRole === "validation")      return "/agent/validation";
-  return "/dashboard/agent";
+  return "/agent/home";
 }
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
-  if (role === "compagnie" || role === "company_admin") return "/dashboard/company";
+  if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
   if (role === "agent")                                 return getAgentPath(agentRole);
-  if (role === "admin"   || role === "super_admin")     return "/dashboard/super-admin";
+  if (role === "admin"   || role === "super_admin")     return "/admin/dashboard";
   return "/(tabs)"; // client / user
 }
 

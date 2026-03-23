@@ -161,7 +161,7 @@ export default function MesColisScreen() {
         colors={[Colors.light.primary, Colors.light.primaryDark]}
         style={styles.header}
       >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")}>
           <Feather name="arrow-left" size={22} color="white" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>

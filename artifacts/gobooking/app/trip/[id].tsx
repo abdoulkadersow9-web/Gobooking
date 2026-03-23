@@ -111,7 +111,7 @@ export default function TripDetailScreen() {
           colors={[Colors.light.primary, Colors.light.primaryDark]}
           style={styles.hero}
         >
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Pressable style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")}>
             <Feather name="arrow-left" size={22} color="white" />
           </Pressable>
           <View style={styles.heroContent}>

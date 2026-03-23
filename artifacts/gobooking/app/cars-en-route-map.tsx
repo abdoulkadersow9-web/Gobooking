@@ -578,7 +578,7 @@ export default function CarsEnRouteMap() {
     <View style={[styles.root,{paddingTop:insets.top}]}>
       {/* ── Header ── */}
       <LinearGradient colors={["#0f172a","#1e293b"]} style={styles.header}>
-        <TouchableOpacity onPress={()=>router.back()} style={styles.backBtn} hitSlop={12}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn} hitSlop={12}>
           <Feather name="arrow-left" size={22} color="#f8fafc"/>
         </TouchableOpacity>
         <View style={styles.headerCenter}>

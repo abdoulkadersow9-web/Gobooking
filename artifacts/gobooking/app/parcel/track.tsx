@@ -198,7 +198,7 @@ export default function ParcelTrackScreen() {
           colors={[Colors.light.primary, Colors.light.primaryDark]}
           style={styles.header}
         >
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Pressable style={styles.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")}>
             <Feather name="arrow-left" size={20} color="white" />
           </Pressable>
           <View style={{ flex: 1 }}>

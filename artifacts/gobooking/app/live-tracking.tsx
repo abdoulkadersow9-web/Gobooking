@@ -595,7 +595,7 @@ export default function LiveTrackingScreen() {
     <View style={[S.root, { paddingTop: topPad }]}>
       {/* Header */}
       <LinearGradient colors={["#0B1E3D", "#0B1628"]} style={S.header}>
-        <Pressable onPress={() => router.back()} style={S.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>

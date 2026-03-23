@@ -57,7 +57,7 @@ export default function PassengersScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Passenger Details</Text>

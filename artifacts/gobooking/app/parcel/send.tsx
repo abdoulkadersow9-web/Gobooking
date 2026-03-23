@@ -139,7 +139,8 @@ export default function ParcelSendScreen() {
   const back = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (step > 0) setStep(step - 1);
-    else router.back();
+    else if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
   };
 
   const formatPhone = (t: string) => {
