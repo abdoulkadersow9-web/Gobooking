@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Modal,
   Platform,
@@ -132,7 +133,8 @@ const DEMO_WALLET: WalletData = {
   ],
 };
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille";
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "en_route";
+type BoardingRequest = { id: string; tripId: string; clientName: string; clientPhone: string; boardingPoint: string; seatsRequested: number; status: string; createdAt: string };
 
 /* ─── Reusable picker row ─────────────────────────────────── */
 function PickerRow<T>({ label, options, value, onSelect, display }: { label: string; options: T[]; value: T; onSelect: (v: T) => void; display?: (v: T) => string }) {
@@ -228,6 +230,8 @@ export default function CompanyDashboard() {
   const [seatActionLoading, setSeatActionLoading] = useState(false);
   const [seatFilter, setSeatFilter] = useState<"all" | "available" | "booked" | "blocked">("all");
   const [reservationFilter, setReservationFilter] = useState<"all" | "confirmed" | "boarded" | "cancelled">("all");
+  const [boardingRequests, setBoardingRequests]   = useState<BoardingRequest[]>([]);
+  const [boardingLoading, setBoardingLoading]     = useState(false);
 
   /* modal states */
   const [addBusModal, setAddBusModal] = useState(false);
@@ -252,6 +256,23 @@ export default function CompanyDashboard() {
   const [parcelSubmitting, setParcelSubmitting] = useState(false);
   const [parcelError, setParcelError] = useState("");
 
+  const loadBoardingRequests = () => {
+    if (!token) return;
+    setBoardingLoading(true);
+    apiFetch<BoardingRequest[]>("/company/boarding-requests", { token })
+      .then(data => setBoardingRequests(data))
+      .catch(() => {})
+      .finally(() => setBoardingLoading(false));
+  };
+
+  const handleBoardingAction = (id: string, action: "accept" | "reject") => {
+    if (!token) return;
+    const endpoint = `/company/boarding-requests/${id}/${action}`;
+    apiFetch<{ success: boolean }>(endpoint, { token, method: "POST" })
+      .then(() => loadBoardingRequests())
+      .catch(() => Alert.alert("Erreur", "Impossible de traiter la demande."));
+  };
+
   useEffect(() => {
     if (!token) return;
     Promise.allSettled([
@@ -269,6 +290,7 @@ export default function CompanyDashboard() {
       if (p.status === "fulfilled" && p.value.length > 0) setParcels(p.value);
       if (w.status === "fulfilled") setWalletData(w.value);
     });
+    loadBoardingRequests();
   }, [token]);
 
   const confirmReservation = async (reservationId: string) => {
@@ -457,7 +479,9 @@ export default function CompanyDashboard() {
     { id: "bus",          label: "Bus",           icon: "truck" },
     { id: "colis",        label: "Colis",         icon: "package" },
     { id: "agents",       label: "Agents",        icon: "users" },
+    { id: "en_route",     label: "En Route",      icon: "radio" },
   ];
+  const pendingBoardingCount = boardingRequests.filter(r => r.status === "pending").length;
 
   const filteredRes = reservationFilter === "all" ? reservations : reservations.filter(r => r.status === reservationFilter);
   const seatBooked  = seats.filter(s => s.status === "booked").length;
@@ -986,6 +1010,104 @@ export default function CompanyDashboard() {
               </View>
             </View>
           ))}
+        </>)}
+
+        {/* ── En Route ── */}
+        {activeTab === "en_route" && (<>
+          <View style={S.sectionRow}>
+            <View>
+              <Text style={S.sectionTitle}>Demandes En Route</Text>
+              <Text style={[S.listSub, { marginTop: 2 }]}>Passagers demandant à monter à bord</Text>
+            </View>
+            <TouchableOpacity style={[S.addBtn, { backgroundColor: "#059669" }]} onPress={loadBoardingRequests} activeOpacity={0.8}>
+              <Feather name="refresh-cw" size={13} color="white" />
+              <Text style={S.addBtnText}>Rafraîchir</Text>
+            </TouchableOpacity>
+          </View>
+
+          {boardingLoading && (
+            <View style={{ alignItems: "center", padding: 24 }}>
+              <ActivityIndicator color={PRIMARY} />
+              <Text style={[S.listSub, { marginTop: 8 }]}>Chargement...</Text>
+            </View>
+          )}
+
+          {!boardingLoading && boardingRequests.length === 0 && (
+            <View style={{ alignItems: "center", padding: 32 }}>
+              <Feather name="radio" size={40} color="#CBD5E1" />
+              <Text style={[S.listTitle, { marginTop: 12, color: "#64748B" }]}>Aucune demande en cours</Text>
+              <Text style={[S.listSub, { textAlign: "center", marginTop: 4 }]}>Les demandes apparaissent quand des passagers demandent à monter sur un trajet en route.</Text>
+            </View>
+          )}
+
+          {boardingRequests.map(req => {
+            const isPending = req.status === "pending";
+            const isAccepted = req.status === "accepted";
+            const isEmbarque = req.status === "embarqué";
+            const isRejected = req.status === "rejected";
+
+            const statusColor = isPending ? "#D97706" : isAccepted ? "#059669" : isEmbarque ? "#1D4ED8" : "#DC2626";
+            const statusBg    = isPending ? "#FFFBEB" : isAccepted ? "#ECFDF5" : isEmbarque ? "#EFF6FF" : "#FEF2F2";
+            const statusLabel = isPending ? "En attente" : isAccepted ? "Accepté" : isEmbarque ? "Embarqué" : "Refusé";
+
+            return (
+              <View key={req.id} style={[S.listCard, { flexDirection: "column", gap: 10 }]}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={S.listTitle}>{req.clientName}</Text>
+                    <Text style={S.listSub}>{req.clientPhone}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      <Feather name="map-pin" size={11} color="#64748B" />
+                      <Text style={S.listSub}>{req.boardingPoint}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                      <Feather name="users" size={11} color="#64748B" />
+                      <Text style={S.listSub}>{req.seatsRequested} siège{req.seatsRequested > 1 ? "s" : ""}</Text>
+                    </View>
+                  </View>
+                  <View style={[S.badge, { backgroundColor: statusBg }]}>
+                    <Text style={[S.badgeText, { color: statusColor }]}>{statusLabel}</Text>
+                  </View>
+                </View>
+
+                {isPending && (
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: "#ECFDF5", borderRadius: 8, paddingVertical: 10, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                      onPress={() => handleBoardingAction(req.id, "accept")} activeOpacity={0.8}
+                    >
+                      <Feather name="check" size={14} color="#059669" />
+                      <Text style={{ color: "#059669", fontWeight: "600", fontSize: 13 }}>Accepter</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: "#FEF2F2", borderRadius: 8, paddingVertical: 10, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                      onPress={() => handleBoardingAction(req.id, "reject")} activeOpacity={0.8}
+                    >
+                      <Feather name="x" size={14} color="#DC2626" />
+                      <Text style={{ color: "#DC2626", fontWeight: "600", fontSize: 13 }}>Refuser</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {(isAccepted || isEmbarque) && (
+                  <View style={{ backgroundColor: isEmbarque ? "#EFF6FF" : "#F0FDF4", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Feather name={isEmbarque ? "check-circle" : "clock"} size={14} color={isEmbarque ? "#1D4ED8" : "#059669"} />
+                    <Text style={{ fontSize: 12, color: isEmbarque ? "#1D4ED8" : "#059669" }}>
+                      {isEmbarque ? "Passager embarqué par l'agent" : "En attente d'embarquement par l'agent"}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+
+          {boardingRequests.length > 0 && (
+            <View style={{ padding: 12, backgroundColor: "#F8FAFC", borderRadius: 10, alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: "#64748B" }}>
+                {pendingBoardingCount} en attente · {boardingRequests.filter(r => r.status === "accepted").length} accepté(s) · {boardingRequests.filter(r => r.status === "embarqué").length} embarqué(s)
+              </Text>
+            </View>
+          )}
         </>)}
 
       </ScrollView>

@@ -481,6 +481,67 @@ router.post("/requests/:id/accept", async (req, res) => {
   }
 });
 
+/* POST /agent/requests/:id/board  — agent scans QR, marks passenger as boarded */
+router.post("/requests/:id/board", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    /* Update in-memory store if present */
+    const req_ = requestStore.get(req.params.id);
+    if (req_) {
+      (req_ as any).status = "embarqué";
+      (req_ as any).boardedAt = Date.now();
+      requestStore.set(req_.id, req_);
+    }
+
+    /* Sync to DB */
+    await db.update(boardingRequestsTable)
+      .set({ status: "embarqué", respondedAt: new Date() })
+      .where(eq(boardingRequestsTable.id, req.params.id));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* GET /agent/requests/confirmed?tripId=XXX  — accepted passengers for current trip */
+router.get("/requests/confirmed", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = (req.query.tripId as string) || "";
+    if (!tripId) { res.json([]); return; }
+
+    const rows = await db
+      .select()
+      .from(boardingRequestsTable)
+      .where(
+        and(
+          eq(boardingRequestsTable.tripId, tripId),
+          inArray(boardingRequestsTable.status, ["accepted", "embarqué"])
+        )
+      )
+      .orderBy(desc(boardingRequestsTable.createdAt))
+      .limit(50);
+
+    res.json(rows.map(r => ({
+      id:             r.id,
+      tripId:         r.tripId,
+      clientName:     r.clientName,
+      clientPhone:    r.clientPhone,
+      boardingPoint:  r.boardingPoint,
+      seatsRequested: parseInt(r.seatsRequested ?? "1", 10),
+      status:         r.status,
+      createdAt:      r.createdAt?.getTime() ?? Date.now(),
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* POST /agent/requests/:id/reject */
 router.post("/requests/:id/reject", async (req, res) => {
   try {

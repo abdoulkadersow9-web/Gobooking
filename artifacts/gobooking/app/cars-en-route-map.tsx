@@ -15,6 +15,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -287,10 +288,16 @@ export default function CarsEnRouteMap() {
   const [countdown, setCountdown]       = useState(5);
   const [successMsg, setSuccessMsg]     = useState("");
 
-  const webviewRef = useRef<WebView>(null);
-  const sheetY     = useRef(new Animated.Value(0)).current;
-  const firstLoad  = useRef(true);
-  const pollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  /* ── En-route request tracking ── */
+  const [activeRequest, setActiveRequest] = useState<{ requestId: string; tripId: string } | null>(null);
+  const [requestStatus, setRequestStatus] = useState<"pending" | "accepted" | "rejected" | null>(null);
+  const [showQR, setShowQR]               = useState(false);
+
+  const webviewRef    = useRef<WebView>(null);
+  const sheetY        = useRef(new Animated.Value(0)).current;
+  const firstLoad     = useRef(true);
+  const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reqPollRef    = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── Load stored user info ── */
   useEffect(()=>{
@@ -412,7 +419,38 @@ export default function CarsEnRouteMap() {
     Linking.openURL(`https://wa.me/${phone.replace(/\D/g,"")}?text=${text}`);
   };
 
-  /* ── Send boarding request ── */
+  /* ── Stop request polling ── */
+  const stopReqPoll = ()=>{
+    if(reqPollRef.current){ clearInterval(reqPollRef.current); reqPollRef.current=null; }
+  };
+
+  /* ── Cleanup on unmount ── */
+  useEffect(()=>()=>{
+    stopReqPoll();
+    if(pollRef.current) clearInterval(pollRef.current);
+  },[]);
+
+  /* ── Poll request status ── */
+  const startReqPoll = (tripId:string, requestId:string)=>{
+    stopReqPoll();
+    reqPollRef.current = setInterval(async()=>{
+      try{
+        const data = await apiFetch(`/trips/${tripId}/request/${requestId}`);
+        const status = (data as any)?.status as string | undefined;
+        if(status==="accepted"){
+          setRequestStatus("accepted");
+          setShowQR(true);
+          stopReqPoll();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else if(status==="rejected"){
+          setRequestStatus("rejected");
+          stopReqPoll();
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+      } catch{}
+    }, 5000);
+  };
+
   const sendRequest = async()=>{
     if(!selectedBus) return;
     if(!clientName.trim()||!clientPhone.trim()||!boardingPoint.trim()){
@@ -420,7 +458,7 @@ export default function CarsEnRouteMap() {
     }
     setSending(true);
     try{
-      await apiFetch(`/trips/${selectedBus.id}/request`,{
+      const data = await apiFetch(`/trips/${selectedBus.id}/request`,{
         method:"POST",
         body:JSON.stringify({
           clientName:clientName.trim(),
@@ -429,13 +467,31 @@ export default function CarsEnRouteMap() {
           boardingPoint:boardingPoint.trim(),
         }),
       });
+      const requestId = (data as any)?.requestId as string | undefined;
       setShowRequest(false);
-      setSuccessMsg("✅ Demande envoyée ! L'agent vous contactera.");
-      setTimeout(()=>setSuccessMsg(""), 4000);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if(requestId){
+        setActiveRequest({ requestId, tripId:selectedBus.id });
+        setRequestStatus("pending");
+        setShowQR(false);
+        setSuccessMsg("⏳ Demande envoyée — en attente de confirmation...");
+        startReqPoll(selectedBus.id, requestId);
+      } else {
+        setSuccessMsg("✅ Demande envoyée ! L'agent vous contactera.");
+        setTimeout(()=>setSuccessMsg(""), 5000);
+      }
     } catch(err){
       Alert.alert("Erreur","Impossible d'envoyer la demande. Réessayez.");
     } finally { setSending(false); }
+  };
+
+  const cancelActiveRequest = ()=>{
+    stopReqPoll();
+    setActiveRequest(null);
+    setRequestStatus(null);
+    setShowQR(false);
+    setSuccessMsg("");
   };
 
   /* ── Unique routes for filter dropdown ── */
@@ -534,6 +590,76 @@ export default function CarsEnRouteMap() {
           <Text style={styles.successText}>{successMsg}</Text>
         </View>
       )}
+
+      {/* ── Request status panel ── */}
+      {activeRequest && (
+        <View style={[styles.successBanner, {
+          backgroundColor: requestStatus==="accepted" ? "#065F46" : requestStatus==="rejected" ? "#7F1D1D" : "#1e3a5f",
+          paddingVertical: 12, paddingHorizontal: 16, gap: 8, alignItems: "stretch",
+        }]}>
+          {requestStatus==="pending" && (
+            <View style={{ flexDirection:"row", alignItems:"center", gap: 10 }}>
+              <ActivityIndicator size="small" color="white" />
+              <Text style={{ color:"white", fontWeight:"600", fontSize: 13 }}>En attente de confirmation...</Text>
+              <TouchableOpacity onPress={cancelActiveRequest}>
+                <Feather name="x-circle" size={18} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </View>
+          )}
+          {requestStatus==="accepted" && (
+            <View style={{ gap: 8 }}>
+              <View style={{ flexDirection:"row", alignItems:"center", gap: 8 }}>
+                <Feather name="check-circle" size={18} color="#6EE7B7" />
+                <Text style={{ color:"#6EE7B7", fontWeight:"700", fontSize: 14 }}>Demande acceptée !</Text>
+                <TouchableOpacity onPress={cancelActiveRequest} style={{ marginLeft:"auto" }}>
+                  <Feather name="x" size={16} color="rgba(255,255,255,0.6)" />
+                </TouchableOpacity>
+              </View>
+              <Text style={{ color:"rgba(255,255,255,0.85)", fontSize: 12 }}>Montrez ce QR code à l'agent embarquement</Text>
+              <TouchableOpacity onPress={()=>setShowQR(true)} style={{ alignSelf:"flex-start", backgroundColor:"white", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, flexDirection:"row", alignItems:"center", gap: 6 }}>
+                <Feather name="maximize" size={14} color="#065F46" />
+                <Text style={{ color:"#065F46", fontWeight:"700", fontSize: 13 }}>Afficher QR Code</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {requestStatus==="rejected" && (
+            <View style={{ flexDirection:"row", alignItems:"center", gap: 8 }}>
+              <Feather name="x-circle" size={18} color="#FCA5A5" />
+              <Text style={{ color:"#FCA5A5", fontWeight:"600", fontSize: 13, flex:1 }}>Demande refusée — bus complet ou indisponible</Text>
+              <TouchableOpacity onPress={cancelActiveRequest}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* ── QR Code Modal ── */}
+      <Modal visible={showQR} transparent animationType="fade" onRequestClose={()=>setShowQR(false)}>
+        <Pressable style={{ flex:1, backgroundColor:"rgba(0,0,0,0.85)", alignItems:"center", justifyContent:"center" }} onPress={()=>setShowQR(false)}>
+          <Pressable style={{ backgroundColor:"white", borderRadius: 20, padding: 28, alignItems:"center", gap: 16, width: 300 }} onPress={e=>e.stopPropagation()}>
+            <Text style={{ fontSize: 18, fontWeight:"700", color:"#0f172a" }}>QR d'embarquement</Text>
+            <Text style={{ fontSize: 12, color:"#64748B", textAlign:"center" }}>Présentez ce code à l'agent pour monter à bord</Text>
+            {activeRequest && (
+              <View style={{ borderWidth: 3, borderColor:"#065F46", borderRadius: 12, padding: 8, backgroundColor:"#F0FDF4" }}>
+                <Image
+                  source={{ uri:`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(activeRequest.requestId)}&size=200x200&margin=4` }}
+                  style={{ width: 200, height: 200 }}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+            <View style={{ backgroundColor:"#ECFDF5", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, width:"100%" }}>
+              <Text style={{ fontSize: 10, color:"#065F46", textAlign:"center", fontFamily: Platform.OS==="ios"?"Courier":"monospace" }}>
+                {activeRequest?.requestId}
+              </Text>
+            </View>
+            <TouchableOpacity style={{ backgroundColor:"#0f172a", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 32 }} onPress={()=>setShowQR(false)} activeOpacity={0.8}>
+              <Text style={{ color:"white", fontWeight:"700", fontSize: 14 }}>Fermer</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ── Bus list (when no bus selected) ── */}
       {!selectedBus && !loading && (

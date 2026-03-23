@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable } from "@workspace/db";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -404,6 +404,131 @@ router.get("/wallet", async (req, res) => {
   } catch (err) {
     console.error("Wallet error:", err);
     res.status(500).json({ error: "Failed to get wallet" });
+  }
+});
+
+/* ─── En-route boarding request management ─────────────────────────────────
+   Company sees and manages boarding requests for their active trips
+──────────────────────────────────────────────────────────────────────────── */
+
+/* GET /company/boarding-requests — pending/accepted boarding requests for company's trips */
+router.get("/boarding-requests", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await getOrCreateCompany(user);
+
+    /* Find all active trips for this company */
+    const activeTrips = await db
+      .select({ id: tripsTable.id })
+      .from(tripsTable)
+      .where(and(
+        eq(tripsTable.companyId, company.id),
+        inArray(tripsTable.status, ["en_route", "en_cours"])
+      ));
+
+    if (activeTrips.length === 0) { res.json([]); return; }
+
+    const tripIds = activeTrips.map(t => t.id);
+
+    const rows = await db
+      .select()
+      .from(boardingRequestsTable)
+      .where(inArray(boardingRequestsTable.tripId, tripIds))
+      .orderBy(desc(boardingRequestsTable.createdAt))
+      .limit(100);
+
+    res.json(rows.map(r => ({
+      id:             r.id,
+      tripId:         r.tripId,
+      clientName:     r.clientName,
+      clientPhone:    r.clientPhone,
+      boardingPoint:  r.boardingPoint,
+      seatsRequested: parseInt(r.seatsRequested ?? "1", 10),
+      status:         r.status,
+      createdAt:      r.createdAt?.toISOString(),
+      respondedAt:    r.respondedAt?.toISOString() ?? null,
+    })));
+  } catch (err) {
+    console.error("company boarding-requests error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /company/boarding-requests/:id/accept */
+router.post("/boarding-requests/:id/accept", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = await db
+      .select()
+      .from(boardingRequestsTable)
+      .where(eq(boardingRequestsTable.id, req.params.id))
+      .limit(1);
+
+    if (!rows.length) { res.status(404).json({ error: "Demande introuvable" }); return; }
+    const request = rows[0];
+
+    if (request.status !== "pending") {
+      res.status(409).json({ error: "Demande déjà traitée" }); return;
+    }
+
+    const n = parseInt(request.seatsRequested ?? "1", 10);
+    let seatsBooked = 0;
+
+    /* Deduct available seats if real trip */
+    const isDemoTrip = request.tripId.startsWith("t-") || request.tripId.startsWith("live-");
+    if (!isDemoTrip) {
+      const availableSeats = await db
+        .select({ id: seatsTable.id })
+        .from(seatsTable)
+        .where(and(eq(seatsTable.tripId, request.tripId), eq(seatsTable.status, "available")))
+        .limit(n);
+
+      if (availableSeats.length < n) {
+        res.status(409).json({ error: "Plus assez de sièges disponibles", code: "NOT_ENOUGH_SEATS" });
+        return;
+      }
+
+      if (availableSeats.length > 0) {
+        await db
+          .update(seatsTable)
+          .set({ status: "booked" })
+          .where(inArray(seatsTable.id, availableSeats.map(s => s.id)));
+        seatsBooked = availableSeats.length;
+      }
+    } else {
+      seatsBooked = n;
+    }
+
+    await db
+      .update(boardingRequestsTable)
+      .set({ status: "accepted", respondedAt: new Date() })
+      .where(eq(boardingRequestsTable.id, req.params.id));
+
+    res.json({ success: true, seatsBooked });
+  } catch (err) {
+    console.error("company accept boarding error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /company/boarding-requests/:id/reject */
+router.post("/boarding-requests/:id/reject", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db
+      .update(boardingRequestsTable)
+      .set({ status: "rejected", respondedAt: new Date() })
+      .where(eq(boardingRequestsTable.id, req.params.id));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 
