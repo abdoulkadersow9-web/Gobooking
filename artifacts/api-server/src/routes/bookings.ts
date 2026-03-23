@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable } from "@workspace/db";
-import { eq, desc, inArray, ne, and, sql } from "drizzle-orm";
+import { eq, desc, inArray, ne, and, sql, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -302,6 +302,190 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Get bookings error:", err);
     res.status(500).json({ error: "Failed to get bookings" });
+  }
+});
+
+/* ── Recommandations personnalisées (IA simple) ────────────────────────────
+   GET /bookings/recommendations
+   Analyse l'historique du client pour trouver :
+   - Sa route favorite (la plus fréquente)
+   - Son heure habituelle de départ (mode)
+   - Son jour habituel de voyage (mode)
+   Puis note chaque trajet futur disponible et retourne les 5 meilleurs.
+─────────────────────────────────────────────────────────────────────────── */
+router.get("/recommendations", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    /* ── 1. Historique du client ─────────────────────────── */
+    const pastBookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.userId, userId))
+      .orderBy(desc(bookingsTable.createdAt));
+
+    /* ── 2. Analyser les routes + heures + jours ─────────── */
+    type RouteStats = { count: number; hours: number[]; days: number[] };
+    const routeMap: Record<string, RouteStats> = {};
+
+    for (const bk of pastBookings) {
+      if (!bk.tripId) continue;
+      const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, bk.tripId)).limit(1);
+      const trip = trips[0];
+      if (!trip) continue;
+
+      const key = `${trip.from}|||${trip.to}`;
+      if (!routeMap[key]) routeMap[key] = { count: 0, hours: [], days: [] };
+      routeMap[key].count++;
+
+      if (trip.departureTime) {
+        const hour = parseInt(trip.departureTime.split(":")[0], 10);
+        if (!isNaN(hour)) routeMap[key].hours.push(hour);
+      }
+
+      if (trip.date) {
+        const d = new Date(trip.date);
+        if (!isNaN(d.getTime())) routeMap[key].days.push(d.getDay());
+      }
+    }
+
+    const mode = (arr: number[]): number | null => {
+      if (!arr.length) return null;
+      const freq: Record<number, number> = {};
+      for (const v of arr) freq[v] = (freq[v] || 0) + 1;
+      return parseInt(Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0], 10);
+    };
+
+    /* ── Top-3 routes par fréquence ──────────────────────── */
+    const sortedRoutes = Object.entries(routeMap)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3);
+
+    const favoriteFrom = sortedRoutes[0]?.[0].split("|||")[0] ?? null;
+    const favoriteTo   = sortedRoutes[0]?.[0].split("|||")[1] ?? null;
+    const preferredHour = mode(sortedRoutes[0]?.[1].hours ?? []);
+    const preferredDay  = mode(sortedRoutes[0]?.[1].days ?? []);
+
+    /* ── 3. Trajets futurs disponibles ───────────────────── */
+    const today = new Date().toISOString().slice(0, 10);
+    const futureTrips = await db
+      .select()
+      .from(tripsTable)
+      .where(gte(tripsTable.date, today))
+      .orderBy(tripsTable.date, tripsTable.departureTime);
+
+    /* ── 4. Enrichir avec sièges disponibles ─────────────── */
+    const enriched = await Promise.all(
+      futureTrips.map(async (trip) => {
+        const seats = await db
+          .select()
+          .from(seatsTable)
+          .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
+
+        let companyName = trip.companyId ?? trip.busName ?? "";
+        if (trip.companyId) {
+          const cos = await db.select().from(companiesTable).where(eq(companiesTable.id, trip.companyId)).limit(1);
+          if (cos[0]) companyName = cos[0].companyName;
+        }
+
+        return { ...trip, availableSeats: seats.length, companyName };
+      })
+    );
+
+    /* ── 5. Scorer chaque trajet ─────────────────────────── */
+    type ScoredTrip = typeof enriched[0] & {
+      score: number;
+      reasons: string[];
+      routeRank: number;
+    };
+
+    const dayNames = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+
+    const scored: ScoredTrip[] = enriched
+      .filter(t => t.availableSeats > 0)
+      .map(trip => {
+        let score = 0;
+        const reasons: string[] = [];
+        let routeRank = 0;
+
+        /* Route match */
+        sortedRoutes.forEach(([key], idx) => {
+          const [f, t2] = key.split("|||");
+          if (
+            trip.from.toLowerCase().includes(f.toLowerCase()) ||
+            f.toLowerCase().includes(trip.from.toLowerCase())
+          ) {
+            if (
+              trip.to.toLowerCase().includes(t2.toLowerCase()) ||
+              t2.toLowerCase().includes(trip.to.toLowerCase())
+            ) {
+              routeRank = idx + 1;
+              const pts = [3, 2, 1][idx];
+              score += pts;
+              if (idx === 0) reasons.push("Route habituelle");
+              else reasons.push("Route connue");
+            }
+          }
+        });
+
+        /* Heure habituelle */
+        if (preferredHour !== null && trip.departureTime) {
+          const tripHour = parseInt(trip.departureTime.split(":")[0], 10);
+          if (!isNaN(tripHour) && Math.abs(tripHour - preferredHour) <= 1) {
+            score += 2;
+            reasons.push(`Heure habituelle (~${preferredHour}h)`);
+          }
+        }
+
+        /* Jour habituel */
+        if (preferredDay !== null && trip.date) {
+          const tripDay = new Date(trip.date).getDay();
+          if (tripDay === preferredDay) {
+            score += 1;
+            reasons.push(`Jour habituel (${dayNames[preferredDay]})`);
+          }
+        }
+
+        /* Bonus places disponibles */
+        if (trip.availableSeats >= 5) {
+          score += 1;
+        }
+
+        return { ...trip, score, reasons, routeRank };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+
+    res.json({
+      profile: {
+        totalBookings: pastBookings.length,
+        favoriteRoute: favoriteFrom && favoriteTo ? { from: favoriteFrom, to: favoriteTo } : null,
+        preferredHour,
+        preferredDay,
+        preferredDayName: preferredDay !== null ? dayNames[preferredDay] : null,
+      },
+      suggestions: scored.map(t => ({
+        id: t.id,
+        from: t.from,
+        to: t.to,
+        date: t.date,
+        departureTime: t.departureTime,
+        arrivalTime: t.arrivalTime,
+        duration: t.duration,
+        price: t.price,
+        busType: t.busType,
+        busName: t.busName,
+        availableSeats: t.availableSeats,
+        companyName: t.companyName,
+        score: t.score,
+        reasons: t.reasons,
+        routeRank: t.routeRank,
+      })),
+    });
+  } catch (err) {
+    console.error("Recommendations error:", err);
+    res.status(500).json({ error: "Recommandations indisponibles" });
   }
 });
 

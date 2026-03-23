@@ -21,6 +21,33 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
+/* ─── Recommandations IA ─────────────────────────────────────────────── */
+interface RecommendedTrip {
+  id: string;
+  from: string;
+  to: string;
+  date: string;
+  departureTime: string;
+  arrivalTime?: string;
+  duration?: string;
+  price: number;
+  busType?: string;
+  busName?: string;
+  availableSeats: number;
+  companyName: string;
+  score: number;
+  reasons: string[];
+  routeRank: number;
+}
+
+interface RecProfile {
+  totalBookings: number;
+  favoriteRoute: { from: string; to: string } | null;
+  preferredHour: number | null;
+  preferredDay: number | null;
+  preferredDayName: string | null;
+}
+
 /* ─── Matching intelligent — types & helpers ──────────────────────────── */
 interface LiveBus {
   id: string;
@@ -129,6 +156,32 @@ export default function HomeScreen() {
   const [latestParcel, setLatestParcel] = useState<Parcel | null>(null);
   const [upcomingBooking, setUpcomingBooking] = useState<Booking | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(false);
+
+  /* ── Recommandations IA ── */
+  const [recommendations, setRecommendations] = useState<RecommendedTrip[]>([]);
+  const [recProfile, setRecProfile] = useState<RecProfile | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
+
+  const loadRecommendations = useCallback(async () => {
+    if (!token) return;
+    setRecLoading(true);
+    try {
+      const data = await apiFetch<{ profile: RecProfile; suggestions: RecommendedTrip[] }>(
+        "/bookings/recommendations",
+        { token }
+      );
+      if (data?.suggestions?.length) {
+        setRecommendations(data.suggestions);
+        setRecProfile(data.profile);
+      }
+    } catch {
+      /* Silently ignore — section reste cachée */
+    } finally {
+      setRecLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => { loadRecommendations(); }, [loadRecommendations]);
 
   /* ── Matching intelligent ── */
   const [nearestBuses, setNearestBuses] = useState<LiveBus[]>([]);
@@ -591,6 +644,191 @@ export default function HomeScreen() {
               })}
             </>
           ) : null}
+        </View>
+      )}
+
+      {/* ── Recommandations personnalisées ── */}
+      {token && (recLoading || recommendations.length > 0) && (
+        <View style={{ paddingHorizontal: 16, paddingTop: 28 }}>
+          {/* En-tête section */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+            <View>
+              <Text style={[styles.sectionTitle, { marginBottom: 2 }]}>Recommandé pour vous</Text>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary }}>
+                {recProfile?.favoriteRoute
+                  ? `Basé sur ${recProfile.totalBookings} réservation${recProfile.totalBookings > 1 ? "s" : ""}`
+                  : "Personnalisé selon votre historique"}
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F5F3FF", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                <Feather name="cpu" size={9} color="#7C3AED" />
+                <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>IA GoBooking</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Profil du voyageur — pill compact */}
+          {recProfile?.favoriteRoute && (
+            <View style={{
+              flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14,
+              backgroundColor: "#FAF5FF", borderRadius: 12, padding: 10,
+              borderWidth: 1, borderColor: "#E9D5FF",
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Feather name="heart" size={11} color="#7C3AED" />
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#6D28D9" }}>
+                  {recProfile.favoriteRoute.from} → {recProfile.favoriteRoute.to}
+                </Text>
+              </View>
+              {recProfile.preferredHour !== null && (
+                <>
+                  <Text style={{ fontSize: 11, color: "#C4B5FD" }}>·</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Feather name="clock" size={10} color="#9333EA" />
+                    <Text style={{ fontSize: 11, color: "#7C3AED", fontFamily: "Inter_500Medium" }}>
+                      ~{recProfile.preferredHour}h
+                    </Text>
+                  </View>
+                </>
+              )}
+              {recProfile.preferredDayName && (
+                <>
+                  <Text style={{ fontSize: 11, color: "#C4B5FD" }}>·</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Feather name="calendar" size={10} color="#9333EA" />
+                    <Text style={{ fontSize: 11, color: "#7C3AED", fontFamily: "Inter_500Medium" }}>
+                      {recProfile.preferredDayName}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Cartes de recommandation */}
+          {recLoading && recommendations.length === 0 ? (
+            <View style={{ height: 90, backgroundColor: "white", borderRadius: 16, justifyContent: "center", alignItems: "center", gap: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+              <ActivityIndicator color="#7C3AED" size="small" />
+              <Text style={{ fontSize: 12, color: Colors.light.textSecondary }}>Analyse de votre profil…</Text>
+            </View>
+          ) : (
+            recommendations.map((trip, idx) => {
+              const isTop = idx === 0;
+              const fmtDate = (() => {
+                try {
+                  const d = new Date(trip.date);
+                  return d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" });
+                } catch { return trip.date; }
+              })();
+
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  activeOpacity={0.88}
+                  onPress={() => {
+                    Haptics.impactAsync(isTop ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+                    router.push({ pathname: "/search-results", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } });
+                  }}
+                  style={{
+                    backgroundColor: isTop ? "#FAF5FF" : "white",
+                    borderRadius: 16, padding: 15, marginBottom: 8,
+                    borderWidth: isTop ? 1.5 : 1,
+                    borderColor: isTop ? "#C4B5FD" : "#F1F5F9",
+                    shadowColor: isTop ? "#7C3AED" : "#000",
+                    shadowOffset: { width: 0, height: isTop ? 4 : 1 },
+                    shadowOpacity: isTop ? 0.1 : 0.04,
+                    shadowRadius: isTop ? 10 : 4,
+                    elevation: isTop ? 4 : 1,
+                  }}
+                >
+                  {/* Score + Raisons */}
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 9 }}>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, flex: 1 }}>
+                      {trip.reasons.map(r => (
+                        <View key={r} style={{ backgroundColor: isTop ? "#EDE9FE" : "#F1F5F9", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: isTop ? "#6D28D9" : "#475569" }}>
+                            {r}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    {/* Score visuel */}
+                    <View style={{ flexDirection: "row", gap: 2, marginLeft: 8 }}>
+                      {[1,2,3,4,5,6,7].map(i => (
+                        <View key={i} style={{ width: 4, height: 12, borderRadius: 2, backgroundColor: i <= trip.score ? "#7C3AED" : "#E2E8F0" }} />
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Route */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <View style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      backgroundColor: isTop ? "#EDE9FE" : "#F8FAFC",
+                      justifyContent: "center", alignItems: "center",
+                    }}>
+                      <Feather name="navigation" size={16} color={isTop ? "#7C3AED" : "#94A3B8"} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" }} numberOfLines={1}>
+                        {trip.from} → {trip.to}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: Colors.light.textSecondary, marginTop: 1 }}>
+                        {trip.companyName}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: isTop ? "#7C3AED" : Colors.light.primary }}>
+                        {trip.price.toLocaleString()} F
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Détails */}
+                  <View style={{ flexDirection: "row", gap: 14, marginBottom: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Feather name="calendar" size={11} color="#94A3B8" />
+                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{fmtDate}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Feather name="clock" size={11} color="#94A3B8" />
+                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.departureTime}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Feather name="users" size={11} color="#94A3B8" />
+                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.availableSeats} places</Text>
+                    </View>
+                    {trip.duration && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Feather name="activity" size={11} color="#94A3B8" />
+                        <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.duration}</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* CTA Réserver */}
+                  <Pressable
+                    style={({ pressed }) => [{
+                      borderRadius: 10, paddingVertical: 10,
+                      alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6,
+                      backgroundColor: isTop ? "#7C3AED" : "#EEF2FF",
+                      opacity: pressed ? 0.85 : 1,
+                    }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      router.push({ pathname: "/search-results", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } });
+                    }}
+                  >
+                    <Feather name="search" size={13} color={isTop ? "white" : Colors.light.primary} />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: isTop ? "white" : Colors.light.primary }}>
+                      Voir les disponibilités
+                    </Text>
+                  </Pressable>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
       )}
 
