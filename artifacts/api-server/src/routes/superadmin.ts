@@ -552,8 +552,14 @@ router.get("/revenue", async (req, res) => {
 
     const paidBookings = allBookings.filter(b => b.status !== "cancelled");
 
-    const totalCommission = paidBookings.reduce((s, b) => s + (b.commissionAmount || 0), 0);
-    const totalRevenue    = paidBookings.reduce((s, b) => s + b.totalAmount, 0);
+    const allParcels = await db.select().from(parcelsTable);
+    const paidParcels = allParcels.filter(p => p.paymentStatus === "paid");
+    const parcelCommission = paidParcels.reduce((s, p) => s + (p.commissionAmount || 0), 0);
+    const parcelRevenue    = paidParcels.reduce((s, p) => s + p.amount, 0);
+
+    const bookingCommission = paidBookings.reduce((s, b) => s + (b.commissionAmount || 0), 0);
+    const totalCommission = bookingCommission + parcelCommission;
+    const totalRevenue    = paidBookings.reduce((s, b) => s + b.totalAmount, 0) + parcelRevenue;
 
     // Daily commissions — last 30 days
     const dailyMap = new Map<string, number>();
@@ -565,6 +571,10 @@ router.get("/revenue", async (req, res) => {
     for (const b of paidBookings) {
       const key = b.createdAt.toISOString().slice(0, 10);
       if (dailyMap.has(key)) dailyMap.set(key, (dailyMap.get(key) || 0) + (b.commissionAmount || 0));
+    }
+    for (const p of paidParcels) {
+      const key = p.createdAt.toISOString().slice(0, 10);
+      if (dailyMap.has(key)) dailyMap.set(key, (dailyMap.get(key) || 0) + (p.commissionAmount || 0));
     }
     const dailyCommissions = Array.from(dailyMap.entries()).map(([date, amount]) => ({ date, amount }));
 
@@ -586,7 +596,15 @@ router.get("/revenue", async (req, res) => {
 
     const settings = commSettings.length ? commSettings[0] : { type: "percentage", value: 10 };
 
-    res.json({ totalCommission, totalRevenue, dailyCommissions, byCompany, settings });
+    res.json({
+      totalCommission,
+      bookingCommission,
+      parcelCommission,
+      totalRevenue,
+      dailyCommissions,
+      byCompany,
+      settings,
+    });
   } catch (err) {
     console.error("Revenue stats error:", err);
     res.status(500).json({ error: "Failed to get revenue stats" });

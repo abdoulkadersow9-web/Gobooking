@@ -86,6 +86,7 @@ router.post("/", async (req, res) => {
     }
 
     const amount = calculateParcelPrice(fromCity, toCity, parseFloat(weight), deliveryType);
+    const commissionAmount = Math.round(amount * 0.05);
 
     // Use the client-supplied ref if it looks valid, otherwise generate one
     const trackingRef = (typeof clientTrackingRef === "string" && clientTrackingRef.startsWith("GBX-"))
@@ -107,6 +108,7 @@ router.post("/", async (req, res) => {
       description: description || null,
       deliveryType,
       amount,
+      commissionAmount,
       paymentMethod: paymentMethod || "orange",
       paymentStatus: "paid",
       status: "en_attente",

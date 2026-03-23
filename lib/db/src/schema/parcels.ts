@@ -19,6 +19,7 @@ export const parcelsTable = pgTable("parcels", {
   description: text("description"),
   deliveryType: varchar("delivery_type", { length: 50 }).notNull(),
   amount: real("amount").notNull(),
+  commissionAmount: real("commission_amount").notNull().default(0),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull().default("orange"),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("paid"),
   status: varchar("status", { length: 30 }).notNull().default("en_attente"),

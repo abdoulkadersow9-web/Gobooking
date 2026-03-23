@@ -39,6 +39,9 @@ interface Booking {
   seatNumbers: string[];
   passengers: { name: string; seatNumber: string }[];
   totalAmount: number;
+  commissionAmount: number;
+  commissionRate: number;
+  netAmount: number;
   paymentMethod: string;
   paymentStatus: string;
   status: string;
@@ -330,6 +333,47 @@ export default function ConfirmationScreen() {
                 {booking.totalAmount.toLocaleString()} FCFA
               </Text>
             </View>
+
+            {/* ── Ventilation commission ── */}
+            {booking.commissionAmount > 0 && (
+              <View style={{
+                marginTop: 8, backgroundColor: "#F8FAFC", borderRadius: 10,
+                padding: 12, gap: 8, borderWidth: 1, borderColor: "#E2E8F0",
+              }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 2 }}>
+                  <Feather name="info" size={11} color="#64748B" />
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Détail du règlement
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 12, color: "#64748B", fontFamily: "Inter_400Regular" }}>Montant total</Text>
+                  <Text style={{ fontSize: 12, color: "#0F172A", fontFamily: "Inter_600SemiBold" }}>
+                    {booking.totalAmount.toLocaleString()} FCFA
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={{ fontSize: 12, color: "#DC2626", fontFamily: "Inter_400Regular" }}>Commission plateforme</Text>
+                    <View style={{ backgroundColor: "#FEE2E2", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5 }}>
+                      <Text style={{ fontSize: 9, color: "#DC2626", fontFamily: "Inter_700Bold" }}>
+                        {booking.commissionRate > 0 ? `${booking.commissionRate}%` : "GoBooking"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: "#DC2626", fontFamily: "Inter_600SemiBold" }}>
+                    -{booking.commissionAmount.toLocaleString()} FCFA
+                  </Text>
+                </View>
+                <View style={{ height: 1, backgroundColor: "#E2E8F0" }} />
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 12, color: "#059669", fontFamily: "Inter_600SemiBold" }}>Revenu compagnie</Text>
+                  <Text style={{ fontSize: 12, color: "#059669", fontFamily: "Inter_700Bold" }}>
+                    {(booking.totalAmount - booking.commissionAmount).toLocaleString()} FCFA
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Perforation */}

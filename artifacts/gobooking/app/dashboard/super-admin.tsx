@@ -37,7 +37,7 @@ interface BookingOverallStats { total: number; confirmed: number; pending: numbe
 interface CommissionSettings { type: "percentage" | "fixed"; value: number }
 interface DailyCommission { date: string; amount: number }
 interface CompanyCommission { name: string; commission: number; bookings: number; revenue: number }
-interface RevenueData { totalCommission: number; totalRevenue: number; dailyCommissions: DailyCommission[]; byCompany: CompanyCommission[]; settings: CommissionSettings }
+interface RevenueData { totalCommission: number; bookingCommission: number; parcelCommission: number; totalRevenue: number; dailyCommissions: DailyCommission[]; byCompany: CompanyCommission[]; settings: CommissionSettings }
 interface AdminAnalytics {
   kpis: { totalBookings: number; totalRevenue: number; bookingRevenue: number; parcelRevenue: number; totalParcels: number; totalCompanies: number };
   byStatus: { confirmed: number; boarded: number; cancelled: number; pending: number };
@@ -1154,6 +1154,58 @@ export default function SuperAdminDashboard() {
               <Text style={S.commRevLabel}>FCFA transactions</Text>
             </LinearGradient>
           </View>
+
+          {/* Ventilation Réservations vs Colis */}
+          {revenueData && (revenueData.bookingCommission > 0 || revenueData.parcelCommission > 0) && (
+            <View style={[S.commCard, { gap: 12 }]}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Ventilation des commissions</Text>
+              {/* Réservations */}
+              {(() => {
+                const total = revenueData.totalCommission || 1;
+                const bPct  = Math.round((revenueData.bookingCommission / total) * 100);
+                const pPct  = Math.round((revenueData.parcelCommission  / total) * 100);
+                return (
+                  <>
+                    <View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#D97706" }} />
+                          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#475569" }}>Réservations (10%)</Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#D97706" }}>
+                          {revenueData.bookingCommission.toLocaleString()} FCFA
+                        </Text>
+                      </View>
+                      <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                        <View style={{ width: `${bPct}%`, height: "100%", backgroundColor: "#D97706", borderRadius: 4 }} />
+                      </View>
+                    </View>
+                    <View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#7C3AED" }} />
+                          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#475569" }}>Colis (5%)</Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>
+                          {revenueData.parcelCommission.toLocaleString()} FCFA
+                        </Text>
+                      </View>
+                      <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                        <View style={{ width: `${pPct}%`, height: "100%", backgroundColor: "#7C3AED", borderRadius: 4 }} />
+                      </View>
+                    </View>
+                    <View style={{ height: 1, backgroundColor: "#F1F5F9" }} />
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Total plateforme</Text>
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" }}>
+                        {revenueData.totalCommission.toLocaleString()} FCFA
+                      </Text>
+                    </View>
+                  </>
+                );
+              })()}
+            </View>
+          )}
           <View style={[S.commCard, { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }]}>
             <View>
               <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Taux effectif moyen</Text>
