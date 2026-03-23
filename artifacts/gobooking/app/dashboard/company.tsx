@@ -26,6 +26,13 @@ const DARK = Colors.light.primaryDark;
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface Stats { totalBuses: number; totalAgents: number; totalTrips: number; totalReservations: number; totalParcels: number; totalRevenue: number; activeBuses: number }
+interface Analytics {
+  kpis: { totalBookings: number; totalRevenue: number; bookingRevenue: number; parcelRevenue: number; totalParcels: number };
+  byStatus: { confirmed: number; boarded: number; cancelled: number; pending: number };
+  byMethod: { method: string; count: number; revenue: number }[];
+  dailyBookings: { date: string; count: number; revenue: number }[];
+  parcelByStatus: Record<string, number>;
+}
 interface Bus { id: string; busName: string; plateNumber: string; busType: string; capacity: number; status: string }
 interface Trip { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; totalSeats: number; busName: string; duration: string; status?: string }
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
@@ -133,7 +140,23 @@ const DEMO_WALLET: WalletData = {
   ],
 };
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "en_route";
+const DEMO_ANALYTICS: Analytics = {
+  kpis: { totalBookings: 1420, totalRevenue: 8_760_000, bookingRevenue: 7_100_000, parcelRevenue: 1_660_000, totalParcels: 638 },
+  byStatus: { confirmed: 924, boarded: 312, cancelled: 87, pending: 97 },
+  byMethod: [
+    { method: "orange", count: 540, revenue: 2_840_000 },
+    { method: "mtn",    count: 380, revenue: 2_120_000 },
+    { method: "wave",   count: 290, revenue: 1_540_000 },
+    { method: "card",   count: 123, revenue: 600_000   },
+  ],
+  dailyBookings: Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i));
+    return { date: d.toISOString().slice(0, 10), count: 40 + Math.round(Math.random() * 60), revenue: (40 + Math.round(Math.random() * 60)) * 3500 };
+  }),
+  parcelByStatus: { livre: 310, en_transit: 142, en_livraison: 88, en_attente: 58, pris_en_charge: 40 },
+};
+
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "en_route" | "analytiques";
 type BoardingRequest = { id: string; tripId: string; clientName: string; clientPhone: string; boardingPoint: string; seatsRequested: number; status: string; createdAt: string };
 
 /* ─── Reusable picker row ─────────────────────────────────── */
@@ -234,6 +257,7 @@ export default function CompanyDashboard() {
   const [boardingLoading, setBoardingLoading]     = useState(false);
   const [tripFilter, setTripFilter] = useState<"all" | "scheduled" | "en_route" | "completed">("all");
   const [tripStatusLoading, setTripStatusLoading] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics>(DEMO_ANALYTICS);
 
   /* modal states */
   const [addBusModal, setAddBusModal] = useState(false);
@@ -299,13 +323,15 @@ export default function CompanyDashboard() {
       apiFetch<Reservation[]>("/company/reservations", { token }),
       apiFetch<Parcel[]>("/company/parcels",{ token }),
       apiFetch<WalletData>("/company/wallet",{ token }),
-    ]).then(([s, b, t, r, p, w]) => {
+      apiFetch<Analytics>("/company/analytics", { token }),
+    ]).then(([s, b, t, r, p, w, a]) => {
       if (s.status === "fulfilled") setStats(s.value);
       if (b.status === "fulfilled" && b.value.length > 0) setBuses(b.value);
       if (t.status === "fulfilled" && t.value.length > 0) setTrips(t.value);
       if (r.status === "fulfilled" && r.value.length > 0) setReservations(r.value);
       if (p.status === "fulfilled" && p.value.length > 0) setParcels(p.value);
       if (w.status === "fulfilled") setWalletData(w.value);
+      if (a.status === "fulfilled") setAnalytics(a.value);
     });
     loadBoardingRequests();
   }, [token]);
@@ -489,6 +515,7 @@ export default function CompanyDashboard() {
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: "apercu",       label: "Aperçu",        icon: "bar-chart-2" },
+    { id: "analytiques",  label: "Analytiques",   icon: "trending-up" },
     { id: "portefeuille", label: "Portefeuille",  icon: "credit-card" },
     { id: "trajets",      label: "Trajets",       icon: "navigation" },
     { id: "reservations", label: "Réservations",  icon: "bookmark" },
@@ -1185,6 +1212,163 @@ export default function CompanyDashboard() {
             </View>
           )}
         </>)}
+
+        {/* ══ Analytiques ════════════════════════════════════════════ */}
+        {activeTab === "analytiques" && (() => {
+          const { kpis, byStatus, byMethod, dailyBookings } = analytics;
+          const totalActive = kpis.totalBookings - byStatus.cancelled;
+          const maxDay = Math.max(...dailyBookings.map(d => d.count), 1);
+
+          const METHOD_META: Record<string, { label: string; color: string; bg: string }> = {
+            orange: { label: "Orange Money",    color: "#FF6B00", bg: "#FFF3E0" },
+            mtn:    { label: "MTN MoMo",        color: "#FFCB00", bg: "#FFFDE7" },
+            wave:   { label: "Wave",            color: "#1BA5E0", bg: "#E3F2FD" },
+            card:   { label: "Carte bancaire",  color: PRIMARY,   bg: "#EEF2FF" },
+            cash:   { label: "Espèces",         color: "#059669", bg: "#ECFDF5" },
+          };
+          const maxMethodRevenue = Math.max(...byMethod.map(m => m.revenue), 1);
+
+          return (<>
+            {/* KPI cards */}
+            <Text style={S.sectionTitle}>Vue business</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {[
+                { label: "Total réservations", value: kpis.totalBookings.toLocaleString(), icon: "bookmark",    color: PRIMARY,   bg: "#EEF2FF" },
+                { label: "Revenus totaux",      value: `${(kpis.totalRevenue/1_000_000).toFixed(2)} M FCFA`, icon: "trending-up", color: "#059669", bg: "#ECFDF5" },
+                { label: "Revenus billets",     value: `${(kpis.bookingRevenue/1_000_000).toFixed(2)} M`,    icon: "navigation",  color: "#1D4ED8", bg: "#EFF6FF" },
+                { label: "Revenus colis",       value: `${(kpis.parcelRevenue/1_000_000).toFixed(2)} M`,     icon: "package",     color: "#D97706", bg: "#FFFBEB" },
+                { label: "Total colis",         value: kpis.totalParcels.toLocaleString(),                   icon: "package",     color: "#7C3AED", bg: "#F5F3FF" },
+                { label: "Actives",             value: totalActive.toLocaleString(),                         icon: "check-circle",color: "#0891B2", bg: "#ECFEFF" },
+              ].map((c, i) => (
+                <View key={i} style={[S.statCard, { width: "47%", borderLeftColor: c.color }]}>
+                  <View style={[S.statIcon, { backgroundColor: c.bg }]}><Feather name={c.icon as never} size={16} color={c.color} /></View>
+                  <Text style={[S.statValue, { fontSize: 16 }]}>{c.value}</Text>
+                  <Text style={S.statLabel}>{c.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Status breakdown */}
+            <Text style={[S.sectionTitle, { marginTop: 8 }]}>Statuts des réservations</Text>
+            {[
+              { label: "Confirmées",  count: byStatus.confirmed, color: "#1D4ED8", bg: "#EFF6FF", total: kpis.totalBookings },
+              { label: "Embarquées",  count: byStatus.boarded,   color: "#059669", bg: "#ECFDF5", total: kpis.totalBookings },
+              { label: "En attente",  count: byStatus.pending,   color: "#D97706", bg: "#FFFBEB", total: kpis.totalBookings },
+              { label: "Annulées",    count: byStatus.cancelled, color: "#DC2626", bg: "#FEF2F2", total: kpis.totalBookings },
+            ].map((s, i) => {
+              const pct = kpis.totalBookings > 0 ? Math.round((s.count / kpis.totalBookings) * 100) : 0;
+              return (
+                <View key={i} style={{ backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s.color }} />
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{s.label}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={[S.badge, { backgroundColor: s.bg }]}>
+                        <Text style={[S.badgeText, { color: s.color }]}>{s.count.toLocaleString()}</Text>
+                      </View>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: s.color }}>{pct}%</Text>
+                    </View>
+                  </View>
+                  <View style={{ height: 8, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                    <View style={{ height: 8, width: `${pct}%` as never, backgroundColor: s.color, borderRadius: 4 }} />
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Revenue by payment method */}
+            <Text style={[S.sectionTitle, { marginTop: 8 }]}>Revenus par mode de paiement</Text>
+            {byMethod.map((m, i) => {
+              const meta = METHOD_META[m.method] || { label: m.method, color: "#6B7280", bg: "#F9FAFB" };
+              const pct = Math.round((m.revenue / maxMethodRevenue) * 100);
+              return (
+                <View key={i} style={{ backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: meta.bg, justifyContent: "center", alignItems: "center" }}>
+                    <Feather name="credit-card" size={18} color={meta.color} />
+                  </View>
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{meta.label}</Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: meta.color }}>{(m.revenue / 1_000).toFixed(0)} k FCFA</Text>
+                    </View>
+                    <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                      <View style={{ height: 7, width: `${pct}%` as never, backgroundColor: meta.color, borderRadius: 4 }} />
+                    </View>
+                    <Text style={{ fontSize: 11, color: "#94A3B8" }}>{m.count} transaction{m.count > 1 ? "s" : ""}</Text>
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Bookings trend (last 14 days) */}
+            <Text style={[S.sectionTitle, { marginTop: 8 }]}>Tendance — 14 derniers jours</Text>
+            <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+              <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, height: 80 }}>
+                {dailyBookings.map((day, i) => {
+                  const h = Math.max(4, Math.round((day.count / maxDay) * 80));
+                  const isToday = i === dailyBookings.length - 1;
+                  const dayLabel = new Date(day.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+                  return (
+                    <View key={i} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end", gap: 3 }}>
+                      <View style={{
+                        height: h,
+                        width: "100%",
+                        backgroundColor: isToday ? PRIMARY : "#93C5FD",
+                        borderRadius: 3,
+                        opacity: 0.85 + (i / dailyBookings.length) * 0.15,
+                      }} />
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={{ flexDirection: "row", gap: 4, marginTop: 6 }}>
+                {dailyBookings.filter((_, i) => i % 7 === 0 || i === dailyBookings.length - 1).map((day, i) => (
+                  <View key={i} style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9, color: "#94A3B8", textAlign: "center" }}>
+                      {new Date(day.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9" }}>
+                <Text style={{ fontSize: 12, color: "#64748B" }}>Total 14 jours</Text>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: PRIMARY }}>
+                  {dailyBookings.reduce((s, d) => s + d.count, 0)} réservations
+                </Text>
+              </View>
+            </View>
+
+            {/* Recap card */}
+            <View style={{ backgroundColor: "#1E293B", borderRadius: 16, padding: 20, marginTop: 8, gap: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" }}>
+                  <Feather name="bar-chart-2" size={18} color="white" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>Résumé financier</Text>
+                  <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>Toutes périodes confondues</Text>
+                </View>
+              </View>
+              {[
+                { label: "Revenus billets",      value: kpis.bookingRevenue, icon: "navigation" },
+                { label: "Revenus livraisons",   value: kpis.parcelRevenue,  icon: "package"    },
+                { label: "Total consolidé",      value: kpis.totalRevenue,   icon: "trending-up" },
+              ].map((row, i) => (
+                <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: i > 0 ? 1 : 0, borderTopColor: "rgba(255,255,255,0.08)", paddingTop: i > 0 ? 10 : 0 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Feather name={row.icon as never} size={14} color="rgba(255,255,255,0.5)" />
+                    <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{row.label}</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: i === 2 ? "#34D399" : "white" }}>
+                    {(row.value / 1_000_000).toFixed(2)} M FCFA
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>);
+        })()}
 
       </ScrollView>
 

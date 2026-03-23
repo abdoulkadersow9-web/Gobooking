@@ -593,4 +593,99 @@ router.get("/revenue", async (req, res) => {
   }
 });
 
+/* GET /superadmin/analytics — Tableau analytique global */
+router.get("/analytics", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [bookings, parcels, companies, allTrips] = await Promise.all([
+      db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt)),
+      db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)),
+      db.select().from(companiesTable),
+      db.select().from(tripsTable),
+    ]);
+
+    // ── Status breakdown ──────────────────────────────────────────────
+    const byStatus = {
+      confirmed: bookings.filter(b => b.status === "confirmed").length,
+      boarded:   bookings.filter(b => b.status === "boarded").length,
+      cancelled: bookings.filter(b => b.status === "cancelled").length,
+      pending:   bookings.filter(b => !["confirmed","boarded","cancelled"].includes(b.status)).length,
+    };
+
+    // ── Revenue by payment method ─────────────────────────────────────
+    const methodMap: Record<string, { count: number; revenue: number }> = {};
+    for (const b of bookings.filter(bk => bk.status !== "cancelled")) {
+      const m = b.paymentMethod || "unknown";
+      if (!methodMap[m]) methodMap[m] = { count: 0, revenue: 0 };
+      methodMap[m].count++;
+      methodMap[m].revenue += b.totalAmount;
+    }
+    const byMethod = Object.entries(methodMap).map(([method, d]) => ({ method, ...d }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // ── Bookings per day (last 14 days) ───────────────────────────────
+    const today = new Date();
+    const dailyBookings: { date: string; count: number; revenue: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const dayBooks = bookings.filter(b => {
+        const bd = b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : "";
+        return bd === key;
+      });
+      dailyBookings.push({
+        date: key,
+        count: dayBooks.length,
+        revenue: dayBooks.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0),
+      });
+    }
+
+    // ── Per-company breakdown ─────────────────────────────────────────
+    const tripMap = new Map(allTrips.map(t => [t.id, t]));
+    const companyIdMap = new Map(companies.map(c => [c.id, c.name]));
+
+    const compMap: Record<string, { id: string; name: string; total: number; confirmed: number; cancelled: number; revenue: number }> = {};
+    for (const b of bookings) {
+      const trip = tripMap.get(b.tripId);
+      const compId = trip?.companyId || "unknown";
+      const compName = companyIdMap.get(compId) || trip?.busName || "Indépendant";
+      if (!compMap[compId]) {
+        compMap[compId] = { id: compId, name: compName, total: 0, confirmed: 0, cancelled: 0, revenue: 0 };
+      }
+      compMap[compId].total++;
+      if (b.status === "confirmed" || b.status === "boarded") {
+        compMap[compId].confirmed++;
+        compMap[compId].revenue += b.totalAmount;
+      }
+      if (b.status === "cancelled") compMap[compId].cancelled++;
+    }
+    const byCompany = Object.values(compMap).sort((a, b) => b.total - a.total).slice(0, 10);
+
+    // ── KPIs ──────────────────────────────────────────────────────────
+    const bookingRevenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0);
+    const parcelRevenue  = parcels.reduce((s, p) => s + p.amount, 0);
+
+    res.json({
+      kpis: {
+        totalBookings: bookings.length,
+        totalRevenue: bookingRevenue + parcelRevenue,
+        bookingRevenue,
+        parcelRevenue,
+        totalParcels: parcels.length,
+        totalCompanies: companies.length,
+      },
+      byStatus,
+      byMethod,
+      dailyBookings,
+      byCompany,
+    });
+  } catch (err) {
+    console.error("Superadmin analytics error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 export default router;

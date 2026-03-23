@@ -561,4 +561,83 @@ router.post("/boarding-requests/:id/reject", async (req, res) => {
   }
 });
 
+/* GET /company/analytics — Tableau analytique détaillé */
+router.get("/analytics", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [bookings, parcels] = await Promise.all([
+      db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt)),
+      db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)),
+    ]);
+
+    // ── Status breakdown ──────────────────────────────────────────────
+    const byStatus = {
+      confirmed: bookings.filter(b => b.status === "confirmed").length,
+      boarded:   bookings.filter(b => b.status === "boarded").length,
+      cancelled: bookings.filter(b => b.status === "cancelled").length,
+      pending:   bookings.filter(b => !["confirmed","boarded","cancelled"].includes(b.status)).length,
+    };
+
+    // ── Revenue by payment method ─────────────────────────────────────
+    const methodMap: Record<string, { count: number; revenue: number }> = {};
+    for (const b of bookings.filter(bk => bk.status !== "cancelled")) {
+      const m = b.paymentMethod || "unknown";
+      if (!methodMap[m]) methodMap[m] = { count: 0, revenue: 0 };
+      methodMap[m].count++;
+      methodMap[m].revenue += b.totalAmount;
+    }
+    const byMethod = Object.entries(methodMap).map(([method, d]) => ({ method, ...d }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // ── Bookings per day (last 14 days) ───────────────────────────────
+    const today = new Date();
+    const dailyBookings: { date: string; count: number; revenue: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const dayBooks = bookings.filter(b => {
+        const bd = b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : "";
+        return bd === key;
+      });
+      dailyBookings.push({
+        date: key,
+        count: dayBooks.length,
+        revenue: dayBooks.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0),
+      });
+    }
+
+    // ── Parcel status breakdown ───────────────────────────────────────
+    const parcelByStatus: Record<string, number> = {};
+    for (const p of parcels) {
+      parcelByStatus[p.status] = (parcelByStatus[p.status] || 0) + 1;
+    }
+
+    // ── KPIs ──────────────────────────────────────────────────────────
+    const totalRevenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0)
+      + parcels.reduce((s, p) => s + p.amount, 0);
+    const parcelRevenue = parcels.reduce((s, p) => s + p.amount, 0);
+    const bookingRevenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0);
+
+    res.json({
+      kpis: {
+        totalBookings: bookings.length,
+        totalRevenue,
+        bookingRevenue,
+        parcelRevenue,
+        totalParcels: parcels.length,
+      },
+      byStatus,
+      byMethod,
+      dailyBookings,
+      parcelByStatus,
+    });
+  } catch (err) {
+    console.error("Company analytics error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 export default router;

@@ -38,8 +38,37 @@ interface CommissionSettings { type: "percentage" | "fixed"; value: number }
 interface DailyCommission { date: string; amount: number }
 interface CompanyCommission { name: string; commission: number; bookings: number; revenue: number }
 interface RevenueData { totalCommission: number; totalRevenue: number; dailyCommissions: DailyCommission[]; byCompany: CompanyCommission[]; settings: CommissionSettings }
+interface AdminAnalytics {
+  kpis: { totalBookings: number; totalRevenue: number; bookingRevenue: number; parcelRevenue: number; totalParcels: number; totalCompanies: number };
+  byStatus: { confirmed: number; boarded: number; cancelled: number; pending: number };
+  byMethod: { method: string; count: number; revenue: number }[];
+  dailyBookings: { date: string; count: number; revenue: number }[];
+  byCompany: { id: string; name: string; total: number; confirmed: number; cancelled: number; revenue: number }[];
+}
 
 /* ─── Demo data ──────────────────────────────────────────────────── */
+const DEMO_ADMIN_ANALYTICS: AdminAnalytics = {
+  kpis: { totalBookings: 5_610, totalRevenue: 42_880_000, bookingRevenue: 36_500_000, parcelRevenue: 6_380_000, totalParcels: 2_290, totalCompanies: 8 },
+  byStatus: { confirmed: 3_420, boarded: 1_210, cancelled: 580, pending: 400 },
+  byMethod: [
+    { method: "orange", count: 2_100, revenue: 18_500_000 },
+    { method: "mtn",    count: 1_540, revenue: 9_200_000  },
+    { method: "wave",   count: 1_200, revenue: 6_100_000  },
+    { method: "card",   count: 770,   revenue: 2_700_000  },
+  ],
+  dailyBookings: Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (13 - i));
+    return { date: d.toISOString().slice(0, 10), count: 250 + Math.round(Math.random() * 150), revenue: (250 + Math.round(Math.random() * 150)) * 3_500 };
+  }),
+  byCompany: [
+    { id: "c1", name: "SOTRAL",          total: 1_840, confirmed: 1_240, cancelled: 180, revenue: 12_400_000 },
+    { id: "c2", name: "UTB",             total: 1_210, confirmed: 820,   cancelled: 120, revenue: 8_200_000  },
+    { id: "c3", name: "Trans Ivoire",    total: 890,   confirmed: 610,   cancelled: 95,  revenue: 5_900_000  },
+    { id: "c4", name: "CTM CI",          total: 720,   confirmed: 490,   cancelled: 72,  revenue: 4_800_000  },
+    { id: "c6", name: "Voyage Plus",     total: 510,   confirmed: 340,   cancelled: 51,  revenue: 3_400_000  },
+    { id: "c7", name: "Confort Bus",     total: 440,   confirmed: 290,   cancelled: 44,  revenue: 2_900_000  },
+  ],
+};
 const DEMO_STATS: GlobalStats = {
   totalUsers: 1_248, totalCompanies: 8, totalAgents: 64, totalTrips: 1_834,
   totalParcels: 2_290, totalBookings: 5_610, totalRevenue: 42_880_000, totalCities: 18,
@@ -208,6 +237,7 @@ export default function SuperAdminDashboard() {
   const [bookings, setBookings]       = useState<BookingItem[]>(DEMO_BOOKINGS);
   const [bookingStats, setBookingStats] = useState<BookingOverallStats | null>(null);
   const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
+  const [adminAnalytics, setAdminAnalytics] = useState<AdminAnalytics>(DEMO_ADMIN_ANALYTICS);
   const [commSettings, setCommSettings] = useState<CommissionSettings>({ type: "percentage", value: 10 });
   const [commForm, setCommForm]       = useState<{ type: "percentage" | "fixed"; value: string }>({ type: "percentage", value: "10" });
   const [commSaving, setCommSaving]   = useState(false);
@@ -271,7 +301,8 @@ export default function SuperAdminDashboard() {
       apiFetch<CommissionSettings>("/superadmin/commission", { token }),
       apiFetch<RevenueData>("/superadmin/revenue",    { token }),
       apiFetch<BookingOverallStats>("/superadmin/bookings/stats", { token }),
-    ]).then(([s, c, u, ci, p, tr, bk, cs, rv, bs]) => {
+      apiFetch<AdminAnalytics>("/superadmin/analytics", { token }),
+    ]).then(([s, c, u, ci, p, tr, bk, cs, rv, bs, an]) => {
       if (s.status  === "fulfilled") setStats(s.value);
       if (c.status  === "fulfilled" && c.value.length  > 0) setCompanies(c.value);
       if (u.status  === "fulfilled" && u.value.length  > 0) setUsers(u.value);
@@ -285,6 +316,7 @@ export default function SuperAdminDashboard() {
       }
       if (rv.status === "fulfilled") setRevenueData(rv.value);
       if (bs.status === "fulfilled") setBookingStats(bs.value);
+      if (an.status === "fulfilled") setAdminAnalytics(an.value);
     });
   }, [token]);
 
@@ -918,6 +950,117 @@ export default function SuperAdminDashboard() {
               <Text style={S.routeStatTrips}>{r.trips} trajets</Text>
             </View>
           ))}
+
+          {/* ── Statuts des réservations ── */}
+          <Text style={[S.sectionTitle, { marginTop: 12 }]}>Statuts des réservations (plateforme)</Text>
+          {([
+            { label: "Confirmées",  count: adminAnalytics.byStatus.confirmed, color: "#1D4ED8", bg: "#EFF6FF" },
+            { label: "Embarquées",  count: adminAnalytics.byStatus.boarded,   color: "#059669", bg: "#ECFDF5" },
+            { label: "En attente",  count: adminAnalytics.byStatus.pending,   color: "#D97706", bg: "#FFFBEB" },
+            { label: "Annulées",    count: adminAnalytics.byStatus.cancelled, color: "#DC2626", bg: "#FEF2F2" },
+          ] as const).map((s, i) => {
+            const total = adminAnalytics.kpis.totalBookings;
+            const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+            return (
+              <View key={i} style={{ backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s.color }} />
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{s.label}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View style={[S.badge, { backgroundColor: s.bg }]}>
+                      <Text style={[S.badgeText, { color: s.color }]}>{s.count.toLocaleString()}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: s.color }}>{pct}%</Text>
+                  </View>
+                </View>
+                <View style={{ height: 8, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                  <View style={{ height: 8, width: `${pct}%` as never, backgroundColor: s.color, borderRadius: 4 }} />
+                </View>
+              </View>
+            );
+          })}
+
+          {/* ── Par entreprise ── */}
+          <Text style={[S.sectionTitle, { marginTop: 12 }]}>Classement par entreprise</Text>
+          {adminAnalytics.byCompany.map((comp, i) => {
+            const maxRev = adminAnalytics.byCompany[0]?.revenue || 1;
+            const pct = Math.round((comp.revenue / maxRev) * 100);
+            const RANK_COLORS = ["#F59E0B", "#9CA3AF", "#CD7F32", "#1D4ED8", "#059669", "#7C3AED"];
+            return (
+              <View key={comp.id} style={{ backgroundColor: "white", borderRadius: 16, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center" }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: RANK_COLORS[i] || "#64748B" }}>#{i + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{comp.name}</Text>
+                    <Text style={{ fontSize: 11, color: "#64748B" }}>{comp.total} réservations · {comp.confirmed} confirmées · {comp.cancelled} annulées</Text>
+                  </View>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#059669" }}>{(comp.revenue / 1_000_000).toFixed(1)} M</Text>
+                </View>
+                <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+                  <View style={{ height: 7, width: `${pct}%` as never, backgroundColor: RANK_COLORS[i] || PRIMARY, borderRadius: 4, opacity: 0.8 }} />
+                </View>
+              </View>
+            );
+          })}
+
+          {/* ── Tendance 14 jours ── */}
+          <Text style={[S.sectionTitle, { marginTop: 12 }]}>Tendance — 14 derniers jours</Text>
+          {(() => {
+            const maxDay = Math.max(...adminAnalytics.dailyBookings.map(d => d.count), 1);
+            return (
+              <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 4, height: 80 }}>
+                  {adminAnalytics.dailyBookings.map((day, i) => {
+                    const h = Math.max(4, Math.round((day.count / maxDay) * 80));
+                    const isToday = i === adminAnalytics.dailyBookings.length - 1;
+                    return (
+                      <View key={i} style={{ flex: 1, alignItems: "center", justifyContent: "flex-end" }}>
+                        <View style={{ height: h, width: "100%", backgroundColor: isToday ? PURPLE : "#A78BFA", borderRadius: 3, opacity: 0.7 + (i / adminAnalytics.dailyBookings.length) * 0.3 }} />
+                      </View>
+                    );
+                  })}
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9" }}>
+                  <Text style={{ fontSize: 12, color: "#64748B" }}>Total 14 jours</Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: PURPLE }}>
+                    {adminAnalytics.dailyBookings.reduce((s, d) => s + d.count, 0).toLocaleString()} réservations
+                  </Text>
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* ── Revenus consolidés ── */}
+          <View style={{ backgroundColor: "#1E293B", borderRadius: 16, padding: 20, marginTop: 8, gap: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(167,139,250,0.2)", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="bar-chart-2" size={18} color="#A78BFA" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>Résumé financier plateforme</Text>
+                <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>{adminAnalytics.kpis.totalCompanies} compagnies actives</Text>
+              </View>
+            </View>
+            {[
+              { label: "Revenus billets",      value: adminAnalytics.kpis.bookingRevenue, icon: "navigation" as const },
+              { label: "Revenus livraisons",   value: adminAnalytics.kpis.parcelRevenue,  icon: "package"    as const },
+              { label: "Total consolidé",      value: adminAnalytics.kpis.totalRevenue,   icon: "trending-up" as const },
+            ].map((row, i) => (
+              <View key={i} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: i > 0 ? 1 : 0, borderTopColor: "rgba(255,255,255,0.08)", paddingTop: i > 0 ? 10 : 0 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Feather name={row.icon} size={14} color="rgba(255,255,255,0.5)" />
+                  <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>{row.label}</Text>
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: i === 2 ? "#34D399" : "white" }}>
+                  {(row.value / 1_000_000).toFixed(2)} M FCFA
+                </Text>
+              </View>
+            ))}
+          </View>
         </>)}
 
         {/* ══ Commission & Revenus ══════════════════════════════════ */}
