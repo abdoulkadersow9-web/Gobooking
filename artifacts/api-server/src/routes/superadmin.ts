@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
@@ -703,6 +703,74 @@ router.get("/analytics", async (req, res) => {
   } catch (err) {
     console.error("Superadmin analytics error:", err);
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FACTURATION ADMIN
+   GET /superadmin/invoices         — toutes les factures de toutes les compagnies
+   PUT /superadmin/invoices/:id/pay — marquer une facture comme payée
+═══════════════════════════════════════════════════════════════════════════ */
+
+router.get("/invoices", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const invs = await db
+      .select()
+      .from(invoicesTable)
+      .orderBy(desc(invoicesTable.period), desc(invoicesTable.createdAt));
+
+    res.json(invs.map(i => ({
+      id:               i.id,
+      companyId:        i.companyId,
+      companyName:      i.companyName,
+      period:           i.period,
+      totalGross:       i.totalGross,
+      totalCommission:  i.totalCommission,
+      totalNet:         i.totalNet,
+      transactionCount: i.transactionCount,
+      status:           i.status,
+      paidAt:           i.paidAt?.toISOString() ?? null,
+      createdAt:        i.createdAt.toISOString(),
+    })));
+  } catch (err) {
+    console.error("Admin invoices error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.put("/invoices/:id/pay", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    const updated = await db
+      .update(invoicesTable)
+      .set({ status: "paid", paidAt: new Date() })
+      .where(eq(invoicesTable.id, id))
+      .returning();
+
+    if (!updated.length) {
+      res.status(404).json({ error: "Facture introuvable" });
+      return;
+    }
+
+    const i = updated[0];
+    res.json({
+      id:               i.id,
+      companyName:      i.companyName,
+      period:           i.period,
+      totalCommission:  i.totalCommission,
+      totalNet:         i.totalNet,
+      status:           i.status,
+      paidAt:           i.paidAt?.toISOString() ?? null,
+    });
+  } catch (err) {
+    console.error("Pay invoice error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

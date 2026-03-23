@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -637,6 +637,129 @@ router.get("/analytics", async (req, res) => {
   } catch (err) {
     console.error("Company analytics error:", err);
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FACTURATION — Invoices
+   GET  /company/invoices          — list company invoices
+   POST /company/invoices/generate — generate/refresh invoice for a period
+═══════════════════════════════════════════════════════════════════════════ */
+
+const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+/* Construire une période YYYY-MM à partir d'une date (ou now) */
+function getPeriod(date?: string): string {
+  return date ? date.slice(0, 7) : new Date().toISOString().slice(0, 7);
+}
+
+/* GET /company/invoices */
+router.get("/invoices", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const company = await getOrCreateCompany(user);
+
+    const invs = await db
+      .select()
+      .from(invoicesTable)
+      .where(eq(invoicesTable.companyId, company.id))
+      .orderBy(desc(invoicesTable.period));
+
+    res.json(invs.map(i => ({
+      id:               i.id,
+      period:           i.period,
+      totalGross:       i.totalGross,
+      totalCommission:  i.totalCommission,
+      totalNet:         i.totalNet,
+      transactionCount: i.transactionCount,
+      status:           i.status,
+      paidAt:           i.paidAt?.toISOString() ?? null,
+      createdAt:        i.createdAt.toISOString(),
+    })));
+  } catch (err) {
+    console.error("List invoices error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /company/invoices/generate
+   Body (optionnel): { period: "2026-03" }
+   Génère ou rafraîchit la facture du mois donné en agrégeant les wallet_transactions.
+*/
+router.post("/invoices/generate", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const company = await getOrCreateCompany(user);
+
+    const period = getPeriod(req.body?.period);
+
+    /* Transactions du mois */
+    const allTx = await db
+      .select()
+      .from(walletTransactionsTable)
+      .where(and(
+        eq(walletTransactionsTable.companyId, company.id),
+        eq(walletTransactionsTable.type, "credit"),
+      ));
+
+    const monthTx = allTx.filter(t => t.createdAt.toISOString().slice(0, 7) === period);
+
+    const totalGross      = monthTx.reduce((s, t) => s + t.grossAmount, 0);
+    const totalCommission = monthTx.reduce((s, t) => s + t.commissionAmount, 0);
+    const totalNet        = monthTx.reduce((s, t) => s + t.netAmount, 0);
+    const transactionCount = monthTx.length;
+
+    /* Upsert : update si existant, sinon insert */
+    const existing = await db
+      .select()
+      .from(invoicesTable)
+      .where(and(eq(invoicesTable.companyId, company.id), eq(invoicesTable.period, period)))
+      .limit(1);
+
+    let invoice;
+    if (existing.length) {
+      /* Ne pas rétrograder status "paid" → "pending" si déjà payé */
+      const newStatus = existing[0].status === "paid" ? "paid" : "pending";
+      const updated = await db
+        .update(invoicesTable)
+        .set({ totalGross, totalCommission, totalNet, transactionCount, status: newStatus })
+        .where(eq(invoicesTable.id, existing[0].id))
+        .returning();
+      invoice = updated[0];
+    } else {
+      const inserted = await db
+        .insert(invoicesTable)
+        .values({
+          id: generateId(),
+          companyId:    company.id,
+          companyName:  company.name || user.name || "Compagnie",
+          period,
+          totalGross,
+          totalCommission,
+          totalNet,
+          transactionCount,
+          status: "pending",
+        })
+        .returning();
+      invoice = inserted[0];
+    }
+
+    res.json({
+      id:               invoice.id,
+      period:           invoice.period,
+      totalGross:       invoice.totalGross,
+      totalCommission:  invoice.totalCommission,
+      totalNet:         invoice.totalNet,
+      transactionCount: invoice.transactionCount,
+      status:           invoice.status,
+      paidAt:           invoice.paidAt?.toISOString() ?? null,
+      createdAt:        invoice.createdAt.toISOString(),
+    });
+  } catch (err) {
+    console.error("Generate invoice error:", err);
+    res.status(500).json({ error: "Erreur génération facture" });
   }
 });
 

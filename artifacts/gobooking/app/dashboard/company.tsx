@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -41,6 +42,7 @@ interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: st
 interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string }
 interface WalletTx { id: string; bookingRef?: string | null; type: string; grossAmount: number; commissionAmount: number; netAmount: number; description?: string | null; createdAt: string }
 interface WalletData { balance: number; totalGross: number; totalCommission: number; totalNet: number; transactions: WalletTx[] }
+interface Invoice { id: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_STATS: Stats = { totalBuses: 12, totalAgents: 18, totalTrips: 284, totalReservations: 1_420, totalParcels: 638, totalRevenue: 8_760_000, activeBuses: 9 };
@@ -156,7 +158,7 @@ const DEMO_ANALYTICS: Analytics = {
   parcelByStatus: { livre: 310, en_transit: 142, en_livraison: 88, en_attente: 58, pris_en_charge: 40 },
 };
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "en_route" | "analytiques";
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "factures" | "en_route" | "analytiques";
 type BoardingRequest = { id: string; tripId: string; clientName: string; clientPhone: string; boardingPoint: string; seatsRequested: number; status: string; createdAt: string };
 
 /* ─── Reusable picker row ─────────────────────────────────── */
@@ -246,6 +248,9 @@ export default function CompanyDashboard() {
   const [parcels, setParcels] = useState<Parcel[]>(DEMO_PARCELS);
   const [agents, setAgents] = useState<AgentItem[]>(DEMO_AGENTS);
   const [walletData, setWalletData] = useState<WalletData>(DEMO_WALLET);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invLoading, setInvLoading] = useState(false);
+  const [invGenerating, setInvGenerating] = useState(false);
   const [selectedTripForSeats, setSelectedTripForSeats] = useState<Trip>(DEMO_TRIPS[0]);
   const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 49, 31));
   const [selectedSeat, setSelectedSeat] = useState<SeatItem | null>(null);
@@ -281,6 +286,26 @@ export default function CompanyDashboard() {
   const [reservationError, setReservationError] = useState("");
   const [parcelSubmitting, setParcelSubmitting] = useState(false);
   const [parcelError, setParcelError] = useState("");
+
+  const loadInvoices = () => {
+    if (!token) return;
+    setInvLoading(true);
+    apiFetch<Invoice[]>("/company/invoices", { token })
+      .then(data => setInvoices(data))
+      .catch(() => {})
+      .finally(() => setInvLoading(false));
+  };
+
+  const generateInvoice = () => {
+    if (!token) return;
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    setInvGenerating(true);
+    apiFetch<Invoice>("/company/invoices/generate", { token, method: "POST", body: { period } })
+      .then(inv => setInvoices(prev => [inv, ...prev.filter(i => i.period !== inv.period)]))
+      .catch(() => Alert.alert("Erreur", "Impossible de générer la facture."))
+      .finally(() => setInvGenerating(false));
+  };
 
   const loadBoardingRequests = () => {
     if (!token) return;
@@ -334,6 +359,7 @@ export default function CompanyDashboard() {
       if (a.status === "fulfilled") setAnalytics(a.value);
     });
     loadBoardingRequests();
+    loadInvoices();
   }, [token]);
 
   const confirmReservation = async (reservationId: string) => {
@@ -517,6 +543,7 @@ export default function CompanyDashboard() {
     { id: "apercu",       label: "Aperçu",        icon: "bar-chart-2" },
     { id: "analytiques",  label: "Analytiques",   icon: "trending-up" },
     { id: "portefeuille", label: "Portefeuille",  icon: "credit-card" },
+    { id: "factures",     label: "Factures",      icon: "file-text" },
     { id: "trajets",      label: "Trajets",       icon: "navigation" },
     { id: "reservations", label: "Réservations",  icon: "bookmark" },
     { id: "sieges",       label: "Sièges",        icon: "grid" },
@@ -1113,6 +1140,105 @@ export default function CompanyDashboard() {
               </View>
             </View>
           ))}
+        </>)}
+
+        {/* ── Factures ── */}
+        {activeTab === "factures" && (<>
+          <View style={S.sectionRow}>
+            <View>
+              <Text style={S.sectionTitle}>Mes Factures</Text>
+              <Text style={[S.listSub, { marginTop: 2 }]}>Commissions & reversements mensuels</Text>
+            </View>
+            <TouchableOpacity
+              style={[S.addBtn, { backgroundColor: "#D97706" }]}
+              onPress={generateInvoice}
+              activeOpacity={0.8}
+              disabled={invGenerating}
+            >
+              {invGenerating
+                ? <ActivityIndicator size={13} color="white" />
+                : <Feather name="file-plus" size={13} color="white" />}
+              <Text style={S.addBtnText}>{invGenerating ? "Génération…" : "Générer"}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {invLoading && (
+            <View style={{ alignItems: "center", padding: 32 }}>
+              <ActivityIndicator color="#D97706" />
+              <Text style={[S.listSub, { marginTop: 8 }]}>Chargement…</Text>
+            </View>
+          )}
+
+          {!invLoading && invoices.length === 0 && (
+            <View style={S.emptyState}>
+              <Feather name="file-text" size={36} color="#CBD5E1" />
+              <Text style={S.emptyStateText}>Aucune facture pour l'instant</Text>
+              <Text style={[S.listSub, { textAlign: "center" }]}>
+                Appuyez sur "Générer" pour créer la facture du mois en cours.
+              </Text>
+            </View>
+          )}
+
+          {!invLoading && invoices.map(inv => {
+            const isPaid = inv.status === "paid";
+            const [yr, mo] = inv.period.split("-");
+            const moNames = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"];
+            const moLabel = `${moNames[parseInt(mo, 10) - 1]} ${yr}`;
+            return (
+              <View key={inv.id} style={[S.card, { borderLeftWidth: 4, borderLeftColor: isPaid ? "#059669" : "#D97706" }]}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: "700", fontSize: 15, color: "#1E293B" }}>{moLabel}</Text>
+                    <Text style={[S.listSub, { marginTop: 2 }]}>{inv.transactionCount} transaction(s)</Text>
+                  </View>
+                  <View style={[S.badge, { backgroundColor: isPaid ? "#ECFDF5" : "#FEF3C7" }]}>
+                    <Text style={[S.badgeText, { color: isPaid ? "#065F46" : "#92400E" }]}>
+                      {isPaid ? "Payée" : "En attente"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ marginTop: 12, gap: 6 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={S.listSub}>Chiffre brut</Text>
+                    <Text style={{ fontWeight: "600", color: "#1E293B" }}>
+                      {inv.totalGross.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={S.listSub}>Commission GoBooking</Text>
+                    <Text style={{ fontWeight: "600", color: "#DC2626" }}>
+                      − {inv.totalCommission.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 2 }} />
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontWeight: "700", color: "#1E293B" }}>Net à reverser</Text>
+                    <Text style={{ fontWeight: "700", fontSize: 15, color: "#059669" }}>
+                      {inv.totalNet.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                </View>
+
+                {isPaid && inv.paidAt && (
+                  <Text style={[S.listSub, { marginTop: 8 }]}>
+                    Payée le {new Date(inv.paidAt).toLocaleDateString("fr-FR")}
+                  </Text>
+                )}
+
+                <TouchableOpacity
+                  style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 }}
+                  onPress={() => Share.share({
+                    title: `Facture GoBooking — ${moLabel}`,
+                    message: `Facture GoBooking — ${moLabel}\n\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
+                  })}
+                >
+                  <Feather name="share-2" size={13} color="#64748B" />
+                  <Text style={[S.listSub, { color: PRIMARY }]}>Partager la facture</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
         </>)}
 
         {/* ── En Route ── */}

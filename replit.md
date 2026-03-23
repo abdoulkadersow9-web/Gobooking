@@ -35,9 +35,11 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 11. Parcel delivery (send, track, real-time status — statuses: en_attente/pris_en_charge/en_transit/en_livraison/livre/annule)
 12. Parcel tracking with QR/ref input — tracking ref format: GBX-XXXX-XXXX
 13. Notifications screen (filter chips: Tous/Colis/Trajet/Promo, date separators)
-14. **Company Dashboard** (bus fleet, routes, colis, agents management — blue theme)
+14. **Company Dashboard** (bus fleet, routes, colis, agents management — amber theme)
 15. **Agent Dashboard** (mission info, passenger boarding validation, parcel pickup/transit/delivery — green theme)
 16. **Super Admin Dashboard** (global stats, companies, users, cities, payment breakdown — purple theme)
+17. **Commission system** (10% on bookings configurable via admin, 5% on parcels; breakdown on booking confirmation; super admin revenue ventilation bars)
+18. **Billing/Invoicing system** — `invoices` table (period YYYY-MM, totalGross, totalCommission, totalNet, transactionCount, status pending/paid, paidAt); company dashboard "Factures" tab with generate + share buttons; super admin "Factures" tab with pay + share actions; backend endpoints: GET/POST /company/invoices, GET /superadmin/invoices, PUT /superadmin/invoices/:id/pay
 
 ## Role-based Dashboards
 - `/dashboard/company` — Company Admin: fleet, routes, parcels, agents

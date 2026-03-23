@@ -4,11 +4,13 @@ import { router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -176,7 +178,8 @@ const FILL_RATE_DATA = [
   { route: "Bouaké → Korhogo",       fillPct: 58, totalSeats: 44, filled: 26 },
 ];
 
-type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission";
+type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission" | "factures";
+interface AdminInvoice { id: string; companyId: string; companyName: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
 
 const SIDEBAR_W = 285;
 const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
@@ -187,6 +190,7 @@ const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "entreprises",  label: "Compagnies",   icon: "briefcase"  },
   { id: "statistiques", label: "Statistiques", icon: "trending-up"},
   { id: "commission",   label: "Commission",   icon: "dollar-sign"},
+  { id: "factures",     label: "Factures",     icon: "file-text"  },
 ];
 const SECTION_LABELS: Record<Tab, string> = {
   apercu:       "Tableau de bord",
@@ -196,6 +200,7 @@ const SECTION_LABELS: Record<Tab, string> = {
   entreprises:  "Compagnies",
   statistiques: "Statistiques",
   commission:   "Commission & Revenus",
+  factures:     "Factures Compagnies",
 };
 
 const EMPTY_TRIP = { from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busName: "", busType: "Standard", totalSeats: "44", duration: "" };
@@ -242,6 +247,9 @@ export default function SuperAdminDashboard() {
   const [commForm, setCommForm]       = useState<{ type: "percentage" | "fixed"; value: string }>({ type: "percentage", value: "10" });
   const [commSaving, setCommSaving]   = useState(false);
   const [commSaveMsg, setCommSaveMsg] = useState("");
+  const [adminInvoices, setAdminInvoices] = useState<AdminInvoice[]>([]);
+  const [invLoading, setInvLoading]   = useState(false);
+  const [invPayingId, setInvPayingId] = useState<string | null>(null);
 
   /* ── modals & filters ── */
   const [addCityModal, setAddCityModal]       = useState(false);
@@ -318,7 +326,41 @@ export default function SuperAdminDashboard() {
       if (bs.status === "fulfilled") setBookingStats(bs.value);
       if (an.status === "fulfilled") setAdminAnalytics(an.value);
     });
+    loadAdminInvoices();
   }, [token]);
+
+  const loadAdminInvoices = () => {
+    if (!token) return;
+    setInvLoading(true);
+    apiFetch<AdminInvoice[]>("/superadmin/invoices", { token })
+      .then(data => setAdminInvoices(data))
+      .catch(() => {})
+      .finally(() => setInvLoading(false));
+  };
+
+  const payInvoice = (inv: AdminInvoice) => {
+    Alert.alert(
+      "Marquer comme payée",
+      `Confirmer le paiement de la facture ${inv.period} pour ${inv.companyName} ?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Confirmer",
+          onPress: async () => {
+            setInvPayingId(inv.id);
+            try {
+              const updated = await apiFetch<AdminInvoice>(`/superadmin/invoices/${inv.id}/pay`, { token: token || "", method: "PUT" });
+              setAdminInvoices(prev => prev.map(i => i.id === updated.id ? { ...i, status: "paid", paidAt: updated.paidAt } : i));
+            } catch {
+              Alert.alert("Erreur", "Impossible de marquer la facture comme payée.");
+            } finally {
+              setInvPayingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   /* ─── Company handlers ─── */
   const createCompany = async () => {
@@ -1280,6 +1322,113 @@ export default function SuperAdminDashboard() {
               );
             })}
           </View>
+        </>)}
+
+        {/* ── Factures ── */}
+        {activeTab === "factures" && (<>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <View>
+              <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Factures compagnies</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 }}>Commissions & reversements mensuels</Text>
+            </View>
+            <TouchableOpacity onPress={loadAdminInvoices} style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+              <Feather name="refresh-cw" size={13} color="#64748B" />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B" }}>Actualiser</Text>
+            </TouchableOpacity>
+          </View>
+
+          {invLoading && (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <ActivityIndicator color={PURPLE} />
+              <Text style={{ marginTop: 8, fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>Chargement…</Text>
+            </View>
+          )}
+
+          {!invLoading && adminInvoices.length === 0 && (
+            <View style={{ alignItems: "center", padding: 48 }}>
+              <Feather name="file-text" size={40} color="#CBD5E1" />
+              <Text style={{ marginTop: 12, fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#94A3B8" }}>Aucune facture</Text>
+              <Text style={{ marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center" }}>
+                Les compagnies peuvent générer leurs factures depuis leur tableau de bord.
+              </Text>
+            </View>
+          )}
+
+          {!invLoading && adminInvoices.map(inv => {
+            const isPaid  = inv.status === "paid";
+            const paying  = invPayingId === inv.id;
+            const [yr, mo] = inv.period.split("-");
+            const moNames  = ["Jan","Fév","Mar","Avr","Mai","Juin","Juil","Aoû","Sep","Oct","Nov","Déc"];
+            const moLabel  = `${moNames[parseInt(mo, 10) - 1]} ${yr}`;
+            return (
+              <View key={inv.id} style={[S.commCard, { marginBottom: 14, borderLeftWidth: 4, borderLeftColor: isPaid ? "#059669" : "#D97706" }]}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{inv.companyName}</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B", marginTop: 2 }}>{moLabel} · {inv.transactionCount} transaction(s)</Text>
+                  </View>
+                  <View style={{ backgroundColor: isPaid ? "#ECFDF5" : "#FEF3C7", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: isPaid ? "#065F46" : "#92400E" }}>
+                      {isPaid ? "Payée" : "En attente"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Chiffre brut</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>
+                      {inv.totalGross.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Commission GoBooking</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#D97706" }}>
+                      {inv.totalCommission.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 2 }} />
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Net compagnie</Text>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" }}>
+                      {inv.totalNet.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                </View>
+
+                {isPaid && inv.paidAt && (
+                  <Text style={{ marginTop: 8, fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>
+                    Payée le {new Date(inv.paidAt).toLocaleDateString("fr-FR")}
+                  </Text>
+                )}
+
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+                  {!isPaid && (
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: PURPLE, borderRadius: 10, paddingVertical: 10, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 }}
+                      onPress={() => payInvoice(inv)}
+                      disabled={paying}
+                    >
+                      {paying ? <ActivityIndicator size={13} color="white" /> : <Feather name="check-circle" size={13} color="white" />}
+                      <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" }}>
+                        {paying ? "En cours…" : "Marquer payée"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 10 }}
+                    onPress={() => Share.share({
+                      title: `Facture GoBooking — ${inv.companyName} — ${moLabel}`,
+                      message: `Facture GoBooking\nCompagnie : ${inv.companyName}\nPériode : ${moLabel}\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
+                    })}
+                  >
+                    <Feather name="share-2" size={13} color="#64748B" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B" }}>Partager</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
         </>)}
 
       </ScrollView>
