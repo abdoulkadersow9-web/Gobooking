@@ -36,6 +36,7 @@ export default function ProfileScreen() {
           onPress: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             logout();
+            router.replace("/(auth)/login");
           },
         },
       ]
