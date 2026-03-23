@@ -773,7 +773,7 @@ export default function AgentDashboard() {
       />
 
       <LinearGradient colors={[GREEN, GREEN_D]} style={S.header}>
-        <Pressable onPress={() => router.back()} style={S.backBtn}>
+        <Pressable onPress={() => router.replace("/(auth)/login")} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>
