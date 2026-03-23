@@ -177,5 +177,23 @@ router.get("/me", async (req, res) => {
   }
 });
 
+router.post("/push-token", async (req, res) => {
+  try {
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith("Bearer ")) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const token = auth.replace("Bearer ", "");
+    const userId = tokenStore.get(token);
+    if (!userId) { res.status(401).json({ error: "Invalid token" }); return; }
+
+    const { pushToken } = req.body;
+    if (!pushToken) { res.status(400).json({ error: "pushToken requis" }); return; }
+
+    await db.update(usersTable).set({ pushToken }).where(eq(usersTable.id, userId));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export { tokenStore };
 export default router;

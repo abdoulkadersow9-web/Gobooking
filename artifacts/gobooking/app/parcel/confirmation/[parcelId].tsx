@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useParcel } from "@/context/ParcelContext";
 import { generateQRData } from "@/utils/qr";
+import { scheduleLocalNotification } from "@/utils/notifications";
 
 function makeQrMatrix(seed: string, size = 21): boolean[][] {
   const matrix: boolean[][] = Array.from({ length: size }, () =>
@@ -130,6 +131,10 @@ export default function ParcelConfirmationScreen() {
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    scheduleLocalNotification(
+      "GoBooking 📦",
+      `Colis enregistré ! Référence de suivi : ${trackingRef}`
+    ).catch(() => {});
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,

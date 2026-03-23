@@ -10,6 +10,7 @@ import React, {
 } from "react";
 
 import { apiFetch } from "@/utils/api";
+import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "embarquement" | "reception_colis" | "vente" | "validation";
@@ -105,6 +106,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem("auth_user", JSON.stringify(newUser));
     setToken(newToken);
     setUser(newUser);
+
+    /* ── Enregistrement push token ── */
+    registerForPushNotifications().then(async (pushToken) => {
+      if (!pushToken) return;
+      try {
+        await apiFetch("/auth/push-token", {
+          method: "POST",
+          token: newToken,
+          body: JSON.stringify({ pushToken }),
+        });
+      } catch {
+      }
+    }).catch(() => {});
   }, []);
 
   const logout = useCallback(async () => {

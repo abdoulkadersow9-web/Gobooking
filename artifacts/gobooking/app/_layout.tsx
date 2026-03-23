@@ -18,6 +18,7 @@ import { AuthProvider, getDashboardPath, useAuth } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ParcelProvider } from "@/context/ParcelContext";
+import { setupNotificationListeners } from "@/utils/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -149,6 +150,18 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  useEffect(() => {
+    const cleanup = setupNotificationListeners(
+      (notification) => {
+        console.log("[GoBooking] Notification reçue:", notification.request.content.title);
+      },
+      (response) => {
+        console.log("[GoBooking] Notification tapée:", response.notification.request.content.title);
+      }
+    );
+    return cleanup;
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 

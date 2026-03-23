@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
+import { sendExpoPush } from "../pushService";
 
 const router: IRouter = Router();
 
@@ -114,6 +115,14 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
     await db.update(parcelsTable).set({ status: "livre" }).where(eq(parcelsTable.id, req.params.parcelId));
+
+    /* ── Notify sender ── */
+    const parcels = await db.select().from(parcelsTable).where(eq(parcelsTable.id, req.params.parcelId)).limit(1);
+    if (parcels.length) {
+      const userRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcels[0].userId)).limit(1);
+      sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis a été livré à destination.`).catch(() => {});
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -629,6 +638,13 @@ router.post("/reservation/:id/board", async (req, res) => {
       .set({ status: "validated" })
       .where(eq(bookingsTable.id, req.params.id));
 
+    /* ── Notify passenger ── */
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, req.params.id)).limit(1);
+    if (bookings.length) {
+      const userRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, bookings[0].userId)).limit(1);
+      sendExpoPush(userRows[0]?.pushToken, "GoBooking 🚌", "Votre embarquement a été validé ! Bon voyage.").catch(() => {});
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
@@ -660,6 +676,13 @@ router.post("/parcels/:parcelId/arrive", async (req, res) => {
     await db.update(parcelsTable)
       .set({ status: "arrive_gare_depart" })
       .where(eq(parcelsTable.id, req.params.parcelId));
+
+    /* ── Notify sender ── */
+    const parcels = await db.select().from(parcelsTable).where(eq(parcelsTable.id, req.params.parcelId)).limit(1);
+    if (parcels.length) {
+      const userRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcels[0].userId)).limit(1);
+      sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis est arrivé à la gare de destination.`).catch(() => {});
+    }
 
     res.json({ success: true });
   } catch (err) {

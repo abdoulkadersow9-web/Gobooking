@@ -21,6 +21,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 import { generateQRData } from "@/utils/qr";
+import { scheduleLocalNotification } from "@/utils/notifications";
 
 interface Booking {
   id: string;
@@ -178,7 +179,15 @@ export default function ConfirmationScreen() {
     ]).start();
 
     apiFetch<Booking>(`/bookings/${bookingId}`, token ? { token } : {})
-      .then(setBooking)
+      .then((b) => {
+        setBooking(b);
+        if (b?.bookingRef) {
+          scheduleLocalNotification(
+            "GoBooking 🎫",
+            `Réservation confirmée ! Référence : ${b.bookingRef}`
+          ).catch(() => {});
+        }
+      })
       .catch(() => null)
       .finally(() => setLoading(false));
   }, [bookingId, token]);
