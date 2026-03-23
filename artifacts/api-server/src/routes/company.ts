@@ -167,6 +167,35 @@ router.post("/trips", async (req, res) => {
   }
 });
 
+router.post("/trips/:id/start", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { id } = req.params;
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, id)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    if (trips[0].status === "en_route") { res.json({ success: true, status: "en_route" }); return; }
+    await db.update(tripsTable).set({ status: "en_route" }).where(eq(tripsTable.id, id));
+    res.json({ success: true, status: "en_route" });
+  } catch (err) {
+    res.status(500).json({ error: "Impossible de démarrer le trajet" });
+  }
+});
+
+router.post("/trips/:id/end", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { id } = req.params;
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, id)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    await db.update(tripsTable).set({ status: "completed" }).where(eq(tripsTable.id, id));
+    res.json({ success: true, status: "completed" });
+  } catch (err) {
+    res.status(500).json({ error: "Impossible de terminer le trajet" });
+  }
+});
+
 router.get("/reservations", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);

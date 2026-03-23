@@ -27,7 +27,7 @@ const DARK = Colors.light.primaryDark;
 /* ─── Types ─────────────────────────────────────────────── */
 interface Stats { totalBuses: number; totalAgents: number; totalTrips: number; totalReservations: number; totalParcels: number; totalRevenue: number; activeBuses: number }
 interface Bus { id: string; busName: string; plateNumber: string; busType: string; capacity: number; status: string }
-interface Trip { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; totalSeats: number; busName: string; duration: string }
+interface Trip { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; totalSeats: number; busName: string; duration: string; status?: string }
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
@@ -47,11 +47,11 @@ const DEMO_BUSES: Bus[] = [
 ];
 
 const DEMO_TRIPS: Trip[] = [
-  { id: "t1", from: "Abidjan", to: "Bouaké",        date: "17/03/2026", departureTime: "08h00", arrivalTime: "12h00", price: 3500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00" },
-  { id: "t2", from: "Abidjan", to: "Yamoussoukro",  date: "17/03/2026", departureTime: "09h00", arrivalTime: "12h30", price: 2000, totalSeats: 59, busName: "Bouaké Direct 02",   duration: "3h30" },
-  { id: "t3", from: "Abidjan", to: "Korhogo",       date: "18/03/2026", departureTime: "07h00", arrivalTime: "15h00", price: 6000, totalSeats: 63, busName: "Yamoussoukro 03",    duration: "8h00" },
-  { id: "t4", from: "Bouaké",  to: "Korhogo",       date: "18/03/2026", departureTime: "10h00", arrivalTime: "14h00", price: 2500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00" },
-  { id: "t5", from: "San Pedro", to: "Abidjan",     date: "19/03/2026", departureTime: "06h00", arrivalTime: "12h00", price: 3000, totalSeats: 59, busName: "San Pedro 05",       duration: "6h00" },
+  { id: "t1", from: "Abidjan", to: "Bouaké",        date: "23/03/2026", departureTime: "08h00", arrivalTime: "12h00", price: 3500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00", status: "en_route" },
+  { id: "t2", from: "Abidjan", to: "Yamoussoukro",  date: "23/03/2026", departureTime: "09h00", arrivalTime: "12h30", price: 2000, totalSeats: 59, busName: "Bouaké Direct 02",   duration: "3h30", status: "scheduled" },
+  { id: "t3", from: "Abidjan", to: "Korhogo",       date: "24/03/2026", departureTime: "07h00", arrivalTime: "15h00", price: 6000, totalSeats: 63, busName: "Yamoussoukro 03",    duration: "8h00", status: "scheduled" },
+  { id: "t4", from: "Bouaké",  to: "Korhogo",       date: "22/03/2026", departureTime: "10h00", arrivalTime: "14h00", price: 2500, totalSeats: 49, busName: "Express Abidjan 01", duration: "4h00", status: "completed" },
+  { id: "t5", from: "San Pedro", to: "Abidjan",     date: "21/03/2026", departureTime: "06h00", arrivalTime: "12h00", price: 3000, totalSeats: 59, busName: "San Pedro 05",       duration: "6h00", status: "completed" },
 ];
 
 const DEMO_RESERVATIONS: Reservation[] = [
@@ -232,6 +232,8 @@ export default function CompanyDashboard() {
   const [reservationFilter, setReservationFilter] = useState<"all" | "confirmed" | "boarded" | "cancelled">("all");
   const [boardingRequests, setBoardingRequests]   = useState<BoardingRequest[]>([]);
   const [boardingLoading, setBoardingLoading]     = useState(false);
+  const [tripFilter, setTripFilter] = useState<"all" | "scheduled" | "en_route" | "completed">("all");
+  const [tripStatusLoading, setTripStatusLoading] = useState<string | null>(null);
 
   /* modal states */
   const [addBusModal, setAddBusModal] = useState(false);
@@ -271,6 +273,21 @@ export default function CompanyDashboard() {
     apiFetch<{ success: boolean }>(endpoint, { token, method: "POST" })
       .then(() => loadBoardingRequests())
       .catch(() => Alert.alert("Erreur", "Impossible de traiter la demande."));
+  };
+
+  const handleTripStatus = (tripId: string, action: "start" | "end") => {
+    setTripStatusLoading(tripId);
+    const endpoint = `/company/trips/${tripId}/${action}`;
+    const newStatus = action === "start" ? "en_route" : "completed";
+    (token
+      ? apiFetch<{ success: boolean; status: string }>(endpoint, { token, method: "POST" })
+      : Promise.resolve({ success: true, status: newStatus })
+    )
+      .then(() => {
+        setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status: newStatus } : t));
+      })
+      .catch(() => Alert.alert("Erreur", "Impossible de modifier le statut du trajet."))
+      .finally(() => setTripStatusLoading(null));
   };
 
   useEffect(() => {
@@ -672,25 +689,84 @@ export default function CompanyDashboard() {
               <Text style={S.addBtnText}>Nouveau trajet</Text>
             </TouchableOpacity>
           </View>
-          {trips.map(trip => (
-            <View key={trip.id} style={S.tripCard}>
-              <View style={S.tripLeft}>
-                <View style={S.tripIconWrap}><Feather name="navigation" size={16} color={PRIMARY} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
-                  <Text style={S.tripMeta}>{trip.date} · {trip.departureTime} → {trip.arrivalTime} · {trip.duration}</Text>
-                  <Text style={S.tripMeta}>{trip.busName} · {trip.totalSeats} places</Text>
+
+          {/* Status filter chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
+            {(["all", "scheduled", "en_route", "completed"] as const).map(f => {
+              const labels: Record<string, string> = { all: "Tous", scheduled: "En attente", en_route: "En cours", completed: "Terminé" };
+              const active = tripFilter === f;
+              return (
+                <Pressable key={f} style={[S.filterChip, active && S.filterChipActive]} onPress={() => setTripFilter(f)}>
+                  <Text style={[S.filterChipText, active && S.filterChipTextActive]}>{labels[f]}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {trips.filter(t => tripFilter === "all" || (t.status ?? "scheduled") === tripFilter).map(trip => {
+            const st = trip.status ?? "scheduled";
+            const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
+              scheduled:  { label: "En attente", color: "#D97706", bg: "#FEF3C7" },
+              en_route:   { label: "En cours",   color: "#059669", bg: "#ECFDF5" },
+              en_cours:   { label: "En cours",   color: "#059669", bg: "#ECFDF5" },
+              completed:  { label: "Terminé",    color: "#6B7280", bg: "#F3F4F6" },
+            };
+            const meta = statusMeta[st] ?? statusMeta.scheduled;
+            const isLoading = tripStatusLoading === trip.id;
+            return (
+              <View key={trip.id} style={S.tripCard}>
+                <View style={S.tripLeft}>
+                  <View style={S.tripIconWrap}>
+                    <Feather name={st === "en_route" || st === "en_cours" ? "radio" : "navigation"} size={16} color={st === "en_route" || st === "en_cours" ? "#059669" : PRIMARY} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20, backgroundColor: meta.bg }}>
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: meta.color }}>{meta.label}</Text>
+                      </View>
+                    </View>
+                    <Text style={S.tripMeta}>{trip.date} · {trip.departureTime} → {trip.arrivalTime} · {trip.duration}</Text>
+                    <Text style={S.tripMeta}>{trip.busName} · {trip.totalSeats} places</Text>
+                  </View>
                 </View>
+                <View style={S.tripRight}>
+                  <Text style={S.tripPrice}>{trip.price.toLocaleString()} F</Text>
+                  <TouchableOpacity style={S.seatBtn} onPress={() => loadSeats(trip)} activeOpacity={0.8}>
+                    <Feather name="grid" size={12} color={PRIMARY} />
+                    <Text style={S.seatBtnText}>Sièges</Text>
+                  </TouchableOpacity>
+                </View>
+                {/* Action buttons */}
+                {(st === "scheduled") && (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 9, borderRadius: 8, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" }}
+                    onPress={() => handleTripStatus(trip.id, "start")}
+                    activeOpacity={0.8}
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? <ActivityIndicator size="small" color="#059669" />
+                      : <><Feather name="play-circle" size={14} color="#059669" /><Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#059669" }}>Démarrer le trajet</Text></>
+                    }
+                  </TouchableOpacity>
+                )}
+                {(st === "en_route" || st === "en_cours") && (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 9, borderRadius: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" }}
+                    onPress={() => handleTripStatus(trip.id, "end")}
+                    activeOpacity={0.8}
+                    disabled={isLoading}
+                  >
+                    {isLoading
+                      ? <ActivityIndicator size="small" color="#DC2626" />
+                      : <><Feather name="stop-circle" size={14} color="#DC2626" /><Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>Terminer le trajet</Text></>
+                    }
+                  </TouchableOpacity>
+                )}
               </View>
-              <View style={S.tripRight}>
-                <Text style={S.tripPrice}>{trip.price.toLocaleString()} F</Text>
-                <TouchableOpacity style={S.seatBtn} onPress={() => loadSeats(trip)} activeOpacity={0.8}>
-                  <Feather name="grid" size={12} color={PRIMARY} />
-                  <Text style={S.seatBtnText}>Sièges</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </>)}
 
         {/* ── Réservations ── */}
