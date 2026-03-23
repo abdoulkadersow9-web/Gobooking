@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiFetch } from "@/utils/api";
+import { notifyLocal } from "@/services/notificationService";
 
 const { width: SW, height: SH } = Dimensions.get("window");
 const MAP_H = Math.min(SH * 0.52, 370);
@@ -339,9 +340,10 @@ export default function LiveTrackingScreen() {
   const [gpsLoading,   setGpsLoading]   = useState(false);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* Request client location once on mount */
+  /* ── Continuous client GPS (watchPositionAsync) ── */
   useEffect(() => {
     let active = true;
+    let sub: Location.LocationSubscription | null = null;
     (async () => {
       setGpsLoading(true);
       try {
@@ -349,13 +351,19 @@ export default function LiveTrackingScreen() {
         if (!active) return;
         if (status !== "granted") { setGpsGranted(false); setGpsLoading(false); return; }
         setGpsGranted(true);
+        /* Seed immediately with a fast one-time read */
         const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (!active) return;
-        setClientPos({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        if (active) setClientPos({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setGpsLoading(false);
+        /* Then watch continuously (every 15 s / 30 m) */
+        sub = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 30 },
+          (loc) => { if (active) setClientPos({ lat: loc.coords.latitude, lon: loc.coords.longitude }); }
+        );
       } catch { if (active) setGpsGranted(false); }
       finally   { if (active) setGpsLoading(false); }
     })();
-    return () => { active = false; };
+    return () => { active = false; sub?.remove(); };
   }, []);
 
   /* ── Live countdown ticker (5s → 0, reset on each fetch) ── */
@@ -402,6 +410,23 @@ export default function LiveTrackingScreen() {
       })
       .sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
   }, [rawBuses, clientPos]);
+
+  /* ── Proximity notification (< 1 km, once per session per bus) ── */
+  const proxySentRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!clientPos) return;
+    buses.forEach(bus => {
+      const d = bus.distanceKm ?? 9999;
+      if (d < 1 && !proxySentRef.current.has(bus.id)) {
+        proxySentRef.current.add(bus.id);
+        notifyLocal(
+          "🚌 Bus proche !",
+          `${bus.busName} est à ${fmtDist(d)} — préparez-vous !`
+        ).catch(() => {});
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      }
+    });
+  }, [buses, clientPos]);
 
   /* ── Client request form state ── */
   const [showRequestForm,    setShowRequestForm]    = useState(false);
