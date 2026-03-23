@@ -219,6 +219,53 @@ router.get("/bookings", async (req, res) => {
   }
 });
 
+/* ─── Statistiques de réservations groupées par compagnie (admin uniquement) ─
+   GET /superadmin/bookings/stats
+   Retourne les compteurs par statut par compagnie — sans détails individuels
+   ni prix.
+────────────────────────────────────────────────────────────────────────────── */
+router.get("/bookings/stats", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = await db
+      .select({
+        status:      bookingsTable.status,
+        tripId:      bookingsTable.tripId,
+        busName:     tripsTable.busName,
+        companyId:   tripsTable.companyId,
+        companyName: companiesTable.name,
+      })
+      .from(bookingsTable)
+      .leftJoin(tripsTable,    eq(bookingsTable.tripId, tripsTable.id))
+      .leftJoin(companiesTable, eq(tripsTable.companyId, companiesTable.id));
+
+    const map: Record<string, { name: string; total: number; confirmed: number; pending: number; cancelled: number }> = {};
+    for (const r of rows) {
+      const key  = r.companyId  || r.busName  || "Autre";
+      const name = r.companyName || r.busName || "Compagnie inconnue";
+      if (!map[key]) map[key] = { name, total: 0, confirmed: 0, pending: 0, cancelled: 0 };
+      map[key].total++;
+      if (r.status === "confirmed")  map[key].confirmed++;
+      else if (r.status === "pending")   map[key].pending++;
+      else if (r.status === "cancelled") map[key].cancelled++;
+    }
+
+    const byCompany = Object.values(map).sort((a, b) => b.total - a.total);
+    res.json({
+      total:     rows.length,
+      confirmed: rows.filter(r => r.status === "confirmed").length,
+      pending:   rows.filter(r => r.status === "pending").length,
+      cancelled: rows.filter(r => r.status === "cancelled").length,
+      byCompany,
+    });
+  } catch (err) {
+    console.error("Booking stats error:", err);
+    res.status(500).json({ error: "Failed to get booking stats" });
+  }
+});
+
 router.patch("/bookings/:id/status", async (req, res) => {
   try {
     const admin = await requireSuperAdmin(req.headers.authorization);

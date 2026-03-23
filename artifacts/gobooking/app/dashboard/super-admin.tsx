@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -32,6 +32,8 @@ interface CityItem { id: string; name: string; region: string }
 interface PaymentItem { id: string; refId: string; refType: string; amount: number; method: string; status: string; createdAt: string }
 interface TripItem  { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; busType: string; busName: string; totalSeats: number; duration: string; status: string }
 interface BookingItem { id: string; bookingRef: string; tripId: string; totalAmount: number; paymentMethod: string; status: string; contactEmail?: string; contactPhone?: string; passengers?: { name: string }[]; seatNumbers?: string[]; createdAt: string }
+interface BookingCompanyStat { name: string; total: number; confirmed: number; pending: number; cancelled: number }
+interface BookingOverallStats { total: number; confirmed: number; pending: number; cancelled: number; byCompany: BookingCompanyStat[] }
 interface CommissionSettings { type: "percentage" | "fixed"; value: number }
 interface DailyCommission { date: string; amount: number }
 interface CompanyCommission { name: string; commission: number; bookings: number; revenue: number }
@@ -204,6 +206,7 @@ export default function SuperAdminDashboard() {
   const [payments, setPayments]       = useState<PaymentItem[]>(DEMO_PAYMENTS);
   const [trips, setTrips]             = useState<TripItem[]>(DEMO_TRIPS);
   const [bookings, setBookings]       = useState<BookingItem[]>(DEMO_BOOKINGS);
+  const [bookingStats, setBookingStats] = useState<BookingOverallStats | null>(null);
   const [revenueData, setRevenueData] = useState<RevenueData | null>(null);
   const [commSettings, setCommSettings] = useState<CommissionSettings>({ type: "percentage", value: 10 });
   const [commForm, setCommForm]       = useState<{ type: "percentage" | "fixed"; value: string }>({ type: "percentage", value: "10" });
@@ -267,7 +270,8 @@ export default function SuperAdminDashboard() {
       apiFetch<BookingItem[]>("/superadmin/bookings", { token }),
       apiFetch<CommissionSettings>("/superadmin/commission", { token }),
       apiFetch<RevenueData>("/superadmin/revenue",    { token }),
-    ]).then(([s, c, u, ci, p, tr, bk, cs, rv]) => {
+      apiFetch<BookingOverallStats>("/superadmin/bookings/stats", { token }),
+    ]).then(([s, c, u, ci, p, tr, bk, cs, rv, bs]) => {
       if (s.status  === "fulfilled") setStats(s.value);
       if (c.status  === "fulfilled" && c.value.length  > 0) setCompanies(c.value);
       if (u.status  === "fulfilled" && u.value.length  > 0) setUsers(u.value);
@@ -280,6 +284,7 @@ export default function SuperAdminDashboard() {
         setCommForm({ type: cs.value.type, value: String(cs.value.value) });
       }
       if (rv.status === "fulfilled") setRevenueData(rv.value);
+      if (bs.status === "fulfilled") setBookingStats(bs.value);
     });
   }, [token]);
 
@@ -465,6 +470,30 @@ export default function SuperAdminDashboard() {
   };
 
   /* ─── Computed lists ─── */
+  /* ── Statistiques réservations par compagnie (fallback depuis bookings+trips) ── */
+  const computedBookingStats = useMemo<BookingOverallStats>(() => {
+    if (bookingStats) return bookingStats;
+    const tripNameMap: Record<string, string> = {};
+    trips.forEach(t => { tripNameMap[t.id] = t.busName; });
+    const map: Record<string, BookingCompanyStat> = {};
+    bookings.forEach(b => {
+      const name = tripNameMap[b.tripId] || "Compagnie inconnue";
+      if (!map[name]) map[name] = { name, total: 0, confirmed: 0, pending: 0, cancelled: 0 };
+      map[name].total++;
+      if (b.status === "confirmed")  map[name].confirmed++;
+      else if (b.status === "pending")   map[name].pending++;
+      else if (b.status === "cancelled") map[name].cancelled++;
+    });
+    const byCompany = Object.values(map).sort((a, b) => b.total - a.total);
+    return {
+      total:     bookings.length,
+      confirmed: bookings.filter(b => b.status === "confirmed").length,
+      pending:   bookings.filter(b => b.status === "pending").length,
+      cancelled: bookings.filter(b => b.status === "cancelled").length,
+      byCompany,
+    };
+  }, [bookingStats, bookings, trips]);
+
   const filteredPayments  = payFilter === "all" ? payments : payments.filter(p => p.refType === payFilter);
   const filteredUsers     = roleFilter === "all" ? users : users.filter(u => {
     if (roleFilter === "client")    return u.role === "client"    || u.role === "user";
@@ -725,84 +754,78 @@ export default function SuperAdminDashboard() {
 
         {/* ══ Réservations ════════════════════════════════════════ */}
         {activeTab === "reservations" && (<>
+          {/* ── En-tête ── */}
           <View style={S.sectionRow}>
             <View>
-              <Text style={S.sectionTitle}>Gestion des réservations</Text>
-              <Text style={S.subLabel}>{bookings.length} réservation{bookings.length > 1 ? "s" : ""} au total</Text>
+              <Text style={S.sectionTitle}>Statistiques des réservations</Text>
+              <Text style={S.subLabel}>Vue globale par compagnie · lecture seule</Text>
             </View>
           </View>
 
-          <View style={S.revenueSmallCard}>
-            <Text style={S.revenueSmallLabel}>Montant total des réservations</Text>
-            <Text style={S.revenueSmallValue}>{filteredBookings.reduce((s, b) => s + b.totalAmount, 0).toLocaleString()} FCFA</Text>
-            <Text style={S.revenueSmallSub}>{filteredBookings.length} réservation{filteredBookings.length > 1 ? "s" : ""}</Text>
+          {/* ── Totaux globaux ── */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+            {[
+              { label: "Total",       value: computedBookingStats.total,     color: PURPLE,    bg: "#F5F3FF" },
+              { label: "Confirmées",  value: computedBookingStats.confirmed, color: "#059669", bg: "#ECFDF5" },
+              { label: "En attente",  value: computedBookingStats.pending,   color: "#D97706", bg: "#FFFBEB" },
+              { label: "Annulées",    value: computedBookingStats.cancelled, color: "#DC2626", bg: "#FEF2F2" },
+            ].map(({ label, value, color, bg }) => (
+              <View key={label} style={{ flex: 1, minWidth: "40%", backgroundColor: bg, borderRadius: 12, padding: 14, alignItems: "center", borderWidth: 1, borderColor: color + "33" }}>
+                <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color }}>{value}</Text>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color, marginTop: 2 }}>{label}</Text>
+              </View>
+            ))}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-            {[
-              { f: "all",       label: "Toutes",       count: bookings.length },
-              { f: "confirmed", label: "Confirmées",   count: bookings.filter(b => b.status === "confirmed").length },
-              { f: "pending",   label: "En attente",   count: bookings.filter(b => b.status === "pending").length },
-              { f: "cancelled", label: "Annulées",     count: bookings.filter(b => b.status === "cancelled").length },
-            ].map(({ f, label, count }) => (
-              <Pressable key={f} style={[S.filterChip, bookingFilter === f && S.filterChipActive]} onPress={() => setBookingFilter(f)}>
-                <Text style={[S.filterChipText, bookingFilter === f && S.filterChipTextActive]}>{label} ({count})</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          {/* ── Par compagnie ── */}
+          <Text style={[S.subLabel, { marginBottom: 10, fontFamily: "Inter_600SemiBold", color: "#475569" }]}>
+            PAR COMPAGNIE ({computedBookingStats.byCompany.length})
+          </Text>
 
-          {filteredBookings.map(b => {
-            const bs   = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.confirmed;
-            const meth = METHOD_STYLE[b.paymentMethod] ?? METHOD_STYLE.orange;
-            const expanded = expandedBooking === b.id;
+          {computedBookingStats.byCompany.map((c, idx) => {
+            const confirmedPct = c.total > 0 ? Math.round((c.confirmed / c.total) * 100) : 0;
             return (
-              <View key={b.id} style={S.bookingCard}>
-                <TouchableOpacity onPress={() => setExpandedBooking(expanded ? null : b.id)} activeOpacity={0.85}>
-                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
-                    <View style={[S.bookingRefBadge, { backgroundColor: bs.bg }]}>
-                      <Feather name="bookmark" size={14} color={bs.color} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Text style={S.bookingRef}>{b.bookingRef}</Text>
-                        <View style={[S.badge, { backgroundColor: bs.bg }]}><Text style={[S.badgeText, { color: bs.color }]}>{bs.label}</Text></View>
-                      </View>
-                      <Text style={S.listSub}>{b.passengers?.length ?? 0} passager{(b.passengers?.length ?? 0) > 1 ? "s" : ""} · Sièges : {b.seatNumbers?.join(", ") || "—"}</Text>
-                      <Text style={[S.listTitle, { fontSize: 13, color: "#059669", marginTop: 2 }]}>{b.totalAmount.toLocaleString()} FCFA</Text>
-                    </View>
-                    <Feather name={expanded ? "chevron-up" : "chevron-down"} size={16} color="#94A3B8" />
+              <View key={idx} style={[S.bookingCard, { marginBottom: 10 }]}>
+                {/* Nom + total */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F5F3FF", alignItems: "center", justifyContent: "center" }}>
+                    <Feather name="briefcase" size={16} color={PURPLE} />
                   </View>
-                </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{c.name}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{c.total} réservation{c.total > 1 ? "s" : ""} au total</Text>
+                  </View>
+                  <View style={{ backgroundColor: "#F5F3FF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: PURPLE }}>{confirmedPct}%</Text>
+                  </View>
+                </View>
 
-                {expanded && (
-                  <View style={S.bookingDetails}>
-                    <View style={S.detailRow}><Feather name="mail" size={12} color="#94A3B8" /><Text style={S.detailText}>{b.contactEmail || "—"}</Text></View>
-                    <View style={S.detailRow}><Feather name="phone" size={12} color="#94A3B8" /><Text style={S.detailText}>{b.contactPhone || "—"}</Text></View>
-                    <View style={S.detailRow}><Feather name="credit-card" size={12} color={meth.color} /><Text style={S.detailText}>{meth.label}</Text></View>
-                    <View style={S.detailRow}><Feather name="clock" size={12} color="#94A3B8" /><Text style={S.detailText}>{new Date(b.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</Text></View>
-                    {b.passengers && b.passengers.length > 0 && (
-                      <View style={{ marginTop: 8 }}>
-                        <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#64748B", marginBottom: 4 }}>PASSAGERS</Text>
-                        {b.passengers.map((p, i) => (
-                          <Text key={i} style={S.detailText}>· {p.name} {b.seatNumbers?.[i] ? `(Siège ${b.seatNumbers[i]})` : ""}</Text>
-                        ))}
-                      </View>
-                    )}
-                    {b.status !== "cancelled" && (
-                      <View style={{ flexDirection: "row", gap: 8, marginTop: 10, alignItems: "center" }}>
-                        <Feather name="eye" size={12} color="#64748B" />
-                        <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_400Regular" }}>Lecture seule — géré par la compagnie</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
+                {/* Barre de progression */}
+                <View style={{ height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, marginBottom: 12, overflow: "hidden" }}>
+                  <View style={{ height: 6, width: `${confirmedPct}%`, backgroundColor: "#059669", borderRadius: 3 }} />
+                </View>
+
+                {/* Compteurs statut */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {[
+                    { label: "Confirmées", value: c.confirmed, color: "#059669", bg: "#ECFDF5" },
+                    { label: "En attente", value: c.pending,   color: "#D97706", bg: "#FFFBEB" },
+                    { label: "Annulées",   value: c.cancelled, color: "#DC2626", bg: "#FEF2F2" },
+                  ].map(({ label, value, color, bg }) => (
+                    <View key={label} style={{ flex: 1, backgroundColor: bg, borderRadius: 8, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color }}>{value}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color, marginTop: 1 }}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             );
           })}
-          {filteredBookings.length === 0 && (
+
+          {computedBookingStats.byCompany.length === 0 && (
             <View style={S.emptyState}>
               <Feather name="bookmark" size={32} color="#CBD5E1" />
-              <Text style={S.emptyStateText}>Aucune réservation dans cette catégorie</Text>
+              <Text style={S.emptyStateText}>Aucune donnée de réservation</Text>
             </View>
           )}
         </>)}
