@@ -469,7 +469,22 @@ function fmtElapsed(seconds: number) {
 /* ─── Main Component ─────────────────────────────────────── */
 export default function AgentDashboard() {
   const insets    = useSafeAreaInsets();
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Déconnexion",
+      "Voulez-vous vous déconnecter ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Déconnexion",
+          style: "destructive",
+          onPress: () => { logout(); router.replace("/(auth)/login"); },
+        },
+      ]
+    );
+  };
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
@@ -773,8 +788,8 @@ export default function AgentDashboard() {
       />
 
       <LinearGradient colors={[GREEN, GREEN_D]} style={S.header}>
-        <Pressable onPress={() => router.replace("/(auth)/login")} style={S.backBtn}>
-          <Feather name="arrow-left" size={20} color="white" />
+        <Pressable onPress={handleLogout} style={S.backBtn}>
+          <Feather name="log-out" size={20} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={S.headerTitle}>Espace Agent</Text>
