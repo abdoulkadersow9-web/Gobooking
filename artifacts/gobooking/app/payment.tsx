@@ -22,6 +22,7 @@ import NetInfo from "@react-native-community/netinfo";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
+import { notifyReservationConfirmee } from "@/services/notificationService";
 import { apiFetch } from "@/utils/api";
 import { generateOfflineId, saveOffline } from "@/utils/offline";
 
@@ -217,6 +218,12 @@ export default function PaymentScreen() {
       });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      /* Notification locale de confirmation */
+      notifyReservationConfirmee({
+        ref:   created.bookingRef,
+        route: trip ? `${trip.from} → ${trip.to}` : undefined,
+        date:  trip?.departureTime,
+      }).catch(() => {});
       updateBooking({ paymentMethod: method });
       router.replace({
         pathname: "/confirmation/[bookingId]",

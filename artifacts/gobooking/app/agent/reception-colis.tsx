@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
+import { notifyColisArrive } from "@/services/notificationService";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import { validateQR, qrErrorMessage } from "@/utils/qr";
@@ -129,6 +130,7 @@ export default function ReceptionColisScreen() {
       });
       setConfirmed(true);
       setColis(prev => prev ? { ...prev, status: "arrive_gare_depart" } : prev);
+      notifyColisArrive({ trackingRef: colis.trackingRef }).catch(() => {});
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de confirmer l'arrivée");
     } finally {

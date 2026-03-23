@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
+import { notifyEmbarquementValide } from "@/services/notificationService";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import { validateQR, qrErrorMessage } from "@/utils/qr";
@@ -153,6 +154,7 @@ export default function EmbarquementScreen() {
       }
       await apiFetch(`/agent/requests/${requestId}/board`, { token: token ?? undefined, method: "POST" });
       setEnRouteList(prev => prev.map(p => p.id === requestId ? { ...p, status: "embarqué" } : p));
+      notifyEmbarquementValide({}).catch(() => {});
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible d'embarquer le passager");
     } finally {
