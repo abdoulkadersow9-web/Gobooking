@@ -134,9 +134,18 @@ function AuthGuard() {
 function GlobalNetworkMonitor() {
   const insets  = useSafeAreaInsets();
   const network = useNetworkStatus(BASE_URL);
-  /* Sync on mount — hook already triggers sync when online */
   return (
-    <View style={{ position: "absolute", top: insets.top, left: 0, right: 0, zIndex: 999 }}>
+    <View
+      style={{
+        position: "absolute",
+        bottom: insets.bottom + 72,
+        left: 24,
+        right: 24,
+        zIndex: 999,
+        alignItems: "center",
+        pointerEvents: "box-none",
+      }}
+    >
       <OfflineBanner status={network} />
     </View>
   );

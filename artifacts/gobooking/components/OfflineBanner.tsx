@@ -1,10 +1,17 @@
 /**
- * OfflineBanner — statut de connexion, actions en attente, lien historique
+ * OfflineBanner — toast flottant moderne (pill style)
  */
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import type { NetworkStatus } from "@/utils/offline";
 
 interface Props {
@@ -12,122 +19,175 @@ interface Props {
   accentColor?: string;
 }
 
-export default function OfflineBanner({ status, accentColor = "#D97706" }: Props) {
+export default function OfflineBanner({ status, accentColor = "#FF3B30" }: Props) {
   const { isOnline, pendingCount, syncNow, isSyncing, lastSyncResult } = status;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
 
-  if (isOnline && pendingCount === 0 && !lastSyncResult) return null;
+  const visible =
+    !isOnline ||
+    pendingCount > 0 ||
+    (lastSyncResult != null && lastSyncResult.synced > 0);
 
-  /* Just finished syncing — brief success flash (shown when pendingCount just became 0 after sync) */
-  if (isOnline && pendingCount === 0 && lastSyncResult && lastSyncResult.synced > 0) {
-    return (
-      <View style={[styles.banner, { backgroundColor: "#065F46" }]}>
-        <View style={styles.row}>
-          <Feather name="check-circle" size={14} color="#6EE7B7" />
-          <Text style={styles.text}>
-            {lastSyncResult.synced} action{lastSyncResult.synced > 1 ? "s" : ""} synchronisée{lastSyncResult.synced > 1 ? "s" : ""} ✓
-          </Text>
-          <TouchableOpacity onPress={() => router.push("/offline/history")} style={styles.histBtn}>
-            <Feather name="clock" size={11} color="#fff" />
-            <Text style={styles.histBtnText}>Historique</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: visible ? 1 : 0,
+        duration: 280,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: visible ? 0 : 20,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [visible]);
+
+  if (!visible) return null;
+
+  /* ── Couleur & contenu selon l'état ── */
+  let bg = accentColor;
+  let iconName: React.ComponentProps<typeof Feather>["name"] = "wifi-off";
+  let iconColor = "#fff";
+  let label = "Mode hors ligne";
+  let sublabel =
+    pendingCount > 0
+      ? `${pendingCount} action${pendingCount > 1 ? "s" : ""} en attente`
+      : null;
+  let showSync = false;
+  let showHistory = false;
+
+  if (isOnline && pendingCount > 0) {
+    bg = "#0B3C5D";
+    iconName = isSyncing ? "refresh-cw" : "upload-cloud";
+    iconColor = "#6EE7B7";
+    label = isSyncing ? "Synchronisation…" : "Actions en attente";
+    sublabel = isSyncing
+      ? null
+      : `${pendingCount} action${pendingCount > 1 ? "s" : ""} à envoyer`;
+    showSync = !isSyncing;
+    showHistory = !isSyncing;
+  } else if (isOnline && pendingCount === 0 && lastSyncResult && lastSyncResult.synced > 0) {
+    bg = "#065F46";
+    iconName = "check-circle";
+    iconColor = "#6EE7B7";
+    label = `${lastSyncResult.synced} synchronisée${lastSyncResult.synced > 1 ? "s" : ""}`;
+    sublabel = null;
+    showHistory = true;
   }
 
-  /* Online with pending items */
-  if (isOnline && pendingCount > 0) {
-    return (
-      <View style={[styles.banner, { backgroundColor: "#065F46" }]}>
-        <View style={styles.row}>
-          {isSyncing
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Feather name="upload-cloud" size={14} color="#6EE7B7" />
-          }
-          <Text style={styles.text}>
-            {isSyncing
-              ? "Synchronisation en cours…"
-              : `${pendingCount} action${pendingCount > 1 ? "s" : ""} en attente de sync`}
-          </Text>
-          {!isSyncing && (
-            <>
-              <TouchableOpacity style={styles.syncBtn} onPress={syncNow} activeOpacity={0.8}>
-                <Feather name="refresh-cw" size={12} color="#fff" />
-                <Text style={styles.syncBtnText}>Sync</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push("/offline/history")} style={styles.histBtn}>
-                <Feather name="clock" size={11} color="#fff" />
-                <Text style={styles.histBtnText}>Historique</Text>
-              </TouchableOpacity>
-            </>
+  return (
+    <Animated.View
+      style={[
+        styles.wrapper,
+        { opacity, transform: [{ translateY }], pointerEvents: "box-none" },
+      ]}
+    >
+      <View style={[styles.pill, { backgroundColor: bg }]}>
+        {/* Icône */}
+        <View style={[styles.iconWrap, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
+          {isSyncing && isOnline && pendingCount > 0 ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Feather name={iconName} size={14} color={iconColor} />
           )}
         </View>
-      </View>
-    );
-  }
 
-  /* Offline */
-  return (
-    <View style={[styles.banner, { backgroundColor: accentColor }]}>
-      <View style={styles.row}>
-        <Feather name="wifi-off" size={14} color="#fff" />
-        <Text style={styles.text}>
-          Mode hors ligne actif
-          {pendingCount > 0 ? ` · ${pendingCount} action${pendingCount > 1 ? "s" : ""} en attente` : ""}
-        </Text>
-        {pendingCount > 0 && (
-          <TouchableOpacity onPress={() => router.push("/offline/history")} style={styles.histBtn}>
+        {/* Texte */}
+        <View style={styles.textBlock}>
+          <Text style={styles.label} numberOfLines={1}>{label}</Text>
+          {sublabel ? (
+            <Text style={styles.sublabel} numberOfLines={1}>{sublabel}</Text>
+          ) : null}
+        </View>
+
+        {/* Actions */}
+        {showSync && (
+          <TouchableOpacity style={styles.actionBtn} onPress={syncNow} activeOpacity={0.75}>
+            <Feather name="refresh-cw" size={11} color="#fff" />
+            <Text style={styles.actionText}>Sync</Text>
+          </TouchableOpacity>
+        )}
+        {showHistory && (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "rgba(255,255,255,0.12)" }]}
+            onPress={() => router.push("/offline/history")}
+            activeOpacity={0.75}
+          >
             <Feather name="clock" size={11} color="#fff" />
-            <Text style={styles.histBtnText}>Voir</Text>
+          </TouchableOpacity>
+        )}
+        {!isOnline && pendingCount > 0 && (
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: "rgba(255,255,255,0.12)" }]}
+            onPress={() => router.push("/offline/history")}
+            activeOpacity={0.75}
+          >
+            <Feather name="list" size={11} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+  wrapper: {
+    alignItems: "center",
+    justifyContent: "center",
   },
-  row: {
+  pill: {
     flexDirection: "row",
     alignItems: "center",
+    borderRadius: 28,
+    paddingVertical: 8,
+    paddingLeft: 10,
+    paddingRight: 12,
     gap: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+    maxWidth: 320,
   },
-  text: {
+  iconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textBlock: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  label: {
     color: "#fff",
     fontSize: 12,
-    fontWeight: "600",
-    flex: 1,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-  syncBtn: {
+  sublabel: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 10,
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  actionBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 12,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
-  syncBtnText: {
+  actionText: {
     color: "#fff",
     fontSize: 11,
     fontWeight: "700",
-  },
-  histBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-  },
-  histBtnText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
   },
 });

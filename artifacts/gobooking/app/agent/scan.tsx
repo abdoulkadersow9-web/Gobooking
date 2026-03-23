@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import OfflineBanner from "@/components/OfflineBanner";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import {
@@ -121,8 +120,6 @@ export default function AgentScan() {
 
   return (
     <SafeAreaView style={S.safe}>
-      <OfflineBanner status={networkStatus} accentColor={ACCENT} />
-
       <View style={S.header}>
         <Pressable onPress={() => router.replace("/agent/home")} style={S.backBtn}>
           <Text style={S.backTxt}>←</Text>
@@ -247,45 +244,63 @@ export default function AgentScan() {
 const S = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: "#F0FDF4" },
   header:      { backgroundColor: GREEN, flexDirection: "row", alignItems: "center",
-                 gap: 12, padding: 16 },
-  backBtn:     { padding: 4 },
-  backTxt:     { fontSize: 22, color: "white" },
-  title:       { fontSize: 20, fontWeight: "700", color: "white", flex: 1 },
+                 gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  backBtn:     { width: 36, height: 36, borderRadius: 18,
+                 backgroundColor: "rgba(255,255,255,0.2)",
+                 justifyContent: "center", alignItems: "center" },
+  backTxt:     { fontSize: 18, color: "white", lineHeight: 22 },
+  title:       { fontSize: 18, fontWeight: "700", color: "white", flex: 1, letterSpacing: 0.2 },
   offlinePill: { flexDirection: "row", alignItems: "center", gap: 4,
-                 backgroundColor: ACCENT, borderRadius: 12,
-                 paddingHorizontal: 8, paddingVertical: 3 },
+                 backgroundColor: ACCENT, borderRadius: 14,
+                 paddingHorizontal: 10, paddingVertical: 4 },
   offlinePillTxt: { color: "#fff", fontSize: 11, fontWeight: "700" },
-  body:        { flex: 1, padding: 20, gap: 16 },
-  scanFrame:   { backgroundColor: "white", borderRadius: 20, padding: 40,
+
+  body:        { flex: 1, padding: 16, gap: 14 },
+
+  scanFrame:   { backgroundColor: "white", borderRadius: 24, padding: 36,
                  alignItems: "center", gap: 16, borderWidth: 2,
-                 borderColor: "#d1fae5", borderStyle: "dashed" },
+                 borderColor: "#d1fae5", borderStyle: "dashed",
+                 shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 10,
+                 shadowOffset: { width: 0, height: 4 }, elevation: 2 },
   scanFrameOffline: { borderColor: "#fed7aa" },
-  scanHint:    { fontSize: 14, color: "#6b7280", textAlign: "center", lineHeight: 20 },
-  resultCard:  { backgroundColor: "white", borderRadius: 16, padding: 20, gap: 10,
-                 borderWidth: 2, alignItems: "center" },
-  resultIcon:  { fontSize: 40 },
+  scanHint:    { fontSize: 13, color: "#6b7280", textAlign: "center", lineHeight: 20 },
+
+  resultCard:  { backgroundColor: "white", borderRadius: 20, padding: 20, gap: 10,
+                 borderWidth: 2, alignItems: "center",
+                 shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 12,
+                 shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  resultIcon:  { fontSize: 44 },
   resultTitle: { fontSize: 18, fontWeight: "700" },
-  resultLine:  { fontSize: 14, color: "#374151", textAlign: "center" },
-  resetBtn:    { marginTop: 8, backgroundColor: GREEN, borderRadius: 10,
-                 paddingHorizontal: 24, paddingVertical: 10 },
-  resetTxt:    { color: "white", fontWeight: "600" },
-  manualSection:{ gap: 10 },
-  manualLabel: { fontSize: 15, fontWeight: "700", color: GREEN },
-  manualRow:   { flexDirection: "row", gap: 10 },
-  manualInput: { flex: 1, backgroundColor: "white", borderRadius: 12, padding: 14,
-                 borderWidth: 1, borderColor: "#d1fae5" },
-  manualTxtInput: { fontSize: 14, color: "#111827" },
-  manualTxt:   { color: "#111827" },
-  manualPlaceholder: { color: "#9ca3af" },
-  validateBtn: { backgroundColor: ACCENT, borderRadius: 12,
-                 paddingHorizontal: 16, justifyContent: "center" },
-  validateTxt: { color: "white", fontWeight: "700" },
-  offlineNote: { flexDirection: "row", alignItems: "flex-start", gap: 6,
-                 backgroundColor: "#FFF7ED", borderRadius: 10, padding: 10,
-                 borderWidth: 1, borderColor: "#fed7aa" },
-  offlineNoteTxt: { fontSize: 12, color: "#92400e", flex: 1, lineHeight: 17 },
-  historyBtn:  { flexDirection: "row", alignItems: "center", gap: 6,
-                 backgroundColor: "#F9FAFB", borderRadius: 10, padding: 10,
-                 borderWidth: 1, borderColor: "#e5e7eb" },
-  historyBtnTxt: { fontSize: 12, color: "#6b7280" },
+  resultLine:  { fontSize: 14, color: "#374151", textAlign: "center", lineHeight: 20 },
+  resetBtn:    { marginTop: 8, backgroundColor: GREEN, borderRadius: 12,
+                 paddingHorizontal: 28, paddingVertical: 12 },
+  resetTxt:    { color: "white", fontWeight: "700", fontSize: 14 },
+
+  manualSection: { gap: 10 },
+  manualLabel:   { fontSize: 14, fontWeight: "700", color: GREEN, letterSpacing: 0.2 },
+  manualRow:     { flexDirection: "row", gap: 10 },
+  manualInput:   { flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14,
+                   borderWidth: 1, borderColor: "#d1fae5",
+                   shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 6,
+                   shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  manualTxtInput:   { fontSize: 14, color: "#111827" },
+  manualTxt:        { color: "#111827", fontSize: 14 },
+  manualPlaceholder: { color: "#9ca3af", fontSize: 14 },
+  validateBtn:  { backgroundColor: ACCENT, borderRadius: 14,
+                  paddingHorizontal: 18, justifyContent: "center",
+                  shadowColor: ACCENT, shadowOpacity: 0.3, shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  validateTxt:  { color: "white", fontWeight: "700", fontSize: 14 },
+
+  offlineNote:  { flexDirection: "row", alignItems: "flex-start", gap: 8,
+                  backgroundColor: "#FFF7ED", borderRadius: 14, padding: 12,
+                  borderWidth: 1, borderColor: "#fed7aa" },
+  offlineNoteTxt: { fontSize: 12, color: "#92400e", flex: 1, lineHeight: 18 },
+
+  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 8,
+                  backgroundColor: "white", borderRadius: 14, padding: 12,
+                  borderWidth: 1, borderColor: "#e5e7eb",
+                  shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 4,
+                  shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  historyBtnTxt: { fontSize: 12, color: "#6b7280", fontWeight: "500" },
 });
