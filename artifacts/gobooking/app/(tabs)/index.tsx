@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -304,11 +305,18 @@ export default function HomeScreen() {
         style={[styles.header, { paddingTop: topPad + 16 }]}
       >
         <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.greeting}>
-              {firstName ? `Bonjour, ${firstName} 👋` : "Bonjour 👋"}
-            </Text>
-            <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
+          <View style={styles.headerLeft}>
+            <Image
+              source={require("../../assets/logo.png")}
+              style={styles.headerLogo}
+              resizeMode="contain"
+            />
+            <View>
+              <Text style={styles.greeting}>
+                {firstName ? `Bonjour, ${firstName} 👋` : "GoBooking 🚌"}
+              </Text>
+              <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
+            </View>
           </View>
           {dashboardPath ? (
             <Pressable
@@ -1073,9 +1081,11 @@ const styles = StyleSheet.create({
 
   // Header
   header: { paddingHorizontal: 16, paddingBottom: 28 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
-  greeting: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  headerLogo: { width: 44, height: 44, borderRadius: 10 },
+  greeting: { fontSize: 18, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 1 },
   adminBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
 
   // Mode selector

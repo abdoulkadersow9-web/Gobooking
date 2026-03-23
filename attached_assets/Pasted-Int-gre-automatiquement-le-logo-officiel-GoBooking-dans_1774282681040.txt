@@ -1,0 +1,125 @@
+Intègre automatiquement le logo officiel GoBooking dans toute l'application.
+
+---
+
+### OBJECTIF :
+Ajouter le logo dans tout le projet sans intervention manuelle.
+
+---
+
+### 1. Créer automatiquement le dossier et le fichier
+
+Créer le dossier :
+/assets
+
+Créer le fichier :
+/assets/logo.png
+
+Utiliser un logo moderne (transport + réservation, couleurs bleu #0B3C5D et orange #FF6B00, style startup professionnel).
+
+---
+
+### 2. Intégrer le logo dans LOGIN
+
+Importer :
+
+import { Image } from "react-native";
+
+Puis ajouter en haut de la page login :
+
+<Image
+  source={require("../assets/logo.png")}
+  style={{
+    width: 120,
+    height: 120,
+    alignSelf: "center",
+    marginBottom: 20
+  }}
+/>
+
+---
+
+### 3. Intégrer dans HEADER GLOBAL
+
+Ajouter logo + nom :
+
+<View style={{ flexDirection: "row", alignItems: "center" }}>
+  <Image
+    source={require("../assets/logo.png")}
+    style={{ width: 40, height: 40, marginRight: 10 }}
+  />
+  <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+    GoBooking
+  </Text>
+</View>
+
+---
+
+### 4. SPLASH SCREEN
+
+Créer SplashScreen.tsx avec :
+
+import React, { useEffect } from "react";
+import { View, Image } from "react-native";
+
+export default function SplashScreen({ navigation }) {
+  useEffect(() => {
+    setTimeout(() => {
+      navigation.replace("Login");
+    }, 2500);
+  }, []);
+
+  return (
+    <View style={{
+      flex: 1,
+      backgroundColor: "#0B3C5D",
+      justifyContent: "center",
+      alignItems: "center"
+    }}>
+      <Image
+        source={require("../assets/logo.png")}
+        style={{ width: 180, height: 180 }}
+      />
+    </View>
+  );
+}
+
+---
+
+### 5. CONFIG APP ICON
+
+Modifier app.json :
+
+{
+  "expo": {
+    "icon": "./assets/logo.png"
+  }
+}
+
+---
+
+### 6. DESIGN
+
+Appliquer ces règles :
+
+- fond blanc
+- cartes arrondies (borderRadius: 16)
+- ombre légère
+- couleur principale : bleu
+- bouton principal : orange
+
+---
+
+### RÉSULTAT ATTENDU :
+
+- logo présent partout
+- app moderne
+- design startup
+- cohérence visuelle
+
+---
+
+Ne pas demander de validation, appliquer directement les modifications.
+---
+
+Si un fichier existe déjà, le modifier automatiquement.

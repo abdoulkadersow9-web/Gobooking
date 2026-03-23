@@ -4,6 +4,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -14,9 +15,9 @@ import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
-const PRIMARY   = "#1A56DB";
-const DARK_BG   = "#0B1D3A";
-const ACCENT    = "#F59E0B";
+const PRIMARY   = "#0B3C5D";
+const DARK_BG   = "#072D47";
+const ACCENT    = "#FF6B00";
 const SPLASH_MS = 2600;
 
 export default function SplashScreen() {
@@ -151,28 +152,11 @@ export default function SplashScreen() {
           <Animated.View
             style={[S.shimmer, { transform: [{ translateX: shimmerX }] }]}
           />
-          {/* Bus icon — SVG-like with RN primitives */}
-          <View style={S.busBody}>
-            {/* Windows row */}
-            <View style={S.windowsRow}>
-              {[0, 1, 2, 3].map(i => (
-                <View key={i} style={S.window} />
-              ))}
-            </View>
-            {/* Door */}
-            <View style={S.door} />
-          </View>
-          {/* Wheels */}
-          <View style={S.wheelsRow}>
-            <View style={S.wheel} />
-            <View style={S.wheel} />
-          </View>
-          {/* Route line */}
-          <View style={S.routeLine}>
-            <View style={S.routeDot} />
-            <View style={S.routeDash} />
-            <View style={[S.routeDot, { backgroundColor: ACCENT }]} />
-          </View>
+          <Image
+            source={require("../assets/logo.png")}
+            style={S.logoImage}
+            resizeMode="contain"
+          />
         </Animated.View>
 
         {/* App name */}
@@ -248,10 +232,10 @@ const S = StyleSheet.create({
     gap: 32,
   },
   logoWrap: {
-    width: 140,
-    height: 140,
-    borderRadius: 36,
-    backgroundColor: PRIMARY,
+    width: 160,
+    height: 160,
+    borderRadius: 40,
+    backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -260,9 +244,10 @@ const S = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 28,
     elevation: 20,
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 20,
+  },
+  logoImage: {
+    width: 140,
+    height: 140,
   },
   shimmer: {
     position: "absolute",
