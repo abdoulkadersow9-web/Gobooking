@@ -15,6 +15,23 @@ function mapXYtoLatLon(mapX: number, mapY: number) {
 
 const router: IRouter = Router();
 
+/* ── Simple in-memory cache for /live (30s TTL) ─────────────────── */
+interface LiveCache {
+  data: unknown[];
+  expiresAt: number;
+}
+const liveCache = new Map<string, LiveCache>();
+
+function getLiveCache(key: string): unknown[] | null {
+  const entry = liveCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) return null;
+  return entry.data;
+}
+
+function setLiveCache(key: string, data: unknown[], ttlMs = 30_000) {
+  liveCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
+
 router.get("/search", async (req, res) => {
   try {
     const { from, to, date } = req.query as { from: string; to: string; date: string };
@@ -126,10 +143,19 @@ router.get("/live", async (req, res) => {
     const authHeader = req.headers.authorization ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     const isAuthenticated = token ? tokenStore.has(token) : false;
+    const cacheKey = `live-${isAuthenticated ? "auth" : "anon"}`;
 
     pruneStale();
 
-    /* ── Fetch active trips from DB (status = "en_route" or "en_cours") ── */
+    /* ── Cache hit ─────────────────────────────────────────────────── */
+    const cached = getLiveCache(cacheKey);
+    if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      res.json(cached);
+      return;
+    }
+
+    /* ── Fetch active trips from DB (status = "en_route") ──────────── */
     const dbTrips = await db
       .select()
       .from(tripsTable)
@@ -241,6 +267,7 @@ router.get("/live", async (req, res) => {
           };
         })
       );
+      setLiveCache(cacheKey, result, 15_000);
       res.json(result);
       return;
     }
@@ -274,6 +301,7 @@ router.get("/live", async (req, res) => {
         speed:        gps?.speed ?? d.speed,
       };
     });
+    setLiveCache(cacheKey, demo, 30_000);
     res.json(demo);
   } catch (err) {
     console.error("Live trips error:", err);

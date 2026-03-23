@@ -159,6 +159,18 @@ export async function clearScannedCodes(): Promise<void> {
   await AsyncStorage.removeItem(SCANNED_KEY);
 }
 
+/* ─── Timeout fetch helper ──────────────────────────────────────── */
+
+const SYNC_TIMEOUT_MS = 10_000;
+
+function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
 /* ─── Sync ──────────────────────────────────────────────────────── */
 
 async function replayItem(item: OfflineItem, baseUrl: string): Promise<boolean> {
@@ -169,19 +181,31 @@ async function replayItem(item: OfflineItem, baseUrl: string): Promise<boolean> 
 
   try {
     if (item.type === "scan") {
-      const res = await fetch(`${baseUrl}/agent/reservation/${item.payload.reservationId}/board`, { method: "POST", headers });
+      const res = await fetchWithTimeout(
+        `${baseUrl}/agent/reservation/${item.payload.reservationId}/board`,
+        { method: "POST", headers }
+      );
       return res.ok;
     }
     if (item.type === "reservation") {
-      const res = await fetch(`${baseUrl}/reservations`, { method: "POST", headers, body: JSON.stringify(item.payload) });
+      const res = await fetchWithTimeout(
+        `${baseUrl}/reservations`,
+        { method: "POST", headers, body: JSON.stringify(item.payload) }
+      );
       return res.ok;
     }
     if (item.type === "colis_arrive") {
-      const res = await fetch(`${baseUrl}/agent/parcels/${item.payload.colisId}/arrive`, { method: "POST", headers });
+      const res = await fetchWithTimeout(
+        `${baseUrl}/agent/parcels/${item.payload.colisId}/arrive`,
+        { method: "POST", headers }
+      );
       return res.ok;
     }
     if (item.type === "en_route_board") {
-      const res = await fetch(`${baseUrl}/agent/requests/${item.payload.requestId}/board`, { method: "POST", headers });
+      const res = await fetchWithTimeout(
+        `${baseUrl}/agent/requests/${item.payload.requestId}/board`,
+        { method: "POST", headers }
+      );
       return res.ok;
     }
     return false;
