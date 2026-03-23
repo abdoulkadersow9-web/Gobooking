@@ -1,12 +1,15 @@
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,12 +20,55 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { apiFetch } from "@/utils/api";
+
+interface WalletData {
+  walletBalance: number;
+  totalTrips: number;
+  referralCode: string;
+  totalReferrals: number;
+}
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, token, logout, isAdmin } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const [wallet, setWallet] = useState<WalletData | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<WalletData>("/growth/wallet", { token })
+      .then(setWallet)
+      .catch(() => {});
+  }, [token]);
+
+  const loyaltyTrips = wallet?.totalTrips ?? user?.totalTrips ?? 0;
+  const tripsToNextReward = Math.max(0, 10 - (loyaltyTrips % 10));
+  const loyaltyLevel = loyaltyTrips >= 30 ? "Or" : loyaltyTrips >= 10 ? "Argent" : "Bronze";
+  const loyaltyColor = loyaltyTrips >= 30 ? "#D97706" : loyaltyTrips >= 10 ? "#64748B" : "#B45309";
+
+  const refCode = wallet?.referralCode ?? user?.referralCode ?? "";
+
+  const copyReferral = async () => {
+    if (!refCode) return;
+    await Clipboard.setStringAsync(refCode);
+    setCopied(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareReferral = async () => {
+    if (!refCode) return;
+    try {
+      await Share.share({
+        message: `Rejoins GoBooking avec mon code parrainage "${refCode}" et gagne 500 FCFA sur ton premier voyage ! 🚌`,
+        title: "GoBooking — Code parrainage",
+      });
+    } catch {}
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -75,12 +121,13 @@ export default function ProfileScreen() {
       }}
       showsVerticalScrollIndicator={false}
     >
+      {/* Profile header */}
       <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
+        <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.avatar}>
           <Text style={styles.avatarText}>
             {user?.name?.charAt(0)?.toUpperCase() || "U"}
           </Text>
-        </View>
+        </LinearGradient>
         <Text style={styles.userName}>{user?.name}</Text>
         <Text style={styles.userEmail}>{user?.email}</Text>
         {isAdmin && (
@@ -91,23 +138,116 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      {/* Stats row — real data */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>12</Text>
-          <Text style={styles.statLabel}>Trips</Text>
+          <Text style={styles.statValue}>{loyaltyTrips}</Text>
+          <Text style={styles.statLabel}>Voyages</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>$480</Text>
-          <Text style={styles.statLabel}>Spent</Text>
+          <Text style={[styles.statValue, { color: "#059669" }]}>
+            {(wallet?.walletBalance ?? user?.walletBalance ?? 0).toLocaleString()}
+          </Text>
+          <Text style={styles.statLabel}>FCFA Wallet</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>Gold</Text>
-          <Text style={styles.statLabel}>Member</Text>
+          <Text style={[styles.statValue, { color: loyaltyColor }]}>{loyaltyLevel}</Text>
+          <Text style={styles.statLabel}>Fidélité</Text>
         </View>
       </View>
 
+      {/* Wallet card */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Mon portefeuille</Text>
+        <LinearGradient colors={["#059669", "#047857"]} style={styles.walletCard}>
+          <View style={styles.walletTop}>
+            <View>
+              <Text style={styles.walletLabel}>Solde disponible</Text>
+              <Text style={styles.walletAmount}>
+                {(wallet?.walletBalance ?? user?.walletBalance ?? 0).toLocaleString()} FCFA
+              </Text>
+            </View>
+            <View style={styles.walletIconWrap}>
+              <Feather name="credit-card" size={24} color="rgba(255,255,255,0.8)" />
+            </View>
+          </View>
+          <View style={styles.walletRow}>
+            <View style={styles.walletStat}>
+              <Feather name="award" size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.walletStatText}>+500 FCFA par voyage confirmé</Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+
+      {/* Loyalty card */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Programme fidélité</Text>
+        <View style={styles.loyaltyCard}>
+          <View style={styles.loyaltyTop}>
+            <View style={[styles.loyaltyBadge, { backgroundColor: loyaltyColor + "20" }]}>
+              <Feather name="star" size={16} color={loyaltyColor} />
+              <Text style={[styles.loyaltyBadgeText, { color: loyaltyColor }]}>{loyaltyLevel}</Text>
+            </View>
+            <Text style={styles.loyaltyTrips}>
+              <Text style={styles.loyaltyTripsNum}>{loyaltyTrips}</Text> voyage{loyaltyTrips !== 1 ? "s" : ""}
+            </Text>
+          </View>
+          <View style={styles.loyaltyBar}>
+            <View style={[styles.loyaltyProgress, { width: `${Math.min(100, ((loyaltyTrips % 10) / 10) * 100)}%` as any, backgroundColor: loyaltyColor }]} />
+          </View>
+          <Text style={styles.loyaltyHint}>
+            {tripsToNextReward === 0
+              ? "🎉 Voyage gratuit disponible !"
+              : `Encore ${tripsToNextReward} voyage${tripsToNextReward > 1 ? "s" : ""} pour un voyage gratuit`}
+          </Text>
+        </View>
+      </View>
+
+      {/* Referral section */}
+      {refCode ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Parrainage</Text>
+          <View style={styles.referralCard}>
+            <View style={styles.referralTop}>
+              <Feather name="gift" size={20} color="#7C3AED" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.referralTitle}>Parrainez, gagnez 500 FCFA</Text>
+                <Text style={styles.referralSub}>500 FCFA crédités pour chaque ami inscrit</Text>
+              </View>
+            </View>
+            <View style={styles.referralCodeRow}>
+              <View style={styles.referralCodeBox}>
+                <Text style={styles.referralCode}>{refCode}</Text>
+              </View>
+              <Pressable
+                onPress={copyReferral}
+                style={[styles.referralBtn, { backgroundColor: copied ? "#059669" : Colors.light.primary }]}
+              >
+                <Feather name={copied ? "check" : "copy"} size={14} color="white" />
+                <Text style={styles.referralBtnText}>{copied ? "Copié !" : "Copier"}</Text>
+              </Pressable>
+              <Pressable onPress={shareReferral} style={[styles.referralBtn, { backgroundColor: "#7C3AED" }]}>
+                <Feather name="share-2" size={14} color="white" />
+                <Text style={styles.referralBtnText}>Partager</Text>
+              </Pressable>
+            </View>
+            {wallet?.totalReferrals != null && wallet.totalReferrals > 0 && (
+              <View style={styles.referralStats}>
+                <Feather name="users" size={13} color="#7C3AED" />
+                <Text style={styles.referralStatsText}>
+                  {wallet.totalReferrals} ami{wallet.totalReferrals > 1 ? "s" : ""} parrainé{wallet.totalReferrals > 1 ? "s" : ""}
+                  {" "}· +{(wallet.totalReferrals * 500).toLocaleString()} FCFA gagnés
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      ) : null}
+
+      {/* Mon compte */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.monCompte}</Text>
         <View style={styles.menuCard}>
@@ -117,6 +257,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Mes réservations */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.mesReservations}</Text>
         <View style={styles.menuCard}>
@@ -124,7 +265,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Language Switch */}
+      {/* Language */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.parametres}</Text>
         <View style={styles.menuCard}>
@@ -153,6 +294,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Tableaux de bord */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Tableaux de bord</Text>
         <View style={styles.dashGrid}>
@@ -189,6 +331,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
+      {/* Support */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.support}</Text>
         <View style={styles.menuCard}>
@@ -198,6 +341,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Déconnexion */}
       <View style={styles.section}>
         <View style={styles.menuCard}>
           <MenuItem icon="log-out" label={t.deconnexion} onPress={handleLogout} danger />
@@ -221,7 +365,6 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
@@ -301,6 +444,186 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
+
+  // Wallet card
+  walletCard: {
+    borderRadius: 16,
+    padding: 20,
+    gap: 16,
+  },
+  walletTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  walletLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.75)",
+    marginBottom: 4,
+  },
+  walletAmount: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: "white",
+  },
+  walletIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  walletRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  walletStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  walletStatText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.8)",
+  },
+
+  // Loyalty card
+  loyaltyCard: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  loyaltyTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  loyaltyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  loyaltyBadgeText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  loyaltyTrips: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+  },
+  loyaltyTripsNum: {
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.text,
+  },
+  loyaltyBar: {
+    height: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  loyaltyProgress: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  loyaltyHint: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.light.textSecondary,
+  },
+
+  // Referral card
+  referralCard: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: "#E9D5FF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  referralTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  referralTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.text,
+  },
+  referralSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  referralCodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  referralCodeBox: {
+    flex: 1,
+    backgroundColor: "#F5F3FF",
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "#DDD6FE",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  referralCode: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#7C3AED",
+    letterSpacing: 3,
+  },
+  referralBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  referralBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "white",
+  },
+  referralStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F5F3FF",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  referralStatsText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#7C3AED",
+  },
+
+  // Menu items
   menuCard: {
     backgroundColor: Colors.light.card,
     borderRadius: 16,
@@ -345,7 +668,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.border,
     marginLeft: 64,
   },
-
   langRow: {
     flexDirection: "row",
     alignItems: "center",

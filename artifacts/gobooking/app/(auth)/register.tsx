@@ -40,6 +40,7 @@ export default function RegisterScreen() {
   const [email, setEmail]             = useState("");
   const [password, setPassword]       = useState("");
   const [confirm, setConfirm]         = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm]   = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -76,6 +77,7 @@ export default function RegisterScreen() {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
+          ...(referralCode.trim() ? { referralCode: referralCode.trim().toUpperCase() } : {}),
         }),
       });
       await login(res.token, res.user);
@@ -242,6 +244,34 @@ export default function RegisterScreen() {
                 <Text style={styles.matchText}>Les mots de passe correspondent</Text>
               </View>
             )}
+          </View>
+
+          {/* ── Code parrainage (optionnel) ── */}
+          <View style={styles.inputGroup}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <Text style={styles.label}>Code de parrainage</Text>
+              <View style={{ backgroundColor: "#ECFDF5", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#059669" }}>Optionnel · +500 FCFA pour votre parrain</Text>
+              </View>
+            </View>
+            <View style={styles.inputRow}>
+              <Feather name="gift" size={18} color={Colors.light.textMuted} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: A3F9C2"
+                placeholderTextColor={Colors.light.textMuted}
+                value={referralCode}
+                onChangeText={t => setReferralCode(t.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={20}
+              />
+              {referralCode.length > 0 && (
+                <Pressable onPress={() => setReferralCode("")} style={styles.eye}>
+                  <Feather name="x" size={16} color={Colors.light.textMuted} />
+                </Pressable>
+              )}
+            </View>
           </View>
 
           {/* ── Bouton S'inscrire ── */}

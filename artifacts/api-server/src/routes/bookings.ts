@@ -3,6 +3,7 @@ import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettin
 import { eq, desc, inArray, ne, and, sql, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { auditLog, detectAnomalies, ACTIONS } from "../audit";
+import { creditUserWallet, usePromoCode } from "./growth";
 
 const router: IRouter = Router();
 
@@ -130,7 +131,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone } = req.body;
+    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
       res.status(400).json({ error: "Champs requis manquants" });
@@ -180,8 +181,19 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const totalAmount = seatsData.reduce((sum, s) => sum + s.price, 0);
+    let totalAmount = seatsData.reduce((sum, s) => sum + s.price, 0);
     const seatNumbers = seatsData.map((s) => s.number);
+
+    /* ── Apply promo discount ──────────────────────────────────── */
+    if (promoId) {
+      const { promosTable } = await import("@workspace/db");
+      const promos = await db.select().from(promosTable).where(eq(promosTable.id, promoId)).limit(1);
+      const promo = promos[0];
+      if (promo?.valid && totalAmount >= promo.minAmount) {
+        totalAmount = Math.max(0, totalAmount - promo.discount);
+        usePromoCode(promoId).catch(() => {});
+      }
+    }
 
     // ── Commission calculation ─────────────────────────────────────
     const commSettings = await db.select().from(commissionSettingsTable).where(eq(commissionSettingsTable.id, "default")).limit(1);
@@ -293,6 +305,9 @@ router.post("/:bookingId/confirm", async (req, res) => {
     auditLog({ userId, userRole: "client", req }, ACTIONS.BOOKING_CONFIRM, bookingId, "booking", {
       bookingRef: booking.bookingRef, paymentMethod: paymentMethod ?? booking.paymentMethod,
     }).catch(() => {});
+
+    /* ── Cashback 500 FCFA + incrément totalTrips ─────────────── */
+    creditUserWallet(userId, 500, true).catch(() => {});
 
     res.json(full);
   } catch (err) {

@@ -3,6 +3,7 @@ import { db, usersTable, agentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { auditLog, ACTIONS } from "../audit";
+import { recordReferral } from "./growth";
 
 const router: IRouter = Router();
 
@@ -45,14 +46,24 @@ router.post("/register", async (req, res) => {
       return;
     }
 
+    const newId = generateId();
+    const generatedReferralCode = newId.slice(0, 6).toUpperCase();
+
     const [user] = await db.insert(usersTable).values({
-      id: generateId(),
+      id: newId,
       name,
       email,
       phone: phone || "",
       passwordHash: hashPassword(password),
       role: mappedRole,
+      referralCode: generatedReferralCode,
     }).returning();
+
+    // Process referral if provided
+    const { referralCode: inputCode } = req.body;
+    if (inputCode) {
+      recordReferral(String(inputCode).toUpperCase().trim(), user.id).catch(() => {});
+    }
 
     const token = generateToken_simple();
     tokenStore.set(token, user.id);
@@ -65,6 +76,9 @@ router.post("/register", async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        referralCode: user.referralCode,
+        walletBalance: user.walletBalance ?? 0,
+        totalTrips: user.totalTrips ?? 0,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
     });
@@ -124,6 +138,9 @@ router.post("/login", async (req, res) => {
         role: user.role,
         agentRole,
         status: user.status,
+        referralCode: user.referralCode ?? user.id.slice(0, 6).toUpperCase(),
+        walletBalance: user.walletBalance ?? 0,
+        totalTrips: user.totalTrips ?? 0,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
     });
@@ -175,6 +192,9 @@ router.get("/me", async (req, res) => {
       role: user.role,
       agentRole,
       status: user.status,
+      referralCode: user.referralCode ?? user.id.slice(0, 6).toUpperCase(),
+      walletBalance: user.walletBalance ?? 0,
+      totalTrips: user.totalTrips ?? 0,
       createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
     });
   } catch (err) {

@@ -101,6 +101,11 @@ export default function PaymentScreen() {
   const [loading, setLoading] = useState(false);
   const [payStep, setPayStep] = useState<"idle" | "creating" | "processing" | "confirming">("idle");
 
+  const [promoInput, setPromoInput]   = useState("");
+  const [promoData, setPromoData]     = useState<{ id: string; code: string; discount: number; minAmount: number } | null>(null);
+  const [promoError, setPromoError]   = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+
   useEffect(() => {
     if (!booking?.tripId) return;
     apiFetch<TripDetail>(`/trips/${booking.tripId}`)
@@ -166,6 +171,7 @@ export default function PaymentScreen() {
           paymentMethod: method,
           contactEmail: booking.contactEmail || "user@gobooking.ci",
           contactPhone: booking.contactPhone || phone,
+          ...(promoData ? { promoId: promoData.id } : {}),
         }),
       });
 
@@ -202,6 +208,34 @@ export default function PaymentScreen() {
     if (payStep === "confirming") return "Confirmation en cours…";
     return "Payer maintenant";
   };
+
+  const validatePromo = async () => {
+    const code = promoInput.trim().toUpperCase();
+    if (!code) { setPromoError("Entrez un code promo."); return; }
+    setPromoLoading(true); setPromoError("");
+    try {
+      const data = await apiFetch<{ id: string; code: string; discount: number; minAmount: number }>(
+        `/growth/promo/${code}`, { token }
+      );
+      const base = booking?.totalAmount ?? 0;
+      if (data.minAmount > base) {
+        setPromoError(`Montant minimum requis : ${data.minAmount.toLocaleString()} FCFA`);
+        setPromoData(null);
+      } else {
+        setPromoData(data);
+        setPromoError("");
+      }
+    } catch (err: any) {
+      setPromoData(null);
+      setPromoError(err.message ?? "Code promo invalide");
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const discountedTotal = promoData
+    ? Math.max(0, (booking?.totalAmount ?? 0) - promoData.discount)
+    : (booking?.totalAmount ?? 0);
 
   const selectedMethod = PAYMENT_METHODS.find((m) => m.id === method)!;
 
@@ -287,10 +321,66 @@ export default function PaymentScreen() {
             <View style={styles.summaryDivider} />
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Montant total</Text>
-              <Text style={styles.totalAmount}>
-                {booking?.totalAmount?.toLocaleString() ?? "0"} FCFA
-              </Text>
+              <View style={{ alignItems: "flex-end" }}>
+                {promoData && (
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", textDecorationLine: "line-through" }}>
+                    {booking?.totalAmount?.toLocaleString()} FCFA
+                  </Text>
+                )}
+                <Text style={[styles.totalAmount, promoData ? { color: "#059669" } : {}]}>
+                  {discountedTotal.toLocaleString()} FCFA
+                </Text>
+                {promoData && (
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#059669" }}>
+                    -{promoData.discount.toLocaleString()} FCFA avec {promoData.code}
+                  </Text>
+                )}
+              </View>
             </View>
+          </View>
+
+          {/* Promo code section */}
+          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: promoData ? "#059669" : "#E2E8F0" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Feather name="tag" size={16} color={promoData ? "#059669" : Colors.light.primary} />
+              <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>Code promo</Text>
+              {promoData && (
+                <View style={{ backgroundColor: "#ECFDF5", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#059669" }}>Appliqué !</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TextInput
+                style={{ flex: 1, borderWidth: 1.5, borderColor: promoData ? "#059669" : "#E2E8F0", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_500Medium", color: "#0F172A", backgroundColor: "#F8FAFC" }}
+                placeholder="Ex: GO1000"
+                placeholderTextColor="#94A3B8"
+                value={promoInput}
+                onChangeText={t => { setPromoInput(t.toUpperCase()); setPromoData(null); setPromoError(""); }}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                editable={!promoData}
+              />
+              {promoData ? (
+                <Pressable onPress={() => { setPromoData(null); setPromoInput(""); }} style={{ backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 14, alignItems: "center", justifyContent: "center" }}>
+                  <Feather name="x" size={16} color="#DC2626" />
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={validatePromo}
+                  disabled={promoLoading || !promoInput.trim()}
+                  style={{ backgroundColor: Colors.light.primary, borderRadius: 10, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" }}
+                >
+                  {promoLoading ? <ActivityIndicator size="small" color="white" /> : <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>Appliquer</Text>}
+                </Pressable>
+              )}
+            </View>
+            {!!promoError && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 }}>
+                <Feather name="alert-circle" size={13} color="#DC2626" />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#DC2626" }}>{promoError}</Text>
+              </View>
+            )}
           </View>
 
           {/* Payment methods */}

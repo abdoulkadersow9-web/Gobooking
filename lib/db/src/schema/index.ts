@@ -17,3 +17,5 @@ export * from "./boarding_requests";
 export * from "./invoices";
 export * from "./subscriptions";
 export * from "./audit_logs";
+export * from "./referrals";
+export * from "./promos";

@@ -10,6 +10,7 @@ import companyRouter from "./company";
 import agentRouter from "./agent";
 import firebaseBookingRouter from "./firebase-booking";
 import subscriptionsRouter from "./subscriptions";
+import growthRouter from "./growth";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use("/company", companyRouter);
 router.use("/agent", agentRouter);
 router.use("/firebase", firebaseBookingRouter);
 router.use(subscriptionsRouter);
+router.use(growthRouter);
 
 export default router;

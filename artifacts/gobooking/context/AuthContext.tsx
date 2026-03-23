@@ -22,6 +22,9 @@ export interface User {
   phone: string;
   role: UserRole;
   agentRole?: AgentRole | null;
+  referralCode?: string;
+  walletBalance?: number;
+  totalTrips?: number;
   createdAt: string;
 }
 
