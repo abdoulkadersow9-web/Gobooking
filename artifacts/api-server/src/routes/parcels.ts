@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, parcelsTable, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
+import { auditLog, ACTIONS } from "../audit";
 
 const router: IRouter = Router();
 
@@ -114,6 +115,10 @@ router.post("/", async (req, res) => {
       status: "en_attente",
       notes: notes || null,
     }).returning();
+
+    auditLog({ userId, userRole: "client", req }, ACTIONS.PARCEL_CREATE, parcel[0].id, "parcel", {
+      trackingRef: parcel[0].trackingRef, fromCity, toCity, weight, amount,
+    }).catch(() => {});
 
     res.status(201).json(parcel[0]);
   } catch (err) {

@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, agentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { auditLog, ACTIONS } from "../audit";
 
 const router: IRouter = Router();
 
@@ -84,12 +85,14 @@ router.post("/login", async (req, res) => {
 
     const users = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
     if (!users.length) {
+      auditLog({ userId: "anonymous", userRole: "unknown", req }, ACTIONS.LOGIN_FAIL, undefined, undefined, { email, reason: "user_not_found" }, false).catch(() => {});
       res.status(401).json({ error: "Invalid email or password" });
       return;
     }
 
     const user = users[0];
     if (user.passwordHash !== hashPassword(password)) {
+      auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.LOGIN_FAIL, user.id, "user", { reason: "wrong_password" }, false).catch(() => {});
       res.status(401).json({ error: "Email ou mot de passe incorrect" });
       return;
     }
@@ -108,6 +111,8 @@ router.post("/login", async (req, res) => {
       const agentRecord = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
       if (agentRecord.length > 0) agentRole = agentRecord[0].agentRole ?? null;
     }
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.LOGIN_OK, user.id, "user", { email: user.email }).catch(() => {});
 
     res.json({
       token,

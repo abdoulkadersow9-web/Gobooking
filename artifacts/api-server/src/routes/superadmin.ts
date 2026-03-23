@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable } from "@workspace/db";
+import { eq, desc, sql, and, count, gte } from "drizzle-orm";
+import { getAuditLogs } from "../audit";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
 
@@ -703,6 +704,72 @@ router.get("/analytics", async (req, res) => {
   } catch (err) {
     console.error("Superadmin analytics error:", err);
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUDIT LOGS
+   GET /superadmin/audit-logs        — paginated logs with optional filters
+   GET /superadmin/audit-logs/stats  — counts per action + flagged alerts
+═══════════════════════════════════════════════════════════════════════════ */
+
+router.get("/audit-logs/stats", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [total, flagged, recent] = await Promise.all([
+      db.select({ cnt: count() }).from(auditLogsTable),
+      db.select({ cnt: count() }).from(auditLogsTable).where(eq(auditLogsTable.flagged, true)),
+      db.select({ cnt: count() }).from(auditLogsTable).where(gte(auditLogsTable.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000))),
+    ]);
+
+    const byAction = await db
+      .select({ action: auditLogsTable.action, cnt: count() })
+      .from(auditLogsTable)
+      .groupBy(auditLogsTable.action)
+      .orderBy(desc(count()));
+
+    res.json({
+      total:   Number(total[0]?.cnt ?? 0),
+      flagged: Number(flagged[0]?.cnt ?? 0),
+      last24h: Number(recent[0]?.cnt ?? 0),
+      byAction: byAction.map(r => ({ action: r.action, count: Number(r.cnt) })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.get("/audit-logs", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const action  = req.query.action  as string | undefined;
+    const userId  = req.query.userId  as string | undefined;
+    const flagged = req.query.flagged === "true" ? true : req.query.flagged === "false" ? false : undefined;
+    const limit   = Math.min(parseInt(req.query.limit  as string ?? "100", 10), 200);
+    const offset  = parseInt(req.query.offset as string ?? "0",   10);
+
+    const logs = await getAuditLogs({ action, userId, flagged, limit, offset });
+
+    res.json(logs.map(l => ({
+      id:         l.id,
+      userId:     l.userId,
+      userRole:   l.userRole,
+      userName:   l.userName,
+      action:     l.action,
+      targetId:   l.targetId,
+      targetType: l.targetType,
+      metadata:   l.metadata ? JSON.parse(l.metadata) : null,
+      ipAddress:  l.ipAddress,
+      flagged:    l.flagged,
+      createdAt:  l.createdAt.toISOString(),
+    })));
+  } catch (err) {
+    console.error("Audit logs error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

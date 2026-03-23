@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable } from "@workspace/db";
 import { eq, desc, inArray, ne, and, sql, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
+import { auditLog, detectAnomalies, ACTIONS } from "../audit";
 
 const router: IRouter = Router();
 
@@ -221,6 +222,15 @@ router.post("/", async (req, res) => {
       });
 
     const bookingResult = await getFullBooking(newBookingId);
+
+    /* ── Audit log + anomaly detection ─────────────────────────────── */
+    const userRows = await db.select({ name: usersTable.name, role: usersTable.role }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const ctx = { userId, userRole: userRows[0]?.role ?? "client", userName: userRows[0]?.name ?? "" };
+    auditLog(ctx, ACTIONS.BOOKING_CREATE, newBookingId, "booking", {
+      bookingRef: newBookingRef, tripId, totalAmount, paymentMethod,
+    }).catch(() => {});
+    detectAnomalies(ctx, ACTIONS.BOOKING_CREATE).catch(() => {});
+
     res.json(bookingResult);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Réservation échouée";
@@ -279,6 +289,11 @@ router.post("/:bookingId/confirm", async (req, res) => {
     await creditCompanyWallet(bookingId);
 
     const full = await getFullBooking(bookingId);
+
+    auditLog({ userId, userRole: "client", req }, ACTIONS.BOOKING_CONFIRM, bookingId, "booking", {
+      bookingRef: booking.bookingRef, paymentMethod: paymentMethod ?? booking.paymentMethod,
+    }).catch(() => {});
+
     res.json(full);
   } catch (err) {
     console.error("Confirm booking error:", err);
@@ -586,6 +601,11 @@ router.post("/:bookingId/cancel", async (req, res) => {
     }
 
     const full = await getFullBooking(bookingId);
+
+    auditLog({ userId, userRole: role ?? "client", req }, ACTIONS.BOOKING_CANCEL, bookingId, "booking", {
+      bookingRef: booking.bookingRef, previousStatus: booking.status,
+    }).catch(() => {});
+
     res.json(full);
   } catch (err) {
     console.error("Cancel booking error:", err);

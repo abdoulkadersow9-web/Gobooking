@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
+import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
@@ -69,7 +70,9 @@ router.post("/boarding/:bookingId/validate", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    await db.update(bookingsTable).set({ status: "validated" }).where(eq(bookingsTable.id, req.params.bookingId));
+    const bookingId = req.params.bookingId;
+    await db.update(bookingsTable).set({ status: "validated" }).where(eq(bookingsTable.id, bookingId));
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.BOOKING_BOARD, bookingId, "booking").catch(() => {});
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -345,6 +348,23 @@ router.get("/scan/:ref", async (req, res) => {
         .limit(1);
       trip = trips[0] ?? null;
     }
+
+    /* ── Anti double-scan ── */
+    if (booking.status === "boarded") {
+      auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_DOUBLE_SCAN, booking.id, "booking", {
+        bookingRef: booking.bookingRef, status: booking.status,
+      }, true).catch(() => {});
+      res.status(409).json({
+        error: "Billet déjà utilisé — embarquement déjà enregistré",
+        code:  "DOUBLE_SCAN",
+        bookingRef: booking.bookingRef,
+      });
+      return;
+    }
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_SCAN, booking.id, "booking", {
+      bookingRef: booking.bookingRef, currentStatus: booking.status,
+    }).catch(() => {});
 
     res.json({
       id: booking.id,

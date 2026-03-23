@@ -43,6 +43,8 @@ interface AgentItem { id: string; name: string; agentCode: string; phone: string
 interface WalletTx { id: string; bookingRef?: string | null; type: string; grossAmount: number; commissionAmount: number; netAmount: number; description?: string | null; createdAt: string }
 interface WalletData { balance: number; totalGross: number; totalCommission: number; totalNet: number; transactions: WalletTx[] }
 interface Invoice { id: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
+interface SubscriptionPlan { id: string; name: string; priceMonthly: number; maxReservations: number | null; maxTrips: number | null; features: string[] }
+interface CompanySubscription { id: string; companyId: string; planId: string; status: string; startDate: string; endDate: string | null; autoRenew: boolean; plan: SubscriptionPlan }
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_STATS: Stats = { totalBuses: 12, totalAgents: 18, totalTrips: 284, totalReservations: 1_420, totalParcels: 638, totalRevenue: 8_760_000, activeBuses: 9 };
@@ -158,7 +160,7 @@ const DEMO_ANALYTICS: Analytics = {
   parcelByStatus: { livre: 310, en_transit: 142, en_livraison: 88, en_attente: 58, pris_en_charge: 40 },
 };
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "factures" | "en_route" | "analytiques";
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "factures" | "en_route" | "analytiques" | "abonnement";
 type BoardingRequest = { id: string; tripId: string; clientName: string; clientPhone: string; boardingPoint: string; seatsRequested: number; status: string; createdAt: string };
 
 /* ─── Reusable picker row ─────────────────────────────────── */
@@ -251,6 +253,9 @@ export default function CompanyDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invLoading, setInvLoading] = useState(false);
   const [invGenerating, setInvGenerating] = useState(false);
+  const [subscription, setSubscription] = useState<CompanySubscription | null>(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [subChanging, setSubChanging] = useState(false);
   const [selectedTripForSeats, setSelectedTripForSeats] = useState<Trip>(DEMO_TRIPS[0]);
   const [seats, setSeats] = useState<SeatItem[]>(genDemoSeats("t1", 49, 31));
   const [selectedSeat, setSelectedSeat] = useState<SeatItem | null>(null);
@@ -286,6 +291,24 @@ export default function CompanyDashboard() {
   const [reservationError, setReservationError] = useState("");
   const [parcelSubmitting, setParcelSubmitting] = useState(false);
   const [parcelError, setParcelError] = useState("");
+
+  const loadSubscription = () => {
+    if (!token) return;
+    setSubLoading(true);
+    apiFetch<CompanySubscription>("/company/subscription", { token })
+      .then(data => setSubscription(data))
+      .catch(() => {})
+      .finally(() => setSubLoading(false));
+  };
+
+  const changeSubscription = (planId: string) => {
+    if (!token) return;
+    setSubChanging(true);
+    apiFetch<CompanySubscription>("/company/subscription", { token, method: "POST", body: { planId } })
+      .then(data => { setSubscription(data); Alert.alert("Abonnement mis à jour", `Votre abonnement ${data.plan.name} est maintenant actif.`); })
+      .catch(() => Alert.alert("Erreur", "Impossible de modifier l'abonnement. Veuillez réessayer."))
+      .finally(() => setSubChanging(false));
+  };
 
   const loadInvoices = () => {
     if (!token) return;
@@ -360,6 +383,7 @@ export default function CompanyDashboard() {
     });
     loadBoardingRequests();
     loadInvoices();
+    loadSubscription();
   }, [token]);
 
   const confirmReservation = async (reservationId: string) => {
@@ -544,6 +568,7 @@ export default function CompanyDashboard() {
     { id: "analytiques",  label: "Analytiques",   icon: "trending-up" },
     { id: "portefeuille", label: "Portefeuille",  icon: "credit-card" },
     { id: "factures",     label: "Factures",      icon: "file-text" },
+    { id: "abonnement",   label: "Abonnement",    icon: "star" },
     { id: "trajets",      label: "Trajets",       icon: "navigation" },
     { id: "reservations", label: "Réservations",  icon: "bookmark" },
     { id: "sieges",       label: "Sièges",        icon: "grid" },
@@ -1239,6 +1264,126 @@ export default function CompanyDashboard() {
               </View>
             );
           })}
+        </>)}
+
+        {/* ── Abonnement ── */}
+        {activeTab === "abonnement" && (<>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <View>
+              <Text style={S.sectionTitle}>Abonnement GoBooking</Text>
+              <Text style={[S.listSub, { marginTop: 2 }]}>Gérez votre plan et vos fonctionnalités</Text>
+            </View>
+            <TouchableOpacity onPress={loadSubscription} style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+              <Feather name="refresh-cw" size={13} color="#64748B" />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B" }}>Actualiser</Text>
+            </TouchableOpacity>
+          </View>
+
+          {subLoading ? (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <ActivityIndicator color={PRIMARY} />
+            </View>
+          ) : (<>
+            {/* Current plan banner */}
+            {subscription && (
+              <View style={{ backgroundColor: PRIMARY + "14", borderRadius: 16, padding: 18, marginBottom: 20, borderWidth: 1.5, borderColor: PRIMARY + "40" }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <View>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: PRIMARY, textTransform: "uppercase", letterSpacing: 0.8 }}>Plan actuel</Text>
+                    <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 4 }}>{subscription.plan.name}</Text>
+                    {subscription.plan.priceMonthly > 0 ? (
+                      <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: PRIMARY, marginTop: 2 }}>
+                        {subscription.plan.priceMonthly.toLocaleString()} FCFA / mois
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#059669", marginTop: 2 }}>Gratuit</Text>
+                    )}
+                  </View>
+                  <View style={{ backgroundColor: subscription.status === "active" ? "#ECFDF5" : "#FEF2F2", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: subscription.status === "active" ? "#065F46" : "#DC2626" }}>
+                      {subscription.status === "active" ? "Actif" : subscription.status}
+                    </Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: "row", gap: 20, marginTop: 14 }}>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                      {subscription.plan.maxReservations ?? "∞"}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Réservations/mois</Text>
+                  </View>
+                  <View style={{ width: 1, backgroundColor: "#E2E8F0" }} />
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" }}>
+                      {subscription.plan.maxTrips ?? "∞"}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Trajets actifs</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Plan cards */}
+            {[
+              { id: "free",    name: "Free",    price: 0,      maxRes: 10,   maxTrips: 3,    color: "#64748B", features: ["10 réservations/mois", "3 trajets actifs", "Support e-mail", "Tableau de bord basique"] },
+              { id: "pro",     name: "Pro",     price: 25_000, maxRes: 500,  maxTrips: null, color: PRIMARY,   features: ["500 réservations/mois", "Trajets illimités", "Suivi GPS", "QR billets signés", "Support prioritaire"] },
+              { id: "premium", name: "Premium", price: 75_000, maxRes: null, maxTrips: null, color: "#D97706", features: ["Réservations illimitées", "Trajets illimités", "IA recommendations", "API access", "Account manager dédié", "Analytics avancés"] },
+            ].map(plan => {
+              const isCurrent = subscription?.planId === plan.id;
+              return (
+                <View key={plan.id} style={{ backgroundColor: "white", borderRadius: 16, padding: 18, marginBottom: 14, borderWidth: isCurrent ? 2 : 1.5, borderColor: isCurrent ? plan.color : "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                    <View>
+                      <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: plan.color }}>{plan.name}</Text>
+                      {plan.price > 0 ? (
+                        <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 2 }}>
+                          {plan.price.toLocaleString()} FCFA<Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}> /mois</Text>
+                        </Text>
+                      ) : (
+                        <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#059669", marginTop: 2 }}>Gratuit</Text>
+                      )}
+                    </View>
+                    {isCurrent && (
+                      <View style={{ backgroundColor: plan.color + "20", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6 }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: plan.color }}>Plan actuel</Text>
+                      </View>
+                    )}
+                  </View>
+                  <View style={{ gap: 6, marginBottom: 14 }}>
+                    {plan.features.map(f => (
+                      <View key={f} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Feather name="check" size={13} color={plan.color} />
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: "#475569" }}>{f}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {!isCurrent && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.alert(
+                          `Passer au plan ${plan.name}`,
+                          plan.price > 0
+                            ? `Ce plan coûte ${plan.price.toLocaleString()} FCFA/mois. Confirmer la souscription ?`
+                            : "Revenir au plan gratuit. Confirmer ?",
+                          [
+                            { text: "Annuler", style: "cancel" },
+                            { text: "Confirmer", onPress: () => changeSubscription(plan.id) },
+                          ]
+                        );
+                      }}
+                      disabled={subChanging}
+                      style={{ backgroundColor: plan.color, borderRadius: 12, paddingVertical: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                    >
+                      {subChanging ? <ActivityIndicator size={14} color="white" /> : <Feather name="arrow-up-circle" size={14} color="white" />}
+                      <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "white" }}>
+                        {subChanging ? "En cours…" : plan.price > 0 ? `Passer à ${plan.name}` : "Rétrograder"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </>)}
         </>)}
 
         {/* ── En Route ── */}

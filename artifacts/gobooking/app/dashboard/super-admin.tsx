@@ -178,8 +178,10 @@ const FILL_RATE_DATA = [
   { route: "Bouaké → Korhogo",       fillPct: 58, totalSeats: 44, filled: 26 },
 ];
 
-type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission" | "factures";
+type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission" | "factures" | "audit";
 interface AdminInvoice { id: string; companyId: string; companyName: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
+interface AuditLogItem { id: string; userId: string; userRole: string; userName: string | null; action: string; targetId: string | null; targetType: string | null; metadata: Record<string, unknown> | null; ipAddress: string | null; flagged: boolean; createdAt: string }
+interface AuditStats { total: number; flagged: number; last24h: number; byAction: { action: string; count: number }[] }
 
 const SIDEBAR_W = 285;
 const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
@@ -191,6 +193,7 @@ const SIDEBAR_ITEMS: { id: Tab; label: string; icon: string }[] = [
   { id: "statistiques", label: "Statistiques", icon: "trending-up"},
   { id: "commission",   label: "Commission",   icon: "dollar-sign"},
   { id: "factures",     label: "Factures",     icon: "file-text"  },
+  { id: "audit",        label: "Audit Sécu.",  icon: "shield"     },
 ];
 const SECTION_LABELS: Record<Tab, string> = {
   apercu:       "Tableau de bord",
@@ -201,6 +204,7 @@ const SECTION_LABELS: Record<Tab, string> = {
   statistiques: "Statistiques",
   commission:   "Commission & Revenus",
   factures:     "Factures Compagnies",
+  audit:        "Audit & Sécurité",
 };
 
 const EMPTY_TRIP = { from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busName: "", busType: "Standard", totalSeats: "44", duration: "" };
@@ -296,6 +300,13 @@ export default function SuperAdminDashboard() {
   const [confirmLoading, setConfirmLoading] = useState(false);
   const [resetPwdResult, setResetPwdResult] = useState<{ name: string; email: string; password: string } | null>(null);
 
+  /* ── Audit state ── */
+  const [auditLogs, setAuditLogs]         = useState<AuditLogItem[]>([]);
+  const [auditStats, setAuditStats]       = useState<AuditStats | null>(null);
+  const [auditLoading, setAuditLoading]   = useState(false);
+  const [auditFilter, setAuditFilter]     = useState<"all" | "flagged">("all");
+  const [auditActionFilter, setAuditActionFilter] = useState<string>("all");
+
   useEffect(() => {
     if (!token) return;
     Promise.allSettled([
@@ -327,6 +338,7 @@ export default function SuperAdminDashboard() {
       if (an.status === "fulfilled") setAdminAnalytics(an.value);
     });
     loadAdminInvoices();
+    loadAuditData();
   }, [token]);
 
   const loadAdminInvoices = () => {
@@ -336,6 +348,18 @@ export default function SuperAdminDashboard() {
       .then(data => setAdminInvoices(data))
       .catch(() => {})
       .finally(() => setInvLoading(false));
+  };
+
+  const loadAuditData = () => {
+    if (!token) return;
+    setAuditLoading(true);
+    Promise.allSettled([
+      apiFetch<AuditLogItem[]>("/superadmin/audit-logs?limit=100", { token }),
+      apiFetch<AuditStats>("/superadmin/audit-logs/stats", { token }),
+    ]).then(([logs, stats]) => {
+      if (logs.status   === "fulfilled") setAuditLogs(logs.value);
+      if (stats.status  === "fulfilled") setAuditStats(stats.value);
+    }).finally(() => setAuditLoading(false));
   };
 
   const payInvoice = (inv: AdminInvoice) => {
@@ -1429,6 +1453,135 @@ export default function SuperAdminDashboard() {
               </View>
             );
           })}
+        </>)}
+
+        {/* ══════════════════════════════════════════════════════════
+            AUDIT & SÉCURITÉ
+        ══════════════════════════════════════════════════════════ */}
+        {activeTab === "audit" && (<>
+          {/* Header */}
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <View>
+              <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Audit & Sécurité</Text>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 }}>Journal des événements système et alertes</Text>
+            </View>
+            <TouchableOpacity onPress={loadAuditData} style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}>
+              <Feather name="refresh-cw" size={13} color="#64748B" />
+              <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#64748B" }}>Actualiser</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Stats rapides */}
+          {auditStats && (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+              {[
+                { label: "Total événements", value: auditStats.total,   icon: "list",        bg: "#F8FAFC", color: PURPLE },
+                { label: "Alertes signalées", value: auditStats.flagged, icon: "alert-triangle", bg: "#FEF2F2", color: "#DC2626" },
+                { label: "Dernières 24h",    value: auditStats.last24h,  icon: "clock",       bg: "#F0FDF4", color: "#059669" },
+              ].map(kpi => (
+                <View key={kpi.label} style={{ flex: 1, minWidth: 90, backgroundColor: kpi.bg, borderRadius: 12, padding: 14, alignItems: "center", gap: 6 }}>
+                  <Feather name={kpi.icon as any} size={18} color={kpi.color} />
+                  <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: kpi.color }}>{kpi.value.toLocaleString()}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center" }}>{kpi.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Filtres */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+            {(["all", "flagged"] as const).map(f => (
+              <TouchableOpacity
+                key={f}
+                onPress={() => setAuditFilter(f)}
+                style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: auditFilter === f ? PURPLE : "#F1F5F9" }}
+              >
+                <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: auditFilter === f ? "white" : "#64748B" }}>
+                  {f === "all" ? "Tous" : "Alertes"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {auditStats && auditStats.byAction.slice(0, 5).map(ba => (
+              <TouchableOpacity
+                key={ba.action}
+                onPress={() => setAuditActionFilter(auditActionFilter === ba.action ? "all" : ba.action)}
+                style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: auditActionFilter === ba.action ? "#7C3AED22" : "#F1F5F9" }}
+              >
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: auditActionFilter === ba.action ? PURPLE : "#64748B" }}>
+                  {ba.action} ({ba.count})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Loading */}
+          {auditLoading && (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <ActivityIndicator color={PURPLE} />
+              <Text style={{ marginTop: 8, fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>Chargement…</Text>
+            </View>
+          )}
+
+          {/* Liste logs */}
+          {!auditLoading && (() => {
+            const filtered = auditLogs.filter(l =>
+              (auditFilter === "all" || l.flagged) &&
+              (auditActionFilter === "all" || l.action === auditActionFilter)
+            );
+            if (filtered.length === 0) return (
+              <View style={{ alignItems: "center", padding: 48 }}>
+                <Feather name="shield" size={40} color="#CBD5E1" />
+                <Text style={{ marginTop: 12, fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#94A3B8" }}>Aucun événement</Text>
+                <Text style={{ marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center" }}>
+                  Les connexions, réservations et scans QR seront journalisés ici.
+                </Text>
+              </View>
+            );
+            return filtered.map(log => {
+              const isFlagged = log.flagged;
+              const ts = new Date(log.createdAt);
+              const tsLabel = ts.toLocaleDateString("fr-FR") + " " + ts.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+              const roleStyle = ROLE_STYLE[log.userRole] ?? { label: log.userRole, color: "#64748B", bg: "#F1F5F9" };
+              return (
+                <View key={log.id} style={[S.commCard, { marginBottom: 12, borderLeftWidth: 3, borderLeftColor: isFlagged ? "#DC2626" : PURPLE + "80" }]}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{log.action}</Text>
+                        {isFlagged && (
+                          <View style={{ backgroundColor: "#FEF2F2", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Feather name="alert-triangle" size={10} color="#DC2626" />
+                            <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#DC2626" }}>ALERTE</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>
+                        {log.userName ?? log.userId} · <Text style={{ color: roleStyle.color }}>{roleStyle.label}</Text>
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{tsLabel}</Text>
+                  </View>
+                  {log.targetId && (
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", marginBottom: 4 }}>
+                      Cible : {log.targetType ?? "?"} #{log.targetId.slice(0, 16)}
+                    </Text>
+                  )}
+                  {log.ipAddress && (
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>IP : {log.ipAddress}</Text>
+                  )}
+                  {log.metadata && Object.keys(log.metadata).length > 0 && (
+                    <View style={{ marginTop: 8, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 8 }}>
+                      {Object.entries(log.metadata).map(([k, v]) => (
+                        <Text key={k} style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>
+                          {k}: {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            });
+          })()}
         </>)}
 
       </ScrollView>
