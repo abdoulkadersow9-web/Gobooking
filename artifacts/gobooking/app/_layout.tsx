@@ -9,16 +9,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import OfflineBanner from "@/components/OfflineBanner";
 import { AuthProvider, getDashboardPath, useAuth } from "@/context/AuthContext";
 import { BookingProvider } from "@/context/BookingContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ParcelProvider } from "@/context/ParcelContext";
+import { BASE_URL } from "@/utils/api";
 import { setupNotificationListeners } from "@/utils/notifications";
+import { useNetworkStatus } from "@/utils/offline";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -126,9 +130,22 @@ function AuthGuard() {
   return null;
 }
 
+/* ─── Indicateur offline global ───────────────────────────── */
+function GlobalNetworkMonitor() {
+  const insets  = useSafeAreaInsets();
+  const network = useNetworkStatus(BASE_URL);
+  /* Sync on mount — hook already triggers sync when online */
+  return (
+    <View style={{ position: "absolute", top: insets.top, left: 0, right: 0, zIndex: 999 }}>
+      <OfflineBanner status={network} />
+    </View>
+  );
+}
+
 function RootLayoutNav() {
   return (
-    <>
+    <View style={{ flex: 1 }}>
+      <GlobalNetworkMonitor />
       <AuthGuard />
       <Stack screenOptions={{ headerShown: false }}>
         {/* Splash */}
@@ -139,7 +156,7 @@ function RootLayoutNav() {
 
         {/* Toutes les autres routes sont auto-découvertes par Expo Router depuis le filesystem */}
       </Stack>
-    </>
+    </View>
   );
 }
 

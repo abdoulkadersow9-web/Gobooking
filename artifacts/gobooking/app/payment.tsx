@@ -17,10 +17,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import NetInfo from "@react-native-community/netinfo";
+
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
+import { generateOfflineId, saveOffline } from "@/utils/offline";
 
 interface BookingResponse {
   id: string;
@@ -148,6 +151,32 @@ export default function PaymentScreen() {
         Alert.alert("Numéro requis", "Veuillez entrer un numéro de téléphone valide.");
         return;
       }
+    }
+
+    /* ── Détection hors-ligne ── */
+    const net = await NetInfo.fetch();
+    if (!net.isConnected || net.isInternetReachable === false) {
+      const primaryPassenger = booking.passengers?.[0];
+      const offlineId = generateOfflineId();
+      await saveOffline({
+        id:        offlineId,
+        type:      "reservation",
+        token,
+        createdAt: Date.now(),
+        payload: {
+          tripId:         booking.tripId ?? "",
+          passengerName:  primaryPassenger?.name  ?? "Passager",
+          passengerPhone: booking.contactPhone     ?? phone,
+          passengerCount: booking.passengers?.length ?? 1,
+          paymentMethod:  method,
+        },
+      });
+      Alert.alert(
+        "Hors ligne",
+        "Vous n'êtes pas connecté. Votre réservation a été sauvegardée localement et sera envoyée automatiquement dès la reconnexion.",
+        [{ text: "OK", onPress: () => router.replace("/(tabs)") }]
+      );
+      return;
     }
 
     setLoading(true);
