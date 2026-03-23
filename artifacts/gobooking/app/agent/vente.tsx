@@ -6,7 +6,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { apiFetch } from "@/utils/api";
+import { apiFetch, BASE_URL } from "@/utils/api";
+import { saveOffline, useNetworkStatus } from "@/utils/offline";
+import OfflineBanner from "@/components/OfflineBanner";
 
 const G = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -30,6 +32,7 @@ const PAYMENT_METHODS = [
 
 export default function VenteScreen() {
   const { user, token } = useAuth();
+  const networkStatus   = useNetworkStatus(BASE_URL);
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
@@ -75,6 +78,23 @@ export default function VenteScreen() {
 
     setSubmitting(true);
     try {
+      if (!networkStatus.isOnline) {
+        const offlineRef = `OFFLINE-${Date.now().toString(36).toUpperCase()}`;
+        await saveOffline({
+          type: "reservation",
+          payload: {
+            tripId: selectedTrip.id,
+            passengerName: passengerName.trim(),
+            passengerPhone: passengerPhone.trim(),
+            passengerCount: count,
+            paymentMethod,
+          },
+          token: token ?? "",
+          createdAt: Date.now(),
+        });
+        setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count });
+        return;
+      }
       const res = await apiFetch("/company/reservations", {
         token: token ?? undefined,
         method: "POST",
@@ -126,7 +146,16 @@ export default function VenteScreen() {
           <Text style={styles.successTitle}>Réservation créée !</Text>
           <Text style={styles.successRef}>Réf: {confirmed.bookingRef}</Text>
           <Text style={styles.successTotal}>Total encaissé: {confirmed.total.toLocaleString()} FCFA</Text>
-          <Text style={styles.successSub}>Imprimez ou envoyez le billet au client</Text>
+          {confirmed.bookingRef.startsWith("OFFLINE-") ? (
+            <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, padding: 12, marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="cloud-offline-outline" size={18} color="#D97706" />
+              <Text style={{ color: "#92400E", fontSize: 12, flex: 1, lineHeight: 18 }}>
+                Sauvegardé hors ligne — sera synchronisé automatiquement dès le retour de la connexion.
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.successSub}>Imprimez ou envoyez le billet au client</Text>
+          )}
           <TouchableOpacity style={styles.newSaleBtn} onPress={reset}>
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
             <Text style={styles.newSaleBtnText}>Nouvelle vente</Text>
@@ -140,6 +169,8 @@ export default function VenteScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
+      <OfflineBanner status={networkStatus} />
+
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerIcon}>
@@ -147,7 +178,9 @@ export default function VenteScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Espace Vente</Text>
-            <Text style={styles.headerSub}>Vente de billets en gare</Text>
+            <Text style={styles.headerSub}>
+              {networkStatus.isOnline ? "Vente de billets en gare" : "⚡ Mode hors ligne actif"}
+            </Text>
           </View>
         </View>
       </View>

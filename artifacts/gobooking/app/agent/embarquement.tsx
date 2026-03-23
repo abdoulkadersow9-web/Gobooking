@@ -7,7 +7,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { apiFetch } from "@/utils/api";
+import { apiFetch, BASE_URL } from "@/utils/api";
+import { saveOffline, useNetworkStatus } from "@/utils/offline";
+import OfflineBanner from "@/components/OfflineBanner";
 
 const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -39,6 +41,7 @@ type MainTab = "billets" | "en_route";
 
 export default function EmbarquementScreen() {
   const { user, token } = useAuth();
+  const networkStatus   = useNetworkStatus(BASE_URL);
 
   /* ── Camera / QR scan ─────────────────────────────── */
   const [permission, requestPermission] = useCameraPermissions();
@@ -129,6 +132,16 @@ export default function EmbarquementScreen() {
   const boardEnRoute = async (requestId: string) => {
     setBoardingId(requestId);
     try {
+      if (!networkStatus.isOnline) {
+        await saveOffline({
+          type: "en_route_board",
+          payload: { requestId },
+          token: token ?? "",
+          createdAt: Date.now(),
+        });
+        setEnRouteList(prev => prev.map(p => p.id === requestId ? { ...p, status: "embarqué" } : p));
+        return;
+      }
       await apiFetch(`/agent/requests/${requestId}/board`, { token: token ?? undefined, method: "POST" });
       setEnRouteList(prev => prev.map(p => p.id === requestId ? { ...p, status: "embarqué" } : p));
     } catch (e: any) {
@@ -209,6 +222,17 @@ export default function EmbarquementScreen() {
     if (!found) return;
     setValidating(true);
     try {
+      if (!networkStatus.isOnline) {
+        await saveOffline({
+          type: "scan",
+          payload: { reservationId: found.reservationId },
+          token: token ?? "",
+          createdAt: Date.now(),
+        });
+        setValidated(true);
+        setFound(prev => prev ? { ...prev, status: "confirmed" } : prev);
+        return;
+      }
       await apiFetch(`/agent/reservation/${found.reservationId}/board`, {
         token: token ?? undefined,
         method: "POST",
@@ -293,6 +317,9 @@ export default function EmbarquementScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
+
+      {/* Offline Banner */}
+      <OfflineBanner status={networkStatus} />
 
       {/* Header */}
       <View style={styles.header}>

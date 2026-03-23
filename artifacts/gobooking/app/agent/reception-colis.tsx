@@ -7,7 +7,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
-import { apiFetch } from "@/utils/api";
+import { apiFetch, BASE_URL } from "@/utils/api";
+import { saveOffline, useNetworkStatus } from "@/utils/offline";
+import OfflineBanner from "@/components/OfflineBanner";
 
 const G = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -40,6 +42,7 @@ interface ColisInfo {
 
 export default function ReceptionColisScreen() {
   const { user, token } = useAuth();
+  const networkStatus   = useNetworkStatus(BASE_URL);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanMode, setScanMode] = useState(false);
@@ -91,6 +94,17 @@ export default function ReceptionColisScreen() {
     if (!colis) return;
     setConfirming(true);
     try {
+      if (!networkStatus.isOnline) {
+        await saveOffline({
+          type: "colis_arrive",
+          payload: { colisId: colis.id, trackingRef: colis.trackingRef },
+          token: token ?? "",
+          createdAt: Date.now(),
+        });
+        setConfirmed(true);
+        setColis(prev => prev ? { ...prev, status: "arrive_gare_depart" } : prev);
+        return;
+      }
       await apiFetch(`/agent/parcels/${colis.id}/arrive`, {
         token: token ?? undefined,
         method: "POST",
@@ -130,6 +144,8 @@ export default function ReceptionColisScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
+      <OfflineBanner status={networkStatus} />
+
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerIcon}>
@@ -137,7 +153,9 @@ export default function ReceptionColisScreen() {
           </View>
           <View>
             <Text style={styles.headerTitle}>Réception Colis</Text>
-            <Text style={styles.headerSub}>Confirmer l'arrivée des colis</Text>
+            <Text style={styles.headerSub}>
+              {networkStatus.isOnline ? "Confirmer l'arrivée des colis" : "⚡ Mode hors ligne actif"}
+            </Text>
           </View>
         </View>
       </View>

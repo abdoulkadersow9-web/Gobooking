@@ -1,0 +1,131 @@
+4"}
+Ajoute un mode offline (hors connexion) dans GoBooking.
+
+OBJECTIF :
+Permettre aux agents et entreprises de continuer à travailler sans internet.
+
+---
+
+### 1. Stockage local
+
+Utiliser AsyncStorage (React Native) :
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+---
+
+### 2. Sauvegarde offline
+
+Quand pas de connexion :
+
+const saveOffline = async (data) => {
+  const existing = await AsyncStorage.getItem("offlineQueue");
+  const queue = existing ? JSON.parse(existing) : [];
+  queue.push(data);
+  await AsyncStorage.setItem("offlineQueue", JSON.stringify(queue));
+};
+
+---
+
+### 3. Création réservation offline
+
+Si pas internet :
+
+saveOffline({
+  type: "reservation",
+  payload: {
+    nom_client,
+    telephone,
+    trajetId,
+    nombre_places,
+    status: "confirmé"
+  }
+});
+
+---
+
+### 4. Création colis offline
+
+saveOffline({
+  type: "colis",
+  payload: {
+    reference,
+    nom_expediteur,
+    telephone_expediteur,
+    status: "en_attente"
+  }
+});
+
+---
+
+### 5. Scan offline
+
+saveOffline({
+  type: "scan",
+  payload: {
+    reservationId,
+    status: "embarqué"
+  }
+});
+
+---
+
+### 6. Synchronisation automatique
+
+Créer fonction :
+
+const syncData = async () => {
+  const data = await AsyncStorage.getItem("offlineQueue");
+  if (!data) return;
+
+  const queue = JSON.parse(data);
+
+  for (const item of queue) {
+    if (item.type === "reservation") {
+      await addDoc(collection(db, "reservations"), item.payload);
+    }
+
+    if (item.type === "colis") {
+      await addDoc(collection(db, "colis"), item.payload);
+    }
+
+    if (item.type === "scan") {
+      await updateDoc(doc(db, "reservations", item.payload.reservationId), {
+        status: item.payload.status
+      });
+    }
+  }
+
+  await AsyncStorage.removeItem("offlineQueue");
+};
+
+---
+
+### 7. Détection connexion
+
+Utiliser NetInfo :
+
+import NetInfo from "@react-native-community/netinfo";
+
+NetInfo.addEventListener(state => {
+  if (state.isConnected) {
+    syncData();
+  }
+});
+
+---
+
+### 8. UI
+
+Afficher message :
+
+"Mode hors ligne actif"
+
+---
+
+RÉSULTAT ATTENDU :
+
+- L’agent peut travailler sans internet
+- Les données sont sauvegardées localement
+- Les données sont envoyées automatiquement dès retour de connexion
+- Aucune perte de donn

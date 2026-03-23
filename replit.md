@@ -47,12 +47,31 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Accessible from Profile tab → "Tableaux de bord" section
 
 ## Agent Sub-Roles (agentRole field in agentsTable)
-- `embarquement` → `/agent/embarquement` — QR scanner for boarding passes, validate boarding
+- `embarquement` → `/agent/embarquement` — QR scanner for boarding passes, validate boarding, "En Route" tab for dynamic boarding
 - `reception_colis` → `/agent/reception-colis` — QR scanner for parcels, confirm arrival at station
 - `vente` → `/agent/vente` — Create walk-in reservations, manage payments
 - `validation` → `/agent/validation` — Confirm/validate reservations by QR or reference
 - No agentRole (demo) → `/dashboard/agent` — Full agent dashboard with all capabilities
-- API endpoints added: GET /agent/reservation/:ref, POST /agent/reservation/:id/board, POST /agent/reservation/:id/confirm, POST /agent/parcels/:id/arrive
+- API endpoints: GET /agent/reservation/:ref, POST /agent/reservation/:id/board, POST /agent/reservation/:id/confirm, POST /agent/parcels/:id/arrive, POST /agent/requests/:id/board, GET /agent/requests/confirmed?tripId=XXX
+
+## Dynamic En-Route Boarding (cars-en-route-map.tsx)
+- Passengers can request to board a moving bus from the live map
+- POST /trips/:tripId/request — send boarding request with clientName/phone/boardingPoint/seatsRequested
+- Returns requestId; frontend polls GET /trips/:tripId/request/:requestId every 5s
+- When accepted: QR code modal appears (from api.qrserver.com using requestId as data)
+- Agent scans QR or manually accepts via company dashboard "En Route" tab
+- Company endpoints: GET /company/boarding-requests, POST /company/boarding-requests/:id/accept, POST /company/boarding-requests/:id/reject
+- Agent embarquement "En Route" tab: lists accepted passengers, Call button, Embarquer button
+
+## Offline Mode
+- Package: @react-native-community/netinfo
+- Utility: utils/offline.ts (saveOffline, syncOfflineQueue, useNetworkStatus hook)
+- Banner component: components/OfflineBanner.tsx (shows status + pending count + sync button)
+- Queue stored in AsyncStorage key: "gobooking_offline_queue"
+- Offline types: scan (boarding validation), reservation (walk-in sale), colis_arrive, en_route_board
+- Auto-sync on reconnect; manual sync button available
+- Integrated in: agent/embarquement.tsx, agent/vente.tsx, agent/reception-colis.tsx
+- Offline reservations get OFFLINE-xxx ref, auto-synced when online returns
 
 ## User Roles
 - `client` / `user` — regular passenger → /(tabs)
