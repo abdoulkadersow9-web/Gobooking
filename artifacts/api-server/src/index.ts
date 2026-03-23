@@ -1,7 +1,7 @@
-import app from "./app";
+import app from "./app.js";
 
-const port = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`GoBooking API démarré sur le port ${PORT}`);
 });
