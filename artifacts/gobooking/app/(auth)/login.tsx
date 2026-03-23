@@ -29,6 +29,7 @@ interface AuthResponse {
     email: string;
     phone: string;
     role: "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
+    agentRole?: "embarquement" | "reception_colis" | "vente" | "validation" | null;
     createdAt: string;
   };
 }
@@ -59,7 +60,7 @@ export default function LoginScreen() {
     await login(res.token, res.user);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.dismissAll();
-    router.replace(getDashboardPath(res.user.role) as never);
+    router.replace(getDashboardPath(res.user.role, res.user.agentRole) as never);
   };
 
   const handleLogin = async () => {

@@ -507,4 +507,103 @@ router.post("/requests/:id/reject", async (req, res) => {
   }
 });
 
+/* ───────────────────────────────────────────────────────────────────────────
+   SUB-ROLE AGENT ENDPOINTS (embarquement, vente, validation, reception_colis)
+─────────────────────────────────────────────────────────────────────────── */
+
+/* GET /agent/reservation/:ref  — lookup booking by ref or id */
+router.get("/reservation/:ref", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const ref = req.params.ref.trim().toUpperCase();
+    const bookings = await db.select().from(bookingsTable)
+      .where(eq(bookingsTable.bookingRef, ref))
+      .limit(1);
+
+    if (!bookings.length) {
+      res.status(404).json({ error: "Réservation introuvable", code: "NOT_FOUND" });
+      return;
+    }
+
+    const booking = bookings[0];
+    let trip = null;
+    if (booking.tripId) {
+      const trips = await db.select().from(tripsTable)
+        .where(eq(tripsTable.id, booking.tripId))
+        .limit(1);
+      trip = trips[0] ?? null;
+    }
+
+    const firstPassenger = Array.isArray(booking.passengers) ? booking.passengers[0] : null;
+    res.json({
+      id: booking.id,
+      bookingRef: booking.bookingRef,
+      reservationId: booking.id,
+      name: (firstPassenger as any)?.name ?? "—",
+      passengerName: (firstPassenger as any)?.name ?? "—",
+      phone: (firstPassenger as any)?.phone ?? booking.contactPhone ?? "—",
+      passengerPhone: (firstPassenger as any)?.phone ?? booking.contactPhone ?? "—",
+      seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—",
+      status: booking.status,
+      price: booking.totalAmount ?? 0,
+      departureCity: trip?.from ?? "—",
+      arrivalCity: trip?.to ?? "—",
+      departureTime: trip?.departureTime ?? "—",
+      tripId: booking.tripId,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /agent/reservation/:id/board  — mark passenger as boarded */
+router.post("/reservation/:id/board", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(bookingsTable)
+      .set({ status: "validated" })
+      .where(eq(bookingsTable.id, req.params.id));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /agent/reservation/:id/confirm  — confirm a reservation */
+router.post("/reservation/:id/confirm", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(bookingsTable)
+      .set({ status: "confirmed" })
+      .where(eq(bookingsTable.id, req.params.id));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /agent/parcels/:id/arrive  — confirm parcel arrival at departure station */
+router.post("/parcels/:parcelId/arrive", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(parcelsTable)
+      .set({ status: "arrive_gare_depart" })
+      .where(eq(parcelsTable.id, req.params.parcelId));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;

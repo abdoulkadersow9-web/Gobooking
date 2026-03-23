@@ -33,6 +33,9 @@ const DASHBOARD_ROLES: Record<string, string[]> = {
 /* ─── Rôles qui n'ont accès QU'à leur dashboard (jamais /(tabs)) ─── */
 const DASHBOARD_ONLY_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
 
+/* ─── Routes spécialisées agent ─────────────────────────── */
+const AGENT_ROUTES = ["embarquement", "reception-colis", "vente", "validation"];
+
 /* ─── Routes publiques (pas besoin d'être connecté) ────────── */
 const PUBLIC_ROOTS = ["index", "(auth)", "live-tracking", "cars-en-route-map"];
 
@@ -56,14 +59,22 @@ function AuthGuard() {
 
     /* Utilisateur connecté sur un écran d'auth → son dashboard */
     if (root === "(auth)") {
-      router.replace(getDashboardPath(user.role) as never);
+      router.replace(getDashboardPath(user.role, user.agentRole) as never);
       return;
     }
 
     /* Agent / Compagnie / Admin → ne peuvent PAS accéder à /(tabs) */
     if (root === "(tabs)" && DASHBOARD_ONLY_ROLES.includes(user.role)) {
-      router.replace(getDashboardPath(user.role) as never);
+      router.replace(getDashboardPath(user.role, user.agentRole) as never);
       return;
+    }
+
+    /* Routes agent spécialisées → réservées aux agents */
+    if (root === "agent") {
+      if (user.role !== "agent") {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+        return;
+      }
     }
 
     /* Contrôle d'accès aux dashboards selon le rôle */
@@ -72,7 +83,7 @@ function AuthGuard() {
       if (requestedDash) {
         const allowedRoles = DASHBOARD_ROLES[requestedDash] ?? [];
         if (!allowedRoles.includes(user.role)) {
-          router.replace(getDashboardPath(user.role) as never);
+          router.replace(getDashboardPath(user.role, user.agentRole) as never);
           return;
         }
       }
@@ -116,6 +127,10 @@ function RootLayoutNav() {
       <Stack.Screen name="dashboard/company" options={{ headerShown: false }} />
       <Stack.Screen name="dashboard/agent" options={{ headerShown: false }} />
       <Stack.Screen name="dashboard/super-admin" options={{ headerShown: false }} />
+      <Stack.Screen name="agent/embarquement" options={{ headerShown: false }} />
+      <Stack.Screen name="agent/reception-colis" options={{ headerShown: false }} />
+      <Stack.Screen name="agent/vente" options={{ headerShown: false }} />
+      <Stack.Screen name="agent/validation" options={{ headerShown: false }} />
     </Stack>
     </>
   );

@@ -12,6 +12,7 @@ import React, {
 import { apiFetch } from "@/utils/api";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
+export type AgentRole = "embarquement" | "reception_colis" | "vente" | "validation";
 
 export interface User {
   id: string;
@@ -19,12 +20,21 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  agentRole?: AgentRole | null;
   createdAt: string;
 }
 
-export function getDashboardPath(role: UserRole): string {
+export function getAgentPath(agentRole?: AgentRole | null): string {
+  if (agentRole === "embarquement")    return "/agent/embarquement";
+  if (agentRole === "reception_colis") return "/agent/reception-colis";
+  if (agentRole === "vente")           return "/agent/vente";
+  if (agentRole === "validation")      return "/agent/validation";
+  return "/dashboard/agent";
+}
+
+export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
   if (role === "compagnie" || role === "company_admin") return "/dashboard/company";
-  if (role === "agent")                                 return "/dashboard/agent";
+  if (role === "agent")                                 return getAgentPath(agentRole);
   if (role === "admin"   || role === "super_admin")     return "/dashboard/super-admin";
   return "/(tabs)"; // client / user
 }
@@ -67,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(storedToken);
           setUser(freshUser);
 
-          const dashPath = getDashboardPath(freshUser.role);
+          const dashPath = getDashboardPath(freshUser.role, freshUser.agentRole);
           const cur = currentPathRef.current;
           const alreadyThere =
             cur === dashPath ||

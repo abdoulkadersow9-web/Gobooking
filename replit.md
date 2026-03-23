@@ -46,6 +46,14 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - All 3 show demo data unauthenticated; fetch real API data when logged in with correct role
 - Accessible from Profile tab → "Tableaux de bord" section
 
+## Agent Sub-Roles (agentRole field in agentsTable)
+- `embarquement` → `/agent/embarquement` — QR scanner for boarding passes, validate boarding
+- `reception_colis` → `/agent/reception-colis` — QR scanner for parcels, confirm arrival at station
+- `vente` → `/agent/vente` — Create walk-in reservations, manage payments
+- `validation` → `/agent/validation` — Confirm/validate reservations by QR or reference
+- No agentRole (demo) → `/dashboard/agent` — Full agent dashboard with all capabilities
+- API endpoints added: GET /agent/reservation/:ref, POST /agent/reservation/:id/board, POST /agent/reservation/:id/confirm, POST /agent/parcels/:id/arrive
+
 ## User Roles
 - `client` / `user` — regular passenger → /(tabs)
 - `admin` / `super_admin` — platform admin → /dashboard/super-admin

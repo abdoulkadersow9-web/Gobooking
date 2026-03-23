@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, agentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
@@ -103,6 +103,12 @@ router.post("/login", async (req, res) => {
     const token = generateToken_simple();
     tokenStore.set(token, user.id);
 
+    let agentRole: string | null = null;
+    if (user.role === "agent") {
+      const agentRecord = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+      if (agentRecord.length > 0) agentRole = agentRecord[0].agentRole ?? null;
+    }
+
     res.json({
       token,
       user: {
@@ -111,6 +117,7 @@ router.post("/login", async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
+        agentRole,
         status: user.status,
         createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
       },
@@ -149,12 +156,19 @@ router.get("/me", async (req, res) => {
       return;
     }
 
+    let agentRole: string | null = null;
+    if (user.role === "agent") {
+      const agentRecord = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+      if (agentRecord.length > 0) agentRole = agentRecord[0].agentRole ?? null;
+    }
+
     res.json({
       id: user.id,
       name: user.name,
       email: user.email,
       phone: user.phone,
       role: user.role,
+      agentRole,
       status: user.status,
       createdAt: user.createdAt?.toISOString() || new Date().toISOString(),
     });
