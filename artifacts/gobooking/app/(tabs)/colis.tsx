@@ -33,6 +33,7 @@ interface Parcel {
   deliveryType: string;
   amount: number;
   status: string;
+  paymentStatus?: string;
   createdAt: string;
 }
 
@@ -57,23 +58,23 @@ const DEMO_PARCELS: Parcel[] = [
   { id: "d1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké",
     senderName: "Kouamé Yao", receiverName: "Adjoua Koné", parcelType: "electronique",
     weight: 2.5, deliveryType: "retrait_agence", amount: 4700, status: "en_transit",
-    createdAt: new Date(Date.now() - 86400000).toISOString() },
+    paymentStatus: "paid", createdAt: new Date(Date.now() - 86400000).toISOString() },
   { id: "d2", trackingRef: "GBX-B9C3-PL44", fromCity: "San Pédro", toCity: "Abidjan",
     senderName: "Traoré Ahmed", receiverName: "Bamba Salif", parcelType: "vetements",
     weight: 5.0, deliveryType: "livraison_domicile", amount: 5900, status: "livre",
-    createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+    paymentStatus: "paid", createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
   { id: "d3", trackingRef: "GBX-C1E7-QR22", fromCity: "Abidjan", toCity: "Yamoussoukro",
     senderName: "Gbané Marie", receiverName: "Koné Francis", parcelType: "documents",
     weight: 0.3, deliveryType: "retrait_agence", amount: 2200, status: "en_attente",
-    createdAt: new Date().toISOString() },
+    paymentStatus: "pending", createdAt: new Date().toISOString() },
   { id: "d4", trackingRef: "GBX-D5F8-MN33", fromCity: "Abidjan", toCity: "Korhogo",
     senderName: "Ouattara Paul", receiverName: "Diomandé Cissé", parcelType: "alimentaire",
     weight: 8.0, deliveryType: "retrait_agence", amount: 8200, status: "pris_en_charge",
-    createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+    paymentStatus: "paid", createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
   { id: "d5", trackingRef: "GBX-E2A1-ZP77", fromCity: "Man", toCity: "Abidjan",
     senderName: "Bamba Seydou", receiverName: "Coulibaly Awa", parcelType: "cosmetique",
     weight: 1.2, deliveryType: "livraison_domicile", amount: 3500, status: "en_livraison",
-    createdAt: new Date(Date.now() - 4 * 86400000).toISOString() },
+    paymentStatus: "pending", createdAt: new Date(Date.now() - 4 * 86400000).toISOString() },
 ];
 
 function formatDate(iso: string, lang: string) {
@@ -127,11 +128,23 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
           <Text style={styles.city}>{item.toCity}</Text>
         </View>
 
-        {/* Date + action */}
+        {/* Montant + statut paiement + action */}
         <View style={styles.rowBottom}>
-          <View style={styles.dateRow}>
-            <Feather name="calendar" size={11} color="#94A3B8" />
-            <Text style={styles.dateText}>{formatDate(item.createdAt, lang)}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={[
+              styles.payPill,
+              { backgroundColor: item.paymentStatus === "paid" ? "#ECFDF5" : "#FFFBEB" }
+            ]}>
+              <Feather
+                name={item.paymentStatus === "paid" ? "check-circle" : "alert-circle"}
+                size={10}
+                color={item.paymentStatus === "paid" ? "#059669" : "#D97706"}
+              />
+              <Text style={[styles.payPillText, { color: item.paymentStatus === "paid" ? "#059669" : "#D97706" }]}>
+                {item.paymentStatus === "paid" ? "Payé" : "Paiement requis"}
+              </Text>
+            </View>
+            <Text style={styles.amountText}>{item.amount.toLocaleString()} FCFA</Text>
           </View>
           <View style={styles.detailBtn}>
             <Text style={styles.detailBtnText}>{t.suivre}</Text>
@@ -400,6 +413,23 @@ const styles = StyleSheet.create({
   rowBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   dateText: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  payPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  payPillText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
+  amountText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#0F172A",
+  },
   detailBtn: {
     flexDirection: "row", alignItems: "center", gap: 3,
     backgroundColor: "#EEF2FF", borderRadius: 8,

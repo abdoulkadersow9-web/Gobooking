@@ -43,9 +43,16 @@ interface Booking {
 }
 
 const STATUS_CONFIG = {
-  confirmed: { color: Colors.light.primary, bg: Colors.light.primaryLight, label: "Confirmed" },
-  cancelled: { color: Colors.light.error, bg: "#FEF2F2", label: "Cancelled" },
-  completed: { color: Colors.light.success, bg: "#ECFDF5", label: "Completed" },
+  confirmed: { color: Colors.light.primary, bg: Colors.light.primaryLight, label: "Confirmé" },
+  cancelled: { color: Colors.light.error, bg: "#FEF2F2", label: "Annulé" },
+  completed: { color: Colors.light.success, bg: "#ECFDF5", label: "Terminé" },
+};
+
+const METHOD_ICONS: Record<string, { label: string; color: string }> = {
+  orange: { label: "Orange Money", color: "#FF6B00" },
+  mtn:    { label: "MTN MoMo",    color: "#FFCB00" },
+  wave:   { label: "Wave",        color: "#1BA5E0" },
+  card:   { label: "Carte bancaire", color: "#1A56DB" },
 };
 
 export default function BookingDetailScreen() {
@@ -126,7 +133,7 @@ export default function BookingDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Booking Details</Text>
+        <Text style={styles.headerTitle}>Détail de la réservation</Text>
         <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
           <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
         </View>
@@ -139,10 +146,26 @@ export default function BookingDetailScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Bannière statut paiement ── */}
+        {booking.paymentStatus !== "paid" ? (
+          <View style={styles.payWarningBanner}>
+            <Feather name="alert-circle" size={18} color="#92400E" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.payWarningTitle}>Paiement requis</Text>
+              <Text style={styles.payWarningText}>Votre réservation sera annulée si le paiement n'est pas effectué.</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.payOkBanner}>
+            <Feather name="check-circle" size={18} color="#065F46" />
+            <Text style={styles.payOkText}>Paiement confirmé</Text>
+          </View>
+        )}
+
         <View style={styles.refCard}>
-          <Text style={styles.refLabel}>Booking Reference</Text>
+          <Text style={styles.refLabel}>Référence de réservation</Text>
           <Text style={styles.refValue}>#{booking.bookingRef}</Text>
-          <Text style={styles.refDate}>Booked on {new Date(booking.createdAt).toLocaleDateString()}</Text>
+          <Text style={styles.refDate}>Réservé le {new Date(booking.createdAt).toLocaleDateString("fr-FR")}</Text>
         </View>
 
         <View style={styles.tripCard}>
@@ -173,12 +196,12 @@ export default function BookingDetailScreen() {
 
           <View style={styles.seatsRow}>
             <Feather name="map-pin" size={13} color={Colors.light.textSecondary} />
-            <Text style={styles.seatsText}>Seats: {booking.seatNumbers.join(", ")}</Text>
+            <Text style={styles.seatsText}>Sièges : {booking.seatNumbers.join(", ")}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Passengers</Text>
+          <Text style={styles.sectionTitle}>Passagers</Text>
           {booking.passengers.map((p, i) => (
             <View key={i} style={styles.paxCard}>
               <View style={styles.paxLeft}>
@@ -187,39 +210,49 @@ export default function BookingDetailScreen() {
                 </View>
                 <View>
                   <Text style={styles.paxName}>{p.name}</Text>
-                  <Text style={styles.paxDetails}>Age {p.age} · {p.gender}</Text>
+                  <Text style={styles.paxDetails}>{p.age} ans · {p.gender}</Text>
                 </View>
               </View>
               <View style={styles.seatChip}>
-                <Text style={styles.seatChipText}>Seat {p.seatNumber}</Text>
+                <Text style={styles.seatChipText}>Siège {p.seatNumber}</Text>
               </View>
             </View>
           ))}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Details</Text>
+          <Text style={styles.sectionTitle}>Paiement</Text>
           <View style={styles.payCard}>
             <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Payment Method</Text>
-              <Text style={styles.payValue}>{booking.paymentMethod.toUpperCase()}</Text>
+              <Text style={styles.payLabel}>Méthode</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={[styles.methodDot, { backgroundColor: METHOD_ICONS[booking.paymentMethod]?.color || "#6B7280" }]} />
+                <Text style={styles.payValue}>
+                  {METHOD_ICONS[booking.paymentMethod]?.label || booking.paymentMethod.toUpperCase()}
+                </Text>
+              </View>
             </View>
             <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Payment Status</Text>
+              <Text style={styles.payLabel}>Statut</Text>
               <View style={[
                 styles.payStatusBadge,
-                { backgroundColor: booking.paymentStatus === "paid" ? "#ECFDF5" : "#FEF2F2" }
+                { backgroundColor: booking.paymentStatus === "paid" ? "#ECFDF5" : "#FFFBEB" }
               ]}>
+                <Feather
+                  name={booking.paymentStatus === "paid" ? "check-circle" : "alert-circle"}
+                  size={12}
+                  color={booking.paymentStatus === "paid" ? "#059669" : "#D97706"}
+                />
                 <Text style={[
                   styles.payStatusText,
-                  { color: booking.paymentStatus === "paid" ? Colors.light.success : Colors.light.error }
+                  { color: booking.paymentStatus === "paid" ? "#059669" : "#D97706" }
                 ]}>
-                  {booking.paymentStatus.toUpperCase()}
+                  {booking.paymentStatus === "paid" ? "Paiement confirmé" : "Paiement requis"}
                 </Text>
               </View>
             </View>
             <View style={[styles.payRow, { borderBottomWidth: 0 }]}>
-              <Text style={styles.payTotalLabel}>Total Amount</Text>
+              <Text style={styles.payTotalLabel}>Montant total</Text>
               <Text style={styles.payTotalValue}>{booking.totalAmount.toLocaleString()} FCFA</Text>
             </View>
           </View>
@@ -240,7 +273,7 @@ export default function BookingDetailScreen() {
             ) : (
               <>
                 <Feather name="x-circle" size={16} color={Colors.light.error} />
-                <Text style={styles.cancelBtnText}>Cancel Booking</Text>
+                <Text style={styles.cancelBtnText}>Annuler la réservation</Text>
               </>
             )}
           </Pressable>
@@ -494,13 +527,59 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   payStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
   payStatusText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+  },
+  methodDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  payWarningBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  payWarningTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#92400E",
+    marginBottom: 2,
+  },
+  payWarningText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#92400E",
+  },
+  payOkBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#ECFDF5",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+  payOkText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#065F46",
   },
   payTotalLabel: {
     fontSize: 15,

@@ -38,9 +38,23 @@ interface Booking {
 }
 
 const STATUS_CONFIG = {
-  confirmed: { color: Colors.light.primary, bg: Colors.light.primaryLight, label: "Confirmed" },
-  cancelled: { color: Colors.light.error, bg: "#FEF2F2", label: "Cancelled" },
-  completed: { color: Colors.light.success, bg: "#ECFDF5", label: "Completed" },
+  confirmed: { color: Colors.light.primary, bg: Colors.light.primaryLight, label: "Confirmé" },
+  cancelled: { color: Colors.light.error, bg: "#FEF2F2", label: "Annulé" },
+  completed: { color: Colors.light.success, bg: "#ECFDF5", label: "Terminé" },
+};
+
+const PAY_CONFIG = {
+  paid:    { color: "#059669", bg: "#ECFDF5", label: "Payé", icon: "check-circle" as const },
+  pending: { color: "#D97706", bg: "#FFFBEB", label: "Paiement requis", icon: "alert-circle" as const },
+  failed:  { color: "#EF4444", bg: "#FEF2F2", label: "Paiement échoué", icon: "x-circle" as const },
+  refunded:{ color: "#6B7280", bg: "#F3F4F6", label: "Remboursé", icon: "rotate-ccw" as const },
+};
+
+const METHOD_LABELS: Record<string, string> = {
+  orange: "Orange Money",
+  mtn: "MTN MoMo",
+  wave: "Wave",
+  card: "Carte bancaire",
 };
 
 export default function BookingsScreen() {
@@ -77,6 +91,8 @@ export default function BookingsScreen() {
 
   const renderBooking = ({ item }: { item: Booking }) => {
     const status = STATUS_CONFIG[item.status] || STATUS_CONFIG.confirmed;
+    const pay = PAY_CONFIG[item.paymentStatus] || PAY_CONFIG.pending;
+    const isPaid = item.paymentStatus === "paid";
     return (
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -112,12 +128,28 @@ export default function BookingsScreen() {
         </View>
 
         <View style={styles.cardFooter}>
-          <View style={styles.seatInfo}>
-            <Feather name="user" size={13} color={Colors.light.textSecondary} />
-            <Text style={styles.seatText}>Seats: {item.seatNumbers.join(", ")}</Text>
+          <View style={[styles.payBadge, { backgroundColor: pay.bg }]}>
+            <Feather name={pay.icon} size={11} color={pay.color} />
+            <Text style={[styles.payBadgeText, { color: pay.color }]}>{pay.label}</Text>
           </View>
-          <Text style={styles.amountText}>${item.totalAmount}</Text>
+          <Text style={[styles.amountText, { color: isPaid ? Colors.light.primary : "#D97706" }]}>
+            {item.totalAmount.toLocaleString()} FCFA
+          </Text>
         </View>
+
+        {!isPaid && (
+          <Pressable
+            style={styles.payNowBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({ pathname: "/booking/[id]", params: { id: item.id } });
+            }}
+          >
+            <Feather name="credit-card" size={13} color="white" />
+            <Text style={styles.payNowText}>Payer maintenant</Text>
+          </Pressable>
+        )}
       </Pressable>
     );
   };
@@ -125,7 +157,7 @@ export default function BookingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Bookings</Text>
+        <Text style={styles.headerTitle}>Mes Réservations</Text>
       </View>
 
       {loading ? (
@@ -145,13 +177,13 @@ export default function BookingsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Feather name="bookmark" size={48} color={Colors.light.textMuted} />
-              <Text style={styles.emptyTitle}>No bookings yet</Text>
-              <Text style={styles.emptySubtitle}>Your trip bookings will appear here</Text>
+              <Text style={styles.emptyTitle}>Aucune réservation</Text>
+              <Text style={styles.emptySubtitle}>Vos réservations de voyage apparaîtront ici</Text>
               <Pressable
                 style={styles.bookNowBtn}
                 onPress={() => router.push("/(tabs)")}
               >
-                <Text style={styles.bookNowText}>Book a Trip</Text>
+                <Text style={styles.bookNowText}>Réserver un trajet</Text>
               </Pressable>
             </View>
           }
@@ -272,9 +304,36 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
   },
   amountText: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
+  },
+  payBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  payBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  payNowBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    backgroundColor: "#D97706",
+    borderRadius: 10,
+    paddingVertical: 9,
+  },
+  payNowText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "white",
   },
   empty: {
     alignItems: "center",
