@@ -40,7 +40,7 @@ export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): 
   if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
   if (role === "agent")                                 return getAgentPath(agentRole);
   if (role === "admin"   || role === "super_admin")     return "/admin/dashboard";
-  return "/(tabs)"; // client / user
+  return "/client/home"; // client / user
 }
 
 interface AuthContextType {
@@ -83,10 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           const dashPath = getDashboardPath(freshUser.role, freshUser.agentRole);
           const cur = currentPathRef.current;
+          const isClient = freshUser.role === "client" || freshUser.role === "user";
           const alreadyThere =
             cur === dashPath ||
-            cur.startsWith(dashPath + "/") ||
-            (dashPath === "/(tabs)" && cur.startsWith("/(tabs)"));
+            cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") || // same section
+            (isClient && (cur.startsWith("/client/") || cur.startsWith("/(tabs)")));
           if (!alreadyThere) {
             router.replace(dashPath as never);
           }

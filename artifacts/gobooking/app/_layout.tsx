@@ -26,6 +26,7 @@ const queryClient = new QueryClient();
 
 /* ─── Rôles autorisés par groupe de routes ───────────────── */
 const ROUTE_ROLES: Record<string, string[]> = {
+  client:     ["client", "user"],
   entreprise: ["compagnie", "company_admin"],
   admin:      ["admin", "super_admin"],
 };
@@ -61,6 +62,15 @@ function AuthGuard() {
     /* Client ne peut pas accéder aux espaces pro */
     if (root === "(tabs)" && DASHBOARD_ONLY_ROLES.includes(user.role)) {
       router.replace(getDashboardPath(user.role, user.agentRole) as never);
+      return;
+    }
+
+    /* Protection espace /client */
+    if (root === "client") {
+      const allowed = ROUTE_ROLES.client ?? [];
+      if (!allowed.includes(user.role)) {
+        router.replace(getDashboardPath(user.role, user.agentRole) as never);
+      }
       return;
     }
 
@@ -129,6 +139,9 @@ function RootLayoutNav() {
 
         {/* Client */}
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="client/home" />
+        <Stack.Screen name="client/reservation" />
+        <Stack.Screen name="client/colis" />
 
         {/* Entreprise */}
         <Stack.Screen name="entreprise/dashboard" />
