@@ -61,6 +61,15 @@ function getUserIdFromToken(authHeader: string | undefined): string | null {
   return tokenStore.get(token) || null;
 }
 
+async function getUserRole(userId: string): Promise<string | null> {
+  try {
+    const users = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    return users[0]?.role || null;
+  } catch {
+    return null;
+  }
+}
+
 async function getFullBooking(bookingId: string) {
   const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
   if (!bookings.length) return null;
@@ -310,6 +319,50 @@ router.get("/:bookingId", async (req, res) => {
   }
 });
 
+/* ── Confirmer une réservation (compagnie uniquement) ─────────────────────
+   POST /bookings/:bookingId/company-confirm
+   Seul un utilisateur avec role "compagnie" peut accéder à cette route.
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/:bookingId/company-confirm", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const role = await getUserRole(userId);
+    if (role !== "compagnie") {
+      res.status(403).json({ error: "Accès refusé — réservé aux compagnies" });
+      return;
+    }
+
+    const { bookingId } = req.params;
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!bookings.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+
+    const booking = bookings[0];
+    if (booking.status === "confirmed") {
+      const full = await getFullBooking(bookingId);
+      res.json(full);
+      return;
+    }
+    if (booking.status === "cancelled") {
+      res.status(400).json({ error: "Impossible de confirmer une réservation annulée" });
+      return;
+    }
+
+    await db.update(bookingsTable)
+      .set({ status: "confirmed", paymentStatus: "paid" })
+      .where(eq(bookingsTable.id, bookingId));
+
+    await creditCompanyWallet(bookingId);
+
+    const full = await getFullBooking(bookingId);
+    res.json(full);
+  } catch (err) {
+    console.error("Company confirm booking error:", err);
+    res.status(500).json({ error: "Échec de la confirmation" });
+  }
+});
+
 router.post("/:bookingId/cancel", async (req, res) => {
   try {
     const userId = getUserIdFromToken(req.headers.authorization);
@@ -326,8 +379,9 @@ router.post("/:bookingId/cancel", async (req, res) => {
     }
 
     const booking = bookings[0];
-    if (booking.userId !== userId) {
-      res.status(403).json({ error: "Not authorized" });
+    const role = await getUserRole(userId);
+    if (booking.userId !== userId && role !== "compagnie") {
+      res.status(403).json({ error: "Non autorisé" });
       return;
     }
 

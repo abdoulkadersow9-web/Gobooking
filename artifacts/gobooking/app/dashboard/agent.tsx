@@ -664,7 +664,7 @@ export default function AgentDashboard() {
 
   const flatPassengers = useMemo(() => {
     const q = passengerSearch.trim().toLowerCase();
-    const all = boarding.flatMap(b =>
+    const all = boarding.filter(b => b.status === "confirmed").flatMap(b =>
       b.passengers.map(p => ({
         key:        `${b.id}-${p.seatNumber}`,
         bookingId:  b.id,

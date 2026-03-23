@@ -797,15 +797,9 @@ export default function SuperAdminDashboard() {
                       </View>
                     )}
                     {b.status !== "cancelled" && (
-                      <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
-                        {b.status !== "confirmed" && (
-                          <TouchableOpacity style={[S.statusActionBtn, { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" }]} onPress={() => updateBookingStatus(b.id, "confirmed")} activeOpacity={0.8}>
-                            <Feather name="check-circle" size={12} color="#059669" /><Text style={[S.statusActionText, { color: "#059669" }]}>Confirmer</Text>
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity style={[S.statusActionBtn, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]} onPress={() => updateBookingStatus(b.id, "cancelled")} activeOpacity={0.8}>
-                          <Feather name="x-circle" size={12} color="#DC2626" /><Text style={[S.statusActionText, { color: "#DC2626" }]}>Annuler</Text>
-                        </TouchableOpacity>
+                      <View style={{ flexDirection: "row", gap: 8, marginTop: 10, alignItems: "center" }}>
+                        <Feather name="eye" size={12} color="#64748B" />
+                        <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_400Regular" }}>Lecture seule — géré par la compagnie</Text>
                       </View>
                     )}
                   </View>

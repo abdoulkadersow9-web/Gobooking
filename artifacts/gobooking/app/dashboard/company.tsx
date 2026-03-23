@@ -259,6 +259,41 @@ export default function CompanyDashboard() {
     });
   }, [token]);
 
+  const confirmReservation = async (reservationId: string) => {
+    Alert.alert("Confirmer la réservation", "Confirmer cette réservation ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Confirmer",
+        onPress: async () => {
+          setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, status: "confirmed" } : r));
+          if (token) {
+            try {
+              await apiFetch(`/bookings/${reservationId}/company-confirm`, { token, method: "POST" });
+            } catch {}
+          }
+        },
+      },
+    ]);
+  };
+
+  const cancelReservation = async (reservationId: string) => {
+    Alert.alert("Annuler la réservation", "Annuler définitivement cette réservation ?", [
+      { text: "Non", style: "cancel" },
+      {
+        text: "Annuler la réservation",
+        style: "destructive",
+        onPress: async () => {
+          setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, status: "cancelled" } : r));
+          if (token) {
+            try {
+              await apiFetch(`/bookings/${reservationId}/cancel`, { token, method: "POST" });
+            } catch {}
+          }
+        },
+      },
+    ]);
+  };
+
   const loadSeats = (trip: Trip) => {
     setSelectedTripForSeats(trip);
     setActiveTab("sieges");
@@ -607,6 +642,36 @@ export default function CompanyDashboard() {
                   <Text style={S.reservPay}>{PAYMENT_LABELS[res.paymentMethod] || res.paymentMethod}</Text>
                   <Text style={S.reservAmount}>{res.totalAmount.toLocaleString()} FCFA</Text>
                 </View>
+                {res.status === "pending" && (
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" }}
+                      onPress={() => confirmReservation(res.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="check-circle" size={13} color="#059669" />
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#059669" }}>Confirmer</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" }}
+                      onPress={() => cancelReservation(res.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Feather name="x-circle" size={13} color="#DC2626" />
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>Annuler</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {res.status === "confirmed" && (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" }}
+                    onPress={() => cancelReservation(res.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="x-circle" size={13} color="#DC2626" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>Annuler</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
