@@ -1,6 +1,8 @@
-const primary = "#1A56DB";
-const primaryDark = "#0F3BA0";
-const primaryLight = "#EEF2FF";
+const primary     = "#0B3C5D";
+const primaryDark  = "#072D47";
+const primaryLight = "#E8F1F8";
+const accent       = "#FF6B00";
+const accentLight  = "#FFF0E6";
 
 export default {
   light: {
@@ -13,6 +15,8 @@ export default {
     primary,
     primaryDark,
     primaryLight,
+    accent,
+    accentLight,
     tabIconDefault: "#94A3B8",
     tabIconSelected: primary,
     border: "#E2E8F0",

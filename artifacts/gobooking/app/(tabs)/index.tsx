@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -147,6 +148,16 @@ export default function HomeScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const firstName = user?.name?.split(" ")[0] || "";
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: false,
+    }).start();
+  }, []);
+
   const [mode, setMode] = useState<Mode>("trajet");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -281,6 +292,7 @@ export default function HomeScreen() {
   const parcelStatus = latestParcel ? (PARCEL_STATUS_STYLE[latestParcel.status] ?? PARCEL_STATUS_STYLE.en_attente) : null;
 
   return (
+    <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 120 }}
@@ -1052,6 +1064,7 @@ export default function HomeScreen() {
         ))}
       </View>
     </ScrollView>
+    </Animated.View>
   );
 }
 
@@ -1080,14 +1093,14 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   routeLabelText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: Colors.light.textSecondary, letterSpacing: 0.5 },
   routeInput: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#0F172A", borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", paddingBottom: 6 },
-  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginTop: 12 },
+  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.light.primaryLight, justifyContent: "center", alignItems: "center", marginTop: 12 },
   bottomRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
   dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
   dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#0F172A" },
   paxWrap: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
   paxBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   paxCount: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A", minWidth: 16, textAlign: "center" },
-  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 12, paddingVertical: 14, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.accent, borderRadius: 12, paddingVertical: 14, shadowColor: Colors.light.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   searchBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
   colisHero: { alignItems: "center", gap: 10, paddingVertical: 8 },
   colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
@@ -1108,9 +1121,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  ctaBtnPrimary: { backgroundColor: "#EEF2FF", borderWidth: 1.5, borderColor: "#C7D2FE" },
+  ctaBtnPrimary: { backgroundColor: Colors.light.primaryLight, borderWidth: 1.5, borderColor: "#B3CBE0" },
   ctaBtnGreen:   { backgroundColor: "#F0FDF4", borderWidth: 1.5, borderColor: "#BBF7D0" },
-  ctaIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center" },
+  ctaIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#C7DCE9", justifyContent: "center", alignItems: "center" },
   ctaText: { flex: 1 },
   ctaTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primaryDark },
   ctaSub:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
