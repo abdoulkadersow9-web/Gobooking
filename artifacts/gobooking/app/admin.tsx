@@ -47,7 +47,8 @@ export default function AdminScreen() {
 
   useEffect(() => {
     if (!isAdmin) {
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace("/(auth)/login");
       return;
     }
     const load = async () => {
