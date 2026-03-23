@@ -326,7 +326,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.administration}</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="settings" label={t.adminDashboard} onPress={() => router.push("/admin")} />
+            <MenuItem icon="settings" label={t.adminDashboard} onPress={() => router.push("/admin/dashboard")} />
           </View>
         </View>
       )}

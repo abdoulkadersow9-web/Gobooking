@@ -103,12 +103,15 @@ artifacts/
       payment          # Payment
       confirmation/[bookingId]  # Booking confirmed
       booking/[id]     # Booking detail
-      admin            # Legacy admin dashboard
       parcel/          # Parcel send/track/confirmation/tracking
+      admin/           # Admin nested layout (guards admin/super_admin roles)
+        _layout.tsx    # Auth guard + Stack for admin routes
+        dashboard.tsx  # Redirect stub → /dashboard/super-admin
+        stats.tsx      # Admin statistics page
       dashboard/
-        company.tsx    # Company dashboard (blue, #1A56DB)
+        company.tsx    # Company dashboard (amber, #0B3C5D) + DashboardCharts
         agent.tsx      # Agent dashboard (green, #059669)
-        super-admin.tsx # Super admin dashboard (purple, #7C3AED)
+        super-admin.tsx # Super admin dashboard (purple, #7C3AED) + DashboardCharts
     context/
       AuthContext      # Auth state + AsyncStorage
       BookingContext   # Multi-step booking flow

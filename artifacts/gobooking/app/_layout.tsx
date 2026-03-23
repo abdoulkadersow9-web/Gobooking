@@ -137,58 +137,7 @@ function RootLayoutNav() {
         {/* Auth */}
         <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
 
-        {/* Client */}
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="client/home" />
-        <Stack.Screen name="client/reservation" />
-        <Stack.Screen name="client/colis" />
-
-        {/* Entreprise */}
-        <Stack.Screen name="entreprise/dashboard" />
-        <Stack.Screen name="entreprise/reservations" />
-        <Stack.Screen name="entreprise/trajets" />
-        <Stack.Screen name="entreprise/colis" />
-
-        {/* Agent */}
-        <Stack.Screen name="agent/home" />
-        <Stack.Screen name="agent/scan" />
-        <Stack.Screen name="agent/embarquement" />
-        <Stack.Screen name="agent/reception-colis" />
-        <Stack.Screen name="agent/vente" />
-        <Stack.Screen name="agent/validation" />
-
-        {/* Admin */}
-        <Stack.Screen name="admin/dashboard" />
-        <Stack.Screen name="admin/stats" />
-
-        {/* Dashboards legacy (toujours accessibles via redirect) */}
-        <Stack.Screen name="dashboard/company" />
-        <Stack.Screen name="dashboard/agent" />
-        <Stack.Screen name="dashboard/super-admin" />
-
-        {/* Flux réservation */}
-        <Stack.Screen name="trip/[id]" />
-        <Stack.Screen name="seats/[tripId]" />
-        <Stack.Screen name="passengers" />
-        <Stack.Screen name="payment" />
-        <Stack.Screen name="confirmation/[bookingId]" />
-        <Stack.Screen name="booking/[id]" />
-        <Stack.Screen name="search-results" />
-
-        {/* Flux colis */}
-        <Stack.Screen name="parcel/send" />
-        <Stack.Screen name="parcel/payment" />
-        <Stack.Screen name="parcel/confirmation/[parcelId]" />
-        <Stack.Screen name="parcel/tracking/[parcelId]" />
-        <Stack.Screen name="parcel/track" />
-        <Stack.Screen name="parcel/mes-colis" />
-
-        {/* Divers */}
-        <Stack.Screen name="admin" />
-        <Stack.Screen name="live-tracking" />
-        <Stack.Screen name="cars-en-route-map" />
-        <Stack.Screen name="offline/history" />
-        <Stack.Screen name="preview/company" />
+        {/* Toutes les autres routes sont auto-découvertes par Expo Router depuis le filesystem */}
       </Stack>
     </>
   );
