@@ -11,7 +11,8 @@ import {
   FileText, 
   LogOut,
   Menu,
-  X
+  X,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { path: "/admin/trajets", label: "Trajets", icon: Map },
   { path: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { path: "/admin/factures", label: "Factures", icon: FileText },
+  { path: "/admin/financier", label: "Financier", icon: TrendingUp },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {

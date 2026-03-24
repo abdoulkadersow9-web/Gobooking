@@ -14,6 +14,7 @@ import Agents from "@/pages/agents";
 import Trips from "@/pages/trips";
 import Analytics from "@/pages/analytics";
 import Invoices from "@/pages/invoices";
+import Financial from "@/pages/financial";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/admin/trajets"><ProtectedRoute component={Trips} /></Route>
       <Route path="/admin/analytics"><ProtectedRoute component={Analytics} /></Route>
       <Route path="/admin/factures"><ProtectedRoute component={Invoices} /></Route>
+      <Route path="/admin/financier"><ProtectedRoute component={Financial} /></Route>
 
       <Route component={NotFound} />
     </Switch>

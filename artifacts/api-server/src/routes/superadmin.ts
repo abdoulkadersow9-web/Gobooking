@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable } from "@workspace/db";
-import { eq, desc, sql, and, count, gte } from "drizzle-orm";
+import { eq, desc, sql, and, count, gte, lte, between } from "drizzle-orm";
 import { getAuditLogs } from "../audit";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
@@ -837,6 +837,128 @@ router.put("/invoices/:id/pay", async (req, res) => {
     });
   } catch (err) {
     console.error("Pay invoice error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── Financial Dashboard ─────────────────────────────────────────────────── */
+router.get("/financial", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Super admin access required" }); return; }
+
+    const period = (req.query.period as string) || "month";
+    const now = new Date();
+    let startDate: Date;
+    if (period === "today") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    } else if (period === "week") {
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else {
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    const [allPayments, allBookings, allParcels, allCompanies, allTrips] = await Promise.all([
+      db.select().from(paymentsTable).where(and(eq(paymentsTable.status, "paid"), gte(paymentsTable.createdAt, startDate))),
+      db.select().from(bookingsTable).where(gte(bookingsTable.createdAt, startDate)),
+      db.select().from(parcelsTable).where(gte(parcelsTable.createdAt, startDate)),
+      db.select().from(companiesTable),
+      db.select().from(tripsTable),
+    ]);
+
+    const totalRevenue = allPayments.reduce((s, p) => s + Number(p.amount), 0);
+    const totalCommissions = Math.round(totalRevenue * 0.1);
+    const bookingsCount = allBookings.filter(b => b.paymentStatus === "paid").length;
+    const parcelsCount = allParcels.filter(p => p.paymentStatus === "paid").length;
+
+    const dayMap: Record<string, { revenue: number; commissions: number; bookings: number; parcels: number }> = {};
+    const daysBack = period === "today" ? 1 : period === "week" ? 7 : 30;
+    for (let i = daysBack - 1; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const key = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+      dayMap[key] = { revenue: 0, commissions: 0, bookings: 0, parcels: 0 };
+    }
+    for (const p of allPayments) {
+      const d = new Date(p.createdAt!);
+      const key = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+      if (dayMap[key]) {
+        dayMap[key].revenue += Number(p.amount);
+        dayMap[key].commissions += Math.round(Number(p.amount) * 0.1);
+        if (p.refType === "booking") dayMap[key].bookings++;
+        if (p.refType === "parcel") dayMap[key].parcels++;
+      }
+    }
+    const dailyData = Object.entries(dayMap).map(([date, v]) => ({ date, ...v }));
+
+    const growthData = dailyData.map((d, i) => ({
+      date: d.date,
+      revenue: d.revenue,
+      growth: i === 0 ? 0 : dailyData[i - 1].revenue > 0
+        ? Math.round(((d.revenue - dailyData[i - 1].revenue) / dailyData[i - 1].revenue) * 100)
+        : 0,
+    }));
+
+    const tripCompanyMap: Record<string, string> = {};
+    for (const t of allTrips) {
+      if (t.companyId) tripCompanyMap[t.id] = t.companyId;
+    }
+    const bookingCompanyMap: Record<string, string> = {};
+    for (const b of allBookings) {
+      const companyId = tripCompanyMap[b.tripId] || null;
+      if (companyId) bookingCompanyMap[b.id] = companyId;
+    }
+    const parcelCompanyMap: Record<string, string> = {};
+    for (const p of allParcels) {
+      if (p.companyId) parcelCompanyMap[p.id] = p.companyId;
+    }
+
+    const companyRevMap: Record<string, { revenue: number; commissions: number; bookings: number; parcels: number }> = {};
+    for (const c of allCompanies) {
+      companyRevMap[c.id] = { revenue: 0, commissions: 0, bookings: 0, parcels: 0 };
+    }
+    for (const p of allPayments) {
+      let companyId: string | null = null;
+      if (p.refType === "booking" && bookingCompanyMap[p.refId]) companyId = bookingCompanyMap[p.refId];
+      else if (p.refType === "parcel" && parcelCompanyMap[p.refId]) companyId = parcelCompanyMap[p.refId];
+      if (companyId && companyRevMap[companyId]) {
+        companyRevMap[companyId].revenue += Number(p.amount);
+        companyRevMap[companyId].commissions += Math.round(Number(p.amount) * 0.1);
+        if (p.refType === "booking") companyRevMap[companyId].bookings++;
+        if (p.refType === "parcel") companyRevMap[companyId].parcels++;
+      }
+    }
+
+    const companyBreakdown = allCompanies
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        city: c.city,
+        ...(companyRevMap[c.id] || { revenue: 0, commissions: 0, bookings: 0, parcels: 0 }),
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const paymentMethodMap: Record<string, number> = {};
+    for (const p of allPayments) {
+      const m = p.method || "other";
+      paymentMethodMap[m] = (paymentMethodMap[m] || 0) + Number(p.amount);
+    }
+    const paymentMethods = Object.entries(paymentMethodMap).map(([method, amount]) => ({ method, amount }));
+
+    res.json({
+      period,
+      totalRevenue,
+      totalCommissions,
+      netRevenue: totalRevenue - totalCommissions,
+      bookingsCount,
+      parcelsCount,
+      totalTransactions: allPayments.length,
+      dailyData,
+      growthData,
+      companyBreakdown,
+      paymentMethods,
+    });
+  } catch (err) {
+    console.error("Financial dashboard error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

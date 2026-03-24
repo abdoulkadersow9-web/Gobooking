@@ -119,3 +119,11 @@ export function useGenerateInvoice() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] }),
   });
 }
+
+export function useFinancialDashboard(period: string = "month") {
+  return useQuery({
+    queryKey: ['financial-dashboard', period],
+    queryFn: () => apiFetch<any>(`/superadmin/financial?period=${period}`),
+    refetchInterval: 60000,
+  });
+}
