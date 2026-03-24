@@ -4,6 +4,21 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
 import { Search, Filter, ChevronDown, CheckCircle } from "lucide-react";
 
+function buildWALink(phone: string, message: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.startsWith("225") ? digits : digits.startsWith("0") && digits.length === 10 ? "225" + digits.slice(1) : "225" + digits;
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+}
+
+const WA_TEMPLATES = {
+  reservationConfirmee: (ref: string, from: string, to: string, date: string, montant: number) =>
+    `✅ *GoBooking – Réservation confirmée*\n\nBonjour,\n\nVotre réservation *#${ref}* est confirmée !\n\n🚌 *Trajet :* ${from} → ${to}\n📅 *Date :* ${date}\n💰 *Montant :* ${montant.toLocaleString("fr-CI")} FCFA\n\nPrésentez votre QR code à l'embarquement.\nBon voyage ! 🙏`,
+  busEnApproche: (from: string, to: string) =>
+    `🚌 *GoBooking – Bus en approche*\n\nBonjour, votre bus *${from} → ${to}* est en approche !\n\nMerci de vous rendre au point d'embarquement. 🏃`,
+  rappel: (ref: string, from: string, to: string, date: string) =>
+    `⏰ *GoBooking – Rappel de départ*\n\nBonjour,\nRappel : votre bus *${from} → ${to}* part le *${date}*.\nRéf : *#${ref}*\n\nSoyez à l'heure ! 👍`,
+};
+
 export default function Reservations() {
   const { data: reservations, isLoading } = useReservations();
   const [searchTerm, setSearchTerm] = useState("");
@@ -54,13 +69,14 @@ export default function Reservations() {
                 <th className="px-6 py-4">Montant</th>
                 <th className="px-6 py-4">Paiement</th>
                 <th className="px-6 py-4">Statut</th>
+                <th className="px-6 py-4">WhatsApp</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Chargement...</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Chargement...</td></tr>
               ) : filtered?.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">Aucune réservation trouvée.</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">Aucune réservation trouvée.</td></tr>
               ) : (
                 filtered?.map((res: any) => (
                   <tr key={res.id} className="hover:bg-muted/30 transition-colors">
@@ -90,6 +106,41 @@ export default function Reservations() {
                        res.status === 'embarqué' ? <Badge variant="success">Embarqué</Badge> :
                        res.status === 'annulé' ? <Badge variant="danger">Annulé</Badge> :
                        <Badge variant="neutral">{res.status}</Badge>}
+                    </td>
+                    <td className="px-6 py-4">
+                      {res.clientPhone ? (
+                        <div className="flex flex-col gap-1">
+                          <a
+                            href={buildWALink(res.clientPhone, WA_TEMPLATES.reservationConfirmee(res.bookingRef, res.tripFrom, res.tripTo, res.tripDate, res.totalAmount))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: "#25D366" }}
+                          >
+                            💬 Confirmé
+                          </a>
+                          <a
+                            href={buildWALink(res.clientPhone, WA_TEMPLATES.busEnApproche(res.tripFrom, res.tripTo))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: "#128C7E" }}
+                          >
+                            🚌 Bus proche
+                          </a>
+                          <a
+                            href={buildWALink(res.clientPhone, WA_TEMPLATES.rappel(res.bookingRef, res.tripFrom, res.tripTo, res.tripDate))}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                            style={{ backgroundColor: "#075E54" }}
+                          >
+                            ⏰ Rappel
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

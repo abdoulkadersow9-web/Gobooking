@@ -21,6 +21,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 import { downloadReceipt, type ReceiptData } from "@/utils/invoicePdf";
+import { openWhatsApp, WA_TEMPLATES } from "@/utils/whatsapp";
 
 interface Booking {
   id: string;
@@ -434,6 +435,31 @@ export default function BookingDetailScreen() {
           </Pressable>
         )}
 
+        {/* ── WhatsApp client – confirmation ── */}
+        {booking.contactPhone ? (
+          <Pressable
+            style={({ pressed }) => [styles.waClientBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              openWhatsApp(
+                booking.contactPhone,
+                WA_TEMPLATES.reservationConfirmee({
+                  clientName: user?.name ?? "Client",
+                  bookingRef: booking.bookingRef,
+                  from: booking.trip.from,
+                  to: booking.trip.to,
+                  date: booking.trip.date,
+                  heure: booking.trip.departureTime,
+                  montant: booking.totalAmount,
+                })
+              );
+            }}
+          >
+            <Text style={styles.waIcon}>💬</Text>
+            <Text style={styles.waClientBtnText}>Partager sur WhatsApp</Text>
+          </Pressable>
+        ) : null}
+
         {/* ── Contacter l'agent ── */}
         {booking.agentPhone ? (
           <View style={styles.agentContactCard}>
@@ -447,13 +473,28 @@ export default function BookingDetailScreen() {
                 <Text style={styles.agentContactPhone}>{booking.agentPhone}</Text>
               </View>
             </View>
-            <Pressable
-              style={({ pressed }) => [styles.callAgentBtn, pressed && { opacity: 0.8 }]}
-              onPress={() => Linking.openURL(`tel:${booking.agentPhone!.replace(/\s/g, "")}`)}
-            >
-              <Feather name="phone-call" size={15} color="#fff" />
-              <Text style={styles.callAgentBtnText}>Appeler</Text>
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <Pressable
+                style={({ pressed }) => [styles.waAgentBtn, pressed && { opacity: 0.8 }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  openWhatsApp(
+                    booking.agentPhone!,
+                    WA_TEMPLATES.contactAgent({ bookingRef: booking.bookingRef })
+                  );
+                }}
+              >
+                <Text style={{ fontSize: 13 }}>💬</Text>
+                <Text style={styles.callAgentBtnText}>WA</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.callAgentBtn, pressed && { opacity: 0.8 }]}
+                onPress={() => Linking.openURL(`tel:${booking.agentPhone!.replace(/\s/g, "")}`)}
+              >
+                <Feather name="phone-call" size={15} color="#fff" />
+                <Text style={styles.callAgentBtnText}>Appeler</Text>
+              </Pressable>
+            </View>
           </View>
         ) : null}
 
@@ -910,6 +951,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "white",
+  },
+  waClientBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#25D366",
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    shadowColor: "#25D366",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  waClientBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  waIcon: {
+    fontSize: 17,
+  },
+  waAgentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#25D366",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   agentContactCard: {
     flexDirection: "row",

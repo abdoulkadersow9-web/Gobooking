@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import { openWhatsApp, WA_TEMPLATES } from "@/utils/whatsapp";
 
 const PRIMARY = "#1A56DB";
 const AMBER   = "#D97706";
@@ -32,6 +33,7 @@ interface Booking {
   } | null;
   seatNumbers: string[];
   totalAmount: number;
+  contactPhone?: string;
   status: "pending" | "confirmed" | "boarded" | "cancelled" | "completed";
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
   createdAt: string;
@@ -94,6 +96,29 @@ function BookingCard({ item }: { item: Booking }) {
         <Text style={S.ref}>#{item.bookingRef}</Text>
         <Text style={S.amount}>{item.totalAmount.toLocaleString("fr-CI")} FCFA</Text>
       </View>
+
+      {/* WhatsApp share */}
+      <Pressable
+        style={({ pressed }) => [S.waBtn, pressed && { opacity: 0.85 }]}
+        onPress={(e) => {
+          e.stopPropagation();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          const phone = item.contactPhone ?? "";
+          if (!phone) return;
+          openWhatsApp(phone, WA_TEMPLATES.reservationConfirmee({
+            clientName: "vous",
+            bookingRef: item.bookingRef,
+            from: trip?.from ?? "",
+            to: trip?.to ?? "",
+            date: trip?.date ?? "",
+            heure: trip?.departureTime ?? "",
+            montant: item.totalAmount,
+          }));
+        }}
+      >
+        <Text style={S.waIcon}>💬</Text>
+        <Text style={S.waBtnText}>Partager sur WhatsApp</Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -225,4 +250,22 @@ const S = StyleSheet.create({
 
   fab: { position: "absolute", right: 20 },
   fabBtn: { width: 54, height: 54, borderRadius: 27, backgroundColor: AMBER, alignItems: "center", justifyContent: "center", shadowColor: AMBER, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+
+  waBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#25D366",
+    borderRadius: 12,
+    paddingVertical: 11,
+    marginTop: 10,
+    shadowColor: "#25D366",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  waIcon: { fontSize: 15 },
+  waBtnText: { fontSize: 13, fontWeight: "700", color: "#fff" },
 });
