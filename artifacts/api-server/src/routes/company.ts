@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable } from "@workspace/db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable } from "@workspace/db";
+import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -1087,6 +1087,62 @@ router.post("/invoices/generate", async (req, res) => {
   } catch (err) {
     console.error("Generate invoice error:", err);
     res.status(500).json({ error: "Erreur génération facture" });
+  }
+});
+
+/* ── GET /company/scan-stats — unified scan counters for current day ── */
+router.get("/scan-stats", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const companyId = ctx.companyId;
+
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const tripId = req.query.tripId as string | undefined;
+
+    const whereBase = and(
+      eq(scansTable.companyId, companyId),
+      gte(scansTable.createdAt, todayStart),
+      ...(tripId ? [eq(scansTable.trajetId, tripId)] : []),
+    );
+
+    const scans = await db.select({
+      type:      scansTable.type,
+      count:     sql<number>`count(*)::int`,
+    })
+      .from(scansTable)
+      .where(whereBase)
+      .groupBy(scansTable.type);
+
+    const stats = { passager: 0, colis: 0, bagage: 0 };
+    for (const s of scans) {
+      if (s.type === "passager" || s.type === "billet") stats.passager += s.count;
+      else if (s.type === "colis") stats.colis += s.count;
+      else if (s.type === "bagage") stats.bagage += s.count;
+    }
+
+    /* Recent scan history (last 50) */
+    const history = await db.select({
+      id: scansTable.id, type: scansTable.type, ref: scansTable.ref,
+      agentName: scansTable.agentName, trajetId: scansTable.trajetId,
+      createdAt: scansTable.createdAt,
+    })
+      .from(scansTable)
+      .where(whereBase)
+      .orderBy(desc(scansTable.createdAt))
+      .limit(50);
+
+    res.json({
+      stats,
+      history: history.map(h => ({
+        id: h.id, type: h.type, ref: h.ref,
+        agentName: h.agentName, trajetId: h.trajetId,
+        createdAt: h.createdAt?.toISOString() ?? null,
+      })),
+    });
+  } catch (err) {
+    console.error("Scan stats error:", err);
+    res.status(500).json({ error: "Erreur stats scan" });
   }
 });
 

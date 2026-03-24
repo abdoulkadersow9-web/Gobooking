@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -1223,160 +1223,250 @@ router.post("/scan", async (req, res) => {
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
     const { qrData, selectedTripId } = req.body as { qrData?: string | Record<string, unknown>; selectedTripId?: string };
-    if (!qrData) {
-      res.status(400).json({ error: "qrData requis", code: "MISSING_DATA" });
-      return;
-    }
+    if (!qrData) { res.status(400).json({ error: "qrData requis", code: "MISSING_DATA" }); return; }
 
-    /* ── 1. Validate QR signature (mirrors utils/qr.ts djb2 logic) ── */
+    /* ── 1. Parse + validate QR signature ── */
     const QR_SECRET = "GBK-CI-2026-SECURE-v1";
     const TTL_MS    = 72 * 60 * 60 * 1000;
 
     function djb2(str: string): string {
       let h = 5381;
-      for (let i = 0; i < str.length; i++) {
-        h = (h * 33) ^ str.charCodeAt(i);
-        h = h >>> 0;
-      }
+      for (let i = 0; i < str.length; i++) { h = (h * 33) ^ str.charCodeAt(i); h = h >>> 0; }
       return h.toString(36).padStart(7, "0");
     }
 
     let ref: string;
-    /* qrData may arrive as a plain object (already parsed) or as a JSON string */
+    let qrType: string = "passager"; /* default — backward compat */
+
     const raw = typeof qrData === "object" ? JSON.stringify(qrData) : String(qrData).trim();
 
     if (raw.startsWith("{")) {
-      let payload: { ref?: string; type?: string; ts?: number; sig?: string };
+      let payload: { ref?: string; type?: string; ts?: number; sig?: string; trajetId?: string };
       try { payload = typeof qrData === "object" ? (qrData as typeof payload) : JSON.parse(raw); }
       catch { res.status(400).json({ error: "QR invalide — format incorrect", code: "INVALID_FORMAT" }); return; }
 
-      const { ref: r, type, ts, sig } = payload;
+      const { ref: r, type, ts, sig, trajetId } = payload;
       if (!r || !type || !ts || !sig) {
         res.status(400).json({ error: "QR invalide — champs manquants", code: "INVALID_FORMAT" }); return;
       }
-      const expected = djb2(`${r}|${type}|${ts}|${QR_SECRET}`);
-      if (sig !== expected) {
+      /* Verify signature — support both new format (with trajetId) and old format */
+      const sigNew = djb2(`${r}|${type}|${ts}|${trajetId ?? ""}|${QR_SECRET}`);
+      const sigOld = djb2(`${r}|${type}|${ts}|${QR_SECRET}`);
+      if (sig !== sigNew && sig !== sigOld) {
         res.status(400).json({ error: "QR invalide — billet potentiellement falsifié", code: "INVALID_SIGNATURE" }); return;
       }
       if (Date.now() - ts > TTL_MS) {
         res.status(400).json({ error: "QR expiré — billet trop ancien (> 72h)", code: "EXPIRED" }); return;
       }
-      ref = r;
+      ref     = r;
+      qrType  = type;
     } else if (/^(GBB|GBX|GBK|OFFLINE-)/i.test(raw) || /^[A-Z0-9]{6,20}$/i.test(raw)) {
       ref = raw.toUpperCase();
     } else {
       res.status(400).json({ error: "QR non reconnu — format invalide", code: "INVALID_FORMAT" }); return;
     }
 
-    /* ── 2. Look up booking ── */
+    /* ── Helper: record scan to scansTable ── */
+    const recordScan = async (type: string, targetId: string, scanRef: string, tripId?: string | null) => {
+      try {
+        const agentRows = await db.select({ companyId: agentsTable.companyId, name: agentsTable.name })
+          .from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+        await db.insert(scansTable).values({
+          id:        `SCN-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          type, ref: scanRef, targetId,
+          trajetId:  selectedTripId ?? tripId ?? null,
+          agentId:   user.id,
+          agentName: agentRows[0]?.name ?? user.name ?? "Agent",
+          companyId: agentRows[0]?.companyId ?? null,
+          status:    "validé",
+        });
+      } catch {}
+    };
+
+    /* ══════════════════════════════════════════════════════════════
+       ROUTE A: "colis" — scan colis, mark as chargé_bus
+    ══════════════════════════════════════════════════════════════ */
+    if (qrType === "colis") {
+      const parcels = await db.select().from(parcelsTable)
+        .where(eq(parcelsTable.trackingRef, ref.toUpperCase())).limit(1);
+      if (!parcels.length) {
+        res.status(404).json({ error: "Colis introuvable — référence inconnue", code: "NOT_FOUND", scanType: "colis" }); return;
+      }
+      const parcel = parcels[0];
+
+      /* Trip mismatch */
+      if (selectedTripId && parcel.tripId && parcel.tripId !== selectedTripId) {
+        res.status(422).json({ error: "Ce colis est enregistré pour un autre trajet.", code: "WRONG_TRIP", scanType: "colis", ref: parcel.trackingRef }); return;
+      }
+
+      /* Anti double-scan */
+      if (["chargé_bus", "en_transit", "arrivé", "livré"].includes(parcel.status ?? "")) {
+        res.status(409).json({
+          error:  "Ce colis a déjà été chargé ou est déjà en transit.",
+          code:   "DOUBLE_SCAN", scanType: "colis", ref: parcel.trackingRef,
+          parcel: { sender: parcel.senderName, receiver: parcel.receiverName, from: parcel.fromCity, to: parcel.toCity },
+        }); return;
+      }
+
+      await db.update(parcelsTable).set({ status: "chargé_bus" }).where(eq(parcelsTable.id, parcel.id));
+      await recordScan("colis", parcel.id, parcel.trackingRef, parcel.tripId);
+
+      const senderRows = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+      sendExpoPush(senderRows[0]?.pushToken, "GoBooking 📦", `Votre colis (${parcel.trackingRef}) a été chargé dans le bus.`).catch(() => {});
+
+      res.json({
+        success: true, scanType: "colis", ref: parcel.trackingRef,
+        parcel: {
+          trackingRef: parcel.trackingRef,
+          sender:      parcel.senderName,
+          receiver:    parcel.receiverName,
+          from:        parcel.fromCity,
+          to:          parcel.toCity,
+          weight:      parcel.weight,
+          newStatus:   "chargé_bus",
+        },
+      });
+      return;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ROUTES B + C: "passager" / "billet" / "bagage" — need booking
+    ══════════════════════════════════════════════════════════════ */
     const bookings = await db.select().from(bookingsTable)
       .where(eq(bookingsTable.bookingRef, ref.toUpperCase())).limit(1);
 
     if (!bookings.length) {
       res.status(404).json({ error: "Billet introuvable — référence inconnue", code: "NOT_FOUND" }); return;
     }
-
     const booking = bookings[0];
 
-    /* ── 2b. Trip mismatch guard — if agent specified a selectedTripId ── */
+    /* ── Trip mismatch guard ── */
     if (selectedTripId && booking.tripId && booking.tripId !== selectedTripId) {
       auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_SCAN, booking.id, "booking", {
-        bookingRef: booking.bookingRef, reason: "WRONG_TRIP",
-        bookingTripId: booking.tripId, selectedTripId,
+        bookingRef: booking.bookingRef, reason: "WRONG_TRIP", bookingTripId: booking.tripId, selectedTripId,
       }, true).catch(() => {});
       const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
       const bTrip = trips[0];
       res.status(422).json({
         error: `Ce billet est pour le trajet ${bTrip?.from ?? "?"} → ${bTrip?.to ?? "?"} (départ ${bTrip?.departureTime ?? "?"}), pas pour le trajet sélectionné.`,
-        code: "WRONG_TRIP",
-        bookingRef: booking.bookingRef,
+        code: "WRONG_TRIP", bookingRef: booking.bookingRef,
         bookingTrip: bTrip ? { from: bTrip.from, to: bTrip.to, departureTime: bTrip.departureTime, busName: bTrip.busName } : null,
+      }); return;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ROUTE B: "bagage" — confirm physical bagage loaded on bus
+    ══════════════════════════════════════════════════════════════ */
+    if (qrType === "bagage") {
+      if (!(booking as any).bagages?.length) {
+        res.status(422).json({ error: "Aucun bagage enregistré pour cette réservation.", code: "NO_BAGAGES", scanType: "bagage", bookingRef: booking.bookingRef }); return;
+      }
+      if ((booking as any).bagageStatus === "refusé") {
+        const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+        res.status(422).json({
+          error: "Bagages refusés par la compagnie — scan bloqué.", code: "BAGAGE_REFUS", scanType: "bagage",
+          bookingRef: booking.bookingRef, passenger: { name: fp?.name ?? "—" }, bagageNote: (booking as any).bagageNote || null,
+        }); return;
+      }
+
+      /* Anti double-scan: check if already scanned today */
+      const existingScan = await db.select({ id: scansTable.id }).from(scansTable)
+        .where(and(eq(scansTable.ref, booking.bookingRef), eq(scansTable.type, "bagage")))
+        .orderBy(desc(scansTable.createdAt)).limit(1);
+      if (existingScan.length) {
+        const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+        res.status(409).json({
+          error: "Bagages déjà validés — scan déjà effectué.", code: "DOUBLE_SCAN", scanType: "bagage",
+          bookingRef: booking.bookingRef, passenger: { name: fp?.name ?? "—" },
+        }); return;
+      }
+
+      await recordScan("bagage", booking.id, booking.bookingRef, booking.tripId);
+      const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+      res.json({
+        success: true, scanType: "bagage", bookingRef: booking.bookingRef,
+        passenger:    { name: fp?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
+        bagages:      (booking as any).bagages ?? [],
+        bagageStatus: (booking as any).bagageStatus,
       });
       return;
     }
 
-    /* ── 3. Anti double-scan ── */
+    /* ══════════════════════════════════════════════════════════════
+       ROUTE C: "passager" / "billet" — standard boarding
+    ══════════════════════════════════════════════════════════════ */
+
+    /* Anti double-scan */
     if (booking.status === "boarded" || booking.status === "validated") {
       auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_DOUBLE_SCAN, booking.id, "booking", {
         bookingRef: booking.bookingRef, status: booking.status,
       }, true).catch(() => {});
-      const firstP = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+      const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
       res.status(409).json({
-        error:      "Billet déjà utilisé — passager déjà embarqué",
-        code:       "DOUBLE_SCAN",
+        error: "Billet déjà utilisé — passager déjà embarqué", code: "DOUBLE_SCAN",
         bookingRef: booking.bookingRef,
-        passenger:  { name: firstP?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
-      });
-      return;
+        passenger:  { name: fp?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
+      }); return;
     }
 
     if (booking.status === "cancelled") {
       res.status(422).json({ error: "Réservation annulée — embarquement refusé", code: "CANCELLED" }); return;
     }
 
-    /* ── 3b. Block scan if booking not paid ── */
     if (booking.paymentStatus !== "paid") {
       res.status(402).json({
-        error:      "Paiement requis — ce billet n'a pas encore été payé",
-        code:       "NOT_PAID",
+        error: "Paiement requis — ce billet n'a pas encore été payé", code: "NOT_PAID",
         bookingRef: booking.bookingRef,
         passenger:  { name: (Array.isArray(booking.passengers) ? (booking.passengers as any[])[0]?.name : null) ?? "—" },
       }); return;
     }
 
-    /* ── 3c. Block scan if bagages are refused ── */
     if ((booking as any).bagageStatus === "refusé") {
-      const firstP = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+      const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
       res.status(422).json({
-        error:      "Embarquement refusé — les bagages de ce passager ont été refusés par la compagnie.",
-        code:       "BAGAGE_REFUS",
-        bookingRef: booking.bookingRef,
-        passenger:  { name: firstP?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
+        error: "Embarquement refusé — les bagages de ce passager ont été refusés par la compagnie.",
+        code:  "BAGAGE_REFUS", bookingRef: booking.bookingRef,
+        passenger:  { name: fp?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
         bagageNote: (booking as any).bagageNote || null,
       }); return;
     }
 
-    /* ── 4. Fetch trip info ── */
+    /* Fetch trip info */
     let trip = null;
     if (booking.tripId) {
       const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
       trip = trips[0] ?? null;
     }
 
-    /* ── 5. Mark as boarded ── */
-    await db.update(bookingsTable)
-      .set({ status: "boarded" })
-      .where(eq(bookingsTable.id, booking.id));
-
+    /* Mark as boarded */
+    await db.update(bookingsTable).set({ status: "boarded" }).where(eq(bookingsTable.id, booking.id));
+    await recordScan("passager", booking.id, booking.bookingRef, booking.tripId);
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_SCAN, booking.id, "booking", {
       bookingRef: booking.bookingRef, newStatus: "boarded",
     }).catch(() => {});
 
-    /* ── 6. Push notification to passenger ── */
+    /* Push notification */
     const userRows = await db.select({ pushToken: usersTable.pushToken, name: usersTable.name })
       .from(usersTable).where(eq(usersTable.id, booking.userId)).limit(1);
-    sendExpoPush(
-      userRows[0]?.pushToken,
-      "GoBooking 🚌",
-      "Votre embarquement a été validé ! Bon voyage."
-    ).catch(() => {});
+    sendExpoPush(userRows[0]?.pushToken, "GoBooking 🚌", "Votre embarquement a été validé ! Bon voyage.").catch(() => {});
 
-    /* ── 7. Build response ── */
-    const firstPassenger = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+    const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
     res.json({
       success:    true,
+      scanType:   "passager",
       bookingRef: booking.bookingRef,
       passenger: {
-        name:  firstPassenger?.name ?? userRows[0]?.name ?? "Passager",
-        seat:  (booking.seatNumbers as string[] ?? [])[0] ?? "—",
-        seats: booking.seatNumbers ?? [],
-        count: (booking.seatNumbers as string[] ?? []).length,
-        from:  trip?.from ?? "—",
-        to:    trip?.to   ?? "—",
+        name:          fp?.name ?? userRows[0]?.name ?? "Passager",
+        seat:          (booking.seatNumbers as string[] ?? [])[0] ?? "—",
+        seats:         booking.seatNumbers ?? [],
+        count:         (booking.seatNumbers as string[] ?? []).length,
+        from:          trip?.from ?? "—",
+        to:            trip?.to   ?? "—",
         departureTime: trip?.departureTime ?? "—",
-        date:  trip?.date ?? "—",
-        busName: trip?.busName ?? "—",
-        totalAmount: booking.totalAmount,
+        date:          trip?.date ?? "—",
+        busName:       trip?.busName ?? "—",
+        totalAmount:   booking.totalAmount,
         paymentMethod: booking.paymentMethod,
       },
     });

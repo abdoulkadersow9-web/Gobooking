@@ -19,3 +19,4 @@ export * from "./subscriptions";
 export * from "./audit_logs";
 export * from "./referrals";
 export * from "./promos";
+export * from "./scans";

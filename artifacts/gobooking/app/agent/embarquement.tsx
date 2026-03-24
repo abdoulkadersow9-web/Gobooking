@@ -99,14 +99,19 @@ export default function EmbarquementScreen() {
   /* ── Unified scan result overlay ──────────────────── */
   type ScanResultType = {
     type: "validé" | "double" | "refusé";
-    name?:   string;
-    seat?:   string;
-    seats?:  string[];
-    count?:  number;
-    from?:   string;
-    to?:     string;
-    ref?:    string;
+    scanType?: "passager" | "colis" | "bagage"; /* which QR type was scanned */
+    name?:    string;
+    seat?:    string;
+    seats?:   string[];
+    count?:   number;
+    from?:    string;
+    to?:      string;
+    ref?:     string;
     errorMsg?: string;
+    /* colis-specific */
+    parcel?: { trackingRef: string; sender: string; receiver: string; from: string; to: string; weight: number };
+    /* bagage-specific */
+    bagageCount?: number;
   };
   const [scanResult, setScanResult] = useState<ScanResultType | null>(null);
   const [scanBusy,   setScanBusy]   = useState(false);
@@ -407,13 +412,13 @@ export default function EmbarquementScreen() {
     /* 4. Unified scan endpoint: validate + board in one request */
     try {
       const res = await apiFetch<{
-        success: boolean;
-        bookingRef: string;
-        passenger: {
-          name: string; seat: string; seats: string[]; count: number;
-          from: string; to: string; departureTime: string; date: string;
-          busName: string; totalAmount: number; paymentMethod: string;
-        };
+        success:   boolean;
+        scanType:  string;
+        bookingRef?: string;
+        ref?:       string;
+        passenger?: { name: string; seat: string; seats: string[]; count: number; from: string; to: string; };
+        parcel?:    { trackingRef: string; sender: string; receiver: string; from: string; to: string; weight: number };
+        bagages?:   any[];
         error?: string; code?: string;
       }>("/agent/scan", {
         token: token ?? undefined,
@@ -422,31 +427,76 @@ export default function EmbarquementScreen() {
       });
 
       setScanBusy(false);
-      notifyEmbarquementValide({}).catch(() => {});
-      showScanResult({
-        type:  "validé",
-        name:  res.passenger?.name,
-        seat:  res.passenger?.seat,
-        seats: res.passenger?.seats,
-        count: res.passenger?.count,
-        from:  res.passenger?.from,
-        to:    res.passenger?.to,
-        ref:   res.bookingRef,
-      });
+
+      if (res.scanType === "colis") {
+        showScanResult({
+          type:     "validé",
+          scanType: "colis",
+          name:     res.parcel ? `${res.parcel.sender} → ${res.parcel.receiver}` : undefined,
+          from:     res.parcel?.from,
+          to:       res.parcel?.to,
+          ref:      res.ref ?? res.parcel?.trackingRef,
+          parcel:   res.parcel,
+        });
+      } else if (res.scanType === "bagage") {
+        showScanResult({
+          type:        "validé",
+          scanType:    "bagage",
+          name:        res.passenger?.name,
+          seat:        res.passenger?.seat,
+          ref:         res.bookingRef,
+          bagageCount: res.bagages?.length ?? 0,
+        });
+      } else {
+        notifyEmbarquementValide({}).catch(() => {});
+        showScanResult({
+          type:     "validé",
+          scanType: "passager",
+          name:     res.passenger?.name,
+          seat:     res.passenger?.seat,
+          seats:    res.passenger?.seats,
+          count:    res.passenger?.count,
+          from:     res.passenger?.from,
+          to:       res.passenger?.to,
+          ref:      res.bookingRef,
+        });
+      }
     } catch (e: any) {
       setScanBusy(false);
-      const code = e?.code as string | undefined;
+      const code     = e?.code     as string | undefined;
+      const scanType = e?.scanType as string | undefined;
+
       if (code === "DOUBLE_SCAN") {
-        showScanResult({
-          type:     "double",
-          name:     e?.passenger?.name,
-          seat:     e?.passenger?.seat,
-          ref:      e?.bookingRef,
-          errorMsg: "Ce billet a déjà été validé — passager déjà embarqué.",
-        });
+        if (scanType === "colis") {
+          showScanResult({
+            type:     "double",
+            scanType: "colis",
+            ref:      e?.ref,
+            name:     e?.parcel ? `${e.parcel.sender} → ${e.parcel.receiver}` : undefined,
+            errorMsg: "Ce colis a déjà été chargé dans le bus.",
+          });
+        } else if (scanType === "bagage") {
+          showScanResult({
+            type:     "double",
+            scanType: "bagage",
+            ref:      e?.bookingRef,
+            name:     e?.passenger?.name,
+            errorMsg: "Ces bagages ont déjà été scannés.",
+          });
+        } else {
+          showScanResult({
+            type:     "double",
+            scanType: "passager",
+            name:     e?.passenger?.name,
+            seat:     e?.passenger?.seat,
+            ref:      e?.bookingRef,
+            errorMsg: "Ce billet a déjà été validé — passager déjà embarqué.",
+          });
+        }
       } else if (code === "NOT_PAID") {
         showScanResult({
           type:     "refusé",
+          scanType: "passager",
           name:     e?.passenger?.name,
           ref:      e?.bookingRef,
           errorMsg: "Billet non payé — le passager doit régler son paiement avant d'embarquer.",
@@ -454,6 +504,7 @@ export default function EmbarquementScreen() {
       } else if (code === "BAGAGE_REFUS") {
         showScanResult({
           type:     "refusé",
+          scanType: scanType === "bagage" ? "bagage" : "passager",
           name:     e?.passenger?.name,
           seat:     e?.passenger?.seat,
           ref:      e?.bookingRef,
@@ -461,19 +512,26 @@ export default function EmbarquementScreen() {
             ? `Bagages refusés — embarquement bloqué.\nMotif : ${e.bagageNote}`
             : "Bagages refusés par la compagnie — embarquement bloqué.",
         });
+      } else if (code === "NO_BAGAGES") {
+        showScanResult({
+          type:     "refusé",
+          scanType: "bagage",
+          ref:      e?.bookingRef,
+          errorMsg: "Aucun bagage enregistré pour cette réservation.",
+        });
       } else if (code === "WRONG_TRIP") {
         const bTrip = e?.bookingTrip;
         showScanResult({
           type:     "refusé",
-          ref:      e?.bookingRef,
+          ref:      e?.bookingRef ?? e?.ref,
           errorMsg: bTrip
-            ? `⚠️ Mauvais trajet !\nCe billet est pour ${bTrip.from} → ${bTrip.to} (${bTrip.departureTime}), pas pour le trajet sélectionné.`
-            : "Ce billet appartient à un autre trajet.",
+            ? `⚠️ Mauvais trajet !\nCe QR est pour ${bTrip.from} → ${bTrip.to} (${bTrip.departureTime}), pas pour le trajet sélectionné.`
+            : "Ce QR appartient à un autre trajet.",
         });
       } else {
         showScanResult({
           type:     "refusé",
-          errorMsg: e?.message ?? e?.error ?? "Billet invalide ou réservation introuvable.",
+          errorMsg: e?.message ?? e?.error ?? "QR invalide ou élément introuvable.",
         });
       }
     }
@@ -567,7 +625,7 @@ export default function EmbarquementScreen() {
 
   /* ── Camera scan overlay (shared for both modes) ──── */
   if (scanMode || enRouteScanMode) {
-    const hint = enRouteScanMode ? "Pointez vers le QR du passager en route" : "Pointez vers le QR du billet";
+    const hint = enRouteScanMode ? "Pointez vers le QR du passager en route" : "Pointez vers le QR : passager, colis ou bagage";
     const onScan = enRouteScanMode ? handleEnRouteScan : handleBarCodeScanned;
     const onClose = () => { setScanMode(false); setEnRouteScanMode(false); };
 
@@ -613,10 +671,24 @@ export default function EmbarquementScreen() {
     const isOk     = scanResult.type === "validé";
     const isDouble = scanResult.type === "double";
     const bgColor  = isOk ? "#065F46" : isDouble ? "#78350F" : "#7F1D1D";
-    const iconName = isOk ? "checkmark-circle" : isDouble ? "alert-circle" : "close-circle";
     const iconColor= isOk ? "#34D399" : isDouble ? "#FCD34D" : "#FCA5A5";
     const label    = isOk ? "VALIDÉ" : isDouble ? "DOUBLE SCAN" : "REFUSÉ";
     const labelColor = isOk ? "#ECFDF5" : isDouble ? "#FEF3C7" : "#FEF2F2";
+
+    /* Type-specific icon */
+    const qrTypeIconName: Parameters<typeof Ionicons>[0]["name"] =
+      scanResult.scanType === "colis"  ? "cube"
+      : scanResult.scanType === "bagage" ? "briefcase"
+      : "person-circle";
+
+    const statusIconName: Parameters<typeof Ionicons>[0]["name"] =
+      isOk ? "checkmark-circle" : isDouble ? "alert-circle" : "close-circle";
+
+    /* Type badge label */
+    const typeBadge =
+      scanResult.scanType === "colis"  ? "📦 COLIS"
+      : scanResult.scanType === "bagage" ? "🧳 BAGAGE"
+      : "🪑 PASSAGER";
 
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, alignItems: "center", justifyContent: "center" }} edges={["top", "bottom"]}>
@@ -628,34 +700,45 @@ export default function EmbarquementScreen() {
           opacity: scanAnim,
           width: "85%",
         }}>
-          {/* Big icon */}
-          <Ionicons name={iconName} size={100} color={iconColor} />
+          {/* Type badge — only show when type is known */}
+          {scanResult.scanType && (
+            <View style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, marginBottom: 12 }}>
+              <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: 2 }}>{typeBadge}</Text>
+            </View>
+          )}
+
+          {/* Big status icon */}
+          <Ionicons name={statusIconName} size={90} color={iconColor} />
 
           {/* Status label */}
           <Text style={{
-            fontSize: 36, fontWeight: "900", letterSpacing: 4,
-            color: labelColor, marginTop: 16, marginBottom: 24,
+            fontSize: 34, fontWeight: "900", letterSpacing: 4,
+            color: labelColor, marginTop: 12, marginBottom: 20,
           }}>
             {label}
           </Text>
 
-          {/* Passenger info (success + double) */}
-          {(isOk || isDouble) && scanResult.name && (
+          {/* Content card */}
+          {(isOk || isDouble) && (scanResult.name || scanResult.parcel) && (
             <View style={{
               backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 16,
-              padding: 20, width: "100%", gap: 10, marginBottom: 16,
+              padding: 18, width: "100%", gap: 10, marginBottom: 16,
             }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <Ionicons name="person-circle" size={28} color={iconColor} />
-                <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff" }}>
-                  {scanResult.name}
-                </Text>
-              </View>
+              {/* Passager / bagage name */}
+              {scanResult.name && scanResult.scanType !== "colis" && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Ionicons name={qrTypeIconName} size={26} color={iconColor} />
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: "#fff", flex: 1 }}>
+                    {scanResult.name}
+                  </Text>
+                </View>
+              )}
 
-              {scanResult.seat && (
+              {/* Passager seat */}
+              {scanResult.seat && scanResult.scanType !== "colis" && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="ticket" size={18} color="rgba(255,255,255,0.6)" />
-                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 15 }}>
+                  <Ionicons name="ticket" size={16} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
                     {scanResult.seats && scanResult.seats.length > 1
                       ? `Sièges : ${scanResult.seats.join(", ")} (${scanResult.count} passagers)`
                       : `Siège : ${scanResult.seat}`}
@@ -663,18 +746,51 @@ export default function EmbarquementScreen() {
                 </View>
               )}
 
-              {scanResult.from && scanResult.from !== "—" && (
+              {/* Bagage count */}
+              {scanResult.scanType === "bagage" && scanResult.bagageCount != null && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="location" size={18} color="rgba(255,255,255,0.6)" />
-                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 15 }}>
+                  <Ionicons name="briefcase" size={16} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
+                    {scanResult.bagageCount} bagage{scanResult.bagageCount > 1 ? "s" : ""} validé{scanResult.bagageCount > 1 ? "s" : ""}
+                  </Text>
+                </View>
+              )}
+
+              {/* Colis info */}
+              {scanResult.scanType === "colis" && scanResult.parcel && (
+                <>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <Ionicons name="cube" size={26} color={iconColor} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>{scanResult.parcel.sender}</Text>
+                      <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>→ {scanResult.parcel.receiver}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="location" size={16} color="rgba(255,255,255,0.6)" />
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>{scanResult.parcel.from} → {scanResult.parcel.to}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="scale" size={16} color="rgba(255,255,255,0.6)" />
+                    <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>{scanResult.parcel.weight} kg · Chargé dans le bus</Text>
+                  </View>
+                </>
+              )}
+
+              {/* Route (passager) */}
+              {scanResult.from && scanResult.from !== "—" && scanResult.scanType !== "colis" && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="location" size={16} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14 }}>
                     {scanResult.from} → {scanResult.to}
                   </Text>
                 </View>
               )}
 
+              {/* Ref */}
               {scanResult.ref && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Ionicons name="barcode" size={18} color="rgba(255,255,255,0.6)" />
+                  <Ionicons name="barcode" size={16} color="rgba(255,255,255,0.6)" />
                   <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, letterSpacing: 1 }}>
                     Réf : {scanResult.ref}
                   </Text>

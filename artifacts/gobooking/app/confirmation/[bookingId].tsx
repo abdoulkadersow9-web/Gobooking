@@ -387,7 +387,7 @@ export default function ConfirmationScreen() {
           <View style={styles.qrSection}>
             <Text style={styles.qrHint}>Scanner pour valider à l'embarquement</Text>
             <View style={styles.qrFrame}>
-              <QRCode value={generateQRData(booking.bookingRef, "billet")} size={160} />
+              <QRCode value={generateQRData(booking.bookingRef, "passager")} size={160} />
               <View style={styles.qrLogoBox}>
                 <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.qrLogo}>
                   <Text style={styles.qrLogoText}>GB</Text>

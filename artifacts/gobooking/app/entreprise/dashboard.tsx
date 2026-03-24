@@ -169,30 +169,35 @@ function SummaryPills({ summary }: { summary: Summary }) {
 }
 
 /* ─── Main screen ────────────────────────────────────────────────────── */
+interface ScanStats { passager: number; colis: number; bagage: number }
+
 export default function EntrepriseDashboard() {
   const insets  = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
 
-  const [data, setData]         = useState<DashboardData | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const [data, setData]             = useState<DashboardData | null>(null);
+  const [scanStats, setScanStats]   = useState<ScanStats | null>(null);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch("/company/dashboard");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setData(json);
+      const [dashRes, scanRes] = await Promise.all([
+        apiFetch<DashboardData>("/company/dashboard", { token: token ?? undefined }),
+        apiFetch<{ stats: ScanStats }>("/company/scan-stats",  { token: token ?? undefined }).catch(() => null),
+      ]);
+      setData(dashRes);
+      if (scanRes) setScanStats(scanRes.stats);
     } catch (e: any) {
       setError(e.message || "Erreur de chargement");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -319,6 +324,30 @@ export default function EntrepriseDashboard() {
             </View>
           )}
         </View>
+
+        {/* Scan unifiés du jour */}
+        {scanStats !== null && (
+          <View style={ss.section}>
+            <SectionTitle icon="scan" title="Scans du jour" color="#7C3AED" />
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 14, alignItems: "center", gap: 4 }}>
+                <Feather name="user-check" size={20} color="#059669" />
+                <Text style={{ fontSize: 22, fontWeight: "800", color: "#059669" }}>{scanStats.passager}</Text>
+                <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>Passagers</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: "#EFF6FF", borderRadius: 12, padding: 14, alignItems: "center", gap: 4 }}>
+                <Feather name="package" size={20} color="#2563EB" />
+                <Text style={{ fontSize: 22, fontWeight: "800", color: "#2563EB" }}>{scanStats.colis}</Text>
+                <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>Colis</Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: "#F5F3FF", borderRadius: 12, padding: 14, alignItems: "center", gap: 4 }}>
+                <Feather name="briefcase" size={20} color="#7C3AED" />
+                <Text style={{ fontSize: 22, fontWeight: "800", color: "#7C3AED" }}>{scanStats.bagage}</Text>
+                <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>Bagages</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Bus en cours */}
         {activeTrips.length > 0 && (
