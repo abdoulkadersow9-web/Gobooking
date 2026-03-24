@@ -301,7 +301,7 @@ export default function HomeScreen() {
     }
     console.log("[GoBooking] Recherche trajet:", { from, to, date, passengers });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: "/search-results", params: { from, to, date, passengers: passengers.toString() } });
+    router.push({ pathname: "/client/resultats", params: { from, to, date, passengers: passengers.toString() } } as never);
   };
 
   const parcelStatus = latestParcel ? (PARCEL_STATUS_STYLE[latestParcel.status] ?? PARCEL_STATUS_STYLE.en_attente) : null;
@@ -482,8 +482,7 @@ export default function HomeScreen() {
           activeOpacity={0.85}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setMode("trajet");
-            scrollRef.current?.scrollTo({ y: 0, animated: true });
+            router.push("/client/resultats" as never);
           }}
         >
           <View style={styles.ctaIcon}>
@@ -783,7 +782,7 @@ export default function HomeScreen() {
                   activeOpacity={0.88}
                   onPress={() => {
                     Haptics.impactAsync(isTop ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
-                    router.push({ pathname: "/search-results", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } });
+                    router.push({ pathname: "/client/resultats", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } } as never);
                   }}
                   style={{
                     backgroundColor: isTop ? "#FAF5FF" : "white",
@@ -872,7 +871,7 @@ export default function HomeScreen() {
                     }]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      router.push({ pathname: "/search-results", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } });
+                      router.push({ pathname: "/client/resultats", params: { from: trip.from, to: trip.to, date: trip.date, passengers: "1" } } as never);
                     }}
                   >
                     <Feather name="search" size={13} color={isTop ? "white" : Colors.light.primary} />

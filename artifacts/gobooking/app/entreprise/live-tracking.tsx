@@ -12,7 +12,14 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from "react-native-maps";
+
+const IS_WEB = Platform.OS === "web";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const MapNative = IS_WEB ? null : (() => { try { return require("react-native-maps"); } catch { return null; } })();
+const MapView = MapNative?.default ?? View;
+const Marker = MapNative?.Marker ?? View;
+const Polyline = MapNative?.Polyline ?? View;
+const PROVIDER_DEFAULT = MapNative?.PROVIDER_DEFAULT ?? null;
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
@@ -74,7 +81,7 @@ function secondsAgo(ts: number | null): string {
 export default function LiveTrackingScreen() {
   const { token } = useAuth();
   const insets    = useSafeAreaInsets();
-  const mapRef    = useRef<MapView>(null);
+  const mapRef    = useRef<any>(null);
 
   const [buses,      setBuses]      = useState<LiveBus[]>([]);
   const [selected,   setSelected]   = useState<string | null>(null);
@@ -180,44 +187,53 @@ export default function LiveTrackingScreen() {
       ) : (
         <>
           {/* ── Map ── */}
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            provider={PROVIDER_DEFAULT}
-            initialRegion={ABIDJAN}
-            showsUserLocation={false}
-            showsCompass
-          >
-            {/* GPS trail for selected bus */}
-            {selected && history.length > 1 && (
-              <Polyline
-                coordinates={history.map(h => ({ latitude: h.lat, longitude: h.lon }))}
-                strokeColor="#0B3C5D"
-                strokeWidth={2}
-                lineDashPattern={[4, 3]}
-              />
-            )}
-
-            {/* Bus markers */}
-            {busesWithGps.map(bus => (
-              <Marker
-                key={bus.tripId}
-                coordinate={{ latitude: bus.gps!.lat, longitude: bus.gps!.lon }}
-                onPress={() => selectBus(bus.tripId)}
-              >
-                <View style={[styles.markerContainer, { borderColor: busColor(bus) }]}>
-                  <View style={[styles.markerDot, { backgroundColor: busColor(bus) }]}>
-                    <Feather name="truck" size={12} color="#fff" />
+          {IS_WEB ? (
+            <View style={[styles.map, { justifyContent: "center", alignItems: "center", backgroundColor: "#E8F4FD" }]}>
+              <Feather name="map" size={48} color="#94A3B8" />
+              <Text style={{ color: "#64748B", fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 10, textAlign: "center", paddingHorizontal: 20 }}>
+                Carte disponible uniquement sur l'application mobile
+              </Text>
+              <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 4 }}>
+                {busesWithGps.length} bus en circulation
+              </Text>
+            </View>
+          ) : (
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={PROVIDER_DEFAULT}
+              initialRegion={ABIDJAN}
+              showsUserLocation={false}
+              showsCompass
+            >
+              {selected && history.length > 1 && (
+                <Polyline
+                  coordinates={history.map(h => ({ latitude: h.lat, longitude: h.lon }))}
+                  strokeColor="#0B3C5D"
+                  strokeWidth={2}
+                  lineDashPattern={[4, 3]}
+                />
+              )}
+              {busesWithGps.map(bus => (
+                <Marker
+                  key={bus.tripId}
+                  coordinate={{ latitude: bus.gps!.lat, longitude: bus.gps!.lon }}
+                  onPress={() => selectBus(bus.tripId)}
+                >
+                  <View style={[styles.markerContainer, { borderColor: busColor(bus) }]}>
+                    <View style={[styles.markerDot, { backgroundColor: busColor(bus) }]}>
+                      <Feather name="truck" size={12} color="#fff" />
+                    </View>
+                    <View style={[styles.markerLabel, { backgroundColor: busColor(bus) }]}>
+                      <Text style={styles.markerName} numberOfLines={1}>
+                        {bus.busName.length > 10 ? bus.busName.slice(0, 10) + "…" : bus.busName}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={[styles.markerLabel, { backgroundColor: busColor(bus) }]}>
-                    <Text style={styles.markerName} numberOfLines={1}>
-                      {bus.busName.length > 10 ? bus.busName.slice(0, 10) + "…" : bus.busName}
-                    </Text>
-                  </View>
-                </View>
-              </Marker>
-            ))}
-          </MapView>
+                </Marker>
+              ))}
+            </MapView>
+          )}
 
           {/* ── Stats bar ── */}
           {StatsBar}
