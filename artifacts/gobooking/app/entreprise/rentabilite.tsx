@@ -81,6 +81,19 @@ export default function RentabiliteScreen() {
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  /* ── Simulateur de gain ── */
+  const [simOpen, setSimOpen] = useState(true);
+  const [simPrix, setSimPrix] = useState("5000");
+  const [simPlaces, setSimPlaces] = useState("70");
+  const [simTaux, setSimTaux] = useState("80");
+
+  const gainEstime = (() => {
+    const prix = parseFloat(simPrix) || 0;
+    const places = parseInt(simPlaces) || 0;
+    const taux = Math.min(Math.max(parseFloat(simTaux) || 0, 0), 100) / 100;
+    return Math.round(prix * places * taux);
+  })();
+
   const [showAddExp, setShowAddExp] = useState(false);
   const [addTarget, setAddTarget] = useState<TripRent | null>(null);
   const [expType, setExpType] = useState("carburant");
@@ -192,6 +205,107 @@ export default function RentabiliteScreen() {
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
         >
+          {/* ── Simulateur de gain ── */}
+          <View style={S.simCard}>
+            <Pressable style={S.simHeader} onPress={() => setSimOpen(o => !o)}>
+              <View style={S.simTitleRow}>
+                <View style={S.simIconBox}>
+                  <Text style={{ fontSize: 16 }}>🔮</Text>
+                </View>
+                <View>
+                  <Text style={S.simTitle}>Simulateur de gain</Text>
+                  <Text style={S.simSub}>Estimez le revenu d'un trajet</Text>
+                </View>
+              </View>
+              <Feather name={simOpen ? "chevron-up" : "chevron-down"} size={16} color="#94A3B8" />
+            </Pressable>
+
+            {simOpen && (
+              <View style={S.simBody}>
+                {/* Inputs row */}
+                <View style={S.simInputGrid}>
+                  <View style={S.simInputBlock}>
+                    <Text style={S.simLabel}>Prix ticket (FCFA)</Text>
+                    <View style={S.simInputWrap}>
+                      <Text style={S.simInputPrefix}>💰</Text>
+                      <TextInput
+                        style={S.simInput}
+                        value={simPrix}
+                        onChangeText={setSimPrix}
+                        keyboardType="numeric"
+                        placeholder="5000"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                  </View>
+                  <View style={S.simInputBlock}>
+                    <Text style={S.simLabel}>Total places</Text>
+                    <View style={S.simInputWrap}>
+                      <Text style={S.simInputPrefix}>💺</Text>
+                      <TextInput
+                        style={S.simInput}
+                        value={simPlaces}
+                        onChangeText={setSimPlaces}
+                        keyboardType="numeric"
+                        placeholder="70"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Taux slider row */}
+                <View style={S.simTauxRow}>
+                  <Text style={S.simLabel}>Taux de remplissage</Text>
+                  <View style={S.simTauxPills}>
+                    {["50", "60", "70", "80", "90", "100"].map(v => (
+                      <Pressable
+                        key={v}
+                        style={[S.simPill, simTaux === v && S.simPillActive]}
+                        onPress={() => setSimTaux(v)}
+                      >
+                        <Text style={[S.simPillText, simTaux === v && { color: "#fff" }]}>{v}%</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <View style={S.simInputWrapFull}>
+                    <TextInput
+                      style={[S.simInput, { textAlign: "center" }]}
+                      value={simTaux}
+                      onChangeText={setSimTaux}
+                      keyboardType="numeric"
+                      placeholder="80"
+                      placeholderTextColor="#CBD5E1"
+                    />
+                    <Text style={S.simPct}>%</Text>
+                  </View>
+                </View>
+
+                {/* Formula reminder */}
+                <View style={S.simFormula}>
+                  <Text style={S.simFormulaText}>
+                    {simPrix || "?"} × {simPlaces || "?"} × {simTaux || "?"}% = gain estimé
+                  </Text>
+                </View>
+
+                {/* Result */}
+                <View style={[S.simResult, { backgroundColor: gainEstime > 0 ? "#F0FDF4" : "#F8FAFC", borderColor: gainEstime > 0 ? "#BBF7D0" : "#E2E8F0" }]}>
+                  <Text style={S.simResultLabel}>Gain estimé</Text>
+                  <Text style={[S.simResultVal, { color: gainEstime > 0 ? PROFIT_GREEN : "#94A3B8" }]}>
+                    {gainEstime > 0 ? fmt(gainEstime) : "—"}
+                  </Text>
+                  {gainEstime > 0 && (
+                    <Text style={S.simResultHint}>
+                      soit {Math.round(gainEstime / Math.max(parseInt(simPlaces) || 1, 1)).toLocaleString("fr-FR")} FCFA / place
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+
+          {trips.length > 0 && <Text style={S.sectionLabel}>Trajets analysés</Text>}
+
           {trips.map(trip => {
             const profit = trip.benefice >= 0;
             const isOpen = expanded === trip.tripId;
@@ -445,4 +559,33 @@ const S = StyleSheet.create({
   cancelText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
   saveBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: PRIMARY, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   saveText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+
+  /* Simulateur */
+  sectionLabel: { fontSize: 11, fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 6, marginBottom: 2 },
+  simCard: { backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6, elevation: 3, borderWidth: 1.5, borderColor: "#E0F2FE" },
+  simHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14 },
+  simTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  simIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F0F9FF", alignItems: "center", justifyContent: "center" },
+  simTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  simSub: { fontSize: 11, color: "#64748B", marginTop: 1 },
+  simBody: { borderTopWidth: 1, borderTopColor: "#F1F5F9", padding: 14, gap: 12 },
+  simInputGrid: { flexDirection: "row", gap: 10 },
+  simInputBlock: { flex: 1, gap: 6 },
+  simLabel: { fontSize: 11, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.6 },
+  simInputWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 10, paddingVertical: 10, gap: 6 },
+  simInputWrapFull: { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: 8, gap: 4, marginTop: 8, alignSelf: "center", minWidth: 90 },
+  simInputPrefix: { fontSize: 14 },
+  simInput: { flex: 1, fontSize: 14, color: "#0F172A", fontWeight: "600" },
+  simPct: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+  simTauxRow: { gap: 8 },
+  simTauxPills: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  simPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+  simPillActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  simPillText: { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  simFormula: { backgroundColor: "#FFF7ED", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 1, borderColor: "#FED7AA" },
+  simFormulaText: { fontSize: 12, fontWeight: "600", color: "#92400E", textAlign: "center" },
+  simResult: { borderRadius: 14, borderWidth: 1.5, padding: 16, alignItems: "center", gap: 4 },
+  simResultLabel: { fontSize: 11, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8 },
+  simResultVal: { fontSize: 26, fontWeight: "900" },
+  simResultHint: { fontSize: 11, color: "#64748B", marginTop: 2 },
 });
