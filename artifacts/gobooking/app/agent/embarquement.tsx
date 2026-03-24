@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking,
+  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -55,7 +56,38 @@ export default function EmbarquementScreen() {
   const [scanMode, setScanMode]         = useState(false);
   const [scanned, setScanned]           = useState(false);
 
-  /* ── Billet lookup (existing flow) ────────────────── */
+  /* ── Unified scan result overlay ──────────────────── */
+  type ScanResultType = {
+    type: "validé" | "double" | "refusé";
+    name?:   string;
+    seat?:   string;
+    seats?:  string[];
+    count?:  number;
+    from?:   string;
+    to?:     string;
+    ref?:    string;
+    errorMsg?: string;
+  };
+  const [scanResult, setScanResult] = useState<ScanResultType | null>(null);
+  const [scanBusy,   setScanBusy]   = useState(false);
+  const scanAnim = useRef(new Animated.Value(0)).current;
+
+  const showScanResult = (result: ScanResultType) => {
+    setScanResult(result);
+    scanAnim.setValue(0);
+    Animated.spring(scanAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 8 }).start();
+    if (result.type === "validé") {
+      setTimeout(resetScanResult, 4000);
+    }
+  };
+
+  const resetScanResult = () => {
+    setScanResult(null);
+    setScanned(false);
+    setScanBusy(false);
+  };
+
+  /* ── Billet lookup (manual search fallback) ────────── */
   const [search, setSearch]       = useState("");
   const [loading, setLoading]     = useState(false);
   const [validating, setValidating] = useState(false);
@@ -201,33 +233,97 @@ export default function EmbarquementScreen() {
     }
   }, [enRouteScanBusy, enRouteList, token]);
 
-  /* ── Existing billet flow ─────────────────────────── */
+  /* ── Unified QR scan → validate → board in one step ── */
   const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
-    if (scanned) return;
+    if (scanned || scanBusy) return;
     setScanMode(false);
+    setScanBusy(true);
 
-    /* 1. Validate QR signature */
+    /* 1. Quick client-side QR validation (before hitting API) */
     const qrResult = validateQR(data.trim());
     if (!qrResult.valid) {
-      setInvalidQR(qrErrorMessage(qrResult.reason));
-      setScanned(false);
+      setScanBusy(false);
+      showScanResult({ type: "refusé", errorMsg: qrErrorMessage(qrResult.reason) });
       return;
     }
 
-    const ref = qrResult.ref;
-
-    /* 2. Anti-duplicate: block if already scanned this session */
-    const duplicate = await isAlreadyScanned(ref);
+    /* 2. Anti-duplicate session guard */
+    const duplicate = await isAlreadyScanned(qrResult.ref);
     if (duplicate) {
-      setIsDuplicate(true);
-      setScanned(false);
+      setScanBusy(false);
+      showScanResult({ type: "double", errorMsg: "Ce billet a déjà été scanné dans cette session." });
       return;
     }
 
     setScanned(true);
-    await markAsScanned(ref);
-    await lookupPassenger(ref);
-  }, [scanned]);
+    await markAsScanned(qrResult.ref);
+
+    /* 3. Offline fallback */
+    if (!networkStatus.isOnline) {
+      await saveOffline({
+        type: "scan",
+        payload: { qrData: data.trim() },
+        token: token ?? "",
+        createdAt: Date.now(),
+      });
+      setScanBusy(false);
+      showScanResult({
+        type: "validé",
+        name: "Passager (hors-ligne)",
+        ref: qrResult.ref,
+        errorMsg: "Validé hors-ligne — synchronisation en attente.",
+      });
+      return;
+    }
+
+    /* 4. Unified scan endpoint: validate + board in one request */
+    try {
+      const res = await apiFetch<{
+        success: boolean;
+        bookingRef: string;
+        passenger: {
+          name: string; seat: string; seats: string[]; count: number;
+          from: string; to: string; departureTime: string; date: string;
+          busName: string; totalAmount: number; paymentMethod: string;
+        };
+        error?: string; code?: string;
+      }>("/agent/scan", {
+        token: token ?? undefined,
+        method: "POST",
+        body: { qrData: data.trim() },
+      });
+
+      setScanBusy(false);
+      notifyEmbarquementValide({}).catch(() => {});
+      showScanResult({
+        type:  "validé",
+        name:  res.passenger?.name,
+        seat:  res.passenger?.seat,
+        seats: res.passenger?.seats,
+        count: res.passenger?.count,
+        from:  res.passenger?.from,
+        to:    res.passenger?.to,
+        ref:   res.bookingRef,
+      });
+    } catch (e: any) {
+      setScanBusy(false);
+      const code = e?.code as string | undefined;
+      if (code === "DOUBLE_SCAN") {
+        showScanResult({
+          type:     "double",
+          name:     e?.passenger?.name,
+          seat:     e?.passenger?.seat,
+          ref:      e?.bookingRef,
+          errorMsg: "Ce billet a déjà été validé — passager déjà embarqué.",
+        });
+      } else {
+        showScanResult({
+          type:     "refusé",
+          errorMsg: e?.message ?? e?.error ?? "Billet invalide ou réservation introuvable.",
+        });
+      }
+    }
+  }, [scanned, scanBusy, networkStatus.isOnline, token]);
 
   const lookupPassenger = async (ref: string) => {
     setLoading(true);
@@ -343,7 +439,142 @@ export default function EmbarquementScreen() {
           <Ionicons name="close-circle" size={44} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.scanHint}>{hint}</Text>
+        {/* Scan busy spinner */}
+        {scanBusy && (
+          <View style={{
+            position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={{ color: "#fff", marginTop: 12, fontSize: 15 }}>Validation…</Text>
+          </View>
+        )}
       </View>
+    );
+  }
+
+  /* ── Scan result fullscreen overlay ─────────────────── */
+  if (scanResult) {
+    const isOk     = scanResult.type === "validé";
+    const isDouble = scanResult.type === "double";
+    const bgColor  = isOk ? "#065F46" : isDouble ? "#78350F" : "#7F1D1D";
+    const iconName = isOk ? "checkmark-circle" : isDouble ? "alert-circle" : "close-circle";
+    const iconColor= isOk ? "#34D399" : isDouble ? "#FCD34D" : "#FCA5A5";
+    const label    = isOk ? "VALIDÉ" : isDouble ? "DOUBLE SCAN" : "REFUSÉ";
+    const labelColor = isOk ? "#ECFDF5" : isDouble ? "#FEF3C7" : "#FEF2F2";
+
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, alignItems: "center", justifyContent: "center" }} edges={["top", "bottom"]}>
+        <StatusBar barStyle="light-content" backgroundColor={bgColor} />
+
+        <Animated.View style={{
+          alignItems: "center",
+          transform: [{ scale: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
+          opacity: scanAnim,
+          width: "85%",
+        }}>
+          {/* Big icon */}
+          <Ionicons name={iconName} size={100} color={iconColor} />
+
+          {/* Status label */}
+          <Text style={{
+            fontSize: 36, fontWeight: "900", letterSpacing: 4,
+            color: labelColor, marginTop: 16, marginBottom: 24,
+          }}>
+            {label}
+          </Text>
+
+          {/* Passenger info (success + double) */}
+          {(isOk || isDouble) && scanResult.name && (
+            <View style={{
+              backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 16,
+              padding: 20, width: "100%", gap: 10, marginBottom: 16,
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Ionicons name="person-circle" size={28} color={iconColor} />
+                <Text style={{ fontSize: 20, fontWeight: "700", color: "#fff" }}>
+                  {scanResult.name}
+                </Text>
+              </View>
+
+              {scanResult.seat && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="ticket" size={18} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 15 }}>
+                    {scanResult.seats && scanResult.seats.length > 1
+                      ? `Sièges : ${scanResult.seats.join(", ")} (${scanResult.count} passagers)`
+                      : `Siège : ${scanResult.seat}`}
+                  </Text>
+                </View>
+              )}
+
+              {scanResult.from && scanResult.from !== "—" && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="location" size={18} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 15 }}>
+                    {scanResult.from} → {scanResult.to}
+                  </Text>
+                </View>
+              )}
+
+              {scanResult.ref && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="barcode" size={18} color="rgba(255,255,255,0.6)" />
+                  <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, letterSpacing: 1 }}>
+                    Réf : {scanResult.ref}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Error message (refusé + double) */}
+          {scanResult.errorMsg && !isOk && (
+            <View style={{
+              backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12,
+              padding: 14, width: "100%", marginBottom: 16,
+            }}>
+              <Text style={{ color: labelColor, fontSize: 14, textAlign: "center", lineHeight: 20 }}>
+                {scanResult.errorMsg}
+              </Text>
+            </View>
+          )}
+
+          {/* Offline note for validé */}
+          {isOk && scanResult.errorMsg && (
+            <View style={{
+              backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12,
+              padding: 10, width: "100%", marginBottom: 16,
+            }}>
+              <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, textAlign: "center" }}>
+                {scanResult.errorMsg}
+              </Text>
+            </View>
+          )}
+
+          {/* Auto-dismiss info */}
+          {isOk && (
+            <Text style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, marginBottom: 20 }}>
+              Fermeture automatique dans 4 secondes…
+            </Text>
+          )}
+
+          {/* Manual dismiss */}
+          <TouchableOpacity
+            onPress={resetScanResult}
+            style={{
+              backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 30,
+              paddingHorizontal: 36, paddingVertical: 14, borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.25)",
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+              Nouveau scan
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
     );
   }
 

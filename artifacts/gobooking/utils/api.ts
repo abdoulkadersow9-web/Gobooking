@@ -21,9 +21,9 @@ function fetchWithTimeout(
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit & { token?: string; timeoutMs?: number } = {}
+  options: (Omit<RequestInit, "body"> & { token?: string; timeoutMs?: number; body?: unknown }) = {}
 ): Promise<T> {
-  const { token, timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = options;
+  const { token, timeoutMs = DEFAULT_TIMEOUT_MS, body, ...rest } = options;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -31,11 +31,19 @@ export async function apiFetch<T>(
     ...(rest.headers as Record<string, string> | undefined),
   };
 
+  /* Auto-serialize plain-object bodies to JSON */
+  const serializedBody: BodyInit | null | undefined =
+    body === undefined || body === null
+      ? undefined
+      : typeof body === "string" || body instanceof Blob || body instanceof FormData
+        ? (body as BodyInit)
+        : JSON.stringify(body);
+
   let res: Response;
   try {
     res = await fetchWithTimeout(
       `${BASE_URL}${path}`,
-      { ...rest, headers },
+      { ...rest, body: serializedBody, headers },
       timeoutMs
     );
   } catch (err: unknown) {
@@ -46,8 +54,11 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-    throw new Error(error.error || `HTTP ${res.status}`);
+    const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    const err = new Error(body.error || `HTTP ${res.status}`) as Error & Record<string, unknown>;
+    /* Preserve all server fields (code, bookingRef, passenger, …) on the error object */
+    Object.assign(err, body);
+    throw err;
   }
 
   return res.json();
