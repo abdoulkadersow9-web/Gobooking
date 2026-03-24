@@ -13,7 +13,8 @@ import { apiFetch } from "@/utils/api";
 import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
-export type AgentRole = "embarquement" | "reception_colis" | "vente" | "validation" | "route";
+export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis"
+  | "embarquement" | "reception_colis" | "vente" | "validation" | "route";
 
 export interface User {
   id: string;
@@ -32,28 +33,34 @@ export interface User {
 }
 
 export function getAgentPath(agentRole?: AgentRole | null): string {
-  if (agentRole === "embarquement")    return "/agent/embarquement";
-  if (agentRole === "reception_colis") return "/agent/reception-colis";
-  if (agentRole === "vente")           return "/agent/vente";
-  if (agentRole === "validation")      return "/agent/validation";
-  if (agentRole === "route")           return "/agent/route";
+  if (agentRole === "agent_ticket"       || agentRole === "vente")           return "/agent/tickets";
+  if (agentRole === "agent_embarquement" || agentRole === "embarquement")    return "/agent/embarquement";
+  if (agentRole === "agent_colis"        || agentRole === "reception_colis") return "/agent/colis";
+  if (agentRole === "validation")        return "/agent/validation";
+  if (agentRole === "route")             return "/agent/route";
   return "/agent/home";
 }
 
 export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
-  embarquement:    "Agent embarquement",
-  reception_colis: "Agent colis",
-  vente:           "Agent vente ticket",
-  validation:      "Agent validation",
-  route:           "Agent en route",
+  agent_ticket:       "Agent Ticketing",
+  agent_embarquement: "Agent Embarquement",
+  agent_colis:        "Agent Colis",
+  embarquement:       "Agent Embarquement",
+  reception_colis:    "Agent Colis",
+  vente:              "Agent Ticketing",
+  validation:         "Agent Validation",
+  route:              "Agent En Route",
 };
 
 export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
-  embarquement:    { bg: "#DBEAFE", text: "#1E40AF" },
-  reception_colis: { bg: "#FEF3C7", text: "#92400E" },
-  vente:           { bg: "#DCFCE7", text: "#166534" },
-  validation:      { bg: "#F3E8FF", text: "#6B21A8" },
-  route:           { bg: "#FFE4CC", text: "#9A3412" },
+  agent_ticket:       { bg: "#FEF3C7", text: "#D97706" },
+  agent_embarquement: { bg: "#DCFCE7", text: "#166534" },
+  agent_colis:        { bg: "#EDE9FE", text: "#7C3AED" },
+  embarquement:       { bg: "#DCFCE7", text: "#166534" },
+  reception_colis:    { bg: "#EDE9FE", text: "#7C3AED" },
+  vente:              { bg: "#FEF3C7", text: "#D97706" },
+  validation:         { bg: "#F3E8FF", text: "#6B21A8" },
+  route:              { bg: "#FFE4CC", text: "#9A3412" },
 };
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {

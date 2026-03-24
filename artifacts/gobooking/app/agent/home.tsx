@@ -16,15 +16,34 @@ import { apiFetch } from "@/utils/api";
 const GREEN = "#166534";
 const GREEN_LIGHT = "#F0FDF4";
 
-const AGENT_MENUS = [
-  { id: "embarquement",    label: "Embarquement",    icon: "🚌", path: "/agent/embarquement",   desc: "Scanner les billets voyageurs" },
-  { id: "vente",           label: "Vente de billets", icon: "🎫", path: "/agent/vente",          desc: "Vendre un billet au guichet" },
-  { id: "reception_colis", label: "Réception colis",  icon: "📦", path: "/agent/reception-colis",desc: "Réceptionner un colis arrivé" },
-  { id: "validation",      label: "Validation",       icon: "✅", path: "/agent/validation",     desc: "Valider les documents" },
-  { id: "route",           label: "Suivi trajet",     icon: "🗺️", path: "/agent/route",          desc: "Suivre le trajet en cours" },
-  { id: "scan",            label: "Scanner QR",       icon: "📷", path: "/agent/scan",           desc: "Scanner un code QR" },
-  { id: "gains",           label: "Mes gains",        icon: "💰", path: "/agent/gains",          desc: "Commissions et validations" },
-  { id: "securite",        label: "Sécurité / SOS",  icon: "🚨", path: "/agent/securite",       desc: "Alertes urgence, panne, SOS", urgent: true },
+const ROLE_TILES = [
+  {
+    role: "agent_ticket" as AgentRole,
+    label: "Vente de billets",
+    icon: "🎫",
+    path: "/agent/tickets",
+    desc: "Vendre un billet au guichet",
+    color: "#D97706",
+    bg: "#FEF3C7",
+  },
+  {
+    role: "agent_embarquement" as AgentRole,
+    label: "Embarquement",
+    icon: "🚌",
+    path: "/agent/embarquement",
+    desc: "Scanner billets et gérer l'embarquement",
+    color: "#166534",
+    bg: "#DCFCE7",
+  },
+  {
+    role: "agent_colis" as AgentRole,
+    label: "Gestion colis",
+    icon: "📦",
+    path: "/agent/colis",
+    desc: "Créer, réceptionner et suivre les colis",
+    color: "#7C3AED",
+    bg: "#EDE9FE",
+  },
 ];
 
 interface BusInfo {
@@ -56,11 +75,15 @@ export default function AgentHome() {
       .finally(() => setBusLoading(false));
   }, [token]);
 
-  const filteredMenus = AGENT_MENUS.filter((m) => {
-    if (!user?.agentRole) return true;
-    if (m.id === "scan" || m.id === "gains" || m.id === "securite") return true;
-    return m.id === user.agentRole;
-  });
+  useEffect(() => {
+    if (!user?.agentRole) return;
+    const role = user.agentRole;
+    if (role === "agent_ticket"       || role === "vente")           { router.replace("/agent/tickets" as never); return; }
+    if (role === "agent_embarquement" || role === "embarquement")    { router.replace("/agent/embarquement" as never); return; }
+    if (role === "agent_colis"        || role === "reception_colis") { router.replace("/agent/colis" as never); return; }
+  }, [user?.agentRole]);
+
+  const roleLabel = user?.agentRole ? (AGENT_ROLE_LABELS[user.agentRole as AgentRole] ?? user.agentRole) : null;
 
   return (
     <SafeAreaView style={S.safe}>
@@ -68,9 +91,7 @@ export default function AgentHome() {
         <View>
           <Text style={S.hello}>Bonjour,</Text>
           <Text style={S.name}>{user?.name ?? "Agent"}</Text>
-          {user?.agentRole && (
-            <Text style={S.role}>{AGENT_ROLE_LABELS[user.agentRole as AgentRole] ?? user.agentRole}</Text>
-          )}
+          {roleLabel && <Text style={S.role}>{roleLabel}</Text>}
         </View>
         <Pressable onPress={logout} style={S.logoutBtn}>
           <Text style={S.logoutTxt}>Déconnexion</Text>
@@ -78,7 +99,6 @@ export default function AgentHome() {
       </View>
 
       <View style={S.body}>
-        {/* ── Mon Bus Card ── */}
         <View style={S.busCard}>
           <View style={S.busCardLeft}>
             <View style={S.busIconBox}>
@@ -106,17 +126,17 @@ export default function AgentHome() {
           )}
         </View>
 
-        <Text style={S.sectionTitle}>Mes actions</Text>
+        <Text style={S.sectionTitle}>Espaces agents</Text>
         <View style={S.grid}>
-          {filteredMenus.map((item) => (
+          {ROLE_TILES.map((tile) => (
             <Pressable
-              key={item.id}
-              style={[S.tile, (item as any).urgent && S.tileUrgent]}
-              onPress={() => router.push(item.path as never)}
+              key={tile.role}
+              style={[S.tile, { borderLeftColor: tile.color, borderLeftWidth: 4 }]}
+              onPress={() => router.push(tile.path as never)}
             >
-              <Text style={S.tileIcon}>{item.icon}</Text>
-              <Text style={[S.tileLabel, (item as any).urgent && { color: "#DC2626" }]}>{item.label}</Text>
-              <Text style={S.tileDesc}>{item.desc}</Text>
+              <Text style={S.tileIcon}>{tile.icon}</Text>
+              <Text style={[S.tileLabel, { color: tile.color }]}>{tile.label}</Text>
+              <Text style={S.tileDesc}>{tile.desc}</Text>
             </Pressable>
           ))}
         </View>
@@ -140,7 +160,7 @@ const S = StyleSheet.create({
 
   busCard: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 16,
+    backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 20,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
     borderLeftWidth: 4, borderLeftColor: GREEN,
@@ -155,12 +175,11 @@ const S = StyleSheet.create({
   busAssignedText: { fontSize: 11, fontWeight: "600", color: GREEN },
 
   sectionTitle:{ fontSize: 16, fontWeight: "700", color: GREEN, marginBottom: 12 },
-  grid:        { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  tile:        { width: "47%", backgroundColor: "white", borderRadius: 14, padding: 16,
+  grid:        { gap: 12 },
+  tile:        { backgroundColor: "white", borderRadius: 14, padding: 18,
                  elevation: 2, shadowColor: "#000", shadowOpacity: 0.06,
                  shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-  tileUrgent:  { backgroundColor: "#FFF1F2", borderWidth: 1.5, borderColor: "#FECDD3" },
-  tileIcon:    { fontSize: 28, marginBottom: 8 },
-  tileLabel:   { fontSize: 15, fontWeight: "700", color: GREEN },
-  tileDesc:    { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  tileIcon:    { fontSize: 32, marginBottom: 8 },
+  tileLabel:   { fontSize: 17, fontWeight: "700" },
+  tileDesc:    { fontSize: 13, color: "#6b7280", marginTop: 4 },
 });

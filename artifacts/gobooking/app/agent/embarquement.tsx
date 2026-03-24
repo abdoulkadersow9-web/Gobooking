@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { router } from "expo-router";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { notifyEmbarquementValide } from "@/services/notificationService";
@@ -86,6 +87,9 @@ type MainTab = "billets" | "en_route" | "depart";
 export default function EmbarquementScreen() {
   const { user, token } = useAuth();
   const networkStatus   = useNetworkStatus(BASE_URL);
+
+  const isEmbarquementAgent = !user?.agentRole ||
+    user.agentRole === "agent_embarquement" || user.agentRole === "embarquement";
 
   /* ── Agent GPS broadcasting ─────────────────────────── */
   const [activeTripIdForGps, setActiveTripIdForGps] = useState<string | null>(null);
@@ -844,6 +848,21 @@ export default function EmbarquementScreen() {
             </Text>
           </TouchableOpacity>
         </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isEmbarquementAgent) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
+        <StatusBar barStyle="dark-content" />
+        <Text style={{ fontSize: 48 }}>🔒</Text>
+        <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>Accès non autorisé</Text>
+        <Text style={{ fontSize: 14, color: "#6B7280", textAlign: "center" }}>Cet écran est réservé aux agents d'embarquement.</Text>
+        <TouchableOpacity style={{ backgroundColor: G, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}
+          onPress={() => router.replace("/agent/home" as never)}>
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Retour</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
   }
