@@ -9,6 +9,17 @@ export interface PassengerInfo {
   seatNumber: string;
 }
 
+export type BagageType = "valise" | "sac" | "colis" | "autre";
+
+export interface BagageInfo {
+  id: string;
+  type: BagageType;
+  poids: number;
+  imageUri?: string;
+  imageUrl?: string;
+  prix: number;
+}
+
 export interface BookingState {
   tripId: string;
   selectedSeats: string[];
@@ -18,6 +29,8 @@ export interface BookingState {
   contactEmail: string;
   contactPhone: string;
   totalAmount: number;
+  bagages: BagageInfo[];
+  bagagePrice: number;
 }
 
 interface BookingContextType {

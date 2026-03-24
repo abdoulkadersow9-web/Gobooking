@@ -112,6 +112,10 @@ async function getFullBooking(bookingId: string) {
     status: booking.status,
     contactEmail: booking.contactEmail,
     contactPhone: booking.contactPhone,
+    bagages: (booking as any).bagages || [],
+    bagageStatus: (booking as any).bagageStatus || null,
+    bagagePrice: (booking as any).bagagePrice || 0,
+    bagageNote: (booking as any).bagageNote || null,
     createdAt: booking.createdAt?.toISOString() || new Date().toISOString(),
   };
 }
@@ -139,12 +143,14 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId } = req.body;
+    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
       res.status(400).json({ error: "Champs requis manquants" });
       return;
     }
+
+    const bagageList: { id: string; type: string; poids: number; imageUrl?: string; prix: number }[] = Array.isArray(bagages) ? bagages : [];
 
     /* ── Vérification atomique anti double-réservation ─────────────────────
        Pour chaque siège, on tente une mise à jour WHERE status != 'booked'.
@@ -191,6 +197,8 @@ router.post("/", async (req, res) => {
 
     let totalAmount = seatsData.reduce((sum, s) => sum + s.price, 0);
     const seatNumbers = seatsData.map((s) => s.number);
+    const bagagePrice = bagageList.reduce((sum, b) => sum + (b.prix || 0), 0);
+    totalAmount += bagagePrice;
 
     /* ── Apply promo discount ──────────────────────────────────── */
     if (promoId) {
@@ -239,7 +247,10 @@ router.post("/", async (req, res) => {
         status: "pending",
         contactEmail,
         contactPhone,
-      });
+        bagages: bagageList as any,
+        bagageStatus: bagageList.length > 0 ? "en_attente" : null,
+        bagagePrice,
+      } as any);
 
     const bookingResult = await getFullBooking(newBookingId);
 
@@ -650,6 +661,93 @@ router.post("/:bookingId/cancel", async (req, res) => {
   } catch (err) {
     console.error("Cancel booking error:", err);
     res.status(500).json({ error: "Failed to cancel booking" });
+  }
+});
+
+/* ── Révision bagages par la compagnie ────────────────────────────────────
+   POST /bookings/:bookingId/baggage-review
+   Body: { decision: "accepté" | "refusé", note?: string }
+   Seul un utilisateur compagnie/company_admin peut accéder.
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/:bookingId/baggage-review", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const role = await getUserRole(userId);
+    if (!role || !["compagnie", "company_admin", "admin"].includes(role)) {
+      res.status(403).json({ error: "Accès refusé — réservé aux compagnies" });
+      return;
+    }
+
+    const { decision, note } = req.body;
+    if (!["accepté", "refusé"].includes(decision)) {
+      res.status(400).json({ error: "decision doit être 'accepté' ou 'refusé'" });
+      return;
+    }
+
+    const { bookingId } = req.params;
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+
+    await db.update(bookingsTable)
+      .set({ bagageStatus: decision, bagageNote: note || null } as any)
+      .where(eq(bookingsTable.id, bookingId));
+
+    auditLog({ userId, userRole: role, req }, ACTIONS.BOOKING_CONFIRM, bookingId, "booking", {
+      action: "baggage-review", decision, note,
+    }).catch(() => {});
+
+    const full = await getFullBooking(bookingId);
+    res.json(full);
+  } catch (err) {
+    console.error("Baggage review error:", err);
+    res.status(500).json({ error: "Échec de la révision bagages" });
+  }
+});
+
+/* ── Upload image bagage vers Firebase Storage ────────────────────────────
+   POST /bookings/upload-image
+   Body: { base64: string, mimeType?: string }
+   Returns: { url: string }
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/upload-image", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const { base64, mimeType = "image/jpeg" } = req.body;
+    if (!base64) { res.status(400).json({ error: "base64 requis" }); return; }
+
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) {
+      res.status(503).json({ error: "Firebase Storage non configuré" });
+      return;
+    }
+
+    const admin = await import("firebase-admin");
+    if (!admin.default.apps.length) {
+      res.status(503).json({ error: "Firebase non initialisé" });
+      return;
+    }
+
+    const bucket = admin.default.storage().bucket(`${projectId}.appspot.com`);
+    const fileName = `bagages/${userId}/${Date.now()}.jpg`;
+    const file = bucket.file(fileName);
+
+    const buffer = Buffer.from(base64, "base64");
+    await file.save(buffer, {
+      metadata: { contentType: mimeType },
+      resumable: false,
+    });
+
+    await file.makePublic();
+    const url = `https://storage.googleapis.com/${projectId}.appspot.com/${fileName}`;
+
+    res.json({ url });
+  } catch (err) {
+    console.error("Upload image error:", err);
+    res.status(500).json({ error: "Échec de l'upload" });
   }
 });
 

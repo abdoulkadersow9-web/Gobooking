@@ -1324,6 +1324,18 @@ router.post("/scan", async (req, res) => {
       }); return;
     }
 
+    /* ── 3c. Block scan if bagages are refused ── */
+    if ((booking as any).bagageStatus === "refusé") {
+      const firstP = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
+      res.status(422).json({
+        error:      "Embarquement refusé — les bagages de ce passager ont été refusés par la compagnie.",
+        code:       "BAGAGE_REFUS",
+        bookingRef: booking.bookingRef,
+        passenger:  { name: firstP?.name ?? "—", seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—" },
+        bagageNote: (booking as any).bagageNote || null,
+      }); return;
+    }
+
     /* ── 4. Fetch trip info ── */
     let trip = null;
     if (booking.tripId) {

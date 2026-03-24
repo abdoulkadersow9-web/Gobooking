@@ -1,5 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -11,25 +13,42 @@ import {
   Text,
   TextInput,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-import { useBooking } from "@/context/BookingContext";
+import { useBooking, type BagageInfo, type BagageType } from "@/context/BookingContext";
+import { apiFetch } from "@/utils/api";
+
+const PRIX_PAR_KG = 500; // FCFA par kg
+const MAX_BAGAGES = 5;
+
+const BAGAGE_TYPES: { value: BagageType; label: string; icon: string }[] = [
+  { value: "valise", label: "Valise",  icon: "briefcase" },
+  { value: "sac",    label: "Sac",     icon: "shopping-bag" },
+  { value: "colis",  label: "Colis",   icon: "package" },
+  { value: "autre",  label: "Autre",   icon: "box" },
+];
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
 
 export default function PassengersScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { booking, updateBooking } = useBooking();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const [passengers, setPassengers] = useState(
-    booking?.passengers || []
-  );
+  const [passengers, setPassengers] = useState(booking?.passengers || []);
   const [contactEmail, setContactEmail] = useState(user?.email || "");
   const [contactPhone, setContactPhone] = useState(user?.phone || "");
+  const [bagages, setBagages] = useState<BagageInfo[]>(booking?.bagages || []);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
 
+  /* ── helpers ─────────────────────────────────────────────────────── */
   const updatePassenger = (index: number, field: string, value: string) => {
     setPassengers((prev) => {
       const updated = [...prev];
@@ -38,64 +57,144 @@ export default function PassengersScreen() {
     });
   };
 
+  const bagagePrice = bagages.reduce((s, b) => s + b.prix, 0);
+  const ticketPrice = (booking?.totalAmount ?? 0) - (booking?.bagagePrice ?? 0);
+  const totalPrice  = ticketPrice + bagagePrice;
+
+  /* ── bagage actions ──────────────────────────────────────────────── */
+  const addBagage = () => {
+    if (bagages.length >= MAX_BAGAGES) {
+      Alert.alert("Maximum atteint", `Vous ne pouvez pas ajouter plus de ${MAX_BAGAGES} bagages.`);
+      return;
+    }
+    const newBag: BagageInfo = { id: generateId(), type: "valise", poids: 1, prix: PRIX_PAR_KG };
+    setBagages(prev => [...prev, newBag]);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const removeBagage = (id: string) => {
+    setBagages(prev => prev.filter(b => b.id !== id));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
+  const updateBagage = (id: string, field: keyof BagageInfo, value: any) => {
+    setBagages(prev => prev.map(b => {
+      if (b.id !== id) return b;
+      const updated = { ...b, [field]: value };
+      if (field === "poids") {
+        updated.prix = Math.max(1, Number(value) || 0) * PRIX_PAR_KG;
+      }
+      return updated;
+    }));
+  };
+
+  const pickImage = async (bagageId: string) => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission requise", "Autorisez l'accès à la galerie pour ajouter une photo.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.5,
+        base64: true,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUri: asset.uri } : b));
+
+      if (asset.base64) {
+        setUploadingId(bagageId);
+        try {
+          const resp = await apiFetch("/bookings/upload-image", {
+            token,
+            method: "POST",
+            body: JSON.stringify({ base64: asset.base64, mimeType: asset.mimeType || "image/jpeg" }),
+          });
+          if (resp.ok) {
+            const { url } = await resp.json();
+            setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUrl: url } : b));
+          }
+        } catch {
+          /* keep local URI only */
+        } finally {
+          setUploadingId(null);
+        }
+      }
+    } catch (e) {
+      Alert.alert("Erreur", "Impossible d'accéder à la galerie.");
+    }
+  };
+
+  /* ── continue ────────────────────────────────────────────────────── */
   const handleContinue = () => {
     for (const p of passengers) {
       if (!p.name.trim() || !p.age || !p.idNumber.trim()) {
-        Alert.alert("Error", "Please fill in all passenger details");
+        Alert.alert("Erreur", "Veuillez renseigner tous les champs passager.");
         return;
       }
     }
     if (!contactEmail.trim() || !contactPhone.trim()) {
-      Alert.alert("Error", "Please fill in contact details");
+      Alert.alert("Erreur", "Veuillez renseigner vos coordonnées de contact.");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    updateBooking({ passengers, contactEmail, contactPhone });
-    router.push("/payment");
+    updateBooking({
+      passengers,
+      contactEmail,
+      contactPhone,
+      bagages,
+      bagagePrice,
+      totalAmount: totalPrice,
+    });
+    router.push("/payment/cinetpay");
   };
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Passenger Details</Text>
+        <Text style={styles.headerTitle}>Détails du voyage</Text>
       </View>
 
       <ScrollView
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: 120,
-        }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Passengers ─────────────────────────────────────────────── */}
         {passengers.map((p, i) => (
-          <View key={i} style={styles.passengerCard}>
-            <View style={styles.passengerHeader}>
-              <View style={styles.passengerNum}>
-                <Text style={styles.passengerNumText}>{i + 1}</Text>
+          <View key={i} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.numBadge}>
+                <Text style={styles.numBadgeText}>{i + 1}</Text>
               </View>
               <View>
-                <Text style={styles.passengerTitle}>Passenger {i + 1}</Text>
-                <Text style={styles.seatInfo}>Seat {p.seatNumber}</Text>
+                <Text style={styles.cardTitle}>Passager {i + 1}</Text>
+                <Text style={styles.cardSub}>Siège {p.seatNumber}</Text>
               </View>
             </View>
 
             <View style={styles.fieldRow}>
               <View style={[styles.field, { flex: 2 }]}>
-                <Text style={styles.fieldLabel}>Full Name</Text>
+                <Text style={styles.fieldLabel}>Nom complet</Text>
                 <TextInput
                   style={styles.fieldInput}
-                  placeholder="John Smith"
+                  placeholder="Ex : Konan Yao"
                   placeholderTextColor={Colors.light.textMuted}
                   value={p.name}
                   onChangeText={(v) => updatePassenger(i, "name", v)}
                 />
               </View>
               <View style={[styles.field, { flex: 1 }]}>
-                <Text style={styles.fieldLabel}>Age</Text>
+                <Text style={styles.fieldLabel}>Âge</Text>
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="25"
@@ -108,24 +207,16 @@ export default function PassengersScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Gender</Text>
-              <View style={styles.genderRow}>
+              <Text style={styles.fieldLabel}>Genre</Text>
+              <View style={styles.chipRow}>
                 {(["male", "female", "other"] as const).map((g) => (
                   <Pressable
                     key={g}
-                    style={[
-                      styles.genderChip,
-                      p.gender === g && styles.genderChipActive,
-                    ]}
+                    style={[styles.chip, p.gender === g && styles.chipActive]}
                     onPress={() => updatePassenger(i, "gender", g)}
                   >
-                    <Text
-                      style={[
-                        styles.genderChipText,
-                        p.gender === g && styles.genderChipTextActive,
-                      ]}
-                    >
-                      {g.charAt(0).toUpperCase() + g.slice(1)}
+                    <Text style={[styles.chipText, p.gender === g && styles.chipTextActive]}>
+                      {g === "male" ? "Homme" : g === "female" ? "Femme" : "Autre"}
                     </Text>
                   </Pressable>
                 ))}
@@ -134,19 +225,16 @@ export default function PassengersScreen() {
 
             <View style={styles.fieldRow}>
               <View style={[styles.field, { flex: 1 }]}>
-                <Text style={styles.fieldLabel}>ID Type</Text>
-                <View style={styles.idTypeRow}>
+                <Text style={styles.fieldLabel}>Type pièce</Text>
+                <View style={styles.chipRow}>
                   {["passport", "license", "id card"].map((t) => (
                     <Pressable
                       key={t}
-                      style={[
-                        styles.idChip,
-                        p.idType === t && styles.idChipActive,
-                      ]}
+                      style={[styles.chip, p.idType === t && styles.chipActive]}
                       onPress={() => updatePassenger(i, "idType", t)}
                     >
-                      <Text style={[styles.idChipText, p.idType === t && styles.idChipTextActive]}>
-                        {t === "id card" ? "ID" : t.charAt(0).toUpperCase() + t.slice(1)}
+                      <Text style={[styles.chipText, p.idType === t && styles.chipTextActive]}>
+                        {t === "id card" ? "CNI" : t === "passport" ? "Passeport" : "Permis"}
                       </Text>
                     </Pressable>
                   ))}
@@ -155,10 +243,10 @@ export default function PassengersScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>ID Number</Text>
+              <Text style={styles.fieldLabel}>Numéro pièce</Text>
               <TextInput
                 style={styles.fieldInput}
-                placeholder="Enter ID number"
+                placeholder="Ex : CI12345678"
                 placeholderTextColor={Colors.light.textMuted}
                 value={p.idNumber}
                 onChangeText={(v) => updatePassenger(i, "idNumber", v)}
@@ -168,17 +256,18 @@ export default function PassengersScreen() {
           </View>
         ))}
 
-        <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>Contact Information</Text>
-          <Text style={styles.contactSubtitle}>Booking confirmation will be sent here</Text>
+        {/* ── Contact ─────────────────────────────────────────────────── */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Coordonnées</Text>
+          <Text style={styles.cardSub2}>La confirmation sera envoyée ici</Text>
 
           <View style={styles.field}>
             <Text style={styles.fieldLabel}>Email</Text>
-            <View style={styles.inputWithIcon}>
+            <View style={styles.inputIcon}>
               <Feather name="mail" size={15} color={Colors.light.textMuted} />
               <TextInput
                 style={styles.iconInput}
-                placeholder="you@example.com"
+                placeholder="vous@exemple.com"
                 placeholderTextColor={Colors.light.textMuted}
                 value={contactEmail}
                 onChangeText={setContactEmail}
@@ -189,12 +278,12 @@ export default function PassengersScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Phone</Text>
-            <View style={styles.inputWithIcon}>
+            <Text style={styles.fieldLabel}>Téléphone</Text>
+            <View style={styles.inputIcon}>
               <Feather name="phone" size={15} color={Colors.light.textMuted} />
               <TextInput
                 style={styles.iconInput}
-                placeholder="+1 (555) 000-0000"
+                placeholder="+225 07 00 00 00 00"
                 placeholderTextColor={Colors.light.textMuted}
                 value={contactPhone}
                 onChangeText={setContactPhone}
@@ -203,18 +292,133 @@ export default function PassengersScreen() {
             </View>
           </View>
         </View>
+
+        {/* ── Bagages ─────────────────────────────────────────────────── */}
+        <View style={styles.bagSection}>
+          <View style={styles.bagHeader}>
+            <View style={styles.bagTitleRow}>
+              <Feather name="package" size={16} color="#7C3AED" />
+              <Text style={styles.bagTitle}>Bagages</Text>
+              <View style={styles.bagOptional}>
+                <Text style={styles.bagOptionalText}>Optionnel</Text>
+              </View>
+            </View>
+            <Text style={styles.bagRate}>{PRIX_PAR_KG} FCFA/kg</Text>
+          </View>
+
+          {bagages.length === 0 && (
+            <View style={styles.bagEmpty}>
+              <Feather name="briefcase" size={28} color="#C4B5FD" />
+              <Text style={styles.bagEmptyText}>Aucun bagage ajouté</Text>
+              <Text style={styles.bagEmptySub}>Bagages soumis à validation avant départ</Text>
+            </View>
+          )}
+
+          {bagages.map((b, idx) => (
+            <View key={b.id} style={styles.bagCard}>
+              {/* Bag header */}
+              <View style={styles.bagCardHeader}>
+                <Text style={styles.bagCardTitle}>Bagage {idx + 1}</Text>
+                <Pressable style={styles.bagRemove} onPress={() => removeBagage(b.id)}>
+                  <Feather name="trash-2" size={15} color="#DC2626" />
+                </Pressable>
+              </View>
+
+              {/* Type selector */}
+              <Text style={styles.fieldLabel}>Type</Text>
+              <View style={[styles.chipRow, { marginBottom: 12 }]}>
+                {BAGAGE_TYPES.map(t => (
+                  <Pressable
+                    key={t.value}
+                    style={[styles.chip, b.type === t.value && styles.chipBagActive]}
+                    onPress={() => updateBagage(b.id, "type", t.value)}
+                  >
+                    <Feather name={t.icon as any} size={12} color={b.type === t.value ? "#7C3AED" : "#6B7280"} />
+                    <Text style={[styles.chipText, b.type === t.value && styles.chipTextBagActive]}>{t.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* Weight + price */}
+              <View style={styles.fieldRow}>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.fieldLabel}>Poids (kg)</Text>
+                  <TextInput
+                    style={styles.fieldInput}
+                    placeholder="Ex : 5"
+                    placeholderTextColor={Colors.light.textMuted}
+                    value={b.poids > 0 ? String(b.poids) : ""}
+                    onChangeText={(v) => updateBagage(b.id, "poids", Number(v) || 0)}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={[styles.field, { flex: 1 }]}>
+                  <Text style={styles.fieldLabel}>Prix estimé</Text>
+                  <View style={styles.prixBox}>
+                    <Text style={styles.prixValue}>{b.prix.toLocaleString()} FCFA</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Photo */}
+              <Text style={styles.fieldLabel}>Photo du bagage</Text>
+              <Pressable style={styles.photoBtn} onPress={() => pickImage(b.id)}>
+                {b.imageUri ? (
+                  <View style={styles.photoPreview}>
+                    <Image source={{ uri: b.imageUri }} style={styles.photoImg} contentFit="cover" />
+                    {uploadingId === b.id && (
+                      <View style={styles.photoOverlay}>
+                        <ActivityIndicator size="small" color="#fff" />
+                        <Text style={styles.photoOverlayTxt}>Upload…</Text>
+                      </View>
+                    )}
+                    {uploadingId !== b.id && b.imageUrl && (
+                      <View style={[styles.photoOverlay, styles.photoSuccess]}>
+                        <Feather name="check-circle" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Feather name="camera" size={20} color="#7C3AED" />
+                    <Text style={styles.photoPlaceholderTxt}>Ajouter une photo</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+          ))}
+
+          {bagages.length < MAX_BAGAGES && (
+            <Pressable style={styles.addBagBtn} onPress={addBagage}>
+              <Feather name="plus-circle" size={18} color="#7C3AED" />
+              <Text style={styles.addBagTxt}>Ajouter un bagage</Text>
+            </Pressable>
+          )}
+
+          {bagagePrice > 0 && (
+            <View style={styles.bagPriceRow}>
+              <Feather name="tag" size={14} color="#7C3AED" />
+              <Text style={styles.bagPriceLabel}>Bagages inclus :</Text>
+              <Text style={styles.bagPriceValue}>+{bagagePrice.toLocaleString()} FCFA</Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
 
+      {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
-          <Text style={styles.totalLabel}>Total Amount</Text>
-          <Text style={styles.totalAmount}>${booking?.totalAmount || 0}</Text>
+          <Text style={styles.totalLabel}>Total à payer</Text>
+          <Text style={styles.totalAmount}>{totalPrice.toLocaleString()} FCFA</Text>
+          {bagagePrice > 0 && (
+            <Text style={styles.totalSub}>dont {bagagePrice.toLocaleString()} FCFA bagages</Text>
+          )}
         </View>
         <Pressable
           style={({ pressed }) => [styles.continueBtn, pressed && styles.continueBtnPressed]}
           onPress={handleContinue}
         >
-          <Text style={styles.continueBtnText}>Proceed to Payment</Text>
+          <Text style={styles.continueBtnText}>Paiement</Text>
           <Feather name="arrow-right" size={18} color="white" />
         </Pressable>
       </View>
@@ -222,229 +426,154 @@ export default function PassengersScreen() {
   );
 }
 
+const PRIMARY = Colors.light.primary;
+const VIOLET  = "#7C3AED";
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
+
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 16, paddingBottom: 12, paddingTop: 8,
     backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-    gap: 12,
+    borderBottomWidth: 1, borderBottomColor: Colors.light.border, gap: 12,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 40, height: 40, borderRadius: 20,
     backgroundColor: Colors.light.background,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: "center", alignItems: "center",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  passengerCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
-    padding: 16,
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.text },
+
+  card: {
+    backgroundColor: Colors.light.card, borderRadius: 16, padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  passengerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  numBadge: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: PRIMARY, justifyContent: "center", alignItems: "center",
   },
-  passengerNum: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.light.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  passengerNumText: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: "white",
-  },
-  passengerTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  seatInfo: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
-  fieldRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  field: {
-    marginBottom: 14,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
-    marginBottom: 6,
-  },
+  numBadgeText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "white" },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  cardSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  cardSub2: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginBottom: 16 },
+
+  fieldRow: { flexDirection: "row", gap: 10 },
+  field: { marginBottom: 14 },
+  fieldLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.light.text, marginBottom: 6 },
   fieldInput: {
-    backgroundColor: Colors.light.background,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.text,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    backgroundColor: Colors.light.background, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.text,
+    borderWidth: 1.5, borderColor: Colors.light.border,
   },
-  genderRow: {
-    flexDirection: "row",
-    gap: 8,
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+    borderWidth: 1.5, borderColor: Colors.light.border, backgroundColor: Colors.light.background,
   },
-  genderChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
-    backgroundColor: Colors.light.background,
+  chipActive: { backgroundColor: Colors.light.primaryLight, borderColor: PRIMARY },
+  chipBagActive: { backgroundColor: "#EDE9FE", borderColor: VIOLET },
+  chipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
+  chipTextActive: { color: PRIMARY },
+  chipTextBagActive: { color: VIOLET },
+  inputIcon: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: Colors.light.background, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderWidth: 1.5, borderColor: Colors.light.border,
   },
-  genderChipActive: {
-    backgroundColor: Colors.light.primaryLight,
-    borderColor: Colors.light.primary,
+  iconInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.text },
+
+  /* Bagage section */
+  bagSection: {
+    backgroundColor: "#FAFAFF", borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1.5, borderColor: "#EDE9FE",
+    shadowColor: VIOLET, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  genderChipText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
+  bagHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  bagTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  bagTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  bagOptional: { backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  bagOptionalText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: VIOLET },
+  bagRate: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: VIOLET },
+
+  bagEmpty: { alignItems: "center", paddingVertical: 20, gap: 6 },
+  bagEmptyText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#6B7280" },
+  bagEmptySub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#9CA3AF", textAlign: "center" },
+
+  bagCard: {
+    backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 10,
+    borderWidth: 1, borderColor: "#E9D5FF",
+    shadowColor: VIOLET, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  genderChipTextActive: {
-    color: Colors.light.primary,
+  bagCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  bagCardTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  bagRemove: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center",
   },
-  idTypeRow: {
-    flexDirection: "row",
-    gap: 6,
+
+  prixBox: {
+    backgroundColor: "#F5F3FF", borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderWidth: 1.5, borderColor: "#DDD6FE",
+    justifyContent: "center",
   },
-  idChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
-    backgroundColor: Colors.light.background,
+  prixValue: { fontSize: 13, fontFamily: "Inter_700Bold", color: VIOLET },
+
+  photoBtn: { marginBottom: 4, borderRadius: 10, overflow: "hidden" },
+  photoPlaceholder: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "#EDE9FE", borderRadius: 10, padding: 12,
+    borderWidth: 1.5, borderColor: "#C4B5FD", borderStyle: "dashed",
   },
-  idChipActive: {
-    backgroundColor: Colors.light.primaryLight,
-    borderColor: Colors.light.primary,
+  photoPlaceholderTxt: { fontSize: 13, fontFamily: "Inter_500Medium", color: VIOLET },
+  photoPreview: { width: "100%", height: 120, borderRadius: 10, overflow: "hidden" },
+  photoImg: { width: "100%", height: "100%" },
+  photoOverlay: {
+    position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center", alignItems: "center", gap: 4,
   },
-  idChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.light.textSecondary,
+  photoSuccess: { backgroundColor: "rgba(16,185,129,0.5)" },
+  photoOverlayTxt: { fontSize: 12, color: "#fff", fontFamily: "Inter_600SemiBold" },
+
+  addBagBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: "#EDE9FE", borderRadius: 12, paddingVertical: 12,
+    borderWidth: 1.5, borderColor: "#C4B5FD", borderStyle: "dashed", marginTop: 4,
   },
-  idChipTextActive: {
-    color: Colors.light.primary,
+  addBagTxt: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: VIOLET },
+
+  bagPriceRow: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "#EDE9FE", borderRadius: 10, padding: 10, marginTop: 10,
   },
-  inputWithIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.light.background,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderWidth: 1.5,
-    borderColor: Colors.light.border,
-  },
-  iconInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.text,
-  },
-  contactCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  contactTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-    marginBottom: 4,
-  },
-  contactSubtitle: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginBottom: 16,
-  },
+  bagPriceLabel: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#4C1D95" },
+  bagPriceValue: { fontSize: 14, fontFamily: "Inter_700Bold", color: VIOLET },
+
+  /* Bottom bar */
   bottomBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: Colors.light.card,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: Colors.light.card, paddingHorizontal: 20, paddingTop: 16,
+    borderTopWidth: 1, borderTopColor: Colors.light.border,
+    shadowColor: "#000", shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 8,
   },
-  totalLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
-  totalAmount: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.primary,
-  },
+  totalLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  totalAmount: { fontSize: 22, fontFamily: "Inter_700Bold", color: PRIMARY },
+  totalSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: VIOLET, marginTop: 1 },
   continueBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: PRIMARY, borderRadius: 14,
+    paddingHorizontal: 20, paddingVertical: 14,
+    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  continueBtnPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.97 }],
-  },
-  continueBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: "white",
-  },
+  continueBtnPressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+  continueBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "white" },
 });

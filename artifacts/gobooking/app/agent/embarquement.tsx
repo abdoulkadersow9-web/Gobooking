@@ -451,6 +451,16 @@ export default function EmbarquementScreen() {
           ref:      e?.bookingRef,
           errorMsg: "Billet non payé — le passager doit régler son paiement avant d'embarquer.",
         });
+      } else if (code === "BAGAGE_REFUS") {
+        showScanResult({
+          type:     "refusé",
+          name:     e?.passenger?.name,
+          seat:     e?.passenger?.seat,
+          ref:      e?.bookingRef,
+          errorMsg: e?.bagageNote
+            ? `Bagages refusés — embarquement bloqué.\nMotif : ${e.bagageNote}`
+            : "Bagages refusés par la compagnie — embarquement bloqué.",
+        });
       } else if (code === "WRONG_TRIP") {
         const bTrip = e?.bookingTrip;
         showScanResult({

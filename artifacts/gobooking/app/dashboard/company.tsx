@@ -37,7 +37,8 @@ interface Analytics {
 }
 interface Bus { id: string; busName: string; plateNumber: string; busType: string; capacity: number; status: string }
 interface Trip { id: string; from: string; to: string; date: string; departureTime: string; arrivalTime: string; price: number; totalSeats: number; busName: string; duration: string; status?: string }
-interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
+interface ResBagage { id: string; type: string; poids: number; imageUrl?: string; prix: number }
+interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string; bagages?: ResBagage[]; bagageStatus?: string | null; bagagePrice?: number; bagageNote?: string | null }
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
 interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; tripId?: string; tripName?: string; status: string; agentRole?: string; email?: string }
@@ -442,6 +443,49 @@ export default function CompanyDashboard() {
         },
       },
     ]);
+  };
+
+  const reviewBaggage = (reservationId: string) => {
+    Alert.alert(
+      "Révision des bagages",
+      "Accepter ou refuser les bagages de cette réservation ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "✅ Accepter",
+          onPress: async () => {
+            setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, bagageStatus: "accepté" } : r));
+            if (token) {
+              try { await apiFetch(`/bookings/${reservationId}/baggage-review`, { token, method: "POST", body: { decision: "accepté" } }); } catch {}
+            }
+          },
+        },
+        {
+          text: "❌ Refuser",
+          style: "destructive",
+          onPress: () => {
+            Alert.prompt(
+              "Motif de refus",
+              "Indiquez la raison du refus (facultatif) :",
+              [
+                { text: "Annuler", style: "cancel" },
+                {
+                  text: "Refuser",
+                  style: "destructive",
+                  onPress: async (note?: string) => {
+                    setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, bagageStatus: "refusé", bagageNote: note || null } : r));
+                    if (token) {
+                      try { await apiFetch(`/bookings/${reservationId}/baggage-review`, { token, method: "POST", body: { decision: "refusé", note: note || "" } }); } catch {}
+                    }
+                  },
+                },
+              ],
+              "plain-text"
+            );
+          },
+        },
+      ]
+    );
   };
 
   const updateParcelStatus = async (parcelId: string, newStatus: string) => {
@@ -946,7 +990,28 @@ export default function CompanyDashboard() {
               <View key={res.id} style={S.reservCard}>
                 <View style={S.reservTop}>
                   <Text style={S.reservRef}>#{res.bookingRef}</Text>
-                  <View style={[S.badge, { backgroundColor: st.bg }]}><Text style={[S.badgeText, { color: st.color }]}>{st.label}</Text></View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {/* Bagages badge */}
+                    {!!res.bagages?.length && (
+                      <View style={{
+                        flexDirection: "row", alignItems: "center", gap: 4,
+                        paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8,
+                        backgroundColor:
+                          res.bagageStatus === "accepté" ? "#D1FAE5" :
+                          res.bagageStatus === "refusé"  ? "#FEE2E2" : "#FEF3C7",
+                      }}>
+                        <Feather
+                          name={res.bagageStatus === "accepté" ? "check" : res.bagageStatus === "refusé" ? "x" : "clock"}
+                          size={10}
+                          color={res.bagageStatus === "accepté" ? "#059669" : res.bagageStatus === "refusé" ? "#DC2626" : "#D97706"}
+                        />
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: res.bagageStatus === "accepté" ? "#059669" : res.bagageStatus === "refusé" ? "#DC2626" : "#D97706" }}>
+                          {res.bagages.length} bagage{res.bagages.length > 1 ? "s" : ""}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={[S.badge, { backgroundColor: st.bg }]}><Text style={[S.badgeText, { color: st.color }]}>{st.label}</Text></View>
+                  </View>
                 </View>
                 <View style={S.reservMid}>
                   {res.passengers.map((p, i) => (
@@ -956,12 +1021,47 @@ export default function CompanyDashboard() {
                     </View>
                   ))}
                 </View>
+
+                {/* Bagages detail */}
+                {!!res.bagages?.length && (
+                  <View style={{ marginTop: 8, backgroundColor: "#FAFAFF", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#EDE9FE" }}>
+                    {res.bagages.map((b, bi) => (
+                      <View key={b.id || bi} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: bi < res.bagages!.length - 1 ? 6 : 0 }}>
+                        <Feather name={b.type === "valise" ? "briefcase" : b.type === "sac" ? "shopping-bag" : b.type === "colis" ? "package" : "box"} size={14} color="#7C3AED" />
+                        <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", color: "#4C1D95", textTransform: "capitalize" }}>
+                          {b.type} · {b.poids} kg
+                        </Text>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>{b.prix.toLocaleString()} F</Text>
+                      </View>
+                    ))}
+                    {(res.bagagePrice ?? 0) > 0 && (
+                      <View style={{ marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: "#EDE9FE", flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#6B7280" }}>Total bagages</Text>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>+{(res.bagagePrice ?? 0).toLocaleString()} FCFA</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
                 <View style={S.reservBottom}>
                   <Text style={S.reservPay}>{PAYMENT_LABELS[res.paymentMethod] || res.paymentMethod}</Text>
                   <Text style={S.reservAmount}>{res.totalAmount.toLocaleString()} FCFA</Text>
                 </View>
+
+                {/* Bagages validation button */}
+                {!!res.bagages?.length && res.bagageStatus === "en_attente" && (
+                  <TouchableOpacity
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8, paddingVertical: 9, borderRadius: 8, backgroundColor: "#EDE9FE", borderWidth: 1, borderColor: "#C4B5FD" }}
+                    onPress={() => reviewBaggage(res.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name="package" size={13} color="#7C3AED" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" }}>Valider les bagages</Text>
+                  </TouchableOpacity>
+                )}
+
                 {res.status === "pending" && (
-                  <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                  <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
                     <TouchableOpacity
                       style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 8, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" }}
                       onPress={() => confirmReservation(res.id)}
@@ -982,7 +1082,7 @@ export default function CompanyDashboard() {
                 )}
                 {res.status === "confirmed" && (
                   <TouchableOpacity
-                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" }}
+                    style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 8, paddingVertical: 8, borderRadius: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" }}
                     onPress={() => cancelReservation(res.id)}
                     activeOpacity={0.8}
                   >

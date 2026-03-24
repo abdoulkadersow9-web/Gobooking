@@ -14,6 +14,17 @@ export interface Passenger {
   seatNumber: string;
 }
 
+export type BagageType = "valise" | "sac" | "colis" | "autre";
+export type BagageStatus = "en_attente" | "accepté" | "refusé";
+
+export interface Bagage {
+  id: string;
+  type: BagageType;
+  poids: number;
+  imageUrl?: string;
+  prix: number;
+}
+
 export const bookingsTable = pgTable("bookings", {
   id: text("id").primaryKey(),
   bookingRef: varchar("booking_ref", { length: 20 }).notNull().unique(),
@@ -30,6 +41,10 @@ export const bookingsTable = pgTable("bookings", {
   status: varchar("status", { length: 20 }).notNull().default("confirmed"),
   contactEmail: varchar("contact_email", { length: 255 }).notNull(),
   contactPhone: varchar("contact_phone", { length: 50 }).notNull(),
+  bagages: json("bagages").$type<Bagage[]>().default([]),
+  bagageStatus: varchar("bagage_status", { length: 20 }).default("en_attente"),
+  bagagePrice: real("bagage_price").notNull().default(0),
+  bagageNote: text("bagage_note"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -39,6 +40,10 @@ interface Booking {
   status: "confirmed" | "cancelled" | "completed";
   contactEmail: string;
   contactPhone: string;
+  bagages?: { id: string; type: string; poids: number; imageUrl?: string; prix: number }[];
+  bagageStatus?: string | null;
+  bagagePrice?: number;
+  bagageNote?: string | null;
   createdAt: string;
 }
 
@@ -219,6 +224,78 @@ export default function BookingDetailScreen() {
             </View>
           ))}
         </View>
+
+        {/* ── Bagages ── */}
+        {!!booking.bagages?.length && (
+          <View style={styles.section}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <Text style={styles.sectionTitle}>Bagages</Text>
+              {booking.bagageStatus && (
+                <View style={{
+                  flexDirection: "row", alignItems: "center", gap: 5,
+                  paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10,
+                  backgroundColor:
+                    booking.bagageStatus === "accepté" ? "#D1FAE5" :
+                    booking.bagageStatus === "refusé"  ? "#FEE2E2" : "#FEF3C7",
+                }}>
+                  <Feather
+                    name={booking.bagageStatus === "accepté" ? "check-circle" : booking.bagageStatus === "refusé" ? "x-circle" : "clock"}
+                    size={12}
+                    color={booking.bagageStatus === "accepté" ? "#059669" : booking.bagageStatus === "refusé" ? "#DC2626" : "#D97706"}
+                  />
+                  <Text style={{
+                    fontSize: 12, fontFamily: "Inter_600SemiBold",
+                    color: booking.bagageStatus === "accepté" ? "#059669" : booking.bagageStatus === "refusé" ? "#DC2626" : "#D97706",
+                  }}>
+                    {booking.bagageStatus === "accepté" ? "Acceptés" : booking.bagageStatus === "refusé" ? "Refusés" : "En attente"}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {booking.bagageStatus === "refusé" && (
+              <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, padding: 12, marginBottom: 10, flexDirection: "row", gap: 8 }}>
+                <Feather name="alert-triangle" size={16} color="#DC2626" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#DC2626" }}>Bagages refusés</Text>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#7F1D1D", marginTop: 2 }}>
+                    {booking.bagageNote || "Vos bagages ont été refusés par la compagnie. Veuillez les modifier avant l'embarquement."}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {booking.bagages.map((b, i) => (
+              <View key={b.id || i} style={{
+                backgroundColor: "#FAFAFF", borderRadius: 12, padding: 12, marginBottom: 8,
+                borderWidth: 1, borderColor: "#EDE9FE", flexDirection: "row", gap: 10, alignItems: "center",
+              }}>
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: "#EDE9FE", alignItems: "center", justifyContent: "center" }}>
+                  <Feather
+                    name={b.type === "valise" ? "briefcase" : b.type === "sac" ? "shopping-bag" : b.type === "colis" ? "package" : "box"}
+                    size={18} color="#7C3AED"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#1E1B4B", textTransform: "capitalize" }}>{b.type}</Text>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280" }}>{b.poids} kg · {b.prix.toLocaleString()} FCFA</Text>
+                </View>
+                {b.imageUrl && (
+                  <View style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden" }}>
+                    <Image source={{ uri: b.imageUrl }} style={{ width: 44, height: 44 }} contentFit="cover" />
+                  </View>
+                )}
+              </View>
+            ))}
+
+            {(booking.bagagePrice ?? 0) > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#EDE9FE", borderRadius: 10, padding: 10, marginTop: 4 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#4C1D95" }}>Total bagages</Text>
+                <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>+{(booking.bagagePrice ?? 0).toLocaleString()} FCFA</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Paiement</Text>
