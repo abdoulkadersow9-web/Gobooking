@@ -2046,4 +2046,98 @@ router.get("/trips/:id/stop-passengers", async (req, res) => {
   }
 });
 
+/* ─── GET /company/boarding-logs ─────────────────────────────────────────────
+   Returns the list of validated passenger scans for the company.
+   Optional query param: ?tripId=xxx to filter by a specific trip.
+   Enriches each scan with booking passenger names, seat numbers, and trip route.
+─────────────────────────────────────────────────────────────────────────── */
+router.get("/boarding-logs", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+    const { tripId } = req.query as { tripId?: string };
+
+    /* ── 1. Fetch passager scans for this company ── */
+    const scans = await db
+      .select()
+      .from(scansTable)
+      .where(
+        and(
+          eq(scansTable.companyId, companyId),
+          eq(scansTable.type, "passager"),
+          ...(tripId ? [eq(scansTable.trajetId, tripId)] : []),
+        )
+      )
+      .orderBy(desc(scansTable.createdAt))
+      .limit(500);
+
+    /* ── 2. Enrich with booking + trip data ── */
+    const bookingIds = [...new Set(scans.map(s => s.targetId).filter(Boolean))];
+    const tripIds    = [...new Set(scans.map(s => s.trajetId).filter(Boolean) as string[])];
+
+    const [bookings, trips] = await Promise.all([
+      bookingIds.length
+        ? db.select({
+            id:           bookingsTable.id,
+            passengers:   bookingsTable.passengers,
+            seatNumbers:  bookingsTable.seatNumbers,
+            contactPhone: bookingsTable.contactPhone,
+          }).from(bookingsTable).where(inArray(bookingsTable.id, bookingIds))
+        : Promise.resolve([]),
+      tripIds.length
+        ? db.select({
+            id:            tripsTable.id,
+            from:          tripsTable.from,
+            to:            tripsTable.to,
+            date:          tripsTable.date,
+            departureTime: tripsTable.departureTime,
+            busName:       tripsTable.busName,
+          }).from(tripsTable).where(inArray(tripsTable.id, tripIds))
+        : Promise.resolve([]),
+    ]);
+
+    const bookingMap = Object.fromEntries(bookings.map(b => [b.id, b]));
+    const tripMap    = Object.fromEntries(trips.map(t => [t.id, t]));
+
+    /* ── 3. Build enriched log entries ── */
+    const logs = scans.map(s => {
+      const bk   = bookingMap[s.targetId] as typeof bookings[0] | undefined;
+      const tr   = s.trajetId ? tripMap[s.trajetId] : undefined;
+      const pax  = (bk?.passengers as { name?: string }[] | null)?.[0];
+      const allPax = (bk?.passengers as { name?: string }[] | null)?.map(p => p.name).filter(Boolean).join(", ");
+
+      return {
+        id:           s.id,
+        ref:          s.ref,
+        bookingId:    s.targetId,
+        agentId:      s.agentId,
+        agentName:    s.agentName || "Agent",
+        tripId:       s.trajetId,
+        passengerName: allPax || pax?.name || s.ref,
+        seats:        (bk?.seatNumbers as string[] | null)?.join(", ") || "—",
+        route:        tr ? `${tr.from} → ${tr.to}` : "—",
+        tripDate:     tr?.date || "—",
+        departureTime: tr?.departureTime || "—",
+        busName:      tr?.busName || "—",
+        validatedAt:  s.createdAt,
+      };
+    });
+
+    /* ── 4. Return trips list for filter UI ── */
+    const companyTrips = await db
+      .select({ id: tripsTable.id, from: tripsTable.from, to: tripsTable.to,
+                date: tripsTable.date, departureTime: tripsTable.departureTime })
+      .from(tripsTable)
+      .where(eq(tripsTable.companyId, companyId))
+      .orderBy(desc(tripsTable.date))
+      .limit(50);
+
+    res.json({ logs, trips: companyTrips, total: logs.length });
+  } catch (err) {
+    console.error("GET /company/boarding-logs error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
