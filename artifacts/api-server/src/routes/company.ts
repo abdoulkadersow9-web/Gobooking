@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -393,6 +393,145 @@ router.get("/agents", async (req, res) => {
     })));
   } catch (err) {
     console.error("GET /company/agents error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════
+   RENTABILITÉ PAR TRAJET
+═══════════════════════════════════════════════════════ */
+
+/* GET /company/rentabilite — recettes, dépenses, bénéfice par trajet */
+router.get("/rentabilite", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripList = await db.select().from(tripsTable)
+      .where(eq(tripsTable.companyId, ctx.companyId))
+      .orderBy(desc(tripsTable.date));
+
+    const tripIds = tripList.map(t => t.id);
+    if (!tripIds.length) {
+      res.json({ trips: [], summary: { totalRecettes: 0, totalDepenses: 0, totalBenefice: 0, tripCount: 0 } });
+      return;
+    }
+
+    /* Recettes réservations — all bookings for these trips */
+    const allBookings = await db.select({
+      tripId: bookingsTable.tripId,
+      totalAmount: bookingsTable.totalAmount,
+      paymentStatus: bookingsTable.paymentStatus,
+    }).from(bookingsTable).where(and(inArray(bookingsTable.tripId, tripIds), eq(bookingsTable.paymentStatus, "paid")));
+
+    const bookingRev: Record<string, number> = {};
+    for (const b of allBookings) {
+      if (!b.tripId) continue;
+      bookingRev[b.tripId] = (bookingRev[b.tripId] ?? 0) + (b.totalAmount ?? 0);
+    }
+
+    /* Recettes colis */
+    const allParcels = await db.select({
+      tripId: parcelsTable.tripId,
+      amount: parcelsTable.amount,
+      status: parcelsTable.status,
+    }).from(parcelsTable).where(inArray(parcelsTable.tripId as any, tripIds));
+
+    const colisRev: Record<string, number> = {};
+    for (const p of allParcels) {
+      if (!p.tripId || p.status === "annulé") continue;
+      colisRev[p.tripId] = (colisRev[p.tripId] ?? 0) + (p.amount ?? 0);
+    }
+
+    /* Dépenses */
+    const expRows = await db.select().from(tripExpensesTable)
+      .where(eq(tripExpensesTable.companyId, ctx.companyId))
+      .orderBy(desc(tripExpensesTable.createdAt));
+
+    const expByTrip: Record<string, typeof expRows> = {};
+    for (const e of expRows) {
+      if (!expByTrip[e.tripId]) expByTrip[e.tripId] = [];
+      expByTrip[e.tripId].push(e);
+    }
+
+    let sumRec = 0, sumDep = 0;
+    const trips = tripList.map(t => {
+      const recBil = bookingRev[t.id] ?? 0;
+      const recCol = colisRev[t.id] ?? 0;
+      const totalRecettes = recBil + recCol;
+      const expenses = expByTrip[t.id] ?? [];
+      const totalDepenses = expenses.reduce((s, e) => s + e.amount, 0);
+      const benefice = totalRecettes - totalDepenses;
+      sumRec += totalRecettes;
+      sumDep += totalDepenses;
+      return {
+        tripId: t.id,
+        from: t.from,
+        to: t.to,
+        date: t.date,
+        departureTime: t.departureTime,
+        busName: t.busName,
+        busType: t.busType,
+        status: t.status,
+        totalRecettes, recettesReservations: recBil, recettesColis: recCol,
+        totalDepenses, benefice,
+        expenses: expenses.map(e => ({ id: e.id, type: e.type, amount: e.amount, description: e.description, date: e.date })),
+      };
+    });
+
+    res.json({
+      trips,
+      summary: { totalRecettes: sumRec, totalDepenses: sumDep, totalBenefice: sumRec - sumDep, tripCount: trips.length },
+    });
+  } catch (err) {
+    console.error("[rentabilite GET]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /company/trips/:tripId/expenses — add expense to a trip */
+router.post("/trips/:tripId/expenses", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const trip = await db.select().from(tripsTable).where(eq(tripsTable.id, req.params.tripId)).limit(1);
+    if (!trip.length || trip[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Trajet non autorisé" }); return;
+    }
+
+    const { type, amount, description, date } = req.body;
+    if (!amount) { res.status(400).json({ error: "amount requis" }); return; }
+
+    const id = Date.now().toString() + Math.random().toString(36).slice(2, 7);
+    await db.insert(tripExpensesTable).values({
+      id, companyId: ctx.companyId, tripId: req.params.tripId,
+      type: type ?? "autre", amount: Number(amount),
+      description: description ?? null,
+      date: date ?? new Date().toISOString().split("T")[0],
+    } as any);
+
+    const created = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.id, id)).limit(1);
+    res.status(201).json(created[0]);
+  } catch (err) {
+    console.error("[trips/expenses POST]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* DELETE /company/expenses/:id — delete a trip expense */
+router.delete("/expenses/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const exp = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.id, req.params.id)).limit(1);
+    if (!exp.length || exp[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+    await db.delete(tripExpensesTable).where(eq(tripExpensesTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
 });

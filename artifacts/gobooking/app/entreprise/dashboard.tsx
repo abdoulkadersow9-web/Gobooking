@@ -390,6 +390,7 @@ export default function EntrepriseDashboard() {
               { icon: "tool",          label: "Maintenance",   route: "/entreprise/maintenance-bus", color: "#F59E0B" },
               { icon: "droplet",       label: "Carburant",     route: "/entreprise/carburant",       color: "#16A34A" },
               { icon: "users",         label: "Affectation",   route: "/entreprise/bus-agents",      color: "#7C3AED" },
+              { icon: "bar-chart-2",   label: "Rentabilité",   route: "/entreprise/rentabilite",     color: "#0891B2" },
               { icon: "settings",      label: "Gestion",       route: "/dashboard/company",        color: AMBER },
             ].map(it => (
               <Pressable
