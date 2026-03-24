@@ -776,82 +776,125 @@ router.post("/boarding-requests/:id/reject", async (req, res) => {
   }
 });
 
-/* GET /company/analytics — Tableau analytique détaillé */
+/* GET /company/analytics — Analytics avancées avec filtres de période */
 router.get("/analytics", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const [bookings, parcels] = await Promise.all([
-      db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt)),
-      db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)),
+    const period = (req.query.period as string) || "week";
+    const now    = new Date();
+    let startDate: Date;
+
+    if (period === "today") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (period === "month") {
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    } else {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    const cid = ctx.companyId;
+
+    /* ─── Fetch data ──────────────────────────────────────────────── */
+    const [trips, allBookings, parcels, scans, agents] = await Promise.all([
+      db.select().from(tripsTable).where(eq(tripsTable.companyId, cid)),
+      db.select().from(bookingsTable),
+      db.select().from(parcelsTable).where(eq(parcelsTable.companyId, cid)),
+      db.select().from(scansTable).where(eq(scansTable.companyId, cid)),
+      db.select({
+        id: agentsTable.id, agentRole: agentsTable.agentRole,
+        agentName: usersTable.name,
+      }).from(agentsTable)
+        .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+        .where(eq(agentsTable.companyId, cid)),
     ]);
 
-    // ── Status breakdown ──────────────────────────────────────────────
-    const byStatus = {
-      confirmed: bookings.filter(b => b.status === "confirmed").length,
-      boarded:   bookings.filter(b => b.status === "boarded").length,
-      cancelled: bookings.filter(b => b.status === "cancelled").length,
-      pending:   bookings.filter(b => !["confirmed","boarded","cancelled"].includes(b.status)).length,
-    };
+    const tripIds = new Set(trips.map(t => t.id));
+    const bookings = allBookings.filter(b => b.tripId && tripIds.has(b.tripId));
 
-    // ── Revenue by payment method ─────────────────────────────────────
+    const inPeriod = (d: Date | null | undefined) => d != null && d >= startDate && d <= now;
+    const periodBookings = bookings.filter(b => inPeriod(b.createdAt));
+    const periodParcels  = parcels.filter(p => inPeriod(p.createdAt));
+    const periodScans    = scans.filter(s => inPeriod(s.createdAt));
+
+    /* ─── Revenue ─────────────────────────────────────────────────── */
+    const isPaid = (s: string | null) => s === "paid" || s === "payé";
+    const bookingRevenue = periodBookings.filter(b => isPaid(b.paymentStatus)).reduce((s, b) => s + (b.totalAmount ?? 0), 0);
+    const parcelRevenue  = periodParcels.filter(p => isPaid(p.paymentStatus)).reduce((s, p) => s + (p.amount ?? 0), 0);
+    const totalRevenue   = Math.round(bookingRevenue + parcelRevenue);
+
+    /* ─── Occupancy ───────────────────────────────────────────────── */
+    const periodTrips = trips.filter(t => { const d = new Date(t.date); return d >= startDate && d <= now; });
+    const totalSeats  = periodTrips.reduce((s, t) => s + (t.totalSeats ?? 0), 0);
+    const bookedSeats = bookings.filter(b => periodTrips.some(t => t.id === b.tripId) && !["annulé","cancelled"].includes(b.status)).length;
+    const occupancyRate = totalSeats > 0 ? Math.round((bookedSeats / totalSeats) * 100) : 0;
+
+    /* ─── Parcel stats ────────────────────────────────────────────── */
+    const parcelDelivered = periodParcels.filter(p => ["livré","delivered"].includes(p.status)).length;
+
+    /* ─── Agent performance ───────────────────────────────────────── */
+    const agentStats = agents.map(a => {
+      const agScans = periodScans.filter(s => s.agentId === a.id);
+      return {
+        agentId: a.id, agentName: a.agentName ?? "Agent", agentRole: a.agentRole,
+        scans: agScans.length,
+        ventes: agScans.filter(s => ["billet","passager","vente"].includes(s.type)).length,
+        colis: agScans.filter(s => s.type === "colis").length,
+      };
+    }).sort((a, b) => b.scans - a.scans);
+
+    /* ─── Payment method breakdown ────────────────────────────────── */
     const methodMap: Record<string, { count: number; revenue: number }> = {};
-    for (const b of bookings.filter(bk => bk.status !== "cancelled")) {
+    for (const b of periodBookings.filter(bk => bk.status !== "cancelled" && bk.status !== "annulé")) {
       const m = b.paymentMethod || "unknown";
       if (!methodMap[m]) methodMap[m] = { count: 0, revenue: 0 };
       methodMap[m].count++;
-      methodMap[m].revenue += b.totalAmount;
+      methodMap[m].revenue += b.totalAmount ?? 0;
     }
-    const byMethod = Object.entries(methodMap).map(([method, d]) => ({ method, ...d }))
-      .sort((a, b) => b.revenue - a.revenue);
+    const byMethod = Object.entries(methodMap).map(([method, d]) => ({ method, ...d })).sort((a, b) => b.revenue - a.revenue);
 
-    // ── Bookings per day (last 14 days) ───────────────────────────────
-    const today = new Date();
-    const dailyBookings: { date: string; count: number; revenue: number }[] = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      const dayBooks = bookings.filter(b => {
-        const bd = b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : "";
-        return bd === key;
-      });
-      dailyBookings.push({
-        date: key,
-        count: dayBooks.length,
-        revenue: dayBooks.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0),
-      });
+    /* ─── Daily chart ─────────────────────────────────────────────── */
+    const dayCount = period === "today" ? 1 : period === "week" ? 7 : 30;
+    const dailyChart: { date: string; revenue: number; bookings: number }[] = [];
+    for (let i = dayCount - 1; i >= 0; i--) {
+      const dd = new Date(now); dd.setDate(dd.getDate() - i);
+      const key = dd.toISOString().slice(0, 10);
+      const dStart = new Date(key); const dEnd = new Date(key); dEnd.setHours(23, 59, 59, 999);
+      const dayBk  = periodBookings.filter(b => b.createdAt && b.createdAt >= dStart && b.createdAt <= dEnd);
+      const dayPar = periodParcels.filter(p => p.createdAt && p.createdAt >= dStart && p.createdAt <= dEnd);
+      const rev = Math.round(
+        dayBk.filter(b => isPaid(b.paymentStatus)).reduce((s, b) => s + (b.totalAmount ?? 0), 0) +
+        dayPar.filter(p => isPaid(p.paymentStatus)).reduce((s, p) => s + (p.amount ?? 0), 0)
+      );
+      dailyChart.push({ date: key, revenue: rev, bookings: dayBk.length });
     }
 
-    // ── Parcel status breakdown ───────────────────────────────────────
-    const parcelByStatus: Record<string, number> = {};
-    for (const p of parcels) {
-      parcelByStatus[p.status] = (parcelByStatus[p.status] || 0) + 1;
-    }
-
-    // ── KPIs ──────────────────────────────────────────────────────────
-    const totalRevenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0)
-      + parcels.reduce((s, p) => s + p.amount, 0);
-    const parcelRevenue = parcels.reduce((s, p) => s + p.amount, 0);
-    const bookingRevenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0);
+    /* ─── Booking status breakdown ────────────────────────────────── */
+    const byStatus = {
+      confirmed: periodBookings.filter(b => b.status === "confirmed").length,
+      boarded:   periodBookings.filter(b => b.status === "boarded").length,
+      cancelled: periodBookings.filter(b => ["cancelled","annulé"].includes(b.status)).length,
+      pending:   periodBookings.filter(b => !["confirmed","boarded","cancelled","annulé"].includes(b.status)).length,
+    };
 
     res.json({
-      kpis: {
-        totalBookings: bookings.length,
-        totalRevenue,
-        bookingRevenue,
-        parcelRevenue,
-        totalParcels: parcels.length,
-      },
+      period,
+      revenue:   { total: totalRevenue, booking: Math.round(bookingRevenue), parcel: Math.round(parcelRevenue) },
+      occupancy: { rate: occupancyRate, booked: bookedSeats, total: totalSeats },
+      parcels:   { total: periodParcels.length, delivered: parcelDelivered, pending: periodParcels.length - parcelDelivered },
+      bookings:  { total: periodBookings.length, paid: periodBookings.filter(b => isPaid(b.paymentStatus)).length },
+      trips:     { total: periodTrips.length },
+      agents:    agentStats,
+      dailyChart,
       byStatus,
       byMethod,
-      dailyBookings,
-      parcelByStatus,
     });
   } catch (err) {
     console.error("Company analytics error:", err);
-    res.status(500).json({ error: "Failed" });
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

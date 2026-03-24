@@ -378,6 +378,7 @@ export default function EntrepriseDashboard() {
               { icon: "package",   label: "Colis",        route: "/entreprise/colis",          color: VIOLET },
               { icon: "map",           label: "Suivi Live",   route: "/entreprise/live-tracking",  color: "#EF4444" },
               { icon: "alert-octagon", label: "Alertes",      route: "/entreprise/alertes",        color: "#DC2626" },
+              { icon: "bar-chart-2",   label: "Analytics",    route: "/entreprise/analytiques",    color: "#059669" },
               { icon: "settings",      label: "Gestion",      route: "/dashboard/company",         color: AMBER },
             ].map(it => (
               <Pressable
