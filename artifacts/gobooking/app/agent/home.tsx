@@ -21,6 +21,7 @@ const AGENT_MENUS = [
   { id: "validation",      label: "Validation",       icon: "✅", path: "/agent/validation",     desc: "Valider les documents" },
   { id: "route",           label: "Suivi trajet",     icon: "🗺️", path: "/agent/route",          desc: "Suivre le trajet en cours" },
   { id: "scan",            label: "Scanner QR",       icon: "📷", path: "/agent/scan",           desc: "Scanner un code QR" },
+  { id: "gains",           label: "Mes gains",        icon: "💰", path: "/agent/gains",          desc: "Commissions et validations" },
   { id: "securite",        label: "Sécurité / SOS",  icon: "🚨", path: "/agent/securite",       desc: "Alertes urgence, panne, SOS", urgent: true },
 ];
 
@@ -29,7 +30,7 @@ export default function AgentHome() {
 
   const filteredMenus = AGENT_MENUS.filter((m) => {
     if (!user?.agentRole) return true;
-    if (m.id === "scan") return true;
+    if (m.id === "scan" || m.id === "gains" || m.id === "securite") return true;
     return m.id === user.agentRole;
   });
 

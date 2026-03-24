@@ -2,10 +2,13 @@ import { integer, json, pgTable, real, text, timestamp, varchar } from "drizzle-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+import { busesTable } from "./buses";
+
 export const tripsTable = pgTable("trips", {
   id: text("id").primaryKey(),
   companyId: text("company_id"),
   agentId: text("agent_id"),
+  busId: text("bus_id").references(() => busesTable.id),
   from: varchar("from_city", { length: 100 }).notNull(),
   to: varchar("to_city", { length: 100 }).notNull(),
   departureTime: varchar("departure_time", { length: 10 }).notNull(),

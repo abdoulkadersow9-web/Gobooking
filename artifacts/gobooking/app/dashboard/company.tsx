@@ -774,6 +774,28 @@ export default function CompanyDashboard() {
             ))}
           </View>
 
+          {/* ── Dedicated management screens ── */}
+          <Text style={[S.sectionTitle, { marginTop: 8 }]}>Gestion avancée</Text>
+          <View style={{ gap: 8 }}>
+            {([
+              { icon: "truck",      label: "Gestion des bus",       sub: "Ajouter, modifier, supprimer",  path: "/entreprise/buses",   color: "#D97706", bg: "#FFFBEB" },
+              { icon: "calendar",   label: "Planification trajets",  sub: "Créer et gérer les départs",   path: "/entreprise/trajets",  color: "#059669", bg: "#DCFCE7" },
+              { icon: "grid",       label: "Agences",                sub: "Gérer les agences et points",  path: "/entreprise/agences",  color: "#0369A1", bg: "#E0F2FE" },
+              { icon: "map",        label: "Routes & Arrêts",        sub: "Trajets multi-arrêts",          path: "/entreprise/routes",   color: "#7C3AED", bg: "#F5F3FF" },
+            ] as const).map(item => (
+              <Pressable key={item.path} style={S.mgmtRow} onPress={() => router.push(item.path as never)}>
+                <View style={[S.mgmtIcon, { backgroundColor: item.bg }]}>
+                  <Feather name={item.icon as never} size={20} color={item.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.mgmtLabel}>{item.label}</Text>
+                  <Text style={S.mgmtSub}>{item.sub}</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color="#CBD5E1" />
+              </Pressable>
+            ))}
+          </View>
+
           {/* Seats overview per bus */}
           <Text style={[S.sectionTitle, { marginTop: 8 }]}>Disponibilité par bus</Text>
           {buses.filter(b => b.status === "active").slice(0, 4).map(bus => {
@@ -2373,6 +2395,11 @@ const S = StyleSheet.create({
   quickCard:      { backgroundColor: "white", borderRadius: 12, padding: 14, flex: 1, minWidth: "28%", alignItems: "center", gap: 8, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   quickIcon:      { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   quickLabel:     { fontSize: 11, fontWeight: "600", color: "#475569" },
+
+  mgmtRow:        { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E2E8F0" },
+  mgmtIcon:       { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  mgmtLabel:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  mgmtSub:        { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
 
   busAvailRow:    { backgroundColor: "white", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 3, elevation: 1 },
   busAvailLeft:   { flex: 1 },

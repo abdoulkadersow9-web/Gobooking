@@ -104,6 +104,28 @@ router.post("/buses", async (req, res) => {
   }
 });
 
+router.patch("/buses/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, req.params.id)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+    const { busName, plateNumber, busType, capacity, status } = req.body;
+    const updates: Partial<typeof busesTable.$inferInsert> = {};
+    if (busName)      updates.busName     = busName;
+    if (plateNumber)  updates.plateNumber = plateNumber;
+    if (busType)      updates.busType     = busType;
+    if (capacity)     updates.capacity    = Number(capacity);
+    if (status)       updates.status      = status;
+    const updated = await db.update(busesTable).set(updates).where(eq(busesTable.id, req.params.id)).returning();
+    res.json(updated[0]);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update bus" });
+  }
+});
+
 router.delete("/buses/:id", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
@@ -288,10 +310,48 @@ router.get("/trips", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
     if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const trips = await db.select().from(tripsTable)
+    const trips = await db.select({
+      id:            tripsTable.id,
+      from:          tripsTable.from,
+      to:            tripsTable.to,
+      date:          tripsTable.date,
+      departureTime: tripsTable.departureTime,
+      arrivalTime:   tripsTable.arrivalTime,
+      price:         tripsTable.price,
+      totalSeats:    tripsTable.totalSeats,
+      duration:      tripsTable.duration,
+      status:        tripsTable.status,
+      busId:         tripsTable.busId,
+      busNameFk:     busesTable.busName,
+      busPlate:      busesTable.plateNumber,
+      busType:       busesTable.busType,
+      busCapacity:   busesTable.capacity,
+      busNameText:   tripsTable.busName,
+      busTypeText:   tripsTable.busType,
+      routeId:       tripsTable.routeId,
+    })
+      .from(tripsTable)
+      .leftJoin(busesTable, eq(tripsTable.busId, busesTable.id))
       .where(eq(tripsTable.companyId, ctx.companyId))
-      .orderBy(desc(tripsTable.date));
-    res.json(trips);
+      .orderBy(desc(tripsTable.date), desc(tripsTable.departureTime));
+
+    const tripsWithSeats = await Promise.all(trips.map(async (t) => {
+      const available = await db.select({ count: seatsTable.id })
+        .from(seatsTable)
+        .where(and(eq(seatsTable.tripId, t.id), eq(seatsTable.status, "available")));
+      const booked = await db.select({ count: seatsTable.id })
+        .from(seatsTable)
+        .where(and(eq(seatsTable.tripId, t.id), eq(seatsTable.status, "booked")));
+      return {
+        ...t,
+        busDisplayName: t.busNameFk ?? t.busNameText,
+        busDisplayType: t.busType ?? t.busTypeText,
+        availableSeats: available.length,
+        bookedSeats:    booked.length,
+      };
+    }));
+
+    res.json(tripsWithSeats);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
@@ -372,18 +432,46 @@ router.post("/trips", async (req, res) => {
       res.status(403).json({ error: "Accès refusé — seules les compagnies peuvent créer des trajets" });
       return;
     }
-    const { from, to, date, departureTime, arrivalTime, price, busName, busType, totalSeats, duration } = req.body;
+    const { from, to, date, departureTime, arrivalTime, price, busName, busType, totalSeats, duration, busId } = req.body;
     if (!from || !to || !date || !departureTime || !price) { res.status(400).json({ error: "Required fields missing" }); return; }
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+
+    let resolvedBusName = busName || "Bus GoBooking";
+    let resolvedBusType = busType || "Standard";
+    let resolvedSeats   = Number(totalSeats) || 44;
+    if (busId) {
+      const busRows = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+      if (busRows.length) {
+        resolvedBusName = busRows[0].busName;
+        resolvedBusType = busRows[0].busType;
+        resolvedSeats   = busRows[0].capacity;
+      }
+    }
+
     const trip = await db.insert(tripsTable).values({
       id, from, to, date, departureTime: departureTime || "08:00", arrivalTime: arrivalTime || "12:00",
-      price: Number(price), busName: busName || "Bus GoBooking", busType: busType || "Standard",
-      totalSeats: totalSeats || 44, duration: duration || "4h00", amenities: [], stops: [], policies: [],
+      price: Number(price), busName: resolvedBusName, busType: resolvedBusType,
+      totalSeats: resolvedSeats, duration: duration || "4h00", amenities: [], stops: [], policies: [],
       companyId: ctx.companyId,
-    }).returning();
+      busId: busId || null,
+    } as any).returning();
     res.json(trip[0]);
   } catch (err) {
     res.status(500).json({ error: "Failed to create trip" });
+  }
+});
+
+router.delete("/trips/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const trips = await db.select().from(tripsTable).where(and(eq(tripsTable.id, req.params.id), eq(tripsTable.companyId, ctx.companyId))).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    if (trips[0].status === "en_route") { res.status(400).json({ error: "Impossible de supprimer un trajet en cours" }); return; }
+    await db.delete(tripsTable).where(eq(tripsTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Impossible de supprimer le trajet" });
   }
 });
 

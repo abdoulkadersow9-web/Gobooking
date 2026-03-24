@@ -1633,4 +1633,54 @@ router.get("/alerts", async (req, res) => {
   }
 });
 
+/* GET /agent/earnings — scan stats + estimated commissions */
+router.get("/earnings", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agents = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agent = agents[0];
+
+    const now = new Date();
+    const startOfDay   = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek  = new Date(now); startOfWeek.setDate(now.getDate() - 7);
+    const startOfMonth = new Date(now); startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+
+    const allScans = await db.select().from(scansTable)
+      .where(and(eq(scansTable.agentId, user.id), gte(scansTable.createdAt, startOfMonth)))
+      .orderBy(desc(scansTable.createdAt));
+
+    const todayScans = allScans.filter(s => new Date(s.createdAt) >= startOfDay);
+    const weekScans  = allScans.filter(s => new Date(s.createdAt) >= startOfWeek);
+
+    const COMMISSION_PER_BOARDING = 200;
+    const todayEarnings = todayScans.length * COMMISSION_PER_BOARDING;
+    const weekEarnings  = weekScans.length  * COMMISSION_PER_BOARDING;
+    const monthEarnings = allScans.length   * COMMISSION_PER_BOARDING;
+
+    const byDay: Record<string, number> = {};
+    for (const s of allScans) {
+      const day = new Date(s.createdAt).toISOString().slice(0, 10);
+      byDay[day] = (byDay[day] || 0) + COMMISSION_PER_BOARDING;
+    }
+    const dailyChart = Object.entries(byDay).map(([date, amount]) => ({ date, amount })).sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+
+    res.json({
+      agentName: user.name,
+      agentRole: agent?.agentRole ?? "agent",
+      today:     { scans: todayScans.length, earnings: todayEarnings },
+      week:      { scans: weekScans.length,  earnings: weekEarnings  },
+      month:     { scans: allScans.length,   earnings: monthEarnings },
+      recentScans: allScans.slice(0, 20).map(s => ({
+        id: s.id, type: s.type, ref: s.ref, status: s.status,
+        commission: COMMISSION_PER_BOARDING, createdAt: s.createdAt,
+      })),
+      dailyChart,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
