@@ -1,11 +1,23 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
 import { locationStore } from "../locationStore";
 
 const router: IRouter = Router();
+
+async function logColisAction(opts: {
+  colisId: string; trackingRef: string | null | undefined;
+  action: string; agentId: string; agentName: string; companyId: string | null | undefined; notes?: string;
+}) {
+  try {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(colisLogsTable).values({ id, colisId: opts.colisId, trackingRef: opts.trackingRef ?? null,
+      action: opts.action, agentId: opts.agentId, agentName: opts.agentName,
+      companyId: opts.companyId ?? null, notes: opts.notes ?? null } as any);
+  } catch (e) { console.error("[colisLog company] error:", e); }
+}
 
 async function requireCompanyAdmin(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -612,6 +624,10 @@ router.post("/parcels", async (req, res) => {
       Math.random().toString(36).toUpperCase().substr(2, 4);
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
+    const company = await db.select({ id: companiesTable.id })
+      .from(companiesTable).where(eq(companiesTable.userId, user.id)).limit(1);
+    const companyId = company[0]?.id ?? null;
+
     const [parcel] = await db.insert(parcelsTable).values({
       id,
       trackingRef,
@@ -628,8 +644,12 @@ router.post("/parcels", async (req, res) => {
       amount,
       paymentMethod: paymentMethod || "cash",
       paymentStatus: "paid",
-      status:        "en_attente",
+      status:        "créé",
+      companyId,
     }).returning();
+
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef,
+      action: "créé", agentId: user.id, agentName: user.name, companyId }).catch(() => {});
 
     res.status(201).json(parcel);
   } catch (err) {
@@ -2045,6 +2065,86 @@ router.get("/trips/:id/stop-passengers", async (req, res) => {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
+
+/* ─── GET /company/colis-historique ──────────────────────────────────────────
+   Returns the complete parcel event timeline for the company.
+   Optional filters:  ?trackingRef=GBX-XXXX-XXXX   ?date=YYYY-MM-DD
+─────────────────────────────────────────────────────────────────────────── */
+router.get("/colis-historique", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+    const { trackingRef, date } = req.query as { trackingRef?: string; date?: string };
+
+    /* ── 1. Base query: logs for this company ── */
+    let baseWhere = eq(colisLogsTable.companyId, companyId);
+
+    if (trackingRef) {
+      const rows = await db
+        .select({ id: parcelsTable.id })
+        .from(parcelsTable)
+        .where(
+          and(
+            eq(parcelsTable.companyId, companyId),
+            eq(parcelsTable.trackingRef, trackingRef.toUpperCase()),
+          )
+        )
+        .limit(1);
+      const targetColisId = rows[0]?.id;
+      if (!targetColisId) { res.json({ logs: [], total: 0 }); return; }
+      const logs = await db.select().from(colisLogsTable)
+        .where(and(eq(colisLogsTable.companyId, companyId), eq(colisLogsTable.colisId, targetColisId)))
+        .orderBy(desc(colisLogsTable.createdAt))
+        .limit(500);
+      const enriched = await enrichLogs(logs);
+      res.json({ logs: enriched, total: enriched.length });
+      return;
+    }
+
+    /* ── 2. Fetch logs (optionally filtered by date prefix) ── */
+    const rawLogs = await db.select().from(colisLogsTable)
+      .where(baseWhere)
+      .orderBy(desc(colisLogsTable.createdAt))
+      .limit(500);
+
+    /* ── 3. Date filter (client-side — ISO string starts with date) ── */
+    const filtered = date
+      ? rawLogs.filter(l => l.createdAt.toISOString().startsWith(date))
+      : rawLogs;
+
+    const enriched = await enrichLogs(filtered);
+    res.json({ logs: enriched, total: enriched.length });
+  } catch (err) {
+    console.error("GET /company/colis-historique error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── Enrich logs with parcel data (sender, receiver, route) ── */
+async function enrichLogs(logs: typeof colisLogsTable.$inferSelect[]) {
+  if (!logs.length) return [];
+  const colisIds = [...new Set(logs.map(l => l.colisId).filter(Boolean))];
+  const parcels = colisIds.length
+    ? await db.select({
+        id:           parcelsTable.id,
+        trackingRef:  parcelsTable.trackingRef,
+        senderName:   parcelsTable.senderName,
+        receiverName: parcelsTable.receiverName,
+        fromCity:     parcelsTable.fromCity,
+        toCity:       parcelsTable.toCity,
+      }).from(parcelsTable).where(inArray(parcelsTable.id, colisIds))
+    : [];
+  const pm = Object.fromEntries(parcels.map(p => [p.id, p]));
+  return logs.map(l => ({
+    ...l,
+    trackingRef:  l.trackingRef ?? pm[l.colisId]?.trackingRef ?? null,
+    senderName:   pm[l.colisId]?.senderName   ?? null,
+    receiverName: pm[l.colisId]?.receiverName ?? null,
+    fromCity:     pm[l.colisId]?.fromCity     ?? null,
+    toCity:       pm[l.colisId]?.toCity       ?? null,
+  }));
+}
 
 /* ─── GET /company/boarding-logs ─────────────────────────────────────────────
    Returns the list of validated passenger scans for the company.

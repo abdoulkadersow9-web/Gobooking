@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -11,6 +11,35 @@ import { calculateParcelPrice } from "./parcels";
 import { awardPoints, POINTS_PER_TRIP } from "./loyalty";
 
 const router: IRouter = Router();
+
+/* ── Colis log helper ───────────────────────────────────────────────────────
+   Insert an event into colis_logs whenever a parcel status changes.
+─────────────────────────────────────────────────────────────────────────── */
+async function logColisAction(opts: {
+  colisId:     string;
+  trackingRef: string | null | undefined;
+  action:      string;
+  agentId:     string;
+  agentName:   string;
+  companyId:   string | null | undefined;
+  notes?:      string;
+}) {
+  try {
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(colisLogsTable).values({
+      id,
+      colisId:     opts.colisId,
+      trackingRef: opts.trackingRef ?? null,
+      action:      opts.action,
+      agentId:     opts.agentId,
+      agentName:   opts.agentName,
+      companyId:   opts.companyId ?? null,
+      notes:       opts.notes ?? null,
+    } as any);
+  } catch (e) {
+    console.error("[colisLog] error:", e);
+  }
+}
 
 async function requireAgent(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -203,6 +232,12 @@ router.post("/parcels", async (req, res) => {
       ACTIONS.PARCEL_CREATE, parcel[0].id, "parcel",
       { trackingRef, fromCity, toCity, weight, amount }).catch(() => {});
 
+    logColisAction({
+      colisId: parcel[0].id, trackingRef,
+      action: "créé", agentId: user.id, agentName: user.name,
+      companyId: agentRecord?.companyId,
+    }).catch(() => {});
+
     res.status(201).json(parcel[0]);
   } catch (err) {
     console.error("Agent create parcel error:", err);
@@ -224,6 +259,8 @@ router.post("/parcels/:parcelId/en-gare", async (req, res) => {
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "en_gare", trackingRef: parcel.trackingRef }).catch(() => {});
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "en_gare",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
     res.json({ success: true, status: "en_gare" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -256,6 +293,9 @@ router.post("/parcels/:parcelId/charge-bus", async (req, res) => {
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel",
       { status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId, trackingRef: parcel.trackingRef }).catch(() => {});
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "chargé_bus",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId,
+      notes: effectiveBusId ? `Bus: ${effectiveBusId}` : undefined }).catch(() => {});
     res.json({ success: true, status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -280,6 +320,8 @@ router.post("/parcels/:parcelId/arrive", async (req, res) => {
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "arrivé", trackingRef: parcel.trackingRef }).catch(() => {});
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "arrivé",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
     res.json({ success: true, status: "arrivé" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -291,8 +333,11 @@ router.post("/parcels/:parcelId/pickup", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
     await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
       .where(eq(parcelsTable.id, req.params.parcelId));
+    logColisAction({ colisId: req.params.parcelId, trackingRef: null, action: "en_transit",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
     res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -304,8 +349,11 @@ router.post("/parcels/:parcelId/transit", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
     await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
       .where(eq(parcelsTable.id, req.params.parcelId));
+    logColisAction({ colisId: req.params.parcelId, trackingRef: null, action: "en_transit",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
     res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -330,6 +378,8 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "livré", trackingRef: parcel.trackingRef }).catch(() => {});
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "livré",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
     res.json({ success: true, status: "livré" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });

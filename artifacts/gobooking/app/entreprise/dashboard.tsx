@@ -383,7 +383,8 @@ export default function EntrepriseDashboard() {
               { icon: "zap",           label: "Marketing Auto",route: "/entreprise/marketing",     color: "#7C3AED" },
               { icon: "home",          label: "Agences",      route: "/entreprise/agences",        color: "#0369A1" },
               { icon: "git-branch",    label: "Routes",       route: "/entreprise/routes",         color: "#7C3AED" },
-              { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",   color: "#059669" },
+              { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",        color: "#059669" },
+              { icon: "clock",         label: "Histo. colis", route: "/entreprise/colis-historique",    color: "#7C3AED" },
               { icon: "settings",      label: "Gestion",      route: "/dashboard/company",         color: AMBER },
             ].map(it => (
               <Pressable
