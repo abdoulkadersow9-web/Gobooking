@@ -4,6 +4,7 @@ import {
   StyleSheet, StatusBar, ActivityIndicator, Alert, Modal,
   KeyboardAvoidingView, Platform,
 } from "react-native";
+import * as Print from "expo-print";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -92,16 +93,15 @@ export default function ColisScreen() {
   const networkStatus = useNetworkStatus(BASE_URL);
   const [tab, setTab]           = useState<TabType>("creer");
 
-  const isColisAgent = !user?.agentRole ||
-    user.agentRole === "agent_colis" || user.agentRole === "reception_colis";
+  const isAgent = user?.role === "agent";
 
-  if (!isColisAgent) {
+  if (!isAgent) {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
         <StatusBar barStyle="dark-content" />
         <Text style={{ fontSize: 48 }}>🔒</Text>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>Accès non autorisé</Text>
-        <Text style={{ fontSize: 14, color: "#6B7280", textAlign: "center" }}>Cet écran est réservé aux agents colis.</Text>
+        <Text style={{ fontSize: 14, color: "#6B7280", textAlign: "center" }}>Cet espace est réservé aux agents GoBooking.</Text>
         <TouchableOpacity style={{ backgroundColor: P, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}
           onPress={() => router.replace("/agent/home" as never)}>
           <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Retour</Text>
@@ -150,6 +150,119 @@ export default function ColisScreen() {
 /* ═══════════════════════════════════════════
    TAB 1 — Créer un colis
    ═══════════════════════════════════════════ */
+interface CreatedParcel {
+  trackingRef: string;
+  senderName: string;
+  senderPhone: string;
+  receiverName: string;
+  receiverPhone: string;
+  fromCity: string;
+  toCity: string;
+  parcelType: string;
+  weight: string;
+  amount: number;
+  deliveryType: string;
+}
+
+function buildLabelHtml(p: CreatedParcel): string {
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(p.trackingRef)}`;
+  const deliveryLabel = p.deliveryType === "livraison_domicile" ? "Livraison à domicile" : "Retrait en gare";
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<title>Étiquette Colis GoBooking</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; background: #fff; }
+  .label { width: 100mm; min-height: 80mm; margin: 0 auto; padding: 10px; border: 3px solid #7C3AED; border-radius: 8px; }
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #7C3AED; padding-bottom: 8px; margin-bottom: 10px; }
+  .brand { font-size: 14px; font-weight: bold; color: #4C1D95; }
+  .tag   { font-size: 9px; color: #6B7280; }
+  .ref-box { background: #EDE9FE; border-radius: 6px; padding: 6px 10px; text-align: center; margin-bottom: 10px; }
+  .ref   { font-size: 16px; font-weight: bold; color: #7C3AED; letter-spacing: 1px; }
+  .route { font-size: 18px; font-weight: bold; color: #111; text-align: center; margin: 8px 0; }
+  .arrow { color: #7C3AED; }
+  .section { margin-bottom: 8px; }
+  .section-title { font-size: 9px; color: #9CA3AF; text-transform: uppercase; margin-bottom: 3px; }
+  .row   { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
+  .row-key { color: #6B7280; }
+  .row-val { color: #111; font-weight: 600; }
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .party { background: #F5F3FF; border-radius: 6px; padding: 8px; font-size: 11px; }
+  .party-role { font-size: 9px; color: #7C3AED; text-transform: uppercase; font-weight: bold; margin-bottom: 3px; }
+  .party-name { font-weight: 700; color: #111; }
+  .party-phone { color: #6B7280; margin-top: 2px; }
+  .bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; border-top: 1px dashed #DDD6FE; padding-top: 8px; }
+  .delivery-badge { background: #7C3AED; color: #fff; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+  .footer { font-size: 8px; color: #9CA3AF; text-align: center; margin-top: 8px; }
+  @media print {
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .label { border: 3px solid #7C3AED; }
+  }
+</style>
+</head>
+<body>
+<div class="label">
+  <div class="header">
+    <div>
+      <div class="brand">📦 GoBooking Colis</div>
+      <div class="tag">Transport Côte d'Ivoire</div>
+    </div>
+    <div class="tag">${new Date().toLocaleDateString("fr-FR")}</div>
+  </div>
+
+  <div class="ref-box">
+    <div class="ref">${p.trackingRef}</div>
+  </div>
+
+  <div class="route">${p.fromCity} <span class="arrow">→</span> ${p.toCity}</div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="party-role">Expéditeur</div>
+      <div class="party-name">${p.senderName}</div>
+      <div class="party-phone">${p.senderPhone}</div>
+    </div>
+    <div class="party">
+      <div class="party-role">Destinataire</div>
+      <div class="party-name">${p.receiverName}</div>
+      <div class="party-phone">${p.receiverPhone}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="row"><span class="row-key">Type</span><span class="row-val">${p.parcelType}</span></div>
+    ${p.weight ? `<div class="row"><span class="row-key">Poids</span><span class="row-val">${p.weight} kg</span></div>` : ""}
+    <div class="row"><span class="row-key">Montant</span><span class="row-val">${Number(p.amount).toLocaleString("fr-FR")} FCFA</span></div>
+  </div>
+
+  <div class="bottom">
+    <div>
+      <div class="delivery-badge">${deliveryLabel}</div>
+      <div class="footer" style="margin-top:6px">Scannez le QR pour suivre</div>
+    </div>
+    <img src="${qrUrl}" width="90" height="90" alt="QR" />
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+async function printLabel(p: CreatedParcel) {
+  try {
+    const html = buildLabelHtml(p);
+    if (Platform.OS === "web") {
+      const win = window.open("", "_blank");
+      if (win) { win.document.write(html); win.document.close(); win.print(); }
+    } else {
+      await Print.printAsync({ html });
+    }
+  } catch (e: any) {
+    Alert.alert("Impression", e?.message ?? "Impossible d'ouvrir l'impression.");
+  }
+}
+
 function CreateTab({ token, networkStatus }: { token: string | null; networkStatus: any }) {
   const [fromCity, setFromCity]       = useState("Abidjan");
   const [toCity, setToCity]           = useState("Bouaké");
@@ -163,7 +276,8 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [deliveryType, setDeliveryType]   = useState("livraison_gare");
   const [submitting, setSubmitting]   = useState(false);
-  const [created, setCreated]         = useState<{ trackingRef: string } | null>(null);
+  const [printing, setPrinting]       = useState(false);
+  const [created, setCreated]         = useState<CreatedParcel | null>(null);
 
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
@@ -185,7 +299,13 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
           receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(),
           parcelType, weight: weight.trim(), amount: Number(amount), paymentMethod, deliveryType },
       });
-      setCreated({ trackingRef: res.trackingRef ?? res.id ?? "—" });
+      setCreated({
+        trackingRef: res.trackingRef ?? res.id ?? "—",
+        senderName: senderName.trim(), senderPhone: senderPhone.trim(),
+        receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(),
+        fromCity, toCity, parcelType, weight: weight.trim(),
+        amount: Number(amount), deliveryType,
+      });
     } catch (e: any) {
       if (e?.status === 404 || e?.status === 405) {
         Alert.alert("Info", "L'endpoint de création sera disponible prochainement.");
@@ -202,17 +322,51 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
     setReceiverName(""); setReceiverPhone(""); setWeight(""); setAmount("");
   };
 
+  const handlePrint = async () => {
+    if (!created) return;
+    setPrinting(true);
+    await printLabel(created);
+    setPrinting(false);
+  };
+
   if (created) {
     return (
-      <ScrollView contentContainerStyle={[SC.content, { alignItems: "center", paddingTop: 50 }]}>
-        <Ionicons name="checkmark-circle" size={80} color={G} />
+      <ScrollView contentContainerStyle={[SC.content, { alignItems: "center", paddingTop: 40 }]}>
+        <Ionicons name="checkmark-circle" size={72} color={G} />
         <Text style={{ fontSize: 24, fontWeight: "800", color: "#111827", marginTop: 12 }}>Colis enregistré !</Text>
-        <View style={{ backgroundColor: P_LIGHT, borderRadius: 14, padding: 16, marginTop: 16, alignItems: "center", width: "100%" }}>
-          <Text style={{ fontSize: 12, color: "#6B7280" }}>Numéro de suivi</Text>
-          <Text style={{ fontSize: 22, fontWeight: "800", color: P, marginTop: 4 }}>{created.trackingRef}</Text>
+
+        {/* Recap card */}
+        <View style={{ backgroundColor: P_LIGHT, borderRadius: 14, padding: 16, marginTop: 16, width: "100%", borderWidth: 2, borderColor: "#DDD6FE", gap: 6 }}>
+          <View style={{ alignItems: "center", borderBottomWidth: 1, borderColor: "#DDD6FE", paddingBottom: 10, marginBottom: 6 }}>
+            <Text style={{ fontSize: 12, color: "#6B7280" }}>Numéro de suivi</Text>
+            <Text style={{ fontSize: 20, fontWeight: "800", color: P, marginTop: 2, letterSpacing: 1 }}>{created.trackingRef}</Text>
+          </View>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#111", textAlign: "center" }}>{created.fromCity} → {created.toCity}</Text>
+          {[
+            { k: "Expéditeur",   v: `${created.senderName} · ${created.senderPhone}` },
+            { k: "Destinataire", v: `${created.receiverName} · ${created.receiverPhone}` },
+            { k: "Type",         v: created.parcelType },
+            { k: "Montant",      v: `${Number(created.amount).toLocaleString("fr-FR")} FCFA` },
+          ].map(r => (
+            <View key={r.k} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 3, borderBottomWidth: 1, borderColor: "#EDE9FE" }}>
+              <Text style={{ fontSize: 12, color: "#6B7280" }}>{r.k}</Text>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#111", flexShrink: 1, textAlign: "right", maxWidth: "60%" }}>{r.v}</Text>
+            </View>
+          ))}
         </View>
+
         <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 10 }}>Transmettez ce numéro à l'expéditeur.</Text>
-        <TouchableOpacity style={[SC.submitBtn, { marginTop: 28 }]} onPress={reset}>
+
+        <TouchableOpacity
+          style={{ marginTop: 20, backgroundColor: "#4C1D95", flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14, width: "100%", justifyContent: "center" }}
+          onPress={handlePrint} disabled={printing}>
+          {printing
+            ? <ActivityIndicator color="#fff" />
+            : <><Ionicons name="print-outline" size={20} color="#fff" /><Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Imprimer l'étiquette</Text></>
+          }
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[SC.submitBtn, { marginTop: 10 }]} onPress={reset}>
           <Ionicons name="add-circle-outline" size={20} color="#fff" />
           <Text style={SC.submitTxt}>Nouveau colis</Text>
         </TouchableOpacity>
@@ -400,19 +554,34 @@ function ListTab({ token }: { token: string | null }) {
               <Text style={SL.metaTxt}>{p.parcelType} {p.weight ? `· ${p.weight}kg` : ""}</Text>
               <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
             </View>
-            {NEXT_ACTION[p.status] && (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {NEXT_ACTION[p.status] && (
+                <TouchableOpacity
+                  style={[SL.actionBtn, { borderColor: NEXT_ACTION[p.status].color, flex: 1 }]}
+                  onPress={() => handleStatusUpdate(p)}
+                  disabled={updating === p.id}
+                >
+                  {updating === p.id ? <ActivityIndicator size="small" color={NEXT_ACTION[p.status].color} /> : (
+                    <Text style={[SL.actionTxt, { color: NEXT_ACTION[p.status].color }]}>
+                      {NEXT_ACTION[p.status].label}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
-                style={[SL.actionBtn, { borderColor: NEXT_ACTION[p.status].color }]}
-                onPress={() => handleStatusUpdate(p)}
-                disabled={updating === p.id}
+                style={[SL.actionBtn, { borderColor: "#7C3AED", paddingHorizontal: 12 }]}
+                onPress={() => printLabel({
+                  trackingRef: p.trackingRef,
+                  senderName: p.senderName, senderPhone: p.senderPhone,
+                  receiverName: p.receiverName, receiverPhone: p.receiverPhone,
+                  fromCity: p.fromCity, toCity: p.toCity,
+                  parcelType: p.parcelType, weight: p.weight ?? "",
+                  amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
+                })}
               >
-                {updating === p.id ? <ActivityIndicator size="small" color={NEXT_ACTION[p.status].color} /> : (
-                  <Text style={[SL.actionTxt, { color: NEXT_ACTION[p.status].color }]}>
-                    {NEXT_ACTION[p.status].label}
-                  </Text>
-                )}
+                <Ionicons name="print-outline" size={16} color="#7C3AED" />
               </TouchableOpacity>
-            )}
+            </View>
           </View>
         ))}
       </ScrollView>

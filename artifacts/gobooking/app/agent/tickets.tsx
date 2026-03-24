@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, StatusBar, ActivityIndicator, Alert,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import * as Print from "expo-print";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
@@ -25,12 +26,103 @@ interface Trip {
   date: string;
 }
 
+interface Confirmed {
+  bookingRef: string;
+  total: number;
+  passengerName: string;
+  passengerPhone: string;
+  seatCount: number;
+  trip: Trip;
+  paymentLabel: string;
+}
+
 const PAYMENT_METHODS = [
-  { id: "cash",         label: "Espèces",      icon: "cash-outline" as const },
-  { id: "orange",       label: "Orange Money", icon: "phone-portrait-outline" as const },
-  { id: "mtn",          label: "MTN Money",    icon: "phone-portrait-outline" as const },
-  { id: "wave",         label: "Wave",         icon: "phone-portrait-outline" as const },
+  { id: "cash",   label: "Espèces",      icon: "cash-outline" as const },
+  { id: "orange", label: "Orange Money", icon: "phone-portrait-outline" as const },
+  { id: "mtn",    label: "MTN Money",    icon: "phone-portrait-outline" as const },
+  { id: "wave",   label: "Wave",         icon: "phone-portrait-outline" as const },
 ];
+
+function buildTicketHtml(c: Confirmed): string {
+  const qrData = encodeURIComponent(c.bookingRef);
+  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${qrData}`;
+  const isOffline = c.bookingRef.startsWith("OFFLINE-");
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Billet GoBooking</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; background: #fff; padding: 0; }
+  .ticket { width: 80mm; margin: 0 auto; padding: 10px; border: 2px dashed #D97706; border-radius: 8px; }
+  .header { text-align: center; border-bottom: 1px dashed #ccc; padding-bottom: 8px; margin-bottom: 10px; }
+  .logo { font-size: 18px; font-weight: bold; color: #92400E; letter-spacing: 2px; }
+  .sub  { font-size: 10px; color: #6B7280; margin-top: 2px; }
+  .ref  { font-size: 14px; font-weight: bold; color: #D97706; text-align: center; letter-spacing: 1px; margin: 8px 0; padding: 6px; background: #FEF3C7; border-radius: 4px; }
+  .route { text-align: center; font-size: 16px; font-weight: bold; color: #111; margin: 6px 0; }
+  .arrow { color: #D97706; }
+  table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; }
+  td { padding: 4px 2px; vertical-align: top; }
+  td:first-child { color: #6B7280; width: 40%; }
+  td:last-child { color: #111; font-weight: 600; text-align: right; }
+  .divider { border-top: 1px dashed #ccc; margin: 8px 0; }
+  .total-row td { font-size: 13px; font-weight: bold; color: #D97706; padding-top: 8px; }
+  .qr-section { text-align: center; margin-top: 10px; }
+  .qr-section img { width: 100px; height: 100px; }
+  .qr-label { font-size: 9px; color: #9CA3AF; margin-top: 4px; }
+  .footer { text-align: center; font-size: 9px; color: #9CA3AF; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ccc; }
+  .offline-badge { background: #FEF3C7; color: #92400E; font-size: 9px; padding: 3px 6px; border-radius: 3px; text-align: center; margin-top: 4px; }
+  @media print {
+    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .ticket { border: 2px dashed #D97706; }
+  }
+</style>
+</head>
+<body>
+<div class="ticket">
+  <div class="header">
+    <div class="logo">🚌 GoBooking</div>
+    <div class="sub">Billet de transport · Côte d'Ivoire</div>
+  </div>
+
+  <div class="route">${c.trip.from} <span class="arrow">→</span> ${c.trip.to}</div>
+  <div class="ref">${c.bookingRef}</div>
+
+  <table>
+    <tr><td>Passager</td><td>${c.passengerName}</td></tr>
+    <tr><td>Téléphone</td><td>${c.passengerPhone}</td></tr>
+    <tr><td>Date</td><td>${c.trip.date}</td></tr>
+    <tr><td>Départ</td><td>${c.trip.departureTime}</td></tr>
+    <tr><td>Places</td><td>${c.seatCount} siège(s)</td></tr>
+    <tr><td>Paiement</td><td>${c.paymentLabel}</td></tr>
+  </table>
+
+  <div class="divider"></div>
+  <table>
+    <tr class="total-row">
+      <td>TOTAL</td>
+      <td>${c.total.toLocaleString("fr-FR")} FCFA</td>
+    </tr>
+  </table>
+
+  ${isOffline ? '<div class="offline-badge">⚡ Billet hors ligne — sera synchronisé</div>' : ""}
+
+  <div class="qr-section">
+    <img src="${qrUrl}" alt="QR Code" />
+    <div class="qr-label">Scannez pour valider l'embarquement</div>
+  </div>
+
+  <div class="footer">
+    Émis le ${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}<br/>
+    Conservez ce billet jusqu'à destination.<br/>
+    Merci de voyager avec GoBooking !
+  </div>
+</div>
+</body>
+</html>`;
+}
 
 export default function TicketsScreen() {
   const { user, token, logout } = useAuth();
@@ -44,10 +136,10 @@ export default function TicketsScreen() {
   const [passengerCount, setPassengerCount] = useState("1");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [submitting, setSubmitting] = useState(false);
-  const [confirmed, setConfirmed]   = useState<{ bookingRef: string; total: number } | null>(null);
+  const [printing, setPrinting]     = useState(false);
+  const [confirmed, setConfirmed]   = useState<Confirmed | null>(null);
 
-  const isTicketAgent = !user?.agentRole ||
-    user.agentRole === "agent_ticket" || user.agentRole === "vente";
+  const isAgent = user?.role === "agent";
 
   const fetchTrips = async () => {
     setLoadingTrips(true);
@@ -63,13 +155,13 @@ export default function TicketsScreen() {
 
   useEffect(() => { fetchTrips(); }, []);
 
-  if (!isTicketAgent) {
+  if (!isAgent) {
     return (
       <SafeAreaView style={S.denied}>
         <StatusBar barStyle="dark-content" />
         <Text style={{ fontSize: 48 }}>🔒</Text>
         <Text style={S.deniedTitle}>Accès non autorisé</Text>
-        <Text style={S.deniedSub}>Cet écran est réservé aux agents ticketing.</Text>
+        <Text style={S.deniedSub}>Cet espace est réservé aux agents GoBooking.</Text>
         <TouchableOpacity style={S.deniedBtn} onPress={() => router.replace("/agent/home" as never)}>
           <Text style={S.deniedBtnTxt}>Retour</Text>
         </TouchableOpacity>
@@ -83,6 +175,7 @@ export default function TicketsScreen() {
     if (!passengerPhone.trim()) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
     const count = parseInt(passengerCount) || 1;
     if (count < 1 || count > 10) { Alert.alert("Erreur", "Nombre de passagers invalide (1-10)."); return; }
+    const pmLabel = PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label ?? paymentMethod;
 
     setSubmitting(true);
     try {
@@ -94,7 +187,9 @@ export default function TicketsScreen() {
             passengerPhone: passengerPhone.trim(), seatCount: count, paymentMethod },
           token: token ?? "", createdAt: Date.now(),
         });
-        setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count });
+        setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count,
+          passengerName: passengerName.trim(), passengerPhone: passengerPhone.trim(),
+          seatCount: count, trip: selectedTrip, paymentLabel: pmLabel });
         return;
       }
       const res = await apiFetch<{ bookingRef?: string; id?: string }>("/company/reservations", {
@@ -102,11 +197,37 @@ export default function TicketsScreen() {
         body: { tripId: selectedTrip.id, clientName: passengerName.trim(),
           clientPhone: passengerPhone.trim(), seatCount: count, paymentMethod },
       });
-      setConfirmed({ bookingRef: res.bookingRef ?? res.id ?? "—", total: selectedTrip.price * count });
+      setConfirmed({
+        bookingRef: res.bookingRef ?? res.id ?? "—",
+        total: selectedTrip.price * count,
+        passengerName: passengerName.trim(),
+        passengerPhone: passengerPhone.trim(),
+        seatCount: count,
+        trip: selectedTrip,
+        paymentLabel: pmLabel,
+      });
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePrint = async () => {
+    if (!confirmed) return;
+    setPrinting(true);
+    try {
+      const html = buildTicketHtml(confirmed);
+      if (Platform.OS === "web") {
+        const win = window.open("", "_blank");
+        if (win) { win.document.write(html); win.document.close(); win.print(); }
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (e: any) {
+      Alert.alert("Impression", e?.message ?? "Impossible d'ouvrir l'impression.");
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -125,24 +246,57 @@ export default function TicketsScreen() {
             <View style={S.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
             <View>
               <Text style={S.headerTitle}>🎫 Espace Ticketing</Text>
-              <Text style={S.headerSub}>Vente de billets en gare</Text>
+              <Text style={S.headerSub}>Billet émis avec succès</Text>
             </View>
           </View>
           <TouchableOpacity onPress={logout} style={S.logoutBtn}>
             <Text style={S.logoutTxt}>Déco.</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 40 }]}>
-          <Ionicons name="checkmark-circle" size={80} color="#16a34a" />
+        <ScrollView contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 32 }]}>
+          <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
           <Text style={S.successTitle}>Billet émis !</Text>
-          <Text style={S.successRef}>Réf : {confirmed.bookingRef}</Text>
-          <Text style={S.successTotal}>{confirmed.total.toLocaleString()} FCFA encaissés</Text>
+
+          {/* Ticket recap card */}
+          <View style={S.ticketCard}>
+            <View style={S.ticketCardHeader}>
+              <Text style={S.ticketRef}>{confirmed.bookingRef}</Text>
+            </View>
+            <Text style={S.ticketRoute}>{confirmed.trip.from} → {confirmed.trip.to}</Text>
+            {[
+              { k: "Passager",   v: confirmed.passengerName },
+              { k: "Téléphone",  v: confirmed.passengerPhone },
+              { k: "Date",       v: confirmed.trip.date },
+              { k: "Départ",     v: confirmed.trip.departureTime },
+              { k: "Places",     v: `${confirmed.seatCount}` },
+              { k: "Paiement",   v: confirmed.paymentLabel },
+            ].map(r => (
+              <View key={r.k} style={S.ticketRow}>
+                <Text style={S.ticketKey}>{r.k}</Text>
+                <Text style={S.ticketVal}>{r.v}</Text>
+              </View>
+            ))}
+            <View style={[S.ticketRow, S.ticketTotalRow]}>
+              <Text style={S.ticketTotalKey}>TOTAL</Text>
+              <Text style={S.ticketTotalVal}>{confirmed.total.toLocaleString("fr-FR")} FCFA</Text>
+            </View>
+          </View>
+
           {confirmed.bookingRef.startsWith("OFFLINE-") && (
             <View style={S.offlineBanner}>
               <Ionicons name="cloud-offline-outline" size={18} color="#D97706" />
               <Text style={S.offlineTxt}>Sauvegardé hors ligne — sync automatique dès retour connexion.</Text>
             </View>
           )}
+
+          {/* Action buttons */}
+          <TouchableOpacity style={S.printBtn} onPress={handlePrint} disabled={printing}>
+            {printing
+              ? <ActivityIndicator color="#fff" />
+              : <><Ionicons name="print-outline" size={20} color="#fff" /><Text style={S.printBtnTxt}>Imprimer le ticket</Text></>
+            }
+          </TouchableOpacity>
+
           <TouchableOpacity style={S.newSaleBtn} onPress={reset}>
             <Ionicons name="add-circle-outline" size={20} color="#fff" />
             <Text style={S.newSaleBtnTxt}>Nouvelle vente</Text>
@@ -333,9 +487,21 @@ const S = StyleSheet.create({
   offlineBanner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 12, marginTop: 8, maxWidth: 320 },
   offlineTxt:    { flex: 1, fontSize: 12, color: "#92400E", lineHeight: 18 },
 
-  successTitle:  { fontSize: 24, fontWeight: "800", color: "#111827", marginTop: 12 },
-  successRef:    { fontSize: 16, fontWeight: "700", color: "#16a34a", marginTop: 4 },
-  successTotal:  { fontSize: 15, color: "#374151", marginTop: 4 },
-  newSaleBtn:    { marginTop: 28, backgroundColor: G, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14 },
-  newSaleBtnTxt: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  successTitle: { fontSize: 24, fontWeight: "800", color: "#111827", marginTop: 12 },
+
+  ticketCard: { width: "100%", backgroundColor: "#FFFBEB", borderRadius: 14, padding: 16, borderWidth: 2, borderColor: "#FDE68A", marginTop: 16, gap: 6 },
+  ticketCardHeader: { borderBottomWidth: 1, borderColor: "#FDE68A", paddingBottom: 10, marginBottom: 6, alignItems: "center" },
+  ticketRef:  { fontSize: 16, fontWeight: "800", color: G, letterSpacing: 1 },
+  ticketRoute:{ fontSize: 15, fontWeight: "700", color: "#111827", textAlign: "center", marginBottom: 8 },
+  ticketRow:  { flexDirection: "row", justifyContent: "space-between", paddingVertical: 4, borderBottomWidth: 1, borderColor: "#FEF3C7" },
+  ticketKey:  { fontSize: 12, color: "#6B7280" },
+  ticketVal:  { fontSize: 12, fontWeight: "700", color: "#111827" },
+  ticketTotalRow: { borderTopWidth: 2, borderColor: "#FDE68A", borderBottomWidth: 0, paddingTop: 10, marginTop: 4 },
+  ticketTotalKey: { fontSize: 14, fontWeight: "800", color: G_DARK },
+  ticketTotalVal: { fontSize: 16, fontWeight: "800", color: G },
+
+  printBtn:    { marginTop: 20, backgroundColor: G_DARK, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, width: "100%", justifyContent: "center" },
+  printBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  newSaleBtn:    { marginTop: 10, backgroundColor: G, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, width: "100%", justifyContent: "center" },
+  newSaleBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 15 },
 });
