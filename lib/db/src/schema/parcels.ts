@@ -22,7 +22,11 @@ export const parcelsTable = pgTable("parcels", {
   commissionAmount: real("commission_amount").notNull().default(0),
   paymentMethod: varchar("payment_method", { length: 30 }).notNull().default("orange"),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("paid"),
-  status: varchar("status", { length: 30 }).notNull().default("en_attente"),
+  status: varchar("status", { length: 30 }).notNull().default("créé"),
+  busId: text("bus_id"),
+  tripId: text("trip_id"),
+  companyId: text("company_id"),
+  statusUpdatedAt: timestamp("status_updated_at"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

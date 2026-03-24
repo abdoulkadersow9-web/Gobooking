@@ -200,20 +200,26 @@ router.patch("/:parcelId/status", async (req, res) => {
       return;
     }
 
-    const { status } = req.body;
+    const { status, busId, tripId } = req.body;
     const validStatuses = [
       "en_attente", "confirme", "en_cours_ramassage",
       "arrive_gare_depart", "pris_en_charge", "en_transit",
       "arrive_destination", "en_livraison", "livre", "annule",
+      "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "livré", "annulé",
     ];
     if (!validStatuses.includes(status)) {
       res.status(400).json({ error: "Statut invalide" });
       return;
     }
 
+    const updatePayload: Record<string, unknown> = { status, statusUpdatedAt: new Date() };
+    if (status === "chargé_bus") {
+      if (busId) updatePayload.busId = busId;
+      if (tripId) updatePayload.tripId = tripId;
+    }
     await db
       .update(parcelsTable)
-      .set({ status })
+      .set(updatePayload as any)
       .where(eq(parcelsTable.id, req.params.parcelId));
 
     const updated = await db

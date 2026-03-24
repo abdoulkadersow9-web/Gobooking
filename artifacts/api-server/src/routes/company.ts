@@ -310,10 +310,49 @@ router.get("/bookings", async (req, res) => {
 
 router.get("/parcels", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const parcels = await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt));
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const parcels = await db.select().from(parcelsTable)
+      .where(eq(parcelsTable.companyId, ctx.companyId))
+      .orderBy(desc(parcelsTable.createdAt));
     res.json(parcels);
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+router.get("/parcels/stats", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const today = new Date().toISOString().split("T")[0];
+    const parcels = await db.select().from(parcelsTable)
+      .where(eq(parcelsTable.companyId, ctx.companyId))
+      .orderBy(desc(parcelsTable.createdAt));
+
+    const todayParcels = parcels.filter(p => p.createdAt?.toISOString().startsWith(today));
+
+    res.json({
+      total: parcels.length,
+      createdToday: todayParcels.length,
+      byStatus: {
+        créé:        parcels.filter(p => p.status === "créé").length,
+        en_gare:     parcels.filter(p => p.status === "en_gare").length,
+        chargé_bus:  parcels.filter(p => p.status === "chargé_bus").length,
+        en_transit:  parcels.filter(p => p.status === "en_transit").length,
+        arrivé:      parcels.filter(p => p.status === "arrivé").length,
+        livré:       parcels.filter(p => p.status === "livré").length,
+        annulé:      parcels.filter(p => p.status === "annulé").length,
+      },
+      recent: parcels.slice(0, 10).map(p => ({
+        id: p.id, trackingRef: p.trackingRef, status: p.status,
+        fromCity: p.fromCity, toCity: p.toCity,
+        senderName: p.senderName, receiverName: p.receiverName,
+        busId: p.busId, tripId: p.tripId, amount: p.amount,
+        createdAt: p.createdAt?.toISOString(),
+      })),
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

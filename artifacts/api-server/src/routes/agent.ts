@@ -7,6 +7,7 @@ import { tokenStore } from "./auth";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
 import { sendExpoPush } from "../pushService";
+import { calculateParcelPrice } from "./parcels";
 
 const router: IRouter = Router();
 
@@ -89,54 +90,246 @@ router.post("/boarding/:bookingId/validate", async (req, res) => {
   }
 });
 
+/* ─── PARCEL MANAGEMENT — Gestion professionnelle des colis ──────────────── */
+
+const PARCEL_STATUSES = ["créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "livré", "annulé"] as const;
+type ParcelStatus = typeof PARCEL_STATUSES[number];
+
+async function getAgentCompany(userId: string) {
+  const agents = await db.select().from(agentsTable).where(eq(agentsTable.userId, userId)).limit(1);
+  return agents[0] ?? null;
+}
+
+async function getParcelAndCheckAccess(parcelId: string, agentCompanyId: string | null | undefined) {
+  const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, parcelId)).limit(1);
+  if (!rows.length) return { error: "Colis introuvable", parcel: null };
+  const parcel = rows[0];
+  if (agentCompanyId && parcel.companyId && parcel.companyId !== agentCompanyId) {
+    return { error: "Accès refusé — ce colis appartient à une autre compagnie", parcel: null };
+  }
+  return { error: null, parcel };
+}
+
+/* GET /agent/parcels — list company's parcels (with optional status filter) */
 router.get("/parcels", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const parcels = await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)).limit(30);
-    res.json(parcels);
+    const agentRecord = await getAgentCompany(user.id);
+    const companyId = agentRecord?.companyId ?? null;
+
+    const parcels = companyId
+      ? await db.select().from(parcelsTable)
+          .where(eq(parcelsTable.companyId, companyId))
+          .orderBy(desc(parcelsTable.createdAt))
+      : await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)).limit(50);
+
+    const { status } = req.query;
+    const filtered = status ? parcels.filter(p => p.status === status) : parcels;
+
+    res.json(filtered);
+  } catch (err) {
+    console.error("GET /agent/parcels error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* GET /agent/parcels/by-bus/:busId — parcels loaded on a specific bus */
+router.get("/parcels/by-bus/:busId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRecord = await getAgentCompany(user.id);
+    const companyId = agentRecord?.companyId ?? null;
+
+    const parcels = await db.select().from(parcelsTable)
+      .where(eq(parcelsTable.busId, req.params.busId))
+      .orderBy(desc(parcelsTable.createdAt));
+
+    const filtered = companyId ? parcels.filter(p => !p.companyId || p.companyId === companyId) : parcels;
+    res.json(filtered);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
 });
 
+/* POST /agent/parcels — agent creates a parcel (status: "créé") */
+router.post("/parcels", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRecord = await getAgentCompany(user.id);
+    const {
+      senderName, senderPhone, receiverName, receiverPhone,
+      fromCity, toCity, parcelType, weight, description,
+      deliveryType, paymentMethod, notes,
+    } = req.body;
+
+    if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
+        !fromCity || !toCity || !parcelType || !weight || !deliveryType) {
+      res.status(400).json({ error: "Champs obligatoires manquants" });
+      return;
+    }
+
+    const amount = calculateParcelPrice(fromCity, toCity, parseFloat(weight), deliveryType);
+    const commissionAmount = Math.round(amount * 0.05);
+
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let part1 = "", part2 = "";
+    for (let i = 0; i < 4; i++) part1 += chars[Math.floor(Math.random() * chars.length)];
+    for (let i = 0; i < 4; i++) part2 += chars[Math.floor(Math.random() * chars.length)];
+    const trackingRef = `GBX-${part1}-${part2}`;
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const parcel = await db.insert(parcelsTable).values({
+      id, trackingRef, userId: user.id,
+      senderName, senderPhone, receiverName, receiverPhone,
+      fromCity, toCity, parcelType,
+      weight: parseFloat(weight),
+      description: description || null,
+      deliveryType, amount, commissionAmount,
+      paymentMethod: paymentMethod || "orange",
+      paymentStatus: "paid",
+      status: "créé",
+      companyId: agentRecord?.companyId ?? null,
+      notes: notes || null,
+    } as any).returning();
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.PARCEL_CREATE, parcel[0].id, "parcel",
+      { trackingRef, fromCity, toCity, weight, amount }).catch(() => {});
+
+    res.status(201).json(parcel[0]);
+  } catch (err) {
+    console.error("Agent create parcel error:", err);
+    res.status(500).json({ error: "Échec de la création du colis" });
+  }
+});
+
+/* POST /agent/parcels/:id/en-gare — parcel arrives at departure station */
+router.post("/parcels/:parcelId/en-gare", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
+
+    await db.update(parcelsTable).set({ status: "en_gare", statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, parcel.id));
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "en_gare", trackingRef: parcel.trackingRef }).catch(() => {});
+    res.json({ success: true, status: "en_gare" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/parcels/:id/charge-bus — load parcel onto bus */
+router.post("/parcels/:parcelId/charge-bus", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
+
+    const { busId, tripId } = req.body;
+    const effectiveBusId = busId || agentRecord?.busId || null;
+    const effectiveTripId = tripId || agentRecord?.tripId || null;
+
+    if (!effectiveBusId) {
+      res.status(400).json({ error: "busId requis pour charger dans un bus" });
+      return;
+    }
+
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
+
+    await db.update(parcelsTable)
+      .set({ status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId, statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, parcel.id));
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.PARCEL_STATUS, parcel.id, "parcel",
+      { status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId, trackingRef: parcel.trackingRef }).catch(() => {});
+    res.json({ success: true, status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/parcels/:id/arrive — old endpoint still supported via parcels route */
+router.post("/parcels/:parcelId/arrive", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
+
+    await db.update(parcelsTable).set({ status: "arrivé", statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, parcel.id));
+
+    const userRows = await db.select({ pushToken: usersTable.pushToken })
+      .from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+    sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis ${parcel.trackingRef} est arrivé à destination.`).catch(() => {});
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "arrivé", trackingRef: parcel.trackingRef }).catch(() => {});
+    res.json({ success: true, status: "arrivé" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/parcels/:id/pickup — pris en charge (kept for backward compat) */
 router.post("/parcels/:parcelId/pickup", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    await db.update(parcelsTable).set({ status: "pris_en_charge" }).where(eq(parcelsTable.id, req.params.parcelId));
-    res.json({ success: true });
+    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, req.params.parcelId));
+    res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
 });
 
+/* POST /agent/parcels/:id/transit */
 router.post("/parcels/:parcelId/transit", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    await db.update(parcelsTable).set({ status: "en_transit" }).where(eq(parcelsTable.id, req.params.parcelId));
-    res.json({ success: true });
+    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, req.params.parcelId));
+    res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
 });
 
+/* POST /agent/parcels/:id/deliver — livré */
 router.post("/parcels/:parcelId/deliver", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    await db.update(parcelsTable).set({ status: "livre" }).where(eq(parcelsTable.id, req.params.parcelId));
+    const agentRecord = await getAgentCompany(user.id);
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
 
-    /* ── Notify sender ── */
-    const parcels = await db.select().from(parcelsTable).where(eq(parcelsTable.id, req.params.parcelId)).limit(1);
-    if (parcels.length) {
-      const userRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcels[0].userId)).limit(1);
-      sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis a été livré à destination.`).catch(() => {});
-    }
+    await db.update(parcelsTable).set({ status: "livré", statusUpdatedAt: new Date() } as any)
+      .where(eq(parcelsTable.id, parcel.id));
 
-    res.json({ success: true });
+    const userRows = await db.select({ pushToken: usersTable.pushToken })
+      .from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+    sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis ${parcel.trackingRef} a été livré. Merci !`).catch(() => {});
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "livré", trackingRef: parcel.trackingRef }).catch(() => {});
+    res.json({ success: true, status: "livré" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
