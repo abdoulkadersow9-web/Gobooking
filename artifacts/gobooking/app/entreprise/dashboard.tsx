@@ -18,6 +18,14 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
+interface Alerte {
+  type: "bus" | "colis" | "trajet";
+  severity: "critical" | "warning";
+  message: string;
+  detail: string;
+  id: string;
+}
+
 interface BookingStats {
   total: number; confirmed: number; paid: number;
   boarded: number; cancelled: number; pending: number;
@@ -177,6 +185,8 @@ export default function EntrepriseDashboard() {
 
   const [data, setData]             = useState<DashboardData | null>(null);
   const [scanStats, setScanStats]   = useState<ScanStats | null>(null);
+  const [alertes, setAlertes]       = useState<Alerte[]>([]);
+  const [alertesOpen, setAlertesOpen] = useState(true);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]           = useState<string | null>(null);
@@ -185,12 +195,14 @@ export default function EntrepriseDashboard() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const [dashRes, scanRes] = await Promise.all([
+      const [dashRes, scanRes, alertRes] = await Promise.all([
         apiFetch<DashboardData>("/company/dashboard", { token: token ?? undefined }),
         apiFetch<{ stats: ScanStats }>("/company/scan-stats",  { token: token ?? undefined }).catch(() => null),
+        apiFetch<{ alertes: Alerte[] }>("/company/alertes", { token: token ?? undefined }).catch(() => null),
       ]);
       setData(dashRes);
       if (scanRes) setScanStats(scanRes.stats);
+      if (alertRes?.alertes) setAlertes(alertRes.alertes);
     } catch (e: any) {
       setError(e.message || "Erreur de chargement");
     } finally {
@@ -268,6 +280,49 @@ export default function EntrepriseDashboard() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AMBER} />
         }
       >
+        {/* ── Alertes automatiques ── */}
+        {alertes.length > 0 && (
+          <View style={ss.alertBox}>
+            <Pressable style={ss.alertHeader} onPress={() => setAlertesOpen(o => !o)}>
+              <View style={ss.alertTitleRow}>
+                <View style={ss.alertIconBox}>
+                  <Text style={{ fontSize: 16 }}>⚠️</Text>
+                </View>
+                <View>
+                  <Text style={ss.alertTitle}>Alertes</Text>
+                  <Text style={ss.alertSub}>{alertes.length} problème{alertes.length > 1 ? "s" : ""} détecté{alertes.length > 1 ? "s" : ""}</Text>
+                </View>
+              </View>
+              <View style={ss.alertCountBadge}>
+                <Text style={ss.alertCountTxt}>{alertes.length}</Text>
+              </View>
+              <Feather name={alertesOpen ? "chevron-up" : "chevron-down"} size={16} color="#B91C1C" style={{ marginLeft: 4 }} />
+            </Pressable>
+
+            {alertesOpen && (
+              <View style={ss.alertList}>
+                {alertes.map((a, i) => {
+                  const typeIcon = a.type === "bus" ? "🚌" : a.type === "colis" ? "📦" : "🗺️";
+                  const isCritical = a.severity === "critical";
+                  return (
+                    <View
+                      key={a.id + i}
+                      style={[ss.alertRow, isCritical && { backgroundColor: "#FEE2E2" }, i === alertes.length - 1 && { borderBottomWidth: 0 }]}
+                    >
+                      <Text style={{ fontSize: 16, marginRight: 8 }}>{typeIcon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={ss.alertMsg}>{a.message}</Text>
+                        {!!a.detail && <Text style={ss.alertDetail}>{a.detail}</Text>}
+                      </View>
+                      <View style={[ss.severityDot, { backgroundColor: isCritical ? RED : "#F59E0B" }]} />
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Revenue card */}
         <View style={ss.section}>
           <RevenueCard revenue={revenue} />
@@ -483,4 +538,19 @@ const ss = StyleSheet.create({
   navCard: { width: "47%", backgroundColor: "#fff", borderRadius: 16, padding: 16, alignItems: "center", gap: 8, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   navIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   navLabel:{ fontSize: 13, fontWeight: "700" },
+
+  /* Alertes */
+  alertBox:        { marginTop: 14, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "#FECACA", overflow: "hidden", shadowColor: "#DC2626", shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  alertHeader:     { flexDirection: "row", alignItems: "center", padding: 14, backgroundColor: "#FEF2F2" },
+  alertTitleRow:   { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
+  alertIconBox:    { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FEE2E2", alignItems: "center", justifyContent: "center" },
+  alertTitle:      { fontSize: 14, fontWeight: "800", color: "#B91C1C" },
+  alertSub:        { fontSize: 11, color: "#DC2626", marginTop: 1 },
+  alertCountBadge: { backgroundColor: RED, borderRadius: 12, minWidth: 24, height: 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  alertCountTxt:   { fontSize: 12, fontWeight: "900", color: "#fff" },
+  alertList:       { paddingVertical: 4 },
+  alertRow:        { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "#FEE2E2" },
+  alertMsg:        { fontSize: 13, fontWeight: "700", color: "#0F172A" },
+  alertDetail:     { fontSize: 11, color: "#64748B", marginTop: 1 },
+  severityDot:     { width: 8, height: 8, borderRadius: 4, marginLeft: 8 },
 });

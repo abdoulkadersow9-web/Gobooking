@@ -398,6 +398,125 @@ router.get("/agents", async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════
+   ALERTES AUTOMATIQUES
+═══════════════════════════════════════════════════════ */
+
+/* GET /company/alertes — bus en panne, colis bloqués, trajets vides */
+router.get("/alertes", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const cid = ctx.companyId;
+
+    /* 1. Bus en panne */
+    const busPanne = await db
+      .select({ id: busesTable.id, busName: busesTable.busName, busType: busesTable.busType })
+      .from(busesTable)
+      .where(and(eq(busesTable.companyId, cid), eq(busesTable.condition, "panne")));
+
+    /* 2. Colis en transit > 48h (status_updated_at or created_at) */
+    const threshold48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const colisBloqués = await db
+      .select({
+        id: parcelsTable.id,
+        tracking: parcelsTable.trackingRef,
+        from: parcelsTable.fromCity,
+        to: parcelsTable.toCity,
+        statusUpdatedAt: parcelsTable.statusUpdatedAt,
+        createdAt: parcelsTable.createdAt,
+      })
+      .from(parcelsTable)
+      .where(
+        and(
+          eq(parcelsTable.companyId, cid),
+          eq(parcelsTable.status, "en_transit"),
+          sql`COALESCE(${parcelsTable.statusUpdatedAt}, ${parcelsTable.createdAt}) < ${threshold48h.toISOString()}`
+        )
+      );
+
+    /* 3. Trajets peu remplis (fill < 30%) — dans les 7 prochains jours */
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const in7days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const upcomingTrips = await db
+      .select({
+        id: tripsTable.id,
+        from: tripsTable.from,
+        to: tripsTable.to,
+        date: tripsTable.date,
+        departureTime: tripsTable.departureTime,
+        busName: tripsTable.busName,
+        totalSeats: tripsTable.totalSeats,
+      })
+      .from(tripsTable)
+      .where(
+        and(
+          eq(tripsTable.companyId, cid),
+          sql`${tripsTable.date} >= ${today.toISOString().split("T")[0]}`,
+          sql`${tripsTable.date} <= ${in7days.toISOString().split("T")[0]}`
+        )
+      );
+
+    let trajetsVides: typeof upcomingTrips = [];
+    if (upcomingTrips.length) {
+      const tripIds = upcomingTrips.map(t => t.id);
+      const bookingCounts = await db
+        .select({ tripId: bookingsTable.tripId, passengers: bookingsTable.passengers })
+        .from(bookingsTable)
+        .where(and(inArray(bookingsTable.tripId, tripIds), eq(bookingsTable.paymentStatus, "paid")));
+
+      const bookedMap: Record<string, number> = {};
+      for (const b of bookingCounts) {
+        if (!b.tripId) continue;
+        const pax = Array.isArray(b.passengers) ? b.passengers.length : 0;
+        bookedMap[b.tripId] = (bookedMap[b.tripId] ?? 0) + pax;
+      }
+
+      trajetsVides = upcomingTrips.filter(t => {
+        const booked = bookedMap[t.id] ?? 0;
+        const fill = t.totalSeats > 0 ? booked / t.totalSeats : 0;
+        return fill < 0.3;
+      });
+    }
+
+    const alertes = [
+      ...busPanne.map(b => ({
+        type: "bus",
+        severity: "critical" as const,
+        message: `Bus en panne : ${b.busName}`,
+        detail: b.busType ?? "",
+        id: b.id,
+      })),
+      ...colisBloqués.map(p => {
+        const since = p.statusUpdatedAt ?? p.createdAt;
+        const hours = since ? Math.round((Date.now() - new Date(since).getTime()) / 3_600_000) : null;
+        return {
+          type: "colis",
+          severity: "warning" as const,
+          message: `Colis bloqué en transit : ${p.tracking ?? p.id.slice(0, 8)}`,
+          detail: `${p.from} → ${p.to}${hours ? ` (${hours}h)` : ""}`,
+          id: p.id,
+        };
+      }),
+      ...trajetsVides.map(t => ({
+        type: "trajet",
+        severity: "warning" as const,
+        message: `Trajet peu rempli (< 30%) : ${t.from} → ${t.to}`,
+        detail: `${t.date} à ${t.departureTime}`,
+        id: t.id,
+      })),
+    ];
+
+    res.json({ alertes, count: alertes.length });
+  } catch (err) {
+    console.error("[alertes GET]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════
    RENTABILITÉ PAR TRAJET
 ═══════════════════════════════════════════════════════ */
 
