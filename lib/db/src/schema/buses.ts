@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { date, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,9 @@ export const busesTable = pgTable("buses", {
   logisticStatus: varchar("logistic_status", { length: 30 }).notNull().default("en_attente"),
   currentLocation: text("current_location"),
   currentTripId: text("current_trip_id"),
+  condition: varchar("condition", { length: 20 }).notNull().default("bon"),
+  issue: text("issue"),
+  lastMaintenanceDate: date("last_maintenance_date"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

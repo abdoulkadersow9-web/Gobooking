@@ -202,6 +202,56 @@ router.patch("/buses/:id/suivi", async (req, res) => {
   }
 });
 
+/* ─── GET /company/buses/maintenance — maintenance status view ─── */
+router.get("/buses/maintenance", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = await db.execute(sql`
+      SELECT id, bus_name, plate_number, bus_type, capacity, status,
+             condition, issue, last_maintenance_date, created_at
+      FROM buses
+      WHERE company_id = ${ctx.companyId}
+      ORDER BY created_at DESC
+    `);
+    res.json((rows as any).rows ?? rows);
+  } catch (err) {
+    console.error("[buses/maintenance GET]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── PATCH /company/buses/:id/maintenance — update condition, issue, lastMaintenanceDate ─── */
+router.patch("/buses/:id/maintenance", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, req.params.id)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+
+    const { condition, issue, lastMaintenanceDate } = req.body;
+    const existing = bus[0] as any;
+
+    await db.execute(sql`
+      UPDATE buses SET
+        condition              = ${condition ?? existing.condition ?? "bon"},
+        issue                  = ${issue !== undefined ? (issue || null) : (existing.issue ?? null)},
+        last_maintenance_date  = ${lastMaintenanceDate ?? existing.last_maintenance_date ?? null}
+      WHERE id = ${req.params.id}
+    `);
+
+    const rows = await db.execute(sql`SELECT * FROM buses WHERE id = ${req.params.id}`);
+    res.json((rows as any).rows?.[0] ?? rows[0]);
+  } catch (err) {
+    console.error("[buses/maintenance PATCH]", err);
+    res.status(500).json({ error: "Failed to update maintenance" });
+  }
+});
+
 router.delete("/buses/:id", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);

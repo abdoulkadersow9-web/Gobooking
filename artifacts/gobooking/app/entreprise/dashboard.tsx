@@ -386,7 +386,8 @@ export default function EntrepriseDashboard() {
               { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",        color: "#059669" },
               { icon: "clock",         label: "Histo. colis", route: "/entreprise/colis-historique",    color: "#7C3AED" },
               { icon: "star",          label: "Avis clients",  route: "/entreprise/avis",           color: "#FBBF24" },
-              { icon: "truck",         label: "Suivi Engins", route: "/entreprise/bus-suivi",      color: "#22C55E" },
+              { icon: "truck",         label: "Suivi Engins",  route: "/entreprise/bus-suivi",     color: "#22C55E" },
+              { icon: "tool",          label: "Maintenance",   route: "/entreprise/maintenance-bus", color: "#F59E0B" },
               { icon: "settings",      label: "Gestion",       route: "/dashboard/company",        color: AMBER },
             ].map(it => (
               <Pressable
