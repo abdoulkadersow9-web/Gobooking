@@ -9,6 +9,7 @@ import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type Tri
 import { sendExpoPush } from "../pushService";
 import { calculateParcelPrice } from "./parcels";
 import { awardPoints, POINTS_PER_TRIP } from "./loyalty";
+import { sendParcelNotification } from "../notificationService";
 
 const router: IRouter = Router();
 
@@ -253,6 +254,8 @@ router.post("/parcels", async (req, res) => {
       action: "créé", agentId: user.id, agentName: user.name,
       companyId: agentRecord?.companyId, notes: locCree,
     }).catch(() => {});
+    sendParcelNotification({ userId: user.id, pushToken: user.pushToken, status: "créé",
+      trackingRef, fromCity, toCity }).catch(() => {});
 
     res.status(201).json(parcel[0]);
   } catch (err) {
@@ -278,6 +281,11 @@ router.post("/parcels/:parcelId/en-gare", async (req, res) => {
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "en_gare", trackingRef: parcel.trackingRef }).catch(() => {});
     logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "en_gare",
       agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId, notes: locEnGare }).catch(() => {});
+    if (parcel.userId) {
+      const uRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+      sendParcelNotification({ userId: parcel.userId, pushToken: uRows[0]?.pushToken, status: "en_gare",
+        trackingRef: parcel.trackingRef ?? "", fromCity: parcel.fromCity, toCity: parcel.toCity }).catch(() => {});
+    }
     res.json({ success: true, status: "en_gare" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -333,16 +341,18 @@ router.post("/parcels/:parcelId/arrive", async (req, res) => {
     await db.update(parcelsTable).set({ status: "arrivé", statusUpdatedAt: new Date() } as any)
       .where(eq(parcelsTable.id, parcel.id));
 
-    const userRows = await db.select({ pushToken: usersTable.pushToken })
-      .from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
-    sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis ${parcel.trackingRef} est arrivé à destination.`).catch(() => {});
+    const locArrive = getLocationForStatus("arrivé", parcel.fromCity, parcel.toCity);
+    await db.update(parcelsTable).set({ location: locArrive } as any).where(eq(parcelsTable.id, parcel.id));
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "arrivé", trackingRef: parcel.trackingRef }).catch(() => {});
-    const locArrive = getLocationForStatus("arrivé", parcel.fromCity, parcel.toCity);
-    await db.update(parcelsTable).set({ location: locArrive } as any).where(eq(parcelsTable.id, parcel.id));
     logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "arrivé",
       agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId, notes: locArrive }).catch(() => {});
+    if (parcel.userId) {
+      const uRows2 = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+      sendParcelNotification({ userId: parcel.userId, pushToken: uRows2[0]?.pushToken, status: "arrivé",
+        trackingRef: parcel.trackingRef ?? "", fromCity: parcel.fromCity, toCity: parcel.toCity }).catch(() => {});
+    }
     res.json({ success: true, status: "arrivé" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -355,10 +365,18 @@ router.post("/parcels/:parcelId/pickup", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
     const agentRecord = await getAgentCompany(user.id);
-    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
+    const pRows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, req.params.parcelId)).limit(1);
+    const p = pRows[0] as any;
+    const locTransit = getLocationForStatus("en_transit", p?.fromCity ?? "", p?.toCity ?? "");
+    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date(), location: locTransit } as any)
       .where(eq(parcelsTable.id, req.params.parcelId));
-    logColisAction({ colisId: req.params.parcelId, trackingRef: null, action: "en_transit",
-      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
+    logColisAction({ colisId: req.params.parcelId, trackingRef: p?.trackingRef ?? null, action: "en_transit",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId, notes: locTransit }).catch(() => {});
+    if (p?.userId) {
+      const uRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, p.userId)).limit(1);
+      sendParcelNotification({ userId: p.userId, pushToken: uRows[0]?.pushToken, status: "en_transit",
+        trackingRef: p.trackingRef ?? "", fromCity: p.fromCity, toCity: p.toCity }).catch(() => {});
+    }
     res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -371,10 +389,18 @@ router.post("/parcels/:parcelId/transit", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
     const agentRecord = await getAgentCompany(user.id);
-    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date() } as any)
+    const pRows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, req.params.parcelId)).limit(1);
+    const p = pRows[0] as any;
+    const locTransit2 = getLocationForStatus("en_transit", p?.fromCity ?? "", p?.toCity ?? "");
+    await db.update(parcelsTable).set({ status: "en_transit", statusUpdatedAt: new Date(), location: locTransit2 } as any)
       .where(eq(parcelsTable.id, req.params.parcelId));
-    logColisAction({ colisId: req.params.parcelId, trackingRef: null, action: "en_transit",
-      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId }).catch(() => {});
+    logColisAction({ colisId: req.params.parcelId, trackingRef: p?.trackingRef ?? null, action: "en_transit",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId, notes: locTransit2 }).catch(() => {});
+    if (p?.userId) {
+      const uRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, p.userId)).limit(1);
+      sendParcelNotification({ userId: p.userId, pushToken: uRows[0]?.pushToken, status: "en_transit",
+        trackingRef: p.trackingRef ?? "", fromCity: p.fromCity, toCity: p.toCity }).catch(() => {});
+    }
     res.json({ success: true, status: "en_transit" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -393,16 +419,19 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
     await db.update(parcelsTable).set({ status: "livré", statusUpdatedAt: new Date() } as any)
       .where(eq(parcelsTable.id, parcel.id));
 
-    const userRows = await db.select({ pushToken: usersTable.pushToken })
-      .from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
-    sendExpoPush(userRows[0]?.pushToken, "GoBooking 📦", `Votre colis ${parcel.trackingRef} a été livré. Merci !`).catch(() => {});
+    const locLivre = getLocationForStatus("livré", parcel.fromCity, parcel.toCity);
+    await db.update(parcelsTable).set({ location: locLivre } as any).where(eq(parcelsTable.id, parcel.id));
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_STATUS, parcel.id, "parcel", { status: "livré", trackingRef: parcel.trackingRef }).catch(() => {});
-    const locLivre = getLocationForStatus("livré", parcel.fromCity, parcel.toCity);
-    await db.update(parcelsTable).set({ location: locLivre } as any).where(eq(parcelsTable.id, parcel.id));
     logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "livré",
       agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId, notes: locLivre }).catch(() => {});
+    if (parcel.userId) {
+      const uRowsL = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+      sendParcelNotification({ userId: parcel.userId, pushToken: uRowsL[0]?.pushToken, status: "livré",
+        trackingRef: parcel.trackingRef ?? "", fromCity: parcel.fromCity, toCity: parcel.toCity,
+        receiverName: parcel.receiverName }).catch(() => {});
+    }
     res.json({ success: true, status: "livré" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
