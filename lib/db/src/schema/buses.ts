@@ -12,6 +12,9 @@ export const busesTable = pgTable("buses", {
   busType: varchar("bus_type", { length: 50 }).notNull().default("Standard"),
   capacity: integer("capacity").notNull().default(44),
   status: varchar("status", { length: 20 }).notNull().default("active"),
+  logisticStatus: varchar("logistic_status", { length: 30 }).notNull().default("en_attente"),
+  currentLocation: text("current_location"),
+  currentTripId: text("current_trip_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

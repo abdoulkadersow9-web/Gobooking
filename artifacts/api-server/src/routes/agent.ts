@@ -1890,4 +1890,36 @@ router.post("/validate-qr", async (req, res) => {
   }
 });
 
+/* ─── PATCH /agent/buses/:busId/update — agent updates bus logistic status & location ─── */
+router.patch("/buses/:busId/update", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { busId } = req.params;
+    const { logisticStatus, currentLocation, currentTripId } = req.body;
+
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+    if (!bus.length) { res.status(404).json({ error: "Bus introuvable" }); return; }
+
+    if (!logisticStatus && currentLocation === undefined && currentTripId === undefined) {
+      res.status(400).json({ error: "Aucune donnée à mettre à jour" }); return;
+    }
+
+    const existingBus = bus[0] as any;
+    await db.execute(sql`
+      UPDATE buses SET
+        logistic_status  = ${logisticStatus   ?? existingBus.logistic_status ?? "en_attente"},
+        current_location = ${currentLocation  ?? null},
+        current_trip_id  = ${currentTripId    ?? null}
+      WHERE id = ${busId}
+    `);
+
+    res.json({ success: true, busId, updated: { logisticStatus, currentLocation, currentTripId } });
+  } catch (err) {
+    console.error("[agent/buses/update]", err);
+    res.status(500).json({ error: "Erreur lors de la mise à jour" });
+  }
+});
+
 export default router;

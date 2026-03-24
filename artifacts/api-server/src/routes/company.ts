@@ -138,6 +138,70 @@ router.patch("/buses/:id", async (req, res) => {
   }
 });
 
+/* ─── GET /company/buses/suivi — logistics tracking view ─── */
+router.get("/buses/suivi", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const buses = await db.select({
+      id: busesTable.id,
+      busName: busesTable.busName,
+      plateNumber: busesTable.plateNumber,
+      busType: busesTable.busType,
+      capacity: busesTable.capacity,
+      status: busesTable.status,
+      logisticStatus: (busesTable as any).logisticStatus,
+      currentLocation: (busesTable as any).currentLocation,
+      currentTripId: (busesTable as any).currentTripId,
+      tripFrom: tripsTable.from,
+      tripTo: tripsTable.to,
+      tripDate: tripsTable.date,
+      tripDepartureTime: tripsTable.departureTime,
+      tripStatus: tripsTable.status,
+    })
+    .from(busesTable)
+    .leftJoin(tripsTable, eq((busesTable as any).currentTripId, tripsTable.id))
+    .where(eq(busesTable.companyId, ctx.companyId))
+    .orderBy(desc(busesTable.createdAt));
+
+    res.json(buses);
+  } catch (err) {
+    console.error("[buses/suivi]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── PATCH /company/buses/:id/suivi — update logistic status + location ─── */
+router.patch("/buses/:id/suivi", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, req.params.id)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+
+    const { logisticStatus, currentLocation, currentTripId } = req.body;
+    const existing = bus[0] as any;
+
+    await db.execute(sql`
+      UPDATE buses SET
+        logistic_status  = ${logisticStatus   ?? existing.logistic_status ?? "en_attente"},
+        current_location = ${currentLocation  ?? null},
+        current_trip_id  = ${currentTripId    ?? null}
+      WHERE id = ${req.params.id}
+    `);
+
+    const rows = await db.execute(sql`SELECT * FROM buses WHERE id = ${req.params.id}`);
+    res.json((rows as any).rows?.[0] ?? rows[0]);
+  } catch (err) {
+    console.error("[buses/suivi PATCH]", err);
+    res.status(500).json({ error: "Failed to update bus tracking" });
+  }
+});
+
 router.delete("/buses/:id", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);

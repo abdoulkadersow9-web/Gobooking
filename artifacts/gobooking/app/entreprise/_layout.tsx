@@ -37,6 +37,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="embarquement" />
       <Stack.Screen name="colis-historique" />
       <Stack.Screen name="avis" />
+      <Stack.Screen name="bus-suivi" />
     </Stack>
   );
 }

@@ -385,8 +385,9 @@ export default function EntrepriseDashboard() {
               { icon: "git-branch",    label: "Routes",       route: "/entreprise/routes",         color: "#7C3AED" },
               { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",        color: "#059669" },
               { icon: "clock",         label: "Histo. colis", route: "/entreprise/colis-historique",    color: "#7C3AED" },
-              { icon: "star",          label: "Avis clients", route: "/entreprise/avis",           color: "#FBBF24" },
-              { icon: "settings",      label: "Gestion",      route: "/dashboard/company",         color: AMBER },
+              { icon: "star",          label: "Avis clients",  route: "/entreprise/avis",           color: "#FBBF24" },
+              { icon: "truck",         label: "Suivi Engins", route: "/entreprise/bus-suivi",      color: "#22C55E" },
+              { icon: "settings",      label: "Gestion",       route: "/dashboard/company",        color: AMBER },
             ].map(it => (
               <Pressable
                 key={it.route}
