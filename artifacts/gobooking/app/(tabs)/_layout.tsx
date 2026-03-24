@@ -6,6 +6,32 @@ import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import Colors from "@/constants/colors";
 
+function TabIcon({
+  name,
+  focused,
+  color,
+}: {
+  name: React.ComponentProps<typeof Feather>["name"];
+  focused: boolean;
+  color: string;
+}) {
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: focused ? Colors.light.primaryLight : "transparent",
+        borderRadius: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 5,
+        marginTop: 2,
+      }}
+    >
+      <Feather name={name} size={22} color={color} />
+    </View>
+  );
+}
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -23,13 +49,13 @@ export default function TabLayout() {
           backgroundColor: isIOS ? "transparent" : "white",
           borderTopWidth: 1,
           borderTopColor: "#E2E8F0",
-          elevation: 8,
+          elevation: 12,
           shadowColor: "#0B3C5D",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          height: isWeb ? 72 : 62,
-          paddingBottom: isWeb ? 12 : 8,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.10,
+          shadowRadius: 16,
+          height: isWeb ? 76 : 66,
+          paddingBottom: isWeb ? 14 : 10,
           paddingTop: 4,
         },
         tabBarBackground: () =>
@@ -43,7 +69,7 @@ export default function TabLayout() {
             <View style={[StyleSheet.absoluteFill, { backgroundColor: "white" }]} />
           ),
         tabBarLabelStyle: {
-          fontFamily: "Inter_500Medium",
+          fontFamily: "Inter_600SemiBold",
           fontSize: 10,
           marginTop: 1,
         },
@@ -54,7 +80,7 @@ export default function TabLayout() {
         options={{
           title: "Accueil",
           tabBarIcon: ({ color, focused }) => (
-            <Feather name="home" size={22} color={color} />
+            <TabIcon name="home" focused={focused} color={color} />
           ),
         }}
       />
@@ -62,8 +88,8 @@ export default function TabLayout() {
         name="bookings"
         options={{
           title: "Trajets",
-          tabBarIcon: ({ color }) => (
-            <Feather name="bookmark" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="bookmark" focused={focused} color={color} />
           ),
         }}
       />
@@ -71,8 +97,8 @@ export default function TabLayout() {
         name="colis"
         options={{
           title: "Colis",
-          tabBarIcon: ({ color }) => (
-            <Feather name="package" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="package" focused={focused} color={color} />
           ),
         }}
       />
@@ -80,8 +106,8 @@ export default function TabLayout() {
         name="suivi"
         options={{
           title: "Suivi",
-          tabBarIcon: ({ color }) => (
-            <Feather name="map-pin" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="map-pin" focused={focused} color={color} />
           ),
         }}
       />
@@ -89,12 +115,11 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profil",
-          tabBarIcon: ({ color }) => (
-            <Feather name="user" size={22} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="user" focused={focused} color={color} />
           ),
         }}
       />
-      {/* Keep notifications screen registered but hidden from tab bar */}
       <Tabs.Screen
         name="notifications"
         options={{

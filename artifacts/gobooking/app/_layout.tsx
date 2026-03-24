@@ -138,7 +138,7 @@ function GlobalNetworkMonitor() {
     <View
       style={{
         position: "absolute",
-        bottom: insets.bottom + 72,
+        top: insets.top + 12,
         left: 24,
         right: 24,
         zIndex: 999,

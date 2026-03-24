@@ -148,7 +148,7 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
           </View>
           <View style={styles.detailBtn}>
             <Text style={styles.detailBtnText}>{t.suivre}</Text>
-            <Feather name="chevron-right" size={13} color={Colors.light.primary} />
+            <Feather name="chevron-right" size={13} color="white" />
           </View>
         </View>
       </View>
@@ -274,7 +274,7 @@ export default function ColisScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
           refreshControl={
             token
               ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
@@ -377,22 +377,22 @@ const styles = StyleSheet.create({
   chipCountText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#64748B" },
   chipCountTextActive: { color: "white" },
 
-  list: { padding: 16, paddingBottom: 120 },
+  list: { padding: 16, paddingTop: 12, paddingBottom: 130 },
   listEmpty: { flex: 1 },
 
   row: {
     flexDirection: "row",
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowColor: "#0B3C5D",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   strip: { width: 5 },
-  rowBody: { flex: 1, padding: 14, gap: 9 },
+  rowBody: { flex: 1, padding: 16, gap: 10 },
 
   rowTop: {
     flexDirection: "row",
@@ -431,11 +431,11 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
   detailBtn: {
-    flexDirection: "row", alignItems: "center", gap: 3,
-    backgroundColor: "#EEF2FF", borderRadius: 8,
-    paddingHorizontal: 9, paddingVertical: 4,
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: Colors.light.primary, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 7,
   },
-  detailBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+  detailBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "white" },
 
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 },
   emptyIcon: {

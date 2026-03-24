@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState, useEffect } from "react";
 import {
@@ -282,7 +283,10 @@ export default function BookingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={styles.header}>
+      <LinearGradient
+        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        style={styles.header}
+      >
         <View>
           <Text style={styles.headerTitle}>Mes Réservations</Text>
           {bookings.length > 0 && (
@@ -294,18 +298,18 @@ export default function BookingsScreen() {
             style={styles.historyBtn}
             onPress={() => { Haptics.selectionAsync(); router.push("/client/factures" as any); }}
           >
-            <Feather name="file-text" size={15} color={Colors.light.primary} />
+            <Feather name="file-text" size={15} color="white" />
             <Text style={styles.historyBtnText}>Factures</Text>
           </Pressable>
           <Pressable
             style={styles.historyBtn}
             onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
           >
-            <Feather name="clock" size={15} color={Colors.light.primary} />
+            <Feather name="clock" size={15} color="white" />
             <Text style={styles.historyBtnText}>Paiements</Text>
           </Pressable>
         </View>
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={styles.center}>
@@ -323,10 +327,13 @@ export default function BookingsScreen() {
           scrollEnabled={bookings.length > 0}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Feather name="bookmark" size={48} color={Colors.light.textMuted} />
+              <View style={styles.emptyIconWrap}>
+                <Feather name="bookmark" size={40} color={Colors.light.primary} />
+              </View>
               <Text style={styles.emptyTitle}>Aucune réservation</Text>
               <Text style={styles.emptySubtitle}>Vos réservations de voyage apparaîtront ici</Text>
               <Pressable style={styles.bookNowBtn} onPress={() => router.push("/(tabs)")}>
+                <Feather name="search" size={16} color="white" />
                 <Text style={styles.bookNowText}>Réserver un trajet</Text>
               </Pressable>
             </View>
@@ -339,13 +346,13 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:         { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: Colors.light.card, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:    { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text },
-  headerSub:      { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
-  historyBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: Colors.light.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+  header:         { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:    { fontSize: 22, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub:      { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  historyBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
+  historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
-  card:         { backgroundColor: Colors.light.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  card:         { backgroundColor: Colors.light.card, borderRadius: 20, padding: 18, marginBottom: 12, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3 },
   cardPressed:  { transform: [{ scale: 0.98 }] },
   cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   refText:      { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
@@ -364,13 +371,14 @@ const styles = StyleSheet.create({
   seatRow:      { flexDirection: "row", alignItems: "center", gap: 4 },
   seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
   amountText:   { fontSize: 17, fontFamily: "Inter_700Bold" },
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, borderRadius: 10, paddingVertical: 9 },
-  ctaText:      { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 12, borderRadius: 14, paddingVertical: 13, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 3 },
+  ctaText:      { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "white" },
   waitingRow:   { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, backgroundColor: "#FFFBEB", borderRadius: 8, padding: 8 },
   waitingText:  { fontSize: 11, fontFamily: "Inter_400Regular", color: "#B45309", flex: 1 },
   empty:        { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyTitle:   { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
-  emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
-  bookNowBtn:   { backgroundColor: Colors.light.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
-  bookNowText:  { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  emptyIconWrap:{ width: 88, height: 88, borderRadius: 28, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 4 },
+  emptyTitle:   { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center" },
+  bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 16, paddingHorizontal: 28, paddingVertical: 14, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
+  bookNowText:  { color: "white", fontSize: 15, fontFamily: "Inter_600SemiBold" },
 });

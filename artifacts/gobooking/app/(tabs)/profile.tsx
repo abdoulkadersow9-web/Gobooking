@@ -122,21 +122,26 @@ export default function ProfileScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Profile header */}
-      <View style={styles.profileHeader}>
-        <LinearGradient colors={[Colors.light.primary, Colors.light.primaryDark]} style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {user?.name?.charAt(0)?.toUpperCase() || "U"}
-          </Text>
-        </LinearGradient>
+      <LinearGradient
+        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        style={styles.profileHeader}
+      >
+        <View style={styles.avatarRing}>
+          <LinearGradient colors={["rgba(255,255,255,0.35)", "rgba(255,255,255,0.15)"]} style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+            </Text>
+          </LinearGradient>
+        </View>
         <Text style={styles.userName}>{user?.name}</Text>
         <Text style={styles.userEmail}>{user?.email}</Text>
         {isAdmin && (
           <View style={styles.adminTag}>
-            <Feather name="shield" size={12} color={Colors.light.primary} />
+            <Feather name="shield" size={12} color="rgba(255,255,255,0.9)" />
             <Text style={styles.adminTagText}>Administrator</Text>
           </View>
         )}
-      </View>
+      </LinearGradient>
 
       {/* Stats row — real data */}
       <View style={styles.statsRow}>
@@ -358,60 +363,72 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: "center",
-    padding: 24,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 44,
   },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+  avatarRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.5)",
+    marginBottom: 14,
+    padding: 2,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+  },
+  avatar: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    justifyContent: "center",
+    alignItems: "center",
   },
   avatarText: {
-    fontSize: 36,
+    fontSize: 38,
     fontFamily: "Inter_700Bold",
     color: "white",
   },
   userName: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    color: "white",
   },
   userEmail: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 2,
+    color: "rgba(255,255,255,0.78)",
+    marginTop: 3,
   },
   adminTag: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.light.primaryLight,
+    backgroundColor: "rgba(255,255,255,0.18)",
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
-    marginTop: 8,
+    marginTop: 10,
   },
   adminTagText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.light.primary,
+    color: "white",
   },
   statsRow: {
     flexDirection: "row",
     backgroundColor: Colors.light.card,
     marginHorizontal: 20,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
+    marginTop: -28,
     marginBottom: 8,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 6,
   },
   statItem: {
     flex: 1,
@@ -433,16 +450,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.border,
   },
   section: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingTop: 24,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.textSecondary,
-    marginBottom: 8,
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.textMuted,
+    marginBottom: 10,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
 
   // Wallet card
@@ -626,27 +643,28 @@ const styles = StyleSheet.create({
   // Menu items
   menuCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: "hidden",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 14,
   },
   menuItemPressed: {
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#F8FAFC",
   },
   menuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: Colors.light.primaryLight,
     justifyContent: "center",
     alignItems: "center",
@@ -666,7 +684,7 @@ const styles = StyleSheet.create({
   menuDivider: {
     height: 1,
     backgroundColor: Colors.light.border,
-    marginLeft: 64,
+    marginLeft: 70,
   },
   langRow: {
     flexDirection: "row",
