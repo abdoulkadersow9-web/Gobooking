@@ -397,6 +397,98 @@ router.get("/agents", async (req, res) => {
   }
 });
 
+/* ═══════════════════════════════════════════════════════
+   BUS ↔ AGENT ASSIGNMENT
+═══════════════════════════════════════════════════════ */
+
+/* GET /company/buses/agents — all buses with their agents + list of free agents */
+router.get("/buses/agents", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const busList = await db.select().from(busesTable)
+      .where(eq(busesTable.companyId, ctx.companyId))
+      .orderBy(busesTable.busName);
+
+    const allAgents = await db.select({
+      agentId:   agentsTable.id,
+      busId:     agentsTable.busId,
+      agentCode: agentsTable.agentCode,
+      agentRole: agentsTable.agentRole,
+      name:      usersTable.name,
+      email:     usersTable.email,
+    })
+      .from(agentsTable)
+      .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+      .where(and(eq(agentsTable.companyId, ctx.companyId), eq(agentsTable.status, "active")));
+
+    const buses = busList.map(b => ({
+      id: b.id, busName: b.busName, plateNumber: b.plateNumber, busType: b.busType,
+      agents: allAgents
+        .filter(a => a.busId === b.id)
+        .map(a => ({ agentId: a.agentId, agentCode: a.agentCode, agentRole: a.agentRole, name: a.name, email: a.email })),
+    }));
+
+    const freeAgents = allAgents
+      .filter(a => !a.busId)
+      .map(a => ({ agentId: a.agentId, agentCode: a.agentCode, agentRole: a.agentRole, name: a.name, email: a.email }));
+
+    res.json({ buses, freeAgents });
+  } catch (err) {
+    console.error("[buses/agents GET]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /company/buses/:busId/agents/:agentId — assign agent to bus */
+router.post("/buses/:busId/agents/:agentId", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, req.params.busId)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Bus non autorisé" }); return;
+    }
+
+    const agent = await db.select().from(agentsTable).where(eq(agentsTable.id, req.params.agentId)).limit(1);
+    if (!agent.length || agent[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Agent non autorisé" }); return;
+    }
+
+    await db.update(agentsTable)
+      .set({ busId: req.params.busId } as any)
+      .where(eq(agentsTable.id, req.params.agentId));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[buses/:busId/agents POST]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* DELETE /company/buses/:busId/agents/:agentId — unassign agent from bus */
+router.delete("/buses/:busId/agents/:agentId", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agent = await db.select().from(agentsTable).where(eq(agentsTable.id, req.params.agentId)).limit(1);
+    if (!agent.length || agent[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Agent non autorisé" }); return;
+    }
+
+    await db.update(agentsTable)
+      .set({ busId: null } as any)
+      .where(eq(agentsTable.id, req.params.agentId));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 /* ── Créer un agent avec rôle ─────────────────────────────────────────────
    POST /company/agents
    Crée un compte utilisateur (role=agent) + enregistrement agent

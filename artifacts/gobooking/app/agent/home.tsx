@@ -1,6 +1,8 @@
+import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -9,10 +11,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth, AGENT_ROLE_LABELS, AGENT_ROLE_COLORS, type AgentRole } from "@/context/AuthContext";
+import { apiFetch } from "@/utils/api";
 
 const GREEN = "#166534";
 const GREEN_LIGHT = "#F0FDF4";
-const ACCENT = "#FF6B00";
 
 const AGENT_MENUS = [
   { id: "embarquement",    label: "Embarquement",    icon: "🚌", path: "/agent/embarquement",   desc: "Scanner les billets voyageurs" },
@@ -25,8 +27,34 @@ const AGENT_MENUS = [
   { id: "securite",        label: "Sécurité / SOS",  icon: "🚨", path: "/agent/securite",       desc: "Alertes urgence, panne, SOS", urgent: true },
 ];
 
+interface BusInfo {
+  busName: string;
+  plateNumber: string;
+  busType: string;
+}
+
 export default function AgentHome() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
+  const [bus, setBus] = useState<BusInfo | null>(null);
+  const [busLoading, setBusLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) { setBusLoading(false); return; }
+    apiFetch("/agent/info", { token })
+      .then(d => {
+        if (d?.bus) {
+          setBus({
+            busName:     d.bus.busName     ?? d.bus.bus_name    ?? "—",
+            plateNumber: d.bus.plateNumber ?? d.bus.plate_number ?? "—",
+            busType:     d.bus.busType     ?? d.bus.bus_type     ?? "—",
+          });
+        } else {
+          setBus(null);
+        }
+      })
+      .catch(() => setBus(null))
+      .finally(() => setBusLoading(false));
+  }, [token]);
 
   const filteredMenus = AGENT_MENUS.filter((m) => {
     if (!user?.agentRole) return true;
@@ -50,6 +78,34 @@ export default function AgentHome() {
       </View>
 
       <View style={S.body}>
+        {/* ── Mon Bus Card ── */}
+        <View style={S.busCard}>
+          <View style={S.busCardLeft}>
+            <View style={S.busIconBox}>
+              <Text style={{ fontSize: 20 }}>🚌</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={S.busCardLabel}>Mon bus affecté</Text>
+              {busLoading ? (
+                <ActivityIndicator size="small" color={GREEN} style={{ marginTop: 4, alignSelf: "flex-start" }} />
+              ) : bus ? (
+                <>
+                  <Text style={S.busCardName}>{bus.busName}</Text>
+                  <Text style={S.busCardMeta}>{bus.plateNumber} · {bus.busType}</Text>
+                </>
+              ) : (
+                <Text style={S.busCardNone}>Aucun bus assigné</Text>
+              )}
+            </View>
+          </View>
+          {bus && (
+            <View style={S.busAssignedBadge}>
+              <Feather name="check-circle" size={12} color={GREEN} />
+              <Text style={S.busAssignedText}>Assigné</Text>
+            </View>
+          )}
+        </View>
+
         <Text style={S.sectionTitle}>Mes actions</Text>
         <View style={S.grid}>
           {filteredMenus.map((item) => (
@@ -79,7 +135,25 @@ const S = StyleSheet.create({
   logoutBtn:   { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8,
                  paddingHorizontal: 14, paddingVertical: 8 },
   logoutTxt:   { color: "white", fontSize: 13, fontWeight: "600" },
+
   body:        { flex: 1, padding: 16 },
+
+  busCard: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+    borderLeftWidth: 4, borderLeftColor: GREEN,
+  },
+  busCardLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  busIconBox:  { width: 42, height: 42, borderRadius: 12, backgroundColor: GREEN_LIGHT, alignItems: "center", justifyContent: "center" },
+  busCardLabel:{ fontSize: 11, fontWeight: "600", color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 },
+  busCardName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  busCardMeta: { fontSize: 12, color: "#64748B", marginTop: 1 },
+  busCardNone: { fontSize: 13, color: "#CBD5E1", fontStyle: "italic", marginTop: 2 },
+  busAssignedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: GREEN_LIGHT, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  busAssignedText: { fontSize: 11, fontWeight: "600", color: GREEN },
+
   sectionTitle:{ fontSize: 16, fontWeight: "700", color: GREEN, marginBottom: 12 },
   grid:        { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   tile:        { width: "47%", backgroundColor: "white", borderRadius: 14, padding: 16,

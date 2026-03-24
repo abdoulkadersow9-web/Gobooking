@@ -40,6 +40,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="bus-suivi" />
       <Stack.Screen name="maintenance-bus" />
       <Stack.Screen name="carburant" />
+      <Stack.Screen name="bus-agents" />
     </Stack>
   );
 }
