@@ -94,6 +94,44 @@ async function getOrCreateCompany(user: { id: string; name: string; email: strin
   return created[0];
 }
 
+/* ─── GET /company/profile — company info ─── */
+router.get("/profile", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.id, ctx.companyId)).limit(1);
+    if (!company.length) { res.status(404).json({ error: "Company not found" }); return; }
+    const agences = await db.select().from(agencesTable).where(eq(agencesTable.companyId, ctx.companyId));
+    res.json({ ...company[0], agences });
+  } catch (err) {
+    console.error("[GET /company/profile]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── PATCH /company/profile — update company info ─── */
+router.patch("/profile", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { name, phone, address, city, licenseNumber } = req.body;
+    const updated = await db.update(companiesTable)
+      .set({
+        ...(name          ? { name }                          : {}),
+        ...(phone         ? { phone }                         : {}),
+        ...(address       ? { address }                       : {}),
+        ...(city          ? { city }                          : {}),
+        ...(licenseNumber !== undefined ? { licenseNumber } : {}),
+      })
+      .where(eq(companiesTable.id, ctx.companyId))
+      .returning();
+    res.json(updated[0]);
+  } catch (err) {
+    console.error("[PATCH /company/profile]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 router.post("/buses", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);

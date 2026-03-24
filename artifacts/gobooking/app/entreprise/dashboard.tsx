@@ -230,7 +230,7 @@ export default function EntrepriseDashboard() {
           <Text style={ss.headerGreet}>Bonjour 👋</Text>
           <Text style={ss.headerName}>{user?.name ?? "Compagnie"}</Text>
         </View>
-        <Pressable style={ss.headerBtn} onPress={() => router.push("/dashboard/company")}>
+        <Pressable style={ss.headerBtn} onPress={() => router.push("/entreprise/parametres")}>
           <Feather name="settings" size={18} color="#fff" />
         </Pressable>
       </View>
@@ -447,7 +447,7 @@ export default function EntrepriseDashboard() {
               { icon: "users",         label: "Affectation",   route: "/entreprise/bus-agents",      color: "#7C3AED" },
               { icon: "bar-chart-2",   label: "Rentabilité",   route: "/entreprise/rentabilite",     color: "#0891B2" },
               { icon: "activity",      label: "Comparaison",   route: "/entreprise/comparaison",     color: "#6366F1" },
-              { icon: "settings",      label: "Gestion",       route: "/dashboard/company",        color: AMBER },
+              { icon: "settings",      label: "Paramètres",    route: "/entreprise/parametres",     color: AMBER },
             ].map(it => (
               <Pressable
                 key={it.route}
