@@ -373,10 +373,11 @@ export default function EntrepriseDashboard() {
           <SectionTitle icon="grid" title="Accès rapide" color={GRAY} />
           <View style={ss.navGrid}>
             {[
-              { icon: "calendar", label: "Trajets",      route: "/entreprise/trajets",      color: BLUE },
-              { icon: "users",    label: "Réservations", route: "/entreprise/reservations", color: GREEN },
-              { icon: "package",  label: "Colis",        route: "/entreprise/colis",        color: VIOLET },
-              { icon: "settings", label: "Gestion",      route: "/dashboard/company",       color: AMBER },
+              { icon: "calendar",  label: "Trajets",      route: "/entreprise/trajets",        color: BLUE },
+              { icon: "users",     label: "Réservations", route: "/entreprise/reservations",   color: GREEN },
+              { icon: "package",   label: "Colis",        route: "/entreprise/colis",          color: VIOLET },
+              { icon: "map",       label: "Suivi Live",   route: "/entreprise/live-tracking",  color: "#EF4444" },
+              { icon: "settings",  label: "Gestion",      route: "/dashboard/company",         color: AMBER },
             ].map(it => (
               <Pressable
                 key={it.route}

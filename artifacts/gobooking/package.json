@@ -62,6 +62,7 @@
     "expo-notifications": "^55.0.13",
     "expo-print": "^55.0.9",
     "expo-sharing": "^55.0.14",
+    "react-native-maps": "^1.27.2",
     "react-native-webview": "^13.16.1"
   }
 }

@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
+import { locationStore } from "../locationStore";
 
 const router: IRouter = Router();
 
@@ -1087,6 +1088,108 @@ router.post("/invoices/generate", async (req, res) => {
   } catch (err) {
     console.error("Generate invoice error:", err);
     res.status(500).json({ error: "Erreur génération facture" });
+  }
+});
+
+/* ── GET /company/live-buses — bus positions en temps réel ──────────── */
+router.get("/live-buses", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+
+    const activeTrips = await db.select({
+      id:            tripsTable.id,
+      from:          tripsTable.from,
+      to:            tripsTable.to,
+      date:          tripsTable.date,
+      departureTime: tripsTable.departureTime,
+      status:        tripsTable.status,
+      busId:         tripsTable.busId,
+      busName:       busesTable.name,
+      busPlate:      busesTable.plateNumber,
+      busType:       busesTable.busType,
+    })
+      .from(tripsTable)
+      .leftJoin(busesTable, eq(tripsTable.busId, busesTable.id))
+      .where(and(eq(tripsTable.companyId, companyId), eq(tripsTable.status, "en_route")));
+
+    const tripIds = activeTrips.map(t => t.id);
+    const dbPositions = tripIds.length > 0
+      ? await db.select().from(busPositionsTable).where(inArray(busPositionsTable.tripId, tripIds))
+      : [];
+    const dbPosMap = new Map(dbPositions.map(p => [p.tripId, p]));
+
+    const now = Date.now();
+    const result = activeTrips.map(trip => {
+      const memPos = locationStore.get(trip.id);
+      const dbPos  = dbPosMap.get(trip.id);
+
+      let gps: { lat: number; lon: number; speed: number | null; heading: number | null } | null = null;
+      let lastUpdated: number | null = null;
+      let isOffline = true;
+      let isStopped = false;
+
+      if (memPos) {
+        gps = { lat: memPos.lat, lon: memPos.lon, speed: memPos.speed ?? null, heading: memPos.heading ?? null };
+        lastUpdated = memPos.updatedAt;
+        isOffline   = (now - memPos.updatedAt) > 30_000;
+        isStopped   = (memPos.speed ?? 1) === 0;
+      } else if (dbPos) {
+        gps = { lat: dbPos.latitude, lon: dbPos.longitude, speed: dbPos.speed ?? null, heading: dbPos.heading ?? null };
+        lastUpdated = dbPos.updatedAt?.getTime() ?? null;
+        isOffline   = !lastUpdated || (now - lastUpdated) > 30_000;
+        isStopped   = (dbPos.speed ?? 1) === 0;
+      }
+
+      return {
+        tripId:        trip.id,
+        from:          trip.from,
+        to:            trip.to,
+        date:          trip.date,
+        departureTime: trip.departureTime,
+        busName:       trip.busName ?? "Bus",
+        busPlate:      trip.busPlate ?? null,
+        busType:       trip.busType ?? null,
+        gps,
+        lastUpdated,
+        isOffline,
+        isStopped,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("live-buses error:", err);
+    res.status(500).json({ error: "Erreur suivi temps réel" });
+  }
+});
+
+/* ── GET /company/trip/:tripId/history — historique GPS ─────────────── */
+router.get("/trip/:tripId/history", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const positionsTable = (await import("@workspace/db")).positionsTable;
+    const positions = await db.select({
+      lat:        positionsTable.lat,
+      lon:        positionsTable.lon,
+      speed:      positionsTable.speed,
+      recordedAt: positionsTable.recordedAt,
+    })
+      .from(positionsTable)
+      .where(eq(positionsTable.tripId, req.params.tripId))
+      .orderBy(positionsTable.recordedAt)
+      .limit(500);
+
+    res.json(positions.map(p => ({
+      lat: p.lat, lon: p.lon,
+      speed: p.speed,
+      recordedAt: p.recordedAt?.toISOString() ?? null,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: "Erreur historique" });
   }
 });
 

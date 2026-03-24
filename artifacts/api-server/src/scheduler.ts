@@ -18,9 +18,11 @@ import {
   parcelsTable,
   notificationsTable,
   agentsTable,
+  busPositionsTable,
 } from "@workspace/db";
 import { eq, and, inArray, isNotNull } from "drizzle-orm";
 import { sendExpoPush } from "./pushService";
+import { locationStore } from "./locationStore";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -346,6 +348,7 @@ export function startScheduler(intervalMs = 30_000) {
         checkUnloadedParcels(),
         autoUpdateTripStatuses(),
         autoConfirmBookings(),
+        checkBusAnomalies(),
       ]);
     } catch (err) {
       console.error("[Scheduler] Erreur générale:", err);
@@ -354,4 +357,114 @@ export function startScheduler(intervalMs = 30_000) {
 
   run(); // exécution immédiate au démarrage
   setInterval(run, intervalMs);
+}
+
+/* ─── Suivi temps réel — détection arrêt et hors-ligne ───────────────────────
+   - Bus arrêté : vitesse == 0 pendant ≥ 2 min → notif compagnie
+   - Bus hors-ligne : pas de mise à jour GPS depuis > 30 s → notif compagnie
+────────────────────────────────────────────────────────────────────────────── */
+
+const stoppedSince   = new Map<string, number>(); // tripId → timestamp du premier speed=0
+const sentStopAlert  = new Set<string>();          // tripId déjà alerté (arrêt)
+const sentOffline    = new Set<string>();          // tripId déjà alerté (hors-ligne)
+
+async function checkBusAnomalies() {
+  const now = Date.now();
+
+  /* 1. Récupère tous les trajets en_route */
+  const activeTrips = await db.select({
+    id:        tripsTable.id,
+    from:      tripsTable.from,
+    to:        tripsTable.to,
+    companyId: tripsTable.companyId,
+  }).from(tripsTable).where(eq(tripsTable.status, "en_route"));
+
+  if (!activeTrips.length) return;
+
+  /* 2. Récupère les positions DB pour les trajets sans entrée mémoire */
+  const dbPositions = await db.select().from(busPositionsTable)
+    .where(inArray(busPositionsTable.tripId, activeTrips.map(t => t.id)));
+  const dbPosMap = new Map(dbPositions.map(p => [p.tripId, p]));
+
+  /* 3. Récupère les agents liés aux compagnies des trajets actifs */
+  const companyIds = [...new Set(activeTrips.map(t => t.companyId).filter(Boolean) as string[])];
+  const companyAgentRows = companyIds.length > 0
+    ? await db.select({ userId: agentsTable.userId, companyId: agentsTable.companyId })
+        .from(agentsTable)
+        .where(inArray(agentsTable.companyId, companyIds))
+    : [];
+
+  /* 4. Récupère les pushTokens des utilisateurs admins compagnie */
+  const agentUserIds = [...new Set(companyAgentRows.map(a => a.userId))];
+  const adminUsers = agentUserIds.length > 0
+    ? await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, role: usersTable.role })
+        .from(usersTable)
+        .where(and(
+          inArray(usersTable.id, agentUserIds),
+          inArray(usersTable.role, ["compagnie", "company_admin"]),
+        ))
+    : [];
+
+  /* helper: trouver les admins d'une compagnie */
+  const adminsForCompany = (companyId: string) => {
+    const userIds = new Set(companyAgentRows.filter(a => a.companyId === companyId).map(a => a.userId));
+    return adminUsers.filter(u => userIds.has(u.id));
+  };
+
+  for (const trip of activeTrips) {
+    if (!trip.companyId) continue;
+    const memPos = locationStore.get(trip.id);
+    const dbPos  = dbPosMap.get(trip.id);
+
+    const lastUpdated = memPos?.updatedAt ?? dbPos?.updatedAt?.getTime() ?? null;
+    const speed       = memPos?.speed ?? dbPos?.speed ?? null;
+
+    /* Hors-ligne : pas de mise à jour depuis > 30 s */
+    if (!lastUpdated || (now - lastUpdated) > 30_000) {
+      if (!sentOffline.has(trip.id)) {
+        sentOffline.add(trip.id);
+        for (const admin of adminsForCompany(trip.companyId)) {
+          if (admin.pushToken) {
+            await sendExpoPush(admin.pushToken, "🚌 Bus hors ligne", `Bus ${trip.from}→${trip.to} ne répond plus`);
+          }
+          await db.insert(notificationsTable).values({
+            id: nanoid(), userId: admin.id, type: "bus_offline",
+            title: "Bus hors ligne",
+            message: `Bus ${trip.from}→${trip.to} : pas de signal GPS depuis plus de 30 secondes.`,
+            refId: trip.id, refType: "trip",
+          });
+        }
+        console.log(`[Scheduler] 📡 Bus hors-ligne : trajet ${trip.id}`);
+      }
+      stoppedSince.delete(trip.id);
+      continue;
+    }
+
+    /* Bus en ligne → reset alerte hors-ligne */
+    sentOffline.delete(trip.id);
+
+    /* Bus arrêté : vitesse == 0 */
+    if (speed === 0) {
+      if (!stoppedSince.has(trip.id)) stoppedSince.set(trip.id, now);
+      const stoppedMs = now - (stoppedSince.get(trip.id) ?? now);
+      if (stoppedMs >= 2 * 60_000 && !sentStopAlert.has(trip.id)) {
+        sentStopAlert.add(trip.id);
+        for (const admin of adminsForCompany(trip.companyId)) {
+          if (admin.pushToken) {
+            await sendExpoPush(admin.pushToken, "🛑 Bus arrêté", `Bus ${trip.from}→${trip.to} immobile depuis 2 min`);
+          }
+          await db.insert(notificationsTable).values({
+            id: nanoid(), userId: admin.id, type: "bus_stopped",
+            title: "Bus arrêté",
+            message: `Bus ${trip.from}→${trip.to} est immobile depuis plus de 2 minutes.`,
+            refId: trip.id, refType: "trip",
+          });
+        }
+        console.log(`[Scheduler] 🛑 Bus arrêté : trajet ${trip.id}`);
+      }
+    } else {
+      stoppedSince.delete(trip.id);
+      sentStopAlert.delete(trip.id);
+    }
+  }
 }

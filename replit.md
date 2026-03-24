@@ -21,6 +21,10 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Inter font family
 - Clean card-based UI, Airbnb/Coinbase-inspired
 
+## New Artifacts
+- **GoBooking Admin Web** (`artifacts/gobooking-admin`) — React + Vite web dashboard at `/admin/` for company management (bookings, parcels, agents, trips, analytics, invoices). Uses JWT auth.
+- **API Server** (`artifacts/api-server`) — All routes at `/api`, started from `index.ts`.
+
 ## Features Implemented
 1. Login / Registration (token-based auth with SHA256 password hashing, role-based registration, inline error messages)
 2. Home screen with bus search (from/to/date/passengers) + recent activity section

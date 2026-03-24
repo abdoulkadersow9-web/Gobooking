@@ -26,6 +26,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="reservations" />
       <Stack.Screen name="trajets" />
       <Stack.Screen name="colis" />
+      <Stack.Screen name="live-tracking" />
     </Stack>
   );
 }
