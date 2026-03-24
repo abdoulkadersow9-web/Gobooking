@@ -201,7 +201,7 @@ export default function ColisScreen() {
   ];
 
   const openSuivi = (item: Parcel) =>
-    router.push({ pathname: "/(tabs)/suivi", params: { ref: item.trackingRef } });
+    router.push({ pathname: "/client/colis-suivi", params: { ref: item.trackingRef } });
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, parcelsTable, usersTable } from "@workspace/db";
+import { db, parcelsTable, usersTable, colisLogsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { auditLog, ACTIONS } from "../audit";
@@ -171,13 +171,13 @@ router.get("/:parcelId", async (req, res) => {
   }
 });
 
-// GET /parcels/track/:trackingRef — track by reference
+// GET /parcels/track/:trackingRef — track by reference (enriched with events)
 router.get("/track/:trackingRef", async (req, res) => {
   try {
     const parcels = await db
       .select()
       .from(parcelsTable)
-      .where(eq(parcelsTable.trackingRef, req.params.trackingRef))
+      .where(eq(parcelsTable.trackingRef, req.params.trackingRef.toUpperCase()))
       .limit(1);
 
     if (!parcels.length) {
@@ -185,7 +185,17 @@ router.get("/track/:trackingRef", async (req, res) => {
       return;
     }
 
-    res.json(parcels[0]);
+    const parcel = parcels[0] as any;
+
+    /* ── Fetch real event timeline from colis_logs ── */
+    const events = await db
+      .select()
+      .from(colisLogsTable)
+      .where(eq(colisLogsTable.colisId, parcel.id))
+      .orderBy(colisLogsTable.createdAt)
+      .limit(50);
+
+    res.json({ ...parcel, events });
   } catch (err) {
     console.error("Track parcel error:", err);
     res.status(500).json({ error: "Échec du suivi" });

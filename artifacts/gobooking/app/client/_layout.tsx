@@ -28,6 +28,7 @@ export default function ClientLayout() {
       <Stack.Screen name="factures" />
       <Stack.Screen name="compagnies" />
       <Stack.Screen name="fidelite" />
+      <Stack.Screen name="colis-suivi" />
     </Stack>
   );
 }
