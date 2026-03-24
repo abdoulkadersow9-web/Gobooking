@@ -124,7 +124,8 @@ export default function BookingsScreen() {
   const [reviewed,  setReviewed]  = useState<Set<string>>(new Set());
 
   const fetch = async () => {
-    if (!token) return;
+    if (!token) { setLoading(false); return; }
+    console.log("[GoBooking] Chargement des réservations...");
     try {
       const [data, reviewedIds] = await Promise.all([
         apiFetch<Booking[]>("/bookings", { token }),
@@ -328,14 +329,27 @@ export default function BookingsScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <View style={styles.emptyIconWrap}>
-                <Feather name="bookmark" size={40} color={Colors.light.primary} />
+                <Feather name={token ? "bookmark" : "lock"} size={40} color={Colors.light.primary} />
               </View>
-              <Text style={styles.emptyTitle}>Aucune réservation</Text>
-              <Text style={styles.emptySubtitle}>Vos réservations de voyage apparaîtront ici</Text>
-              <Pressable style={styles.bookNowBtn} onPress={() => router.push("/(tabs)")}>
-                <Feather name="search" size={16} color="white" />
-                <Text style={styles.bookNowText}>Réserver un trajet</Text>
-              </Pressable>
+              {token ? (
+                <>
+                  <Text style={styles.emptyTitle}>Aucune réservation</Text>
+                  <Text style={styles.emptySubtitle}>Vos réservations de voyage apparaîtront ici</Text>
+                  <Pressable style={styles.bookNowBtn} onPress={() => router.push("/(tabs)")}>
+                    <Feather name="search" size={16} color="white" />
+                    <Text style={styles.bookNowText}>Rechercher un trajet</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emptyTitle}>Non connecté</Text>
+                  <Text style={styles.emptySubtitle}>Connectez-vous pour voir vos réservations</Text>
+                  <Pressable style={styles.bookNowBtn} onPress={() => router.push("/(auth)/login")}>
+                    <Feather name="log-in" size={16} color="white" />
+                    <Text style={styles.bookNowText}>Se connecter</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           }
         />

@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   Platform,
@@ -150,6 +151,7 @@ export default function HomeScreen() {
   const firstName = user?.name?.split(" ")[0] || "";
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -285,7 +287,19 @@ export default function HomeScreen() {
   };
 
   const search = () => {
-    if (!from.trim() || !to.trim()) return;
+    if (!from.trim()) {
+      Alert.alert("Départ manquant", "Veuillez saisir ou sélectionner une ville de départ.");
+      return;
+    }
+    if (!to.trim()) {
+      Alert.alert("Arrivée manquante", "Veuillez saisir ou sélectionner une ville d'arrivée.");
+      return;
+    }
+    if (from.trim().toLowerCase() === to.trim().toLowerCase()) {
+      Alert.alert("Trajet invalide", "La ville de départ et d'arrivée doivent être différentes.");
+      return;
+    }
+    console.log("[GoBooking] Recherche trajet:", { from, to, date, passengers });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({ pathname: "/search-results", params: { from, to, date, passengers: passengers.toString() } });
   };
@@ -295,6 +309,7 @@ export default function HomeScreen() {
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
@@ -392,6 +407,22 @@ export default function HomeScreen() {
                 />
               </View>
             </View>
+            {/* ── Villes populaires ── */}
+            <View style={styles.citiesRow}>
+              {["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man"].map((city) => (
+                <Pressable
+                  key={city}
+                  style={({ pressed }) => [styles.cityChip, pressed && { opacity: 0.7 }]}
+                  onPress={() => {
+                    if (!from) { setFrom(city); }
+                    else if (!to) { setTo(city); }
+                    else { setTo(city); }
+                  }}
+                >
+                  <Text style={styles.cityChipText}>{city}</Text>
+                </Pressable>
+              ))}
+            </View>
             <View style={styles.bottomRow}>
               <View style={styles.dateWrap}>
                 <Feather name="calendar" size={15} color={Colors.light.textSecondary} />
@@ -449,7 +480,11 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[styles.ctaBtn, styles.ctaBtnPrimary]}
           activeOpacity={0.85}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setMode("trajet"); }}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            setMode("trajet");
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+          }}
         >
           <View style={styles.ctaIcon}>
             <Feather name="map" size={20} color={Colors.light.primary} />
@@ -1128,6 +1163,9 @@ const styles = StyleSheet.create({
   paxCount: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A", minWidth: 16, textAlign: "center" },
   searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.accent, borderRadius: 12, paddingVertical: 14, shadowColor: Colors.light.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
   searchBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12, marginTop: 4 },
+  cityChip: { backgroundColor: "#EEF2FF", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#C7D2FE" },
+  cityChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
   colisHero: { alignItems: "center", gap: 10, paddingVertical: 8 },
   colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   colisTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },

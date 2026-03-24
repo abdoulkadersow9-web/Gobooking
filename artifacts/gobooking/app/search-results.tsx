@@ -175,6 +175,7 @@ export default function SearchResultsScreen() {
   useEffect(() => {
     const load = async () => {
       setUsingFallback(false);
+      console.log("[GoBooking] Recherche de trajets:", { from, to, date, passengers });
       try {
         let url = `/trips/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}&passengers=${passengers}`;
         if (companyId) url += `&companyId=${encodeURIComponent(companyId)}`;
