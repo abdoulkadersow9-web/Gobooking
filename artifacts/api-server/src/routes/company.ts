@@ -112,6 +112,83 @@ router.get("/agents", async (req, res) => {
   }
 });
 
+/* ── Créer un agent avec rôle ─────────────────────────────────────────────
+   POST /company/agents
+   Crée un compte utilisateur (role=agent) + enregistrement agent
+   avec le rôle spécifique (embarquement, vente, reception_colis, route, validation)
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/agents", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { name, email, password, phone, agentRole, agentCode, busId } = req.body as {
+      name: string; email: string; password: string; phone?: string;
+      agentRole: string; agentCode?: string; busId?: string;
+    };
+
+    const VALID_AGENT_ROLES = ["embarquement", "reception_colis", "vente", "validation", "route"];
+
+    if (!name || !email || !password || !agentRole) {
+      res.status(400).json({ error: "Nom, email, mot de passe et rôle sont requis" });
+      return;
+    }
+    if (!VALID_AGENT_ROLES.includes(agentRole)) {
+      res.status(400).json({ error: "Rôle d'agent invalide" });
+      return;
+    }
+
+    const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (existing.length > 0) {
+      res.status(400).json({ error: "Cet email est déjà utilisé" });
+      return;
+    }
+
+    const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const crypto = await import("crypto");
+    const pwHash = crypto.createHash("sha256").update(password + "gobooking_salt_2024").digest("hex");
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id ?? "default";
+
+    const userId = generateId();
+    const [newUser] = await db.insert(usersTable).values({
+      id: userId,
+      name,
+      email,
+      phone: phone ?? "",
+      passwordHash: pwHash,
+      role: "agent",
+    }).returning();
+
+    const code = agentCode || `AGT-${Date.now().toString().slice(-5)}`;
+    const agentId = generateId();
+    const [newAgent] = await db.insert(agentsTable).values({
+      id: agentId,
+      userId: newUser.id,
+      companyId,
+      agentCode: code,
+      agentRole,
+      busId: busId ?? null,
+      status: "active",
+    }).returning();
+
+    res.json({
+      id: newAgent.id,
+      name: newUser.name,
+      email: newUser.email,
+      phone: newUser.phone,
+      agentCode: newAgent.agentCode,
+      agentRole: newAgent.agentRole,
+      busId: newAgent.busId,
+      status: newAgent.status,
+    });
+  } catch (err) {
+    console.error("Create agent error:", err);
+    res.status(500).json({ error: "Impossible de créer l'agent" });
+  }
+});
+
 router.get("/trips", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);

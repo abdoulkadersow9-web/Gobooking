@@ -40,12 +40,29 @@ interface Trip { id: string; from: string; to: string; date: string; departureTi
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
-interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string }
+interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string; agentRole?: string; email?: string }
 interface WalletTx { id: string; bookingRef?: string | null; type: string; grossAmount: number; commissionAmount: number; netAmount: number; description?: string | null; createdAt: string }
 interface WalletData { balance: number; totalGross: number; totalCommission: number; totalNet: number; transactions: WalletTx[] }
 interface Invoice { id: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
 interface SubscriptionPlan { id: string; name: string; priceMonthly: number; maxReservations: number | null; maxTrips: number | null; features: string[] }
 interface CompanySubscription { id: string; companyId: string; planId: string; status: string; startDate: string; endDate: string | null; autoRenew: boolean; plan: SubscriptionPlan }
+
+/* ─── Agent role metadata ────────────────────────────────── */
+const AGENT_ROLE_META: Record<string, { label: string; bg: string; text: string }> = {
+  embarquement:    { label: "Embarquement",  bg: "#DBEAFE", text: "#1E40AF" },
+  reception_colis: { label: "Colis",         bg: "#FEF3C7", text: "#92400E" },
+  vente:           { label: "Vente ticket",  bg: "#DCFCE7", text: "#166534" },
+  validation:      { label: "Validation",    bg: "#F3E8FF", text: "#6B21A8" },
+  route:           { label: "En route",      bg: "#FFE4CC", text: "#9A3412" },
+};
+
+const AGENT_ROLES = [
+  { value: "vente",           label: "Agent vente ticket" },
+  { value: "embarquement",    label: "Agent embarquement" },
+  { value: "reception_colis", label: "Agent colis" },
+  { value: "route",           label: "Agent en route" },
+  { value: "validation",      label: "Agent validation" },
+];
 
 /* ─── Demo data ─────────────────────────────────────────── */
 const DEMO_STATS: Stats = { totalBuses: 12, totalAgents: 18, totalTrips: 284, totalReservations: 1_420, totalParcels: 638, totalRevenue: 8_760_000, activeBuses: 9 };
@@ -83,12 +100,12 @@ const DEMO_PARCELS: Parcel[] = [
 ];
 
 const DEMO_AGENTS: AgentItem[] = [
-  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", status: "active" },
-  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", status: "active" },
-  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", status: "active" },
-  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   status: "inactive" },
-  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", status: "active" },
-  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", status: "active" },
+  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", status: "active",   agentRole: "embarquement" },
+  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", status: "active",   agentRole: "vente" },
+  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", status: "active",   agentRole: "reception_colis" },
+  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   status: "inactive", agentRole: "vente" },
+  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", status: "active",   agentRole: "route" },
+  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", status: "active",   agentRole: "validation" },
 ];
 
 /* ─── Seat grid generator ────────────────────────────────── */
@@ -281,7 +298,9 @@ export default function CompanyDashboard() {
   /* form states */
   const [newBus, setNewBus] = useState({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
   const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
-  const [newAgent, setNewAgent] = useState({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
+  const [newAgent, setNewAgent] = useState({ name: "", phone: "", email: "", password: "", agentCode: "", busId: "", busName: "", agentRole: "" });
+  const [agentSubmitting, setAgentSubmitting] = useState(false);
+  const [agentError, setAgentError] = useState("");
   const [newReservation, setNewReservation] = useState({ clientName: "", clientPhone: "", tripId: "", seatCount: "1", paymentMethod: "cash" });
   const [newParcel, setNewParcel] = useState({ senderName: "", senderPhone: "", receiverName: "", receiverPhone: "", fromCity: "Abidjan", toCity: "Bouaké", weight: "1", paymentMethod: "cash" });
 
@@ -548,15 +567,39 @@ export default function CompanyDashboard() {
     if (token) apiFetch("/company/trips", { token, method: "POST", body: { ...t } }).catch(() => {});
   };
 
-  const handleAddAgent = () => {
-    if (!newAgent.name || !newAgent.phone) return;
+  const handleAddAgent = async () => {
+    if (!newAgent.name || !newAgent.phone || !newAgent.email || !newAgent.password || !newAgent.agentRole) return;
+    setAgentSubmitting(true);
+    setAgentError("");
     const code = newAgent.agentCode || `AGT-${String(agents.length + 1).padStart(3, "0")}`;
     const busLabel = newAgent.busName || "Non assigné";
-    const ag: AgentItem = { id: Date.now().toString(), name: newAgent.name, agentCode: code, phone: newAgent.phone, bus: busLabel, busId: newAgent.busId, status: "active" };
-    setAgents(p => [...p, ag]);
+    try {
+      const created = await apiFetch<AgentItem>("/company/agents", {
+        token,
+        method: "POST",
+        body: JSON.stringify({
+          name: newAgent.name,
+          email: newAgent.email,
+          password: newAgent.password,
+          phone: newAgent.phone,
+          agentRole: newAgent.agentRole,
+          agentCode: code,
+          busId: newAgent.busId || undefined,
+        }),
+      });
+      setAgents(p => [...p, { ...created, bus: busLabel }]);
+    } catch {
+      const ag: AgentItem = {
+        id: Date.now().toString(), name: newAgent.name, agentCode: code,
+        phone: newAgent.phone, bus: busLabel, busId: newAgent.busId,
+        status: "active", agentRole: newAgent.agentRole, email: newAgent.email,
+      };
+      setAgents(p => [...p, ag]);
+    }
     setStats(s => ({ ...s, totalAgents: s.totalAgents + 1 }));
     setAddAgentModal(false);
-    setNewAgent({ name: "", phone: "", agentCode: "", busId: "", busName: "" });
+    setAgentSubmitting(false);
+    setNewAgent({ name: "", phone: "", email: "", password: "", agentCode: "", busId: "", busName: "", agentRole: "" });
   };
 
   const handleAssignAgent = (agent: AgentItem, bus: Bus) => {
@@ -1149,15 +1192,24 @@ export default function CompanyDashboard() {
               <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
-          {agents.map(agent => (
+          {agents.map(agent => {
+            const roleMeta = AGENT_ROLE_META[agent.agentRole ?? ""] ?? { label: "Agent", bg: "#F1F5F9", text: "#475569" };
+            return (
             <View key={agent.id} style={S.listCard}>
               <View style={S.agentAvatar}><Text style={S.agentAvatarText}>{agent.name.charAt(0)}</Text></View>
               <View style={{ flex: 1 }}>
                 <Text style={S.listTitle}>{agent.name}</Text>
                 <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                  <Feather name="truck" size={10} color={agent.busId ? PRIMARY : "#94A3B8"} />
-                  <Text style={[S.listSub, { color: agent.busId ? PRIMARY : "#94A3B8" }]}>{agent.bus}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                  {agent.agentRole && (
+                    <View style={[S.badge, { backgroundColor: roleMeta.bg }]}>
+                      <Text style={[S.badgeText, { color: roleMeta.text }]}>{roleMeta.label}</Text>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                    <Feather name="truck" size={10} color={agent.busId ? PRIMARY : "#94A3B8"} />
+                    <Text style={[S.listSub, { color: agent.busId ? PRIMARY : "#94A3B8" }]}>{agent.bus}</Text>
+                  </View>
                 </View>
               </View>
               <View style={{ alignItems: "flex-end", gap: 6 }}>
@@ -1172,7 +1224,8 @@ export default function CompanyDashboard() {
                 </TouchableOpacity>
               </View>
             </View>
-          ))}
+            );
+          })}
         </>)}
 
         {/* ── Factures ── */}
@@ -1837,17 +1890,59 @@ export default function CompanyDashboard() {
         <View style={S.modalOverlay}>
           <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
             <View style={S.modalHeader}>
-              <Text style={S.modalTitle}>Ajouter un agent</Text>
-              <Pressable onPress={() => setAddAgentModal(false)}><Feather name="x" size={20} color="#64748B" /></Pressable>
+              <Text style={S.modalTitle}>Nouvel agent</Text>
+              <Pressable onPress={() => { setAddAgentModal(false); setAgentError(""); setNewAgent({ name: "", phone: "", email: "", password: "", agentCode: "", busId: "", busName: "", agentRole: "" }); }}>
+                <Feather name="x" size={20} color="#64748B" />
+              </Pressable>
             </View>
-            <TextInput style={S.modalInput} placeholder="Nom complet" value={newAgent.name} onChangeText={v => setNewAgent(p => ({ ...p, name: v }))} placeholderTextColor="#94A3B8" />
-            <TextInput style={S.modalInput} placeholder="Téléphone (07 XX XX XX XX)" keyboardType="phone-pad" value={newAgent.phone} onChangeText={v => setNewAgent(p => ({ ...p, phone: v }))} placeholderTextColor="#94A3B8" />
-            <TextInput style={S.modalInput} placeholder={`Code agent (auto: AGT-${String(agents.length + 1).padStart(3,"0")})`} value={newAgent.agentCode} onChangeText={v => setNewAgent(p => ({ ...p, agentCode: v }))} placeholderTextColor="#94A3B8" />
+
+            {/* Role selector */}
+            <Text style={S.subLabel}>Rôle de l'agent *</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+              {AGENT_ROLES.map(r => (
+                <Pressable key={r.value}
+                  onPress={() => setNewAgent(p => ({ ...p, agentRole: r.value }))}
+                  style={[
+                    S.roleChip,
+                    newAgent.agentRole === r.value && { backgroundColor: PRIMARY, borderColor: PRIMARY },
+                  ]}>
+                  <Text style={[S.roleChipText, newAgent.agentRole === r.value && { color: "white" }]}>
+                    {r.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={S.subLabel}>Informations personnelles *</Text>
+            <TextInput style={S.modalInput} placeholder="Nom complet *" value={newAgent.name}
+              onChangeText={v => setNewAgent(p => ({ ...p, name: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Téléphone *" keyboardType="phone-pad"
+              value={newAgent.phone} onChangeText={v => setNewAgent(p => ({ ...p, phone: v }))} placeholderTextColor="#94A3B8" />
+
+            <Text style={[S.subLabel, { marginTop: 4 }]}>Accès compte *</Text>
+            <TextInput style={S.modalInput} placeholder="Email de connexion *" keyboardType="email-address"
+              autoCapitalize="none" value={newAgent.email}
+              onChangeText={v => setNewAgent(p => ({ ...p, email: v }))} placeholderTextColor="#94A3B8" />
+            <TextInput style={S.modalInput} placeholder="Mot de passe temporaire *" secureTextEntry
+              value={newAgent.password} onChangeText={v => setNewAgent(p => ({ ...p, password: v }))} placeholderTextColor="#94A3B8" />
+
+            <TextInput style={S.modalInput} placeholder={`Code agent (auto: AGT-${String(agents.length + 1).padStart(3,"0")})`}
+              value={newAgent.agentCode} onChangeText={v => setNewAgent(p => ({ ...p, agentCode: v }))} placeholderTextColor="#94A3B8" />
             <BusSelector buses={buses} selected={newAgent.busId} onSelect={bus => setNewAgent(p => ({ ...p, busId: bus.id, busName: bus.busName }))} />
+
+            {agentError ? <Text style={{ color: "#DC2626", fontSize: 13, marginBottom: 8 }}>{agentError}</Text> : null}
+
             <View style={S.modalBtns}>
-              <Pressable style={S.modalCancel} onPress={() => setAddAgentModal(false)}><Text style={S.modalCancelText}>Annuler</Text></Pressable>
-              <Pressable style={[S.modalConfirm, (!newAgent.name || !newAgent.phone) && S.modalConfirmDisabled]} onPress={handleAddAgent}>
-                <Text style={S.modalConfirmText}>Ajouter</Text>
+              <Pressable style={S.modalCancel} onPress={() => { setAddAgentModal(false); setAgentError(""); }}>
+                <Text style={S.modalCancelText}>Annuler</Text>
+              </Pressable>
+              <Pressable
+                style={[S.modalConfirm, (!newAgent.name || !newAgent.phone || !newAgent.email || !newAgent.password || !newAgent.agentRole || agentSubmitting) && S.modalConfirmDisabled]}
+                onPress={handleAddAgent}
+                disabled={agentSubmitting}>
+                {agentSubmitting
+                  ? <ActivityIndicator size="small" color="white" />
+                  : <Text style={S.modalConfirmText}>Créer l'agent</Text>}
               </Pressable>
             </View>
           </ScrollView>
@@ -2066,6 +2161,10 @@ const S = StyleSheet.create({
   filterChipActive:    { backgroundColor: "#EEF2FF", borderColor: PRIMARY },
   filterChipText:      { fontSize: 12, color: "#64748B" },
   filterChipTextActive:{ color: PRIMARY, fontWeight: "600" },
+
+  roleChip:       { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5,
+                    borderColor: "#CBD5E1", backgroundColor: "#F8FAFC" },
+  roleChipText:   { fontSize: 12, color: "#475569", fontWeight: "500" },
 
   reservCard:     { backgroundColor: "white", borderRadius: 12, padding: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
   reservTop:      { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },

@@ -30,7 +30,7 @@ interface AuthResponse {
     email: string;
     phone: string;
     role: "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
-    agentRole?: "embarquement" | "reception_colis" | "vente" | "validation" | null;
+    agentRole?: "embarquement" | "reception_colis" | "vente" | "validation" | "route" | null;
     createdAt: string;
   };
 }

@@ -8,18 +8,19 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, AGENT_ROLE_LABELS, AGENT_ROLE_COLORS, type AgentRole } from "@/context/AuthContext";
 
 const GREEN = "#166534";
 const GREEN_LIGHT = "#F0FDF4";
 const ACCENT = "#FF6B00";
 
 const AGENT_MENUS = [
-  { id: "embarquement",   label: "Embarquement",    icon: "🚌", path: "/agent/embarquement",   desc: "Scanner les billets voyageurs" },
-  { id: "vente",          label: "Vente de billets", icon: "🎫", path: "/agent/vente",           desc: "Vendre un billet au guichet" },
-  { id: "reception_colis",label: "Réception colis",  icon: "📦", path: "/agent/reception-colis", desc: "Réceptionner un colis arrivé" },
-  { id: "validation",     label: "Validation",       icon: "✅", path: "/agent/validation",      desc: "Valider les documents" },
-  { id: "scan",           label: "Scanner QR",       icon: "📷", path: "/agent/scan",            desc: "Scanner un code QR" },
+  { id: "embarquement",    label: "Embarquement",    icon: "🚌", path: "/agent/embarquement",   desc: "Scanner les billets voyageurs" },
+  { id: "vente",           label: "Vente de billets", icon: "🎫", path: "/agent/vente",          desc: "Vendre un billet au guichet" },
+  { id: "reception_colis", label: "Réception colis",  icon: "📦", path: "/agent/reception-colis",desc: "Réceptionner un colis arrivé" },
+  { id: "validation",      label: "Validation",       icon: "✅", path: "/agent/validation",     desc: "Valider les documents" },
+  { id: "route",           label: "Suivi trajet",     icon: "🗺️", path: "/agent/route",          desc: "Suivre le trajet en cours" },
+  { id: "scan",            label: "Scanner QR",       icon: "📷", path: "/agent/scan",           desc: "Scanner un code QR" },
 ];
 
 export default function AgentHome() {
@@ -38,7 +39,7 @@ export default function AgentHome() {
           <Text style={S.hello}>Bonjour,</Text>
           <Text style={S.name}>{user?.name ?? "Agent"}</Text>
           {user?.agentRole && (
-            <Text style={S.role}>{user.agentRole.replace("_", " ")}</Text>
+            <Text style={S.role}>{AGENT_ROLE_LABELS[user.agentRole as AgentRole] ?? user.agentRole}</Text>
           )}
         </View>
         <Pressable onPress={logout} style={S.logoutBtn}>

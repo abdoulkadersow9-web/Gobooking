@@ -13,7 +13,7 @@ import { apiFetch } from "@/utils/api";
 import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
-export type AgentRole = "embarquement" | "reception_colis" | "vente" | "validation";
+export type AgentRole = "embarquement" | "reception_colis" | "vente" | "validation" | "route";
 
 export interface User {
   id: string;
@@ -33,8 +33,25 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
   if (agentRole === "reception_colis") return "/agent/reception-colis";
   if (agentRole === "vente")           return "/agent/vente";
   if (agentRole === "validation")      return "/agent/validation";
+  if (agentRole === "route")           return "/agent/route";
   return "/agent/home";
 }
+
+export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
+  embarquement:    "Agent embarquement",
+  reception_colis: "Agent colis",
+  vente:           "Agent vente ticket",
+  validation:      "Agent validation",
+  route:           "Agent en route",
+};
+
+export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
+  embarquement:    { bg: "#DBEAFE", text: "#1E40AF" },
+  reception_colis: { bg: "#FEF3C7", text: "#92400E" },
+  vente:           { bg: "#DCFCE7", text: "#166534" },
+  validation:      { bg: "#F3E8FF", text: "#6B21A8" },
+  route:           { bg: "#FFE4CC", text: "#9A3412" },
+};
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
   if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
