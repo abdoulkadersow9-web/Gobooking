@@ -1,185 +1,189 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
-  ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useAuth, AGENT_ROLE_LABELS, AGENT_ROLE_COLORS, type AgentRole } from "@/context/AuthContext";
-import { apiFetch } from "@/utils/api";
+import { useAuth } from "@/context/AuthContext";
 
-const GREEN = "#166534";
-const GREEN_LIGHT = "#F0FDF4";
+const GREEN  = "#166534";
+const AMBER  = "#D97706";
+const PURPLE = "#7C3AED";
+const NAVY   = "#0B3C5D";
 
-const ROLE_TILES = [
+const MODULES = [
   {
-    role: "agent_ticket" as AgentRole,
-    label: "Vente de billets",
-    icon: "🎫",
+    id: "guichet",
+    label: "Agent Guichet",
+    sub: "Vente de billets",
+    desc: "Émettre et imprimer des billets, encaisser les paiements",
+    icon: "credit-card" as const,
+    emoji: "🎫",
     path: "/agent/tickets",
-    desc: "Vendre un billet au guichet",
-    color: "#D97706",
-    bg: "#FEF3C7",
+    color: AMBER,
+    gradient: ["#FFF7ED", "#FEF3C7"] as [string, string],
+    border: "#FBBF24",
   },
   {
-    role: "agent_embarquement" as AgentRole,
-    label: "Embarquement",
-    icon: "🚌",
+    id: "embarquement",
+    label: "Agent Embarquement",
+    sub: "Contrôle d'accès",
+    desc: "Scanner les QR codes, valider les billets, gérer l'embarquement",
+    icon: "check-square" as const,
+    emoji: "🚌",
     path: "/agent/embarquement",
-    desc: "Scanner billets et gérer l'embarquement",
-    color: "#166534",
-    bg: "#DCFCE7",
+    color: GREEN,
+    gradient: ["#F0FDF4", "#DCFCE7"] as [string, string],
+    border: "#4ADE80",
   },
   {
-    role: "agent_colis" as AgentRole,
-    label: "Gestion colis",
-    icon: "📦",
+    id: "colis",
+    label: "Agent Colis",
+    sub: "Gestion des envois",
+    desc: "Créer, réceptionner et suivre les colis intercités",
+    icon: "package" as const,
+    emoji: "📦",
     path: "/agent/colis",
-    desc: "Créer, réceptionner et suivre les colis",
-    color: "#7C3AED",
-    bg: "#EDE9FE",
+    color: PURPLE,
+    gradient: ["#FAF5FF", "#EDE9FE"] as [string, string],
+    border: "#A78BFA",
   },
 ];
 
-interface BusInfo {
-  busName: string;
-  plateNumber: string;
-  busType: string;
-}
-
 export default function AgentHome() {
-  const { user, token, logout } = useAuth();
-  const [bus, setBus] = useState<BusInfo | null>(null);
-  const [busLoading, setBusLoading] = useState(true);
+  const { user, logout } = useAuth();
 
-  useEffect(() => {
-    if (!token) { setBusLoading(false); return; }
-    apiFetch<{ agent?: any; bus?: Record<string, any> | null }>("/agent/info", { token })
-      .then(d => {
-        if (d?.bus) {
-          setBus({
-            busName:     d.bus.busName     ?? d.bus.bus_name    ?? "—",
-            plateNumber: d.bus.plateNumber ?? d.bus.plate_number ?? "—",
-            busType:     d.bus.busType     ?? d.bus.bus_type     ?? "—",
-          });
-        } else {
-          setBus(null);
-        }
-      })
-      .catch(() => setBus(null))
-      .finally(() => setBusLoading(false));
-  }, [token]);
-
-  useEffect(() => {
-    if (!user?.agentRole) return;
-    const role = user.agentRole;
-    if (role === "agent_ticket"       || role === "vente")           { router.replace("/agent/tickets" as never); return; }
-    if (role === "agent_embarquement" || role === "embarquement")    { router.replace("/agent/embarquement" as never); return; }
-    if (role === "agent_colis"        || role === "reception_colis") { router.replace("/agent/colis" as never); return; }
-  }, [user?.agentRole]);
-
-  const roleLabel = user?.agentRole ? (AGENT_ROLE_LABELS[user.agentRole as AgentRole] ?? user.agentRole) : null;
+  const roleLabel = () => {
+    const r = user?.agentRole;
+    if (!r) return null;
+    if (r === "agent_guichet" || r === "agent_ticket" || r === "vente") return "Agent Guichet";
+    if (r === "agent_embarquement" || r === "embarquement") return "Agent Embarquement";
+    if (r === "agent_colis" || r === "reception_colis") return "Agent Colis";
+    return r;
+  };
 
   return (
-    <SafeAreaView style={S.safe}>
-      <View style={S.header}>
-        <View>
-          <Text style={S.hello}>Bonjour,</Text>
-          <Text style={S.name}>{user?.name ?? "Agent"}</Text>
-          {roleLabel && <Text style={S.role}>{roleLabel}</Text>}
-        </View>
-        <Pressable onPress={logout} style={S.logoutBtn}>
-          <Text style={S.logoutTxt}>Déconnexion</Text>
-        </Pressable>
-      </View>
-
-      <View style={S.body}>
-        <View style={S.busCard}>
-          <View style={S.busCardLeft}>
-            <View style={S.busIconBox}>
-              <Text style={{ fontSize: 20 }}>🚌</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={S.busCardLabel}>Mon bus affecté</Text>
-              {busLoading ? (
-                <ActivityIndicator size="small" color={GREEN} style={{ marginTop: 4, alignSelf: "flex-start" }} />
-              ) : bus ? (
-                <>
-                  <Text style={S.busCardName}>{bus.busName}</Text>
-                  <Text style={S.busCardMeta}>{bus.plateNumber} · {bus.busType}</Text>
-                </>
-              ) : (
-                <Text style={S.busCardNone}>Aucun bus assigné</Text>
-              )}
-            </View>
-          </View>
-          {bus && (
-            <View style={S.busAssignedBadge}>
-              <Feather name="check-circle" size={12} color={GREEN} />
-              <Text style={S.busAssignedText}>Assigné</Text>
+    <SafeAreaView style={S.root} edges={["top"]}>
+      {/* Header */}
+      <LinearGradient colors={[NAVY, "#1A5C8A"]} style={S.header}>
+        <View style={S.headerLeft}>
+          <Text style={S.headerHello}>Bonjour 👋</Text>
+          <Text style={S.headerName}>{user?.name ?? "Agent"}</Text>
+          {roleLabel() && (
+            <View style={S.rolePill}>
+              <Text style={S.rolePillText}>{roleLabel()}</Text>
             </View>
           )}
         </View>
+        <Pressable onPress={logout} style={S.logoutBtn} hitSlop={8}>
+          <Feather name="log-out" size={18} color="rgba(255,255,255,0.8)" />
+        </Pressable>
+      </LinearGradient>
 
-        <Text style={S.sectionTitle}>Espaces agents</Text>
-        <View style={S.grid}>
-          {ROLE_TILES.map((tile) => (
-            <Pressable
-              key={tile.role}
-              style={[S.tile, { borderLeftColor: tile.color, borderLeftWidth: 4 }]}
-              onPress={() => router.push(tile.path as never)}
-            >
-              <Text style={S.tileIcon}>{tile.icon}</Text>
-              <Text style={[S.tileLabel, { color: tile.color }]}>{tile.label}</Text>
-              <Text style={S.tileDesc}>{tile.desc}</Text>
-            </Pressable>
-          ))}
-        </View>
+      {/* Intro */}
+      <View style={S.intro}>
+        <Text style={S.introTitle}>Choisissez votre module</Text>
+        <Text style={S.introSub}>Accédez à votre espace de travail</Text>
       </View>
+
+      {/* Module cards */}
+      <ScrollView
+        style={S.scroll}
+        contentContainerStyle={S.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {MODULES.map(mod => (
+          <Pressable
+            key={mod.id}
+            style={({ pressed }) => [S.card, pressed && S.cardPressed]}
+            onPress={() => router.push(mod.path as never)}
+          >
+            <LinearGradient
+              colors={mod.gradient}
+              style={S.cardGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              {/* Left accent bar */}
+              <View style={[S.cardAccent, { backgroundColor: mod.color }]} />
+
+              {/* Icon */}
+              <View style={[S.cardIconBox, { backgroundColor: mod.color + "20", borderColor: mod.border }]}>
+                <Text style={S.cardEmoji}>{mod.emoji}</Text>
+              </View>
+
+              {/* Text */}
+              <View style={S.cardBody}>
+                <Text style={[S.cardLabel, { color: mod.color }]}>{mod.label}</Text>
+                <Text style={S.cardSub}>{mod.sub}</Text>
+                <Text style={S.cardDesc}>{mod.desc}</Text>
+              </View>
+
+              {/* Arrow */}
+              <View style={[S.cardArrow, { backgroundColor: mod.color }]}>
+                <Feather name="arrow-right" size={16} color="#fff" />
+              </View>
+            </LinearGradient>
+          </Pressable>
+        ))}
+
+        {/* Extra links */}
+        <View style={S.extraRow}>
+          <Pressable style={S.extraBtn} onPress={() => router.push("/agent/scan" as never)}>
+            <Feather name="maximize" size={16} color={NAVY} />
+            <Text style={S.extraBtnText}>Scanner QR</Text>
+          </Pressable>
+          <Pressable style={S.extraBtn} onPress={() => router.push("/agent/gains" as never)}>
+            <Feather name="trending-up" size={16} color={NAVY} />
+            <Text style={S.extraBtnText}>Mes gains</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const S = StyleSheet.create({
-  safe:        { flex: 1, backgroundColor: GREEN_LIGHT },
-  header:      { backgroundColor: GREEN, padding: 20, flexDirection: "row",
-                 justifyContent: "space-between", alignItems: "center" },
-  hello:       { color: "rgba(255,255,255,0.7)", fontSize: 13 },
-  name:        { color: "white", fontSize: 20, fontWeight: "700" },
-  role:        { color: "rgba(255,255,255,0.6)", fontSize: 12, marginTop: 2, textTransform: "capitalize" },
-  logoutBtn:   { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8,
-                 paddingHorizontal: 14, paddingVertical: 8 },
-  logoutTxt:   { color: "white", fontSize: 13, fontWeight: "600" },
+  root: { flex: 1, backgroundColor: "#F8FAFC" },
 
-  body:        { flex: 1, padding: 16 },
+  header:     { paddingHorizontal: 20, paddingVertical: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  headerLeft: { flex: 1, gap: 2 },
+  headerHello:{ color: "rgba(255,255,255,0.7)", fontSize: 13 },
+  headerName: { color: "#fff", fontSize: 22, fontWeight: "800" },
+  rolePill:   { alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.18)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginTop: 4 },
+  rolePillText: { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600" },
+  logoutBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
 
-  busCard: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 20,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-    borderLeftWidth: 4, borderLeftColor: GREEN,
-  },
-  busCardLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  busIconBox:  { width: 42, height: 42, borderRadius: 12, backgroundColor: GREEN_LIGHT, alignItems: "center", justifyContent: "center" },
-  busCardLabel:{ fontSize: 11, fontWeight: "600", color: "#6B7280", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 2 },
-  busCardName: { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  busCardMeta: { fontSize: 12, color: "#64748B", marginTop: 1 },
-  busCardNone: { fontSize: 13, color: "#CBD5E1", fontStyle: "italic", marginTop: 2 },
-  busAssignedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: GREEN_LIGHT, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  busAssignedText: { fontSize: 11, fontWeight: "600", color: GREEN },
+  intro:       { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
+  introTitle:  { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  introSub:    { fontSize: 14, color: "#64748B", marginTop: 2 },
 
-  sectionTitle:{ fontSize: 16, fontWeight: "700", color: GREEN, marginBottom: 12 },
-  grid:        { gap: 12 },
-  tile:        { backgroundColor: "white", borderRadius: 14, padding: 18,
-                 elevation: 2, shadowColor: "#000", shadowOpacity: 0.06,
-                 shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-  tileIcon:    { fontSize: 32, marginBottom: 8 },
-  tileLabel:   { fontSize: 17, fontWeight: "700" },
-  tileDesc:    { fontSize: 13, color: "#6b7280", marginTop: 4 },
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
+
+  card:        { borderRadius: 18, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  cardPressed: { opacity: 0.92, transform: [{ scale: 0.985 }] },
+  cardGradient:{ flexDirection: "row", alignItems: "center", padding: 18, gap: 14, position: "relative" },
+  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 5, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+
+  cardIconBox: { width: 58, height: 58, borderRadius: 16, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
+  cardEmoji:   { fontSize: 26 },
+
+  cardBody:    { flex: 1, gap: 2 },
+  cardLabel:   { fontSize: 16, fontWeight: "800" },
+  cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
+  cardDesc:    { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 17 },
+
+  cardArrow:   { width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+
+  extraRow:    { flexDirection: "row", gap: 12, marginTop: 6 },
+  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  extraBtnText:{ fontSize: 13, fontWeight: "700", color: NAVY },
 });

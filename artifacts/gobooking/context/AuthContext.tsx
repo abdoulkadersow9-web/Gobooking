@@ -67,7 +67,7 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
   if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
-  if (role === "agent")                                 return getAgentPath(agentRole);
+  if (role === "agent")                                 return "/agent/home";
   if (role === "admin"   || role === "super_admin")     return "/admin/dashboard";
   return "/client/home"; // client / user
 }
