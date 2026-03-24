@@ -89,7 +89,7 @@ export default function ValidationScreen() {
     setNotFound(false);
     setValidated(false);
     try {
-      const res = await apiFetch(`/agent/reservation/${ref.trim()}`, { token: token ?? undefined });
+      const res = await apiFetch<ReservationInfo>(`/agent/reservation/${ref.trim()}`, { token: token ?? undefined });
       setReservation(res);
     } catch {
       setNotFound(true);

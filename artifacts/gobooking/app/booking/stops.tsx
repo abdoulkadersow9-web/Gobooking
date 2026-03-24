@@ -28,7 +28,7 @@ interface Stop {
 export default function StopsScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
   const insets     = useSafeAreaInsets();
-  const { booking, setBooking } = useBooking();
+  const { booking, updateBooking } = useBooking();
 
   const [stops,    setStops]    = useState<Stop[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -62,13 +62,12 @@ export default function StopsScreen() {
       Alert.alert("Sélection incomplète", "Choisissez un arrêt de départ et d'arrivée.");
       return;
     }
-    setBooking(prev => ({
-      ...prev,
+    updateBooking({
       fromStopId:   fromStop.id,
       fromStopName: fromStop.name,
       toStopId:     toStop.id,
       toStopName:   toStop.name,
-    }));
+    });
     router.back();
   }
 

@@ -211,7 +211,7 @@ export default function BookingDetailScreen() {
             <View style={styles.qrHeader}>
               <Feather name="smartphone" size={16} color={Colors.light.primary} />
               <Text style={styles.qrTitle}>Billet électronique</Text>
-              {(booking.status === "boarded" || (booking.status as string) === "validated") && (
+              {((booking.status as string) === "boarded" || (booking.status as string) === "validated") && (
                 <View style={styles.qrUsedBadge}>
                   <Text style={styles.qrUsedText}>Utilisé</Text>
                 </View>
@@ -396,7 +396,7 @@ export default function BookingDetailScreen() {
         </View>
 
         {/* ── Bouton Payer ── */}
-        {booking.paymentStatus !== "paid" && booking.status !== "cancelled" && booking.status !== "boarded" && (
+        {booking.paymentStatus !== "paid" && booking.status !== "cancelled" && (booking.status as string) !== "boarded" && (
           <Pressable
             style={({ pressed }) => [styles.payNowBtn, pressed && { opacity: 0.85 }]}
             onPress={() => {

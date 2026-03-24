@@ -137,7 +137,7 @@ export default function AlertesScreen() {
   const fetchAlerts = useCallback(async () => {
     try {
       const qs = filter !== "all" ? `?status=${filter}` : "";
-      const data = await apiFetch<CompanyAlert[]>(`/company/alerts${qs}`, { token });
+      const data = await apiFetch<CompanyAlert[]>(`/company/alerts${qs}`, { token: token ?? undefined });
       setAlerts(data ?? []);
     } catch { /* silent */ } finally {
       setLoading(false);
@@ -155,7 +155,7 @@ export default function AlertesScreen() {
   const handleResolve = useCallback(async (alertId: string) => {
     setResolving(alertId);
     try {
-      await apiFetch(`/company/alerts/${alertId}/resolve`, { method: "PATCH", token });
+      await apiFetch(`/company/alerts/${alertId}/resolve`, { method: "PATCH", token: token ?? undefined });
       fetchAlerts();
     } catch { /* silent */ } finally {
       setResolving(null);

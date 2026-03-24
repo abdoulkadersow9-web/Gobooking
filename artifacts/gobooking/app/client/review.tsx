@@ -90,7 +90,7 @@ export default function ReviewScreen() {
     setLoading(true);
     try {
       await apiFetch("/reviews", {
-        token,
+        token: token ?? undefined,
         method: "POST",
         body: {
           bookingId:  params.bookingId,

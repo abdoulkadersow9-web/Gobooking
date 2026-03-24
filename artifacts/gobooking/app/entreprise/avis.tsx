@@ -91,7 +91,7 @@ export default function AvisScreen() {
   const load = useCallback(async () => {
     if (!companyId) { setError("ID compagnie introuvable"); setLoading(false); return; }
     try {
-      const d = await apiFetch<ReviewsData>(`/reviews/company/${companyId}`, { token });
+      const d = await apiFetch<ReviewsData>(`/reviews/company/${companyId}`, { token: token ?? undefined });
       setData(d);
       setError("");
     } catch (e: any) {

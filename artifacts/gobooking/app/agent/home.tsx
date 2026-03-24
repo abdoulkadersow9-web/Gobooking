@@ -40,7 +40,7 @@ export default function AgentHome() {
 
   useEffect(() => {
     if (!token) { setBusLoading(false); return; }
-    apiFetch("/agent/info", { token })
+    apiFetch<{ agent?: any; bus?: Record<string, any> | null }>("/agent/info", { token })
       .then(d => {
         if (d?.bus) {
           setBus({

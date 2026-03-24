@@ -153,7 +153,7 @@ function GererTab({ token, networkStatus }: { token: string | null; networkStatu
   const lookupColis = async (ref: string) => {
     setLoading(true); setColis(null); setNotFound(false); setActionDone(null);
     try {
-      const res = await apiFetch(`/parcels/track/${ref.trim()}`, { token: token ?? undefined });
+      const res = await apiFetch<Parcel>(`/parcels/track/${ref.trim()}`, { token: token ?? undefined });
       setColis(res);
     } catch {
       setNotFound(true);
@@ -204,7 +204,7 @@ function GererTab({ token, networkStatus }: { token: string | null; networkStatu
         setColis(prev => prev ? { ...prev, status: "en_gare" } : prev);
         return;
       }
-      const result = await apiFetch(`/agent/parcels/${colis.id}/${route}`, {
+      const result = await apiFetch<{ status?: string; busId?: string }>(`/agent/parcels/${colis.id}/${route}`, {
         token: token ?? undefined,
         method: "POST",
         body: extraBody ? JSON.stringify(extraBody) : undefined,
@@ -228,7 +228,7 @@ function GererTab({ token, networkStatus }: { token: string | null; networkStatu
     if (!colis) return;
     setActioning(true);
     try {
-      const result = await apiFetch(`/agent/parcels/${colis.id}/${route}`, {
+      const result = await apiFetch<{ status?: string; busId?: string }>(`/agent/parcels/${colis.id}/${route}`, {
         token: token ?? undefined,
         method: "POST",
         body: body ? JSON.stringify(body) : undefined,
@@ -527,7 +527,7 @@ function CreerTab({ token, onCreated }: { token: string | null; onCreated: () =>
     }
     setLoading(true);
     try {
-      const result = await apiFetch("/agent/parcels", {
+      const result = await apiFetch<Parcel>("/agent/parcels", {
         token: token ?? undefined,
         method: "POST",
         body: JSON.stringify(form),

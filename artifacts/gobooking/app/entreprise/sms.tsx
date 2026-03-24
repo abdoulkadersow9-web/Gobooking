@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { apiFetch } from "@/utils/api";
+import { useAuth } from "@/context/AuthContext";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface Customer {
@@ -54,6 +55,7 @@ type TabId = "form" | "clients" | "historique";
 
 export default function SmsScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const [tab, setTab] = useState<TabId>("form");
 
   /* Form state */
@@ -70,20 +72,20 @@ export default function SmsScreen() {
   const loadCustomers = useCallback(async () => {
     setLoadingCust(true);
     try {
-      const data = await apiFetch<Customer[]>("/company/customers");
+      const data = await apiFetch<Customer[]>("/company/customers", { token: token ?? undefined });
       setCustomers(data);
     } catch { setCustomers([]); }
     finally { setLoadingCust(false); }
-  }, []);
+  }, [token]);
 
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
-      const data = await apiFetch<SmsLog[]>("/company/sms/logs");
+      const data = await apiFetch<SmsLog[]>("/company/sms/logs", { token: token ?? undefined });
       setLogs(data);
     } catch { setLogs([]); }
     finally { setLoadingLogs(false); }
-  }, []);
+  }, [token]);
 
   useEffect(() => { loadCustomers(); loadLogs(); }, []);
   useEffect(() => { if (tab === "clients") loadCustomers(); if (tab === "historique") loadLogs(); }, [tab]);
@@ -110,7 +112,7 @@ export default function SmsScreen() {
             try {
               const result = await apiFetch<{ sent: number; failed: number; total: number }>(
                 "/company/sms/send",
-                { method: "POST", body: JSON.stringify({ message: message.trim(), segment }) }
+                { method: "POST", body: JSON.stringify({ message: message.trim(), segment }), token: token ?? undefined }
               );
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("SMS envoyés ✓", `${result.sent} message${result.sent > 1 ? "s" : ""} envoyé${result.sent > 1 ? "s" : ""} avec succès.`);

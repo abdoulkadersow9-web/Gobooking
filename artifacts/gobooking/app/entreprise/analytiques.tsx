@@ -188,7 +188,7 @@ export default function AnalytiquesScreen() {
 
   const fetchData = useCallback(async (p: Period) => {
     try {
-      const res = await apiFetch<AnalyticsData>(`/company/analytics?period=${p}`, { token });
+      const res = await apiFetch<AnalyticsData>(`/company/analytics?period=${p}`, { token: token ?? undefined });
       setData(res);
     } catch { /* silent */ } finally {
       setLoading(false);

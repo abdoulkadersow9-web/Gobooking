@@ -74,8 +74,8 @@ export default function CarburantScreen() {
   const fetchData = useCallback(async () => {
     try {
       const [fuelData, busData] = await Promise.all([
-        apiFetch("/company/fuel-logs", { token: token! }),
-        apiFetch("/company/buses", { token: token! }),
+        apiFetch<{ logs: any[]; totalLitres: number; totalCost: number }>("/company/fuel-logs", { token: token! }),
+        apiFetch<any[]>("/company/buses", { token: token! }),
       ]);
       setLogs(Array.isArray(fuelData?.logs) ? fuelData.logs : []);
       setTotalLitres(fuelData?.totalLitres ?? 0);

@@ -117,7 +117,7 @@ export default function RentabiliteScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await apiFetch("/company/rentabilite", { token: token! });
+      const data = await apiFetch<{ trips?: TripRent[]; summary?: Summary }>("/company/rentabilite", { token: token! });
       setTrips(Array.isArray(data?.trips) ? data.trips : []);
       setSummary(data?.summary ?? { totalRecettes: 0, totalDepenses: 0, totalBenefice: 0, tripCount: 0 });
     } catch {

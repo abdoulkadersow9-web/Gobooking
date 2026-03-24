@@ -73,7 +73,7 @@ export default function SecuriteScreen() {
   /* Fetch alert history */
   const fetchHistory = useCallback(async () => {
     try {
-      const data = await apiFetch<AlertRecord[]>("/agent/alerts", { token });
+      const data = await apiFetch<AlertRecord[]>("/agent/alerts", { token: token ?? undefined });
       setHistory(data ?? []);
     } catch { /* silent */ } finally {
       setLoadHist(false);
@@ -122,7 +122,7 @@ export default function SecuriteScreen() {
             try {
               await apiFetch("/agent/alert", {
                 method: "POST",
-                token,
+                token: token ?? undefined,
                 body: JSON.stringify({
                   type,
                   message: message.trim() || null,

@@ -70,7 +70,7 @@ export default function BusAgentsScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await apiFetch("/company/buses/agents", { token: token! });
+      const data = await apiFetch<{ buses: any[]; freeAgents: any[] }>("/company/buses/agents", { token: token! });
       setBuses(Array.isArray(data?.buses) ? data.buses : []);
       setFreeAgents(Array.isArray(data?.freeAgents) ? data.freeAgents : []);
     } catch {

@@ -9,8 +9,9 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import { useAuth } from "@/context/AuthContext";
-import { apiFetch } from "@/utils/api";
+import { apiFetch, BASE_URL } from "@/utils/api";
 import OfflineBanner from "@/components/OfflineBanner";
+import { useNetworkStatus } from "@/utils/offline";
 
 const AMBER   = "#D97706";
 const A_LIGHT = "#FFFBEB";
@@ -50,6 +51,7 @@ function StopBadge({ order }: { order: number }) {
 export default function RoutesScreen() {
   const { token } = useAuth();
   const insets    = useSafeAreaInsets();
+  const networkStatus = useNetworkStatus(BASE_URL);
 
   const [routes,  setRoutes]  = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export default function RoutesScreen() {
     setSaving(true);
     try {
       const r = await apiFetch<Route>("/company/routes", {
-        token, method: "POST", body: { name: routeName.trim() },
+        token: token ?? undefined, method: "POST", body: { name: routeName.trim() },
       });
       setRoutes(prev => [...prev, { ...r, stops: [] }]);
       setRouteName("");
@@ -118,7 +120,7 @@ export default function RoutesScreen() {
     setSaving(true);
     try {
       const s = await apiFetch<Stop>(`/company/routes/${activeRoute.id}/stops`, {
-        token, method: "POST",
+        token: token ?? undefined, method: "POST",
         body: {
           name:      stopName.trim(),
           city:      stopCity.trim(),
@@ -142,7 +144,7 @@ export default function RoutesScreen() {
     setSaving(true);
     try {
       const s = await apiFetch<Stop>(`/company/stops/${editStop.id}`, {
-        token, method: "PUT",
+        token: token ?? undefined, method: "PUT",
         body: {
           name:      stopName.trim() || editStop.name,
           city:      stopCity.trim() || editStop.city,
@@ -168,7 +170,7 @@ export default function RoutesScreen() {
         text: "Supprimer", style: "destructive",
         onPress: async () => {
           try {
-            await apiFetch(`/company/stops/${stop.id}`, { token, method: "DELETE" });
+            await apiFetch(`/company/stops/${stop.id}`, { token: token ?? undefined, method: "DELETE" });
             setRoutes(prev => prev.map(r => ({
               ...r, stops: r.stops.filter(s => s.id !== stop.id),
             })));
@@ -186,7 +188,7 @@ export default function RoutesScreen() {
         text: "Désactiver", style: "destructive",
         onPress: async () => {
           try {
-            await apiFetch(`/company/routes/${r.id}`, { token, method: "DELETE" });
+            await apiFetch(`/company/routes/${r.id}`, { token: token ?? undefined, method: "DELETE" });
             setRoutes(prev => prev.map(x => x.id === r.id ? { ...x, status: "inactive" } : x));
           } catch (e: any) { Alert.alert("Erreur", e.message); }
         },
@@ -250,7 +252,7 @@ export default function RoutesScreen() {
         </View>
       </View>
 
-      <OfflineBanner />
+      <OfflineBanner status={networkStatus} />
 
       {loading ? (
         <ActivityIndicator size="large" color={AMBER} style={{ marginTop: 40 }} />

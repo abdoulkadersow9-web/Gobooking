@@ -1817,7 +1817,7 @@ router.get("/live-buses", async (req, res) => {
       departureTime: tripsTable.departureTime,
       status:        tripsTable.status,
       busId:         tripsTable.busId,
-      busName:       busesTable.name,
+      busName:       busesTable.busName,
       busPlate:      busesTable.plateNumber,
       busType:       busesTable.busType,
     })

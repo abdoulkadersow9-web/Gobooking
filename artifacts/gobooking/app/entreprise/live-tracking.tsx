@@ -85,7 +85,7 @@ export default function LiveTrackingScreen() {
   /* ── Fetch live buses ── */
   const fetchBuses = useCallback(async () => {
     try {
-      const data = await apiFetch<LiveBus[]>("/company/live-buses", { token });
+      const data = await apiFetch<LiveBus[]>("/company/live-buses", { token: token ?? undefined });
       setBuses(data ?? []);
     } catch { /* silent */ } finally {
       setLoading(false);
@@ -103,7 +103,7 @@ export default function LiveTrackingScreen() {
   /* ── Fetch GPS history for selected bus ── */
   const fetchHistory = useCallback(async (tripId: string) => {
     try {
-      const data = await apiFetch<HistoryPoint[]>(`/company/trip/${tripId}/history`, { token });
+      const data = await apiFetch<HistoryPoint[]>(`/company/trip/${tripId}/history`, { token: token ?? undefined });
       setHistory(data ?? []);
     } catch {
       setHistory([]);
@@ -392,4 +392,10 @@ const styles = StyleSheet.create({
   /* GPS row */
   gpsRow:          { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   gpsText:         { fontSize: 11, color: "#64748B", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+
+  /* Map markers */
+  markerContainer: { alignItems: "center" },
+  markerDot:       { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: "#fff", alignItems: "center", justifyContent: "center" },
+  markerLabel:     { marginTop: 2, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  markerName:      { fontSize: 9, color: "#fff", fontWeight: "700" },
 });

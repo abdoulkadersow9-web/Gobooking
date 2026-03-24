@@ -243,7 +243,7 @@ function BusSelector({ buses, selected, onSelect }: { buses: Bus[]; selected: st
 /* ─── Component ─────────────────────────────────────────── */
 export default function CompanyDashboard() {
   const insets = useSafeAreaInsets();
-  const { token, logout } = useAuth();
+  const { token, logout, user } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
@@ -624,7 +624,7 @@ export default function CompanyDashboard() {
     const busLabel = newAgent.busName || "Non assigné";
     try {
       const created = await apiFetch<AgentItem>("/company/agents", {
-        token,
+        token: token ?? undefined,
         method: "POST",
         body: JSON.stringify({
           name: newAgent.name,
@@ -2536,4 +2536,8 @@ const S = StyleSheet.create({
 
   tripBusInfo:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#ECFDF5", borderRadius: 8, padding: 10, marginBottom: 10 },
   tripBusInfoText:{ fontSize: 12, color: "#059669", fontWeight: "600" },
+
+  emptyState:     { alignItems: "center", paddingVertical: 48, paddingHorizontal: 24, gap: 12 },
+  emptyStateText: { fontSize: 15, color: "#94A3B8", fontWeight: "600", textAlign: "center" },
+  card:           { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
 });

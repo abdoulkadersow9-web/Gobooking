@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { apiFetch } from "@/utils/api";
+import { useAuth } from "@/context/AuthContext";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface MarketingLog {
@@ -40,6 +41,7 @@ function formatDate(iso: string) {
 /* ─── Main ─────────────────────────────────────────────────────── */
 export default function MarketingScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const [data, setData]       = useState<MarketingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("all");
@@ -47,11 +49,11 @@ export default function MarketingScreen() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiFetch<MarketingData>("/company/marketing/logs");
+      const res = await apiFetch<MarketingData>("/company/marketing/logs", { token: token ?? undefined });
       setData(res);
     } catch { setData(null); }
     finally { setLoading(false); }
-  }, []);
+  }, [token]);
 
   useEffect(() => { load(); }, []);
 

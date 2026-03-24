@@ -222,7 +222,7 @@ export default function RouteScreen() {
         </View>
       </View>
 
-      <OfflineBanner />
+      <OfflineBanner status={networkStatus} />
 
       {/* No active trip */}
       {!loading && trips.length === 0 && (

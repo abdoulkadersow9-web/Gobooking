@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { apiFetch } from "@/utils/api";
+import { useAuth } from "@/context/AuthContext";
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface AgentItem {
@@ -59,6 +60,7 @@ function getRoleStyle(role: string | null) {
 /* ─── Main ───────────────────────────────────────────────────────── */
 export default function AgencesScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const [agences, setAgences]           = useState<Agence[]>([]);
   const [loading, setLoading]           = useState(true);
   const [refreshing, setRefreshing]     = useState(false);
@@ -70,7 +72,7 @@ export default function AgencesScreen() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await apiFetch<Agence[]>("/company/agences");
+      const data = await apiFetch<Agence[]>("/company/agences", { token: token ?? undefined });
       setAgences(data);
     } catch {
       Alert.alert("Erreur", "Impossible de charger les agences");
@@ -78,7 +80,7 @@ export default function AgencesScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -281,6 +283,7 @@ function KpiChip({ icon, label, value, color }: { icon: any; label: string; valu
 
 /* ─── CreateAgenceModal ──────────────────────────────────────────── */
 function CreateAgenceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { token } = useAuth();
   const [name, setName]       = useState("");
   const [city, setCity]       = useState("");
   const [address, setAddress] = useState("");
@@ -296,6 +299,7 @@ function CreateAgenceModal({ onClose, onCreated }: { onClose: () => void; onCrea
     try {
       await apiFetch("/company/agences", {
         method: "POST",
+        token: token ?? undefined,
         body: JSON.stringify({ name: name.trim(), city: city.trim(), address: address.trim() || undefined, phone: phone.trim() || undefined }),
       });
       onCreated();
@@ -336,6 +340,7 @@ function CreateAgentModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { token } = useAuth();
   const [name, setName]       = useState("");
   const [email, setEmail]     = useState("");
   const [phone, setPhone]     = useState("");
@@ -354,6 +359,7 @@ function CreateAgentModal({
     try {
       await apiFetch("/company/agents", {
         method: "POST",
+        token: token ?? undefined,
         body: JSON.stringify({
           name: name.trim(),
           email: email.trim().toLowerCase(),

@@ -95,7 +95,7 @@ export default function VenteScreen() {
         setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count });
         return;
       }
-      const res = await apiFetch("/company/reservations", {
+      const res = await apiFetch<{ bookingRef?: string; id?: string }>("/company/reservations", {
         token: token ?? undefined,
         method: "POST",
         body: {

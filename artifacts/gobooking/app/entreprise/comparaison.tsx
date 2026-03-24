@@ -51,7 +51,7 @@ export default function ComparaisonScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await apiFetch("/company/rentabilite", { token: token! });
+      const data = await apiFetch<{ trips?: TripPerf[] }>("/company/rentabilite", { token: token! });
       const raw: TripPerf[] = Array.isArray(data?.trips) ? data.trips : [];
       /* Sort by bénéfice descending */
       raw.sort((a, b) => b.benefice - a.benefice);

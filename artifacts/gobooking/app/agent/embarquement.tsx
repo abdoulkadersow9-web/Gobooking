@@ -395,7 +395,7 @@ export default function EmbarquementScreen() {
     if (!networkStatus.isOnline) {
       await saveOffline({
         type: "scan",
-        payload: { qrData: data.trim() },
+        payload: { reservationId: qrResult.ref },
         token: token ?? "",
         createdAt: Date.now(),
       });
@@ -543,7 +543,7 @@ export default function EmbarquementScreen() {
     setNotFound(false);
     setValidated(false);
     try {
-      const res = await apiFetch(`/agent/reservation/${ref.trim()}`, { token: token ?? undefined });
+      const res = await apiFetch<Passenger>(`/agent/reservation/${ref.trim()}`, { token: token ?? undefined });
       setFound(res);
     } catch {
       setNotFound(true);
@@ -676,13 +676,13 @@ export default function EmbarquementScreen() {
     const labelColor = isOk ? "#ECFDF5" : isDouble ? "#FEF3C7" : "#FEF2F2";
 
     /* Type-specific icon */
-    const qrTypeIconName: Parameters<typeof Ionicons>[0]["name"] =
-      scanResult.scanType === "colis"  ? "cube"
+    const qrTypeIconName =
+      (scanResult.scanType === "colis"  ? "cube"
       : scanResult.scanType === "bagage" ? "briefcase"
-      : "person-circle";
+      : "person-circle") as React.ComponentProps<typeof Ionicons>["name"];
 
-    const statusIconName: Parameters<typeof Ionicons>[0]["name"] =
-      isOk ? "checkmark-circle" : isDouble ? "alert-circle" : "close-circle";
+    const statusIconName =
+      (isOk ? "checkmark-circle" : isDouble ? "alert-circle" : "close-circle") as React.ComponentProps<typeof Ionicons>["name"];
 
     /* Type badge label */
     const typeBadge =

@@ -371,7 +371,7 @@ export default function CarsEnRouteMap() {
   /* ── Fetch buses ── */
   const fetchBuses = useCallback(async()=>{
     try{
-      const data = await apiFetch("/trips/live");
+      const data = await apiFetch<LiveBus[]>("/trips/live");
       const arr: LiveBus[] = (data||[]).map((b:LiveBus)=>{
         let lat = b.lat, lon = b.lon;
         if(!lat || !lon){

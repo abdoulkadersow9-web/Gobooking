@@ -111,14 +111,13 @@ export default function PassengersScreen() {
       if (asset.base64) {
         setUploadingId(bagageId);
         try {
-          const resp = await apiFetch("/bookings/upload-image", {
-            token,
+          const resp = await apiFetch<{ url?: string }>("/bookings/upload-image", {
+            token: token ?? undefined,
             method: "POST",
             body: JSON.stringify({ base64: asset.base64, mimeType: asset.mimeType || "image/jpeg" }),
           });
-          if (resp.ok) {
-            const { url } = await resp.json();
-            setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUrl: url } : b));
+          if (resp?.url) {
+            setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUrl: resp.url } : b));
           }
         } catch {
           /* keep local URI only */
