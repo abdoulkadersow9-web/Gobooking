@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -174,12 +174,15 @@ router.post("/agents", async (req, res) => {
     const admin = await requireCompanyAdmin(req.headers.authorization);
     if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { name, email, password, phone, agentRole, agentCode, busId } = req.body as {
+    const { name, email, password, phone, agentRole, agentCode, busId, agenceId } = req.body as {
       name: string; email: string; password: string; phone?: string;
-      agentRole: string; agentCode?: string; busId?: string;
+      agentRole: string; agentCode?: string; busId?: string; agenceId?: string;
     };
 
-    const VALID_AGENT_ROLES = ["embarquement", "reception_colis", "vente", "validation", "route"];
+    const VALID_AGENT_ROLES = [
+      "agent_ticket", "agent_embarquement", "agent_colis", "agent_reception", "agent_route",
+      "embarquement", "reception_colis", "vente", "validation", "route",
+    ];
 
     if (!name || !email || !password || !agentRole) {
       res.status(400).json({ error: "Nom, email, mot de passe et rôle sont requis" });
@@ -219,6 +222,7 @@ router.post("/agents", async (req, res) => {
       id: agentId,
       userId: newUser.id,
       companyId,
+      agenceId: agenceId ?? null,
       agentCode: code,
       agentRole,
       busId: busId ?? null,
@@ -1567,6 +1571,175 @@ router.get("/sms/logs", async (req, res) => {
   } catch (err) {
     console.error("SMS logs error:", err);
     res.status(500).json({ error: "Erreur historique SMS" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AGENCES — CRUD
+   GET    /company/agences            liste les agences de la compagnie
+   POST   /company/agences            créer une agence
+   PUT    /company/agences/:id        modifier une agence
+   DELETE /company/agences/:id        supprimer (désactiver) une agence
+   GET    /company/agences/:id/agents liste les agents d'une agence
+══════════════════════════════════════════════════════════════════════════ */
+
+router.get("/agences", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id;
+    if (!companyId) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+
+    const agences = await db.select().from(agencesTable)
+      .where(eq(agencesTable.companyId, companyId))
+      .orderBy(agencesTable.city, agencesTable.name);
+
+    const allAgents = await db.select({
+      id:        agentsTable.id,
+      userId:    agentsTable.userId,
+      agenceId:  agentsTable.agenceId,
+      agentCode: agentsTable.agentCode,
+      agentRole: agentsTable.agentRole,
+      status:    agentsTable.status,
+      name:      usersTable.name,
+      email:     usersTable.email,
+      phone:     usersTable.phone,
+    })
+      .from(agentsTable)
+      .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+      .where(eq(agentsTable.companyId, companyId));
+
+    const agentsById: Record<string, typeof allAgents> = {};
+    for (const a of allAgents) {
+      if (a.agenceId) {
+        agentsById[a.agenceId] = agentsById[a.agenceId] || [];
+        agentsById[a.agenceId].push(a);
+      }
+    }
+
+    res.json(agences.map(a => ({
+      ...a,
+      agentCount: (agentsById[a.id] || []).length,
+      agents: agentsById[a.id] || [],
+    })));
+  } catch (err) {
+    console.error("GET /company/agences error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.post("/agences", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id;
+    if (!companyId) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+
+    const { name, city, address, phone } = req.body as { name: string; city: string; address?: string; phone?: string };
+    if (!name || !city) { res.status(400).json({ error: "Nom et ville sont requis" }); return; }
+
+    const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const [agence] = await db.insert(agencesTable).values({
+      id: generateId(),
+      name,
+      city,
+      address: address ?? null,
+      phone: phone ?? null,
+      companyId,
+      status: "active",
+    }).returning();
+
+    res.json(agence);
+  } catch (err) {
+    console.error("POST /company/agences error:", err);
+    res.status(500).json({ error: "Erreur création agence" });
+  }
+});
+
+router.put("/agences/:id", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id;
+    if (!companyId) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+
+    const agenceId = req.params.id;
+    const [existing] = await db.select().from(agencesTable)
+      .where(and(eq(agencesTable.id, agenceId), eq(agencesTable.companyId, companyId))).limit(1);
+    if (!existing) { res.status(404).json({ error: "Agence introuvable" }); return; }
+
+    const { name, city, address, phone, status } = req.body;
+    const [updated] = await db.update(agencesTable)
+      .set({ ...(name && { name }), ...(city && { city }), address: address ?? existing.address, phone: phone ?? existing.phone, ...(status && { status }) })
+      .where(eq(agencesTable.id, agenceId))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    console.error("PUT /company/agences/:id error:", err);
+    res.status(500).json({ error: "Erreur modification agence" });
+  }
+});
+
+router.delete("/agences/:id", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id;
+    if (!companyId) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+
+    const agenceId = req.params.id;
+    const [existing] = await db.select().from(agencesTable)
+      .where(and(eq(agencesTable.id, agenceId), eq(agencesTable.companyId, companyId))).limit(1);
+    if (!existing) { res.status(404).json({ error: "Agence introuvable" }); return; }
+
+    await db.update(agencesTable).set({ status: "inactive" }).where(eq(agencesTable.id, agenceId));
+    res.json({ ok: true, id: agenceId });
+  } catch (err) {
+    console.error("DELETE /company/agences/:id error:", err);
+    res.status(500).json({ error: "Erreur suppression agence" });
+  }
+});
+
+router.get("/agences/:id/agents", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const company = await db.select().from(companiesTable).where(eq(companiesTable.email, admin.email)).limit(1);
+    const companyId = company[0]?.id;
+    if (!companyId) { res.status(404).json({ error: "Compagnie introuvable" }); return; }
+
+    const agenceId = req.params.id;
+    const agents = await db.select({
+      id:        agentsTable.id,
+      userId:    agentsTable.userId,
+      agenceId:  agentsTable.agenceId,
+      agentCode: agentsTable.agentCode,
+      agentRole: agentsTable.agentRole,
+      status:    agentsTable.status,
+      createdAt: agentsTable.createdAt,
+      name:      usersTable.name,
+      email:     usersTable.email,
+      phone:     usersTable.phone,
+    })
+      .from(agentsTable)
+      .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+      .where(and(eq(agentsTable.companyId, companyId), eq(agentsTable.agenceId, agenceId)))
+      .orderBy(desc(agentsTable.createdAt));
+
+    res.json(agents);
+  } catch (err) {
+    console.error("GET /company/agences/:id/agents error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

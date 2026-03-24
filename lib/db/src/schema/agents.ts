@@ -10,10 +10,11 @@ export const agentsTable = pgTable("agents", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => usersTable.id),
   companyId: text("company_id").notNull().references(() => companiesTable.id),
+  agenceId: text("agence_id"),
   busId: text("bus_id").references(() => busesTable.id),
   tripId: text("trip_id"),
   agentCode: varchar("agent_code", { length: 20 }).notNull().unique(),
-  agentRole: varchar("agent_role", { length: 30 }),
+  agentRole: varchar("agent_role", { length: 50 }),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
