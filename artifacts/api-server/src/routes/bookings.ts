@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable } from "@workspace/db";
+import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable, notificationsTable } from "@workspace/db";
 import { eq, desc, inArray, ne, and, sql, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { auditLog, detectAnomalies, ACTIONS } from "../audit";
 import { creditUserWallet, usePromoCode } from "./growth";
+import { sendExpoPush } from "../pushService";
 
 const router: IRouter = Router();
 
@@ -697,6 +698,44 @@ router.post("/:bookingId/baggage-review", async (req, res) => {
     auditLog({ userId, userRole: role, req }, ACTIONS.BOOKING_CONFIRM, bookingId, "booking", {
       action: "baggage-review", decision, note,
     }).catch(() => {});
+
+    // Push notification au client selon la décision
+    const bookingOwner = rows[0];
+    const ownerUser = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(usersTable)
+      .where(eq(usersTable.id, bookingOwner.userId))
+      .limit(1);
+
+    const nanoid = () => Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+
+    if (decision === "refusé") {
+      const msg = note
+        ? `Vos bagages ont été refusés : ${note}. Veuillez les modifier avant l'embarquement.`
+        : "Vos bagages ont été refusés par la compagnie. Veuillez les modifier avant l'embarquement.";
+      await db.insert(notificationsTable).values({
+        id: nanoid(),
+        userId: bookingOwner.userId,
+        type: "bagage_refused",
+        title: "🧳 Bagage refusé",
+        message: msg,
+        refId: bookingId,
+        refType: "booking",
+      }).catch(() => {});
+      sendExpoPush(ownerUser[0]?.pushToken, "🧳 Bagage refusé", msg).catch(() => {});
+    } else {
+      const msg = "Vos bagages ont été acceptés. Bon voyage !";
+      await db.insert(notificationsTable).values({
+        id: nanoid(),
+        userId: bookingOwner.userId,
+        type: "bagage_accepted",
+        title: "✅ Bagage accepté",
+        message: msg,
+        refId: bookingId,
+        refType: "booking",
+      }).catch(() => {});
+      sendExpoPush(ownerUser[0]?.pushToken, "✅ Bagage accepté", msg).catch(() => {});
+    }
 
     const full = await getFullBooking(bookingId);
     res.json(full);
