@@ -811,7 +811,7 @@ router.post("/scan", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { qrData } = req.body as { qrData?: string };
+    const { qrData } = req.body as { qrData?: string | Record<string, unknown> };
     if (!qrData) {
       res.status(400).json({ error: "qrData requis", code: "MISSING_DATA" });
       return;
@@ -831,11 +831,12 @@ router.post("/scan", async (req, res) => {
     }
 
     let ref: string;
-    const raw = qrData.trim();
+    /* qrData may arrive as a plain object (already parsed) or as a JSON string */
+    const raw = typeof qrData === "object" ? JSON.stringify(qrData) : String(qrData).trim();
 
     if (raw.startsWith("{")) {
       let payload: { ref?: string; type?: string; ts?: number; sig?: string };
-      try { payload = JSON.parse(raw); }
+      try { payload = typeof qrData === "object" ? (qrData as typeof payload) : JSON.parse(raw); }
       catch { res.status(400).json({ error: "QR invalide — format incorrect", code: "INVALID_FORMAT" }); return; }
 
       const { ref: r, type, ts, sig } = payload;
