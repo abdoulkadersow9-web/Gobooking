@@ -32,6 +32,7 @@ interface ScanResult {
   passenger?: string;
   route?: string;
   departure_time?: string;
+  seats?: string;
   message?: string;
 }
 
@@ -169,15 +170,15 @@ export default function AgentScan() {
             </Text>
             <Text style={[S.resultTitle, { color: result.valid ? (result.type === "hors-ligne" ? ACCENT : "#16a34a") : "#dc2626" }]}>
               {result.valid
-                ? (result.type === "hors-ligne" ? "En attente de sync" : "QR Code Valide !")
-                : "QR Code Invalide"}
+                ? (result.type === "hors-ligne" ? "En attente de sync" : "Embarquement validé !")
+                : (result.message?.includes("déjà utilisé") ? "Billet déjà utilisé" : "Billet invalide")}
             </Text>
             {result.valid && result.type !== "hors-ligne" && (
               <>
                 {result.passenger      && <Text style={S.resultLine}>👤 {result.passenger}</Text>}
                 {result.route          && <Text style={S.resultLine}>🛣️ {result.route}</Text>}
-                {result.departure_time && <Text style={S.resultLine}>🕐 {new Date(result.departure_time).toLocaleString("fr-FR")}</Text>}
-                {result.type           && <Text style={S.resultLine}>📋 Type : {result.type}</Text>}
+                {result.departure_time && <Text style={S.resultLine}>🕐 {result.departure_time}</Text>}
+                {result.seats          && <Text style={S.resultLine}>💺 Siège(s) : {result.seats}</Text>}
               </>
             )}
             {result.message && (

@@ -117,8 +117,22 @@ async function getFullBooking(bookingId: string) {
     bagageStatus: (booking as any).bagageStatus || null,
     bagagePrice: (booking as any).bagagePrice || 0,
     bagageNote: (booking as any).bagageNote || null,
+    qrCode:     (booking as any).qrCode || null,
     createdAt: booking.createdAt?.toISOString() || new Date().toISOString(),
   };
+}
+
+/* ── QR helper — djb2 hash + signed payload ───────────────────────────── */
+function djb2(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) { h = (h * 33) ^ str.charCodeAt(i); h = h >>> 0; }
+  return h.toString(36).padStart(7, "0");
+}
+const QR_SECRET = "GBK-CI-2026-SECURE-v1";
+function generateQRPayload(bookingRef: string, tripId: string): string {
+  const ts  = Date.now();
+  const sig = djb2(`${bookingRef}|passager|${ts}|${tripId}|${QR_SECRET}`);
+  return JSON.stringify({ ref: bookingRef, type: "passager", ts, trajetId: tripId, sig });
 }
 
 /* ── Créer une réservation (statut: pending) ───────────────────────────────
@@ -227,8 +241,9 @@ router.post("/", async (req, res) => {
       }
     }
 
-    const newBookingId = generateId();
+    const newBookingId  = generateId();
     const newBookingRef = generateRef();
+    const qrCode        = generateQRPayload(newBookingRef, tripId);
 
     await db
       .insert(bookingsTable)
@@ -253,6 +268,7 @@ router.post("/", async (req, res) => {
         bagagePrice,
         fromStopId: fromStopId ?? null,
         toStopId:   toStopId   ?? null,
+        qrCode,
       } as any);
 
     const bookingResult = await getFullBooking(newBookingId);

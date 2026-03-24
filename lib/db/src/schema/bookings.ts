@@ -47,6 +47,7 @@ export const bookingsTable = pgTable("bookings", {
   bagageNote: text("bagage_note"),
   fromStopId: text("from_stop_id"),
   toStopId:   text("to_stop_id"),
+  qrCode:     text("qr_code"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

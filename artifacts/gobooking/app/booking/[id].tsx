@@ -13,6 +13,7 @@ import {
   Text,
   View,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
@@ -45,6 +46,7 @@ interface Booking {
   bagageStatus?: string | null;
   bagagePrice?: number;
   bagageNote?: string | null;
+  qrCode?: string | null;
   createdAt: string;
 }
 
@@ -199,6 +201,34 @@ export default function BookingDetailScreen() {
           <Text style={styles.refValue}>#{booking.bookingRef}</Text>
           <Text style={styles.refDate}>Réservé le {new Date(booking.createdAt).toLocaleDateString("fr-FR")}</Text>
         </View>
+
+        {/* ── QR Code billet ── */}
+        {booking.paymentStatus === "paid" && booking.status !== "cancelled" && (
+          <View style={styles.qrCard}>
+            <View style={styles.qrHeader}>
+              <Feather name="smartphone" size={16} color={Colors.light.primary} />
+              <Text style={styles.qrTitle}>Billet électronique</Text>
+              {(booking.status === "boarded" || (booking.status as string) === "validated") && (
+                <View style={styles.qrUsedBadge}>
+                  <Text style={styles.qrUsedText}>Utilisé</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.qrSub}>Présentez ce QR à l'agent lors de l'embarquement</Text>
+            <View style={styles.qrBox}>
+              <QRCode
+                value={booking.qrCode || booking.bookingRef}
+                size={180}
+                color="#0B3C5D"
+                backgroundColor="white"
+              />
+            </View>
+            <View style={styles.qrFooter}>
+              <Feather name="shield" size={12} color="#10b981" />
+              <Text style={styles.qrFooterText}>Billet signé et sécurisé • GoBooking CI</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.tripCard}>
           <Text style={styles.busName}>{booking.trip.busName}</Text>
@@ -495,6 +525,74 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     marginTop: 4,
   },
+
+  /* ── QR Code card ── */
+  qrCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 14,
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  qrHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+    alignSelf: "stretch",
+  },
+  qrTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: Colors.light.text,
+    flex: 1,
+  },
+  qrUsedBadge: {
+    backgroundColor: "#FEF2F2",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  qrUsedText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#DC2626",
+  },
+  qrSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.light.textMuted,
+    textAlign: "center",
+    marginBottom: 18,
+  },
+  qrBox: {
+    padding: 16,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  qrFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 14,
+  },
+  qrFooterText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: "#10b981",
+  },
+
   tripCard: {
     backgroundColor: Colors.light.card,
     borderRadius: 16,

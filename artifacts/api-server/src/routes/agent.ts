@@ -1683,4 +1683,109 @@ router.get("/earnings", async (req, res) => {
   }
 });
 
+/* ─── POST /agent/validate-qr ───────────────────────────────────────────────
+   Simplified QR scan validation endpoint called by the mobile scan screen.
+   Accepts { qrCode } — either a signed JSON payload or a plain bookingRef.
+   Returns { valid, passenger, route, departure_time, message }.
+   Records scan in scansTable and updates booking status to "validated".
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/validate-qr", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { qrCode } = req.body as { qrCode?: string };
+    if (!qrCode) { res.status(400).json({ error: "qrCode requis" }); return; }
+
+    /* ── 1. Parse QR payload ── */
+    const QR_SECRET = "GBK-CI-2026-SECURE-v1";
+    const TTL_MS    = 72 * 60 * 60 * 1000;
+
+    function djb2(str: string): string {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) { h = (h * 33) ^ str.charCodeAt(i); h = h >>> 0; }
+      return h.toString(36).padStart(7, "0");
+    }
+
+    const raw = String(qrCode).trim();
+    let ref: string;
+
+    if (raw.startsWith("{")) {
+      let payload: { ref?: string; type?: string; ts?: number; sig?: string; trajetId?: string };
+      try { payload = JSON.parse(raw); } catch { res.status(400).json({ valid: false, message: "QR invalide — format incorrect" }); return; }
+
+      const { ref: r, type, ts, sig, trajetId } = payload;
+      if (!r || !type || !ts || !sig) { res.status(400).json({ valid: false, message: "QR invalide — données manquantes" }); return; }
+
+      const sigNew = djb2(`${r}|${type}|${ts}|${trajetId ?? ""}|${QR_SECRET}`);
+      const sigOld = djb2(`${r}|${type}|${ts}|${QR_SECRET}`);
+      if (sig !== sigNew && sig !== sigOld) { res.status(400).json({ valid: false, message: "QR invalide — billet potentiellement falsifié" }); return; }
+      if (Date.now() - ts > TTL_MS) { res.status(400).json({ valid: false, message: "QR expiré — billet trop ancien (> 72h)" }); return; }
+      ref = r;
+    } else {
+      ref = raw.toUpperCase();
+    }
+
+    /* ── 2. Find booking by bookingRef ── */
+    const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.bookingRef, ref)).limit(1);
+    if (!bookings.length) { res.status(404).json({ valid: false, message: "Billet introuvable — référence inconnue" }); return; }
+
+    const booking = bookings[0];
+
+    /* ── 3. Check already used ── */
+    if (booking.status === "boarded" || booking.status === "validated" as any) {
+      res.status(200).json({ valid: false, message: "Billet déjà utilisé — passager déjà embarqué" });
+      return;
+    }
+
+    if (booking.status === "cancelled") {
+      res.status(200).json({ valid: false, message: "Billet annulé — réservation invalide" });
+      return;
+    }
+
+    if (booking.paymentStatus !== "paid") {
+      res.status(200).json({ valid: false, message: "Paiement non confirmé — billet non valide" });
+      return;
+    }
+
+    /* ── 4. Fetch trip info ── */
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
+    const trip  = trips[0];
+
+    /* ── 5. Mark booking as validated ── */
+    await db.update(bookingsTable).set({ status: "validated" as any }).where(eq(bookingsTable.id, booking.id));
+
+    /* ── 6. Record scan ── */
+    try {
+      const agentRows = await db.select({ companyId: agentsTable.companyId, name: agentsTable.name })
+        .from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+      await db.insert(scansTable).values({
+        id:        `SCN-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type:      "passager",
+        ref,
+        targetId:  booking.id,
+        trajetId:  booking.tripId,
+        agentId:   user.id,
+        agentName: agentRows[0]?.name ?? user.name ?? "Agent",
+        companyId: agentRows[0]?.companyId ?? null,
+        status:    "validé",
+      });
+    } catch {}
+
+    /* ── 7. Return success ── */
+    const passengerNames = (booking.passengers as any[])?.map((p: any) => p.name).join(", ") || "Passager";
+    res.json({
+      valid:          true,
+      type:           "passager",
+      passenger:      passengerNames,
+      route:          trip ? `${trip.from} → ${trip.to}` : "",
+      departure_time: trip ? `${trip.date} ${trip.departureTime}` : "",
+      seats:          (booking.seatNumbers as string[])?.join(", ") || "",
+      message:        "Embarquement validé",
+    });
+  } catch (err) {
+    res.status(500).json({ valid: false, message: "Erreur serveur lors de la validation" });
+  }
+});
+
 export default router;

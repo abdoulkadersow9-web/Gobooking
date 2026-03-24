@@ -63,6 +63,7 @@
     "expo-print": "^55.0.9",
     "expo-sharing": "^55.0.14",
     "react-native-maps": "^1.27.2",
+    "react-native-qrcode-svg": "^6.3.21",
     "react-native-webview": "^13.16.1"
   }
 }
