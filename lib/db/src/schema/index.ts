@@ -20,3 +20,4 @@ export * from "./audit_logs";
 export * from "./referrals";
 export * from "./promos";
 export * from "./scans";
+export * from "./agent_alerts";

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { locationStore } from "../locationStore";
@@ -1190,6 +1190,57 @@ router.get("/trip/:tripId/history", async (req, res) => {
     })));
   } catch (err) {
     res.status(500).json({ error: "Erreur historique" });
+  }
+});
+
+/* ── GET /company/alerts — alertes sécurité des agents ──────────────── */
+router.get("/alerts", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const status = req.query.status as string | undefined;
+    const limit  = Math.min(Number(req.query.limit) || 100, 200);
+
+    const conditions = [eq(agentAlertsTable.companyId, ctx.companyId)];
+    if (status === "active")   conditions.push(eq(agentAlertsTable.status, "active"));
+    if (status === "resolved") conditions.push(eq(agentAlertsTable.status, "resolved"));
+
+    const alerts = await db.select().from(agentAlertsTable)
+      .where(and(...conditions))
+      .orderBy(desc(agentAlertsTable.createdAt))
+      .limit(limit);
+
+    res.json(alerts.map(a => ({
+      id: a.id, type: a.type, status: a.status,
+      agentName: a.agentName, busName: a.busName,
+      tripId: a.tripId, lat: a.lat, lon: a.lon,
+      message: a.message,
+      createdAt: a.createdAt?.toISOString() ?? null,
+      resolvedAt: a.resolvedAt?.toISOString() ?? null,
+    })));
+  } catch (err) {
+    console.error("Company alerts error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── PATCH /company/alerts/:id/resolve — résoudre une alerte ─────────── */
+router.patch("/alerts/:id/resolve", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(agentAlertsTable)
+      .set({ status: "resolved", resolvedAt: new Date(), resolvedBy: ctx.user.id })
+      .where(and(
+        eq(agentAlertsTable.id, req.params.id),
+        eq(agentAlertsTable.companyId, ctx.companyId),
+      ));
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

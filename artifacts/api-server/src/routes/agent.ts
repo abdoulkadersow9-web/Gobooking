@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -1494,6 +1494,125 @@ router.post("/parcels/:parcelId/arrive", async (req, res) => {
     }
 
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/alert — Envoi alerte sécurité (panne/urgence/contrôle/sos) */
+router.post("/alert", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { type, tripId, busId, lat, lon, message } = req.body as {
+      type: string; tripId?: string; busId?: string;
+      lat?: number; lon?: number; message?: string;
+    };
+
+    const VALID_TYPES = ["urgence", "panne", "controle", "sos"];
+    if (!VALID_TYPES.includes(type)) {
+      res.status(400).json({ error: "Type invalide. Valeurs acceptées: urgence, panne, controle, sos" }); return;
+    }
+
+    /* Récupère les infos de l'agent (companyId, busName) */
+    const agentRows = await db.select({
+      companyId: agentsTable.companyId,
+      busId:     agentsTable.busId,
+    }).from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRow = agentRows[0];
+
+    /* Récupère le nom du bus si dispo */
+    const resolvedBusId = busId ?? agentRow?.busId;
+    let busName: string | undefined;
+    if (resolvedBusId) {
+      const buses = await db.select({ name: busesTable.name }).from(busesTable).where(eq(busesTable.id, resolvedBusId)).limit(1);
+      busName = buses[0]?.name;
+    }
+
+    const alertId = Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+
+    await db.insert(agentAlertsTable).values({
+      id:        alertId,
+      type,
+      agentId:   user.id,
+      agentName: user.name,
+      companyId: agentRow?.companyId ?? null,
+      tripId:    tripId ?? null,
+      busId:     resolvedBusId ?? null,
+      busName:   busName ?? null,
+      lat:       typeof lat === "number" ? lat : null,
+      lon:       typeof lon === "number" ? lon : null,
+      message:   message ?? null,
+      status:    "active",
+    });
+
+    /* Notifie les admins de la compagnie */
+    if (agentRow?.companyId) {
+      const agentAdmins = await db.select({
+        userId: agentsTable.userId,
+        companyId: agentsTable.companyId,
+      }).from(agentsTable).where(and(
+        eq(agentsTable.companyId, agentRow.companyId),
+      ));
+      const adminUserIds = [...new Set(agentAdmins.map(a => a.userId))];
+      if (adminUserIds.length > 0) {
+        const admins = await db.select({ id: usersTable.id, pushToken: usersTable.pushToken })
+          .from(usersTable)
+          .where(and(inArray(usersTable.id, adminUserIds), inArray(usersTable.role, ["compagnie", "company_admin"])));
+
+        const TITLES: Record<string, string> = {
+          urgence:  "🚨 URGENCE — Intervention requise",
+          panne:    "⚠️  PANNE bus signalée",
+          controle: "🔵 Contrôle de routine",
+          sos:      "🆘 SOS — DANGER IMMÉDIAT",
+        };
+        const title   = TITLES[type] ?? "Alerte agent";
+        const msgBody = `Agent: ${user.name} · ${busName ?? "Bus"} · ${type.toUpperCase()}`;
+
+        for (const admin of admins) {
+          if (admin.pushToken) {
+            await sendExpoPush(admin.pushToken, title, msgBody);
+          }
+          await db.insert((await import("@workspace/db")).notificationsTable).values({
+            id:       Math.random().toString(36).slice(2, 11) + Date.now().toString(36),
+            userId:   admin.id,
+            type:     "agent_alert",
+            title,
+            message:  msgBody,
+            refId:    alertId,
+            refType:  "agent_alert",
+          });
+        }
+      }
+    }
+
+    console.log(`[Alert] 🚨 ${type.toUpperCase()} — agent: ${user.name}`);
+    res.json({ success: true, alertId });
+  } catch (err) {
+    console.error("Alert error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/alerts — Historique des alertes de l'agent ── */
+router.get("/alerts", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const alerts = await db.select().from(agentAlertsTable)
+      .where(eq(agentAlertsTable.agentId, user.id))
+      .orderBy(desc(agentAlertsTable.createdAt))
+      .limit(50);
+
+    res.json(alerts.map(a => ({
+      id: a.id, type: a.type, status: a.status,
+      tripId: a.tripId, busName: a.busName,
+      lat: a.lat, lon: a.lon, message: a.message,
+      createdAt: a.createdAt?.toISOString() ?? null,
+      resolvedAt: a.resolvedAt?.toISOString() ?? null,
+    })));
   } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }

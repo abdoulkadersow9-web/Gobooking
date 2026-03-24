@@ -21,6 +21,7 @@ const AGENT_MENUS = [
   { id: "validation",      label: "Validation",       icon: "✅", path: "/agent/validation",     desc: "Valider les documents" },
   { id: "route",           label: "Suivi trajet",     icon: "🗺️", path: "/agent/route",          desc: "Suivre le trajet en cours" },
   { id: "scan",            label: "Scanner QR",       icon: "📷", path: "/agent/scan",           desc: "Scanner un code QR" },
+  { id: "securite",        label: "Sécurité / SOS",  icon: "🚨", path: "/agent/securite",       desc: "Alertes urgence, panne, SOS", urgent: true },
 ];
 
 export default function AgentHome() {
@@ -53,11 +54,11 @@ export default function AgentHome() {
           {filteredMenus.map((item) => (
             <Pressable
               key={item.id}
-              style={S.tile}
+              style={[S.tile, (item as any).urgent && S.tileUrgent]}
               onPress={() => router.push(item.path as never)}
             >
               <Text style={S.tileIcon}>{item.icon}</Text>
-              <Text style={S.tileLabel}>{item.label}</Text>
+              <Text style={[S.tileLabel, (item as any).urgent && { color: "#DC2626" }]}>{item.label}</Text>
               <Text style={S.tileDesc}>{item.desc}</Text>
             </Pressable>
           ))}
@@ -83,6 +84,7 @@ const S = StyleSheet.create({
   tile:        { width: "47%", backgroundColor: "white", borderRadius: 14, padding: 16,
                  elevation: 2, shadowColor: "#000", shadowOpacity: 0.06,
                  shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  tileUrgent:  { backgroundColor: "#FFF1F2", borderWidth: 1.5, borderColor: "#FECDD3" },
   tileIcon:    { fontSize: 28, marginBottom: 8 },
   tileLabel:   { fontSize: 15, fontWeight: "700", color: GREEN },
   tileDesc:    { fontSize: 12, color: "#6b7280", marginTop: 4 },
