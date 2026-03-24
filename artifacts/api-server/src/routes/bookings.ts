@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable, notificationsTable } from "@workspace/db";
+import { db, bookingsTable, tripsTable, seatsTable, usersTable, commissionSettingsTable, companiesTable, busesTable, walletTransactionsTable, notificationsTable, agentsTable } from "@workspace/db";
 import { eq, desc, inArray, ne, and, sql, gte } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { auditLog, detectAnomalies, ACTIONS } from "../audit";
@@ -81,6 +81,26 @@ async function getFullBooking(bookingId: string) {
   const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
   const trip = trips[0];
 
+  /* Fetch agent contact for this trip's bus */
+  let agentPhone: string | null = null;
+  let agentName: string | null = null;
+  if (trip?.busId) {
+    const agents = await db.select({
+      id:    agentsTable.id,
+      busId: agentsTable.busId,
+      userId: agentsTable.userId,
+    }).from(agentsTable).where(eq(agentsTable.busId, trip.busId)).limit(3);
+
+    if (agents.length) {
+      const agentUser = await db.select({ name: usersTable.name, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, agents[0].userId)).limit(1);
+      if (agentUser.length) {
+        agentPhone = agentUser[0].phone || null;
+        agentName  = agentUser[0].name  || null;
+      }
+    }
+  }
+
   return {
     id: booking.id,
     bookingRef: booking.bookingRef,
@@ -120,6 +140,8 @@ async function getFullBooking(bookingId: string) {
     bagageNote: (booking as any).bagageNote || null,
     qrCode:     (booking as any).qrCode || null,
     createdAt: booking.createdAt?.toISOString() || new Date().toISOString(),
+    agentPhone,
+    agentName,
   };
 }
 

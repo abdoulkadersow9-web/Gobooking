@@ -6,6 +6,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -48,6 +49,8 @@ interface Booking {
   bagageNote?: string | null;
   qrCode?: string | null;
   createdAt: string;
+  agentPhone?: string | null;
+  agentName?: string | null;
 }
 
 const STATUS_CONFIG = {
@@ -430,6 +433,29 @@ export default function BookingDetailScreen() {
             )}
           </Pressable>
         )}
+
+        {/* ── Contacter l'agent ── */}
+        {booking.agentPhone ? (
+          <View style={styles.agentContactCard}>
+            <View style={styles.agentContactLeft}>
+              <View style={styles.agentContactIcon}>
+                <Feather name="phone" size={18} color="#0B3C5D" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.agentContactLabel}>Agent de voyage</Text>
+                <Text style={styles.agentContactName}>{booking.agentName ?? "Votre agent"}</Text>
+                <Text style={styles.agentContactPhone}>{booking.agentPhone}</Text>
+              </View>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.callAgentBtn, pressed && { opacity: 0.8 }]}
+              onPress={() => Linking.openURL(`tel:${booking.agentPhone!.replace(/\s/g, "")}`)}
+            >
+              <Feather name="phone-call" size={15} color="#fff" />
+              <Text style={styles.callAgentBtnText}>Appeler</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {booking.status === "confirmed" && booking.paymentStatus === "paid" && (
           <Pressable
@@ -884,5 +910,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "white",
+  },
+  agentContactCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  agentContactLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  agentContactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#DBEAFE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  agentContactLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#64748B",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  agentContactName: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#0B3C5D",
+  },
+  agentContactPhone: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#3B82F6",
+    marginTop: 1,
+  },
+  callAgentBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#0B3C5D",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  callAgentBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
 });
