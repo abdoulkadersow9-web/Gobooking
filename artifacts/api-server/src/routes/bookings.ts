@@ -11,7 +11,7 @@ const generateId = () => Date.now().toString() + Math.random().toString(36).subs
 const generateRef = () => "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
 
 /* ── Credit company wallet after a confirmed booking ─────────────── */
-async function creditCompanyWallet(bookingId: string) {
+export async function creditCompanyWallet(bookingId: string) {
   try {
     const bookings = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
     if (!bookings.length) return;

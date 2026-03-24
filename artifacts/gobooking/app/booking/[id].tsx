@@ -258,7 +258,28 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
-        {booking.status === "confirmed" && (
+        {/* ── Bouton Payer ── */}
+        {booking.paymentStatus !== "paid" && booking.status !== "cancelled" && booking.status !== "boarded" && (
+          <Pressable
+            style={({ pressed }) => [styles.payNowBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({
+                pathname: "/payment/cinetpay",
+                params: {
+                  bookingId:  booking.id,
+                  amount:     String(booking.totalAmount),
+                  bookingRef: booking.bookingRef,
+                },
+              });
+            }}
+          >
+            <Feather name="credit-card" size={16} color="white" />
+            <Text style={styles.payNowBtnText}>Payer {booking.totalAmount.toLocaleString()} FCFA</Text>
+          </Pressable>
+        )}
+
+        {booking.status === "confirmed" && booking.paymentStatus === "paid" && (
           <Pressable
             style={({ pressed }) => [
               styles.cancelBtn,
@@ -607,5 +628,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.light.error,
+  },
+  payNowBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#059669",
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 8,
+    marginBottom: 10,
+    shadowColor: "#059669",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  payNowBtnText: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "white",
   },
 });

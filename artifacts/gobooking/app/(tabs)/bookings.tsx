@@ -211,11 +211,18 @@ export default function BookingsScreen() {
         {/* CTA: pay now if confirmed but not paid */}
         {needsPay && (
           <Pressable
-            style={[styles.ctaBtn, { backgroundColor: "#0B3C5D" }]}
+            style={[styles.ctaBtn, { backgroundColor: "#059669" }]}
             onPress={(e) => {
               e.stopPropagation?.();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: "/booking/[id]", params: { id: item.id } });
+              router.push({
+                pathname: "/payment/cinetpay",
+                params: {
+                  bookingId:  item.id,
+                  amount:     String(item.totalAmount),
+                  bookingRef: item.bookingRef,
+                },
+              });
             }}
           >
             <Feather name="credit-card" size={13} color="white" />
