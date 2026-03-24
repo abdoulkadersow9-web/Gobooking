@@ -1,0 +1,19 @@
+packages:
+  "recharts": "For dashboard and analytics charts"
+  "framer-motion": "For smooth page transitions and micro-interactions"
+  "date-fns": "For formatting dates easily"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility function to efficiently merge Tailwind CSS classes"
+
+images:
+  - path: "artifacts/gobooking-admin/public/images/logo.png"
+    description: "Modern minimalist logo mark for a bus transport company called GoBooking, geometric shapes, navy blue and vibrant orange"
+    aspect_ratio: "1:1"
+  - path: "artifacts/gobooking-admin/public/images/auth-bg.png"
+    description: "Abstract architectural background with deep navy blue gradients and subtle orange glowing light leaks, highly professional enterprise feel"
+    aspect_ratio: "16:9"
+
+notes:
+  - Auth token is stored in localStorage as 'gobooking_token'
+  - All API requests prepend '/api' to the path and include the Authorization Bearer token
+  - Using Tailwind v4 inline theme for custom colors based on Navy (#0B3C5D), Orange (#FF6B00), and Amber (#D97706)
