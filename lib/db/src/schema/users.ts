@@ -12,8 +12,9 @@ export const usersTable = pgTable("users", {
   status:       varchar("status", { length: 20 }).notNull().default("active"),
   pushToken:    text("push_token"),
   referralCode: varchar("referral_code", { length: 20 }).unique(),
-  walletBalance: integer("wallet_balance").notNull().default(0),
-  totalTrips:   integer("total_trips").notNull().default(0),
+  walletBalance:  integer("wallet_balance").notNull().default(0),
+  totalTrips:    integer("total_trips").notNull().default(0),
+  loyaltyPoints: integer("loyalty_points").notNull().default(0),
   createdAt:    timestamp("created_at").notNull().defaultNow(),
 });
 

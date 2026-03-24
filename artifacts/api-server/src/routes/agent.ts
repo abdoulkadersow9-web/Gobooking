@@ -8,6 +8,7 @@ import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, requestsForTrip, newRequestId, pruneOldRequests, type TripRequest } from "../requestStore";
 import { sendExpoPush } from "../pushService";
 import { calculateParcelPrice } from "./parcels";
+import { awardPoints, POINTS_PER_TRIP } from "./loyalty";
 
 const router: IRouter = Router();
 
@@ -1446,10 +1447,24 @@ router.post("/scan", async (req, res) => {
       bookingRef: booking.bookingRef, newStatus: "boarded",
     }).catch(() => {});
 
+    /* Award loyalty points */
+    const loyaltyResult = await awardPoints(
+      booking.userId, POINTS_PER_TRIP,
+      `Embarquement validé — billet ${booking.bookingRef}`,
+      booking.id
+    ).catch(() => null);
+
     /* Push notification */
     const userRows = await db.select({ pushToken: usersTable.pushToken, name: usersTable.name })
       .from(usersTable).where(eq(usersTable.id, booking.userId)).limit(1);
     sendExpoPush(userRows[0]?.pushToken, "GoBooking 🚌", "Votre embarquement a été validé ! Bon voyage.").catch(() => {});
+    if (loyaltyResult) {
+      sendExpoPush(
+        userRows[0]?.pushToken,
+        "🎁 Bonus fidélité",
+        `+${POINTS_PER_TRIP} points gagnés ! Total : ${loyaltyResult.newBalance} pts`
+      ).catch(() => {});
+    }
 
     const fp = Array.isArray(booking.passengers) ? (booking.passengers as any[])[0] : null;
     res.json({

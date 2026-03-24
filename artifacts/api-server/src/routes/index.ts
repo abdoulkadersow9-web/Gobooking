@@ -13,6 +13,7 @@ import subscriptionsRouter from "./subscriptions";
 import growthRouter from "./growth";
 import paymentRouter from "./payment";
 import publicRouter from "./public";
+import loyaltyRouter from "./loyalty";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use("/firebase", firebaseBookingRouter);
 router.use(subscriptionsRouter);
 router.use(growthRouter);
 router.use("/payment", paymentRouter);
+router.use("/loyalty", loyaltyRouter);
 
 export default router;

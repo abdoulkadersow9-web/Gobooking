@@ -22,3 +22,4 @@ export * from "./promos";
 export * from "./scans";
 export * from "./agent_alerts";
 export * from "./sms_logs";
+export * from "./points_history";
