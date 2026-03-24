@@ -60,7 +60,17 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts">("trajet");
+  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets">("trajet");
+
+  interface StopWithPassengers {
+    id: string;
+    name: string;
+    city: string;
+    order: number;
+    passengers: { bookingRef: string; userName: string | null; fromStopId: string | null }[];
+  }
+  const [stopData, setStopData]         = useState<StopWithPassengers[]>([]);
+  const [stopLoading, setStopLoading]   = useState(false);
 
   const assignedTripId = user?.tripId ?? null;
   const assignedBusId  = user?.busId  ?? null;
@@ -106,10 +116,26 @@ export default function RouteScreen() {
     }
   }, [token]);
 
+  const loadStopData = useCallback(async (tripId: string) => {
+    if (!token) return;
+    setStopLoading(true);
+    try {
+      const data = await apiFetch<{ stops: StopWithPassengers[] }>(`/company/trips/${tripId}/stop-passengers`, { token });
+      setStopData(data.stops ?? []);
+    } catch {
+      setStopData([]);
+    } finally {
+      setStopLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => { loadTrips(); }, []);
 
   useEffect(() => {
-    if (activeTrip) loadPassengers(activeTrip.id);
+    if (activeTrip) {
+      loadPassengers(activeTrip.id);
+      loadStopData(activeTrip.id);
+    }
   }, [activeTrip?.id]);
 
   const handleRefresh = async () => {
@@ -301,15 +327,17 @@ export default function RouteScreen() {
           )}
 
           {/* Tabs */}
-          <View style={S.tabs}>
-            {(["trajet", "passagers", "contacts"] as const).map(t => (
-              <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
-                <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                  {t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : "📞 Contacts"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
+            <View style={S.tabs}>
+              {(["trajet", "passagers", "arrets", "contacts"] as const).map(t => (
+                <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
+                  <Text style={[S.tabText, tab === t && S.tabTextActive]}>
+                    {t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : t === "arrets" ? "🗺 Arrêts" : "📞 Contacts"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
 
           <ScrollView contentContainerStyle={S.body} showsVerticalScrollIndicator={false}>
             {tab === "trajet" && activeTrip && (
@@ -411,6 +439,57 @@ export default function RouteScreen() {
               </>
             )}
 
+            {tab === "arrets" && (
+              <>
+                <Text style={S.sectionTitle}>Ordre des arrêts</Text>
+                {stopLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
+                {!stopLoading && stopData.length === 0 && (
+                  <View style={{ alignItems: "center", marginTop: 24, gap: 8 }}>
+                    <Text style={{ fontSize: 28 }}>🗺️</Text>
+                    <Text style={S.emptySub}>Aucun arrêt configuré pour ce trajet.</Text>
+                  </View>
+                )}
+                {!stopLoading && stopData.map((stop, idx) => (
+                  <View key={stop.id} style={{ marginBottom: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                      {/* order dot + connector */}
+                      <View style={{ width: 32, alignItems: "center" }}>
+                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: G, alignItems: "center", justifyContent: "center" }}>
+                          <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{idx + 1}</Text>
+                        </View>
+                        {idx < stopData.length - 1 && (
+                          <View style={{ width: 2, height: 20, backgroundColor: "#D1FAE5", marginTop: 2 }} />
+                        )}
+                      </View>
+                      {/* stop info */}
+                      <View style={{ flex: 1, marginLeft: 10, backgroundColor: "#fff", borderRadius: 10, padding: 10, marginBottom: 4, elevation: 1, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                          <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>{stop.name}</Text>
+                          <View style={{ backgroundColor: G_LIGHT, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>{stop.passengers.length} passager{stop.passengers.length !== 1 ? "s" : ""}</Text>
+                          </View>
+                        </View>
+                        <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{stop.city}</Text>
+                        {stop.passengers.length > 0 && (
+                          <View style={{ marginTop: 8, gap: 4 }}>
+                            {stop.passengers.map((p, pi) => (
+                              <View key={pi} style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: G, alignItems: "center", justifyContent: "center" }}>
+                                  <Text style={{ fontSize: 10, color: "#fff", fontWeight: "700" }}>{(p.userName ?? "?").charAt(0)}</Text>
+                                </View>
+                                <Text style={{ fontSize: 12, fontWeight: "600", color: "#166534", flex: 1 }}>{p.userName ?? "Passager"}</Text>
+                                <Text style={{ fontSize: 10, color: "#6B7280" }}>#{p.bookingRef}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+
             {tab === "contacts" && (
               <>
                 <Text style={S.sectionTitle}>Contacts clients ({passengers.length})</Text>
@@ -499,10 +578,11 @@ const S = StyleSheet.create({
   occBar:           { height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" },
   occFill:          { height: "100%", backgroundColor: G, borderRadius: 3 },
 
-  tabs:             { flexDirection: "row", marginHorizontal: 16, marginVertical: 12, backgroundColor: "white",
+  tabsScroll:       { marginHorizontal: 16, marginVertical: 12 },
+  tabs:             { flexDirection: "row", backgroundColor: "white",
                       borderRadius: 10, padding: 4, gap: 4,
                       shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  tabBtn:           { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
+  tabBtn:           { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, alignItems: "center" },
   tabBtnActive:     { backgroundColor: G },
   tabText:          { fontSize: 13, color: "#64748B", fontWeight: "600" },
   tabTextActive:    { color: "white" },

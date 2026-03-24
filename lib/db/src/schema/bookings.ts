@@ -45,6 +45,8 @@ export const bookingsTable = pgTable("bookings", {
   bagageStatus: varchar("bagage_status", { length: 20 }).default("en_attente"),
   bagagePrice: real("bagage_price").notNull().default(0),
   bagageNote: text("bagage_note"),
+  fromStopId: text("from_stop_id"),
+  toStopId:   text("to_stop_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

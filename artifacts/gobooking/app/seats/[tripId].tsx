@@ -365,6 +365,23 @@ export default function SeatSelectionScreen() {
               <Text style={styles.priceValue}>{totalPrice.toLocaleString()} FCFA</Text>
             </View>
           </View>
+
+          {/* Stop selection row */}
+          <Pressable
+            style={({ pressed }) => [styles.stopBtn, pressed && { opacity: 0.75 }]}
+            onPress={() => router.push({ pathname: "/booking/stops", params: { tripId: tripId as string } })}
+          >
+            <Feather name="map-pin" size={15} color={booking?.fromStopId ? "#059669" : "#0369A1"} />
+            {booking?.fromStopId && booking?.toStopId ? (
+              <Text style={[styles.stopBtnText, { color: "#059669" }]} numberOfLines={1}>
+                {booking.fromStopName} → {booking.toStopName}
+              </Text>
+            ) : (
+              <Text style={styles.stopBtnText}>Choisir vos arrêts (optionnel)</Text>
+            )}
+            <Feather name="chevron-right" size={14} color="#64748B" style={{ marginLeft: "auto" }} />
+          </Pressable>
+
           <Pressable
             style={({ pressed }) => [
               styles.continueBtn,
@@ -715,5 +732,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: "white",
+  },
+  stopBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F0F9FF",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+  },
+  stopBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#0369A1",
+    flex: 1,
   },
 });

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -1739,6 +1739,221 @@ router.get("/agences/:id/agents", async (req, res) => {
     res.json(agents);
   } catch (err) {
     console.error("GET /company/agences/:id/agents error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ROUTES & STOPS
+═══════════════════════════════════════════════════════════════════════ */
+
+/** GET /company/routes – list routes with stops for current company */
+router.get("/routes", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const routes = await db.select().from(routesTable)
+      .where(eq(routesTable.companyId, ctx.companyId))
+      .orderBy(routesTable.name);
+
+    const stops = await db.select().from(stopsTable)
+      .where(inArray(stopsTable.routeId, routes.map(r => r.id)))
+      .orderBy(stopsTable.order);
+
+    const result = routes.map(r => ({
+      ...r,
+      stops: stops.filter(s => s.routeId === r.id),
+    }));
+    res.json(result);
+  } catch (err) {
+    console.error("GET /company/routes error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/** POST /company/routes – create a route */
+router.post("/routes", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { name } = req.body;
+    if (!name) { res.status(400).json({ error: "Le nom est requis" }); return; }
+
+    const id = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    const [route] = await db.insert(routesTable).values({
+      id, name, companyId: ctx.companyId, status: "active",
+    }).returning();
+    res.json(route);
+  } catch (err) {
+    console.error("POST /company/routes error:", err);
+    res.status(500).json({ error: "Erreur création route" });
+  }
+});
+
+/** PUT /company/routes/:id – update route name/status */
+router.put("/routes/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { name, status } = req.body;
+    const updates: Record<string, unknown> = {};
+    if (name)   updates.name   = name;
+    if (status) updates.status = status;
+
+    const [updated] = await db.update(routesTable)
+      .set(updates)
+      .where(and(eq(routesTable.id, req.params.id), eq(routesTable.companyId, ctx.companyId)))
+      .returning();
+
+    if (!updated) { res.status(404).json({ error: "Route introuvable" }); return; }
+    res.json(updated);
+  } catch (err) {
+    console.error("PUT /company/routes/:id error:", err);
+    res.status(500).json({ error: "Erreur mise à jour" });
+  }
+});
+
+/** DELETE /company/routes/:id – deactivate route */
+router.delete("/routes/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(routesTable)
+      .set({ status: "inactive" })
+      .where(and(eq(routesTable.id, req.params.id), eq(routesTable.companyId, ctx.companyId)));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /company/routes/:id error:", err);
+    res.status(500).json({ error: "Erreur suppression" });
+  }
+});
+
+/** GET /company/routes/:id/stops – stops ordered for a route */
+router.get("/routes/:id/stops", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const stops = await db.select().from(stopsTable)
+      .where(eq(stopsTable.routeId, req.params.id))
+      .orderBy(stopsTable.order);
+    res.json(stops);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/** POST /company/routes/:id/stops – add a stop to a route */
+router.post("/routes/:id/stops", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { name, city, latitude, longitude, order } = req.body;
+    if (!name || !city) { res.status(400).json({ error: "name et city requis" }); return; }
+
+    const existing = await db.select().from(stopsTable)
+      .where(eq(stopsTable.routeId, req.params.id))
+      .orderBy(desc(stopsTable.order))
+      .limit(1);
+    const nextOrder = order ?? ((existing[0]?.order ?? -1) + 1);
+
+    const id = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+    const [stop] = await db.insert(stopsTable).values({
+      id, routeId: req.params.id, name, city,
+      latitude:  latitude  ?? null,
+      longitude: longitude ?? null,
+      order:     nextOrder,
+    }).returning();
+    res.json(stop);
+  } catch (err) {
+    console.error("POST /company/routes/:id/stops error:", err);
+    res.status(500).json({ error: "Erreur ajout arrêt" });
+  }
+});
+
+/** PUT /company/stops/:id – update a stop */
+router.put("/stops/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { name, city, latitude, longitude, order } = req.body;
+    const updates: Record<string, unknown> = {};
+    if (name      !== undefined) updates.name      = name;
+    if (city      !== undefined) updates.city      = city;
+    if (latitude  !== undefined) updates.latitude  = latitude;
+    if (longitude !== undefined) updates.longitude = longitude;
+    if (order     !== undefined) updates.order     = order;
+
+    const [updated] = await db.update(stopsTable).set(updates)
+      .where(eq(stopsTable.id, req.params.id))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Arrêt introuvable" }); return; }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur mise à jour arrêt" });
+  }
+});
+
+/** DELETE /company/stops/:id – remove a stop */
+router.delete("/stops/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.delete(stopsTable).where(eq(stopsTable.id, req.params.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur suppression arrêt" });
+  }
+});
+
+/** GET /company/trips/:id/stop-passengers
+ * Returns each stop with count/list of passengers boarding there.
+ * Used by agent-bus screen.
+ */
+router.get("/trips/:id/stop-passengers", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, req.params.id)).limit(1);
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    const bookings = await db.select({
+      id:         bookingsTable.id,
+      bookingRef: bookingsTable.bookingRef,
+      passengers: bookingsTable.passengers,
+      fromStopId: bookingsTable.fromStopId,
+      toStopId:   bookingsTable.toStopId,
+      status:     bookingsTable.status,
+      userName:   usersTable.name,
+    }).from(bookingsTable)
+      .leftJoin(usersTable, eq(bookingsTable.userId, usersTable.id))
+      .where(and(eq(bookingsTable.tripId, req.params.id), eq(bookingsTable.status, "confirmed")));
+
+    let stops: Array<typeof stopsTable.$inferSelect> = [];
+    if (trip.routeId) {
+      stops = await db.select().from(stopsTable)
+        .where(eq(stopsTable.routeId, trip.routeId))
+        .orderBy(stopsTable.order);
+    }
+
+    const stopMap = stops.map(s => ({
+      ...s,
+      passengers: bookings.filter(b => b.fromStopId === s.id),
+    }));
+
+    const noStop = bookings.filter(b => !b.fromStopId);
+
+    res.json({ trip, stops: stopMap, noStopPassengers: noStop });
+  } catch (err) {
+    console.error("GET /company/trips/:id/stop-passengers error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

@@ -47,6 +47,7 @@ export default function PassengersScreen() {
   const [contactPhone, setContactPhone] = useState(user?.phone || "");
   const [bagages, setBagages] = useState<BagageInfo[]>(booking?.bagages || []);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   /* ── helpers ─────────────────────────────────────────────────────── */
   const updatePassenger = (index: number, field: string, value: string) => {
@@ -131,7 +132,7 @@ export default function PassengersScreen() {
   };
 
   /* ── continue ────────────────────────────────────────────────────── */
-  const handleContinue = () => {
+  const handleContinue = async () => {
     for (const p of passengers) {
       if (!p.name.trim() || !p.age || !p.idNumber.trim()) {
         Alert.alert("Erreur", "Veuillez renseigner tous les champs passager.");
@@ -142,16 +143,46 @@ export default function PassengersScreen() {
       Alert.alert("Erreur", "Veuillez renseigner vos coordonnées de contact.");
       return;
     }
+    if (!booking?.tripId || !booking?.selectedSeats?.length) {
+      Alert.alert("Erreur", "Informations de trajet manquantes. Recommencez la sélection.");
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    updateBooking({
-      passengers,
-      contactEmail,
-      contactPhone,
-      bagages,
-      bagagePrice,
-      totalAmount: totalPrice,
-    });
-    router.push("/payment/cinetpay");
+    updateBooking({ passengers, contactEmail, contactPhone, bagages, bagagePrice, totalAmount: totalPrice });
+
+    setSubmitting(true);
+    try {
+      const result = await apiFetch<{ id: string; bookingRef: string; totalAmount: number }>(
+        "/bookings",
+        {
+          token: token ?? undefined,
+          method: "POST",
+          body: {
+            tripId:       booking.tripId,
+            seatIds:      booking.selectedSeats,
+            passengers,
+            paymentMethod: "wave",
+            contactEmail,
+            contactPhone,
+            bagages,
+            fromStopId:   booking.fromStopId ?? null,
+            toStopId:     booking.toStopId   ?? null,
+          },
+        }
+      );
+      router.push({
+        pathname: "/payment/cinetpay",
+        params: {
+          bookingId:  result.id,
+          amount:     String(result.totalAmount),
+          bookingRef: result.bookingRef,
+        },
+      });
+    } catch (err: any) {
+      Alert.alert("Erreur de réservation", err?.message ?? "Impossible de créer la réservation. Réessayez.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -415,11 +446,18 @@ export default function PassengersScreen() {
           )}
         </View>
         <Pressable
-          style={({ pressed }) => [styles.continueBtn, pressed && styles.continueBtnPressed]}
+          style={({ pressed }) => [styles.continueBtn, (pressed || submitting) && styles.continueBtnPressed]}
           onPress={handleContinue}
+          disabled={submitting}
         >
-          <Text style={styles.continueBtnText}>Paiement</Text>
-          <Feather name="arrow-right" size={18} color="white" />
+          {submitting ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Text style={styles.continueBtnText}>Paiement</Text>
+              <Feather name="arrow-right" size={18} color="white" />
+            </>
+          )}
         </Pressable>
       </View>
     </View>

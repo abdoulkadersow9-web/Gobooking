@@ -144,7 +144,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages } = req.body;
+    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages, fromStopId, toStopId } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
       res.status(400).json({ error: "Champs requis manquants" });
@@ -251,6 +251,8 @@ router.post("/", async (req, res) => {
         bagages: bagageList as any,
         bagageStatus: bagageList.length > 0 ? "en_attente" : null,
         bagagePrice,
+        fromStopId: fromStopId ?? null,
+        toStopId:   toStopId   ?? null,
       } as any);
 
     const bookingResult = await getFullBooking(newBookingId);

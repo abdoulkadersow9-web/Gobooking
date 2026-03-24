@@ -32,6 +32,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="sms" />
       <Stack.Screen name="marketing" />
       <Stack.Screen name="agences" />
+      <Stack.Screen name="routes" />
     </Stack>
   );
 }

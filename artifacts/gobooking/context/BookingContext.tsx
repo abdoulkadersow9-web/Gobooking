@@ -31,6 +31,10 @@ export interface BookingState {
   totalAmount: number;
   bagages: BagageInfo[];
   bagagePrice: number;
+  fromStopId?:   string;
+  fromStopName?: string;
+  toStopId?:     string;
+  toStopName?:   string;
 }
 
 interface BookingContextType {
