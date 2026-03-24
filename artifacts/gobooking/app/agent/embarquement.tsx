@@ -41,7 +41,47 @@ interface EnRoutePassenger {
   createdAt: number;
 }
 
-type MainTab = "billets" | "en_route";
+interface TodayTrip {
+  id: string;
+  from: string;
+  to: string;
+  date: string;
+  departureTime: string;
+  arrivalTime: string;
+  busName: string;
+  busType: string;
+  status: string;
+  totalSeats: number;
+  totalPassengers: number;
+  boardedPassengers: number;
+  absentPassengers: number;
+}
+
+interface BoardingPassenger {
+  bookingId: string;
+  bookingRef: string;
+  name: string;
+  phone: string;
+  seats: string[];
+  status: string;
+  boarded: boolean;
+  amount: number;
+}
+
+interface BoardingStatus {
+  trip: {
+    id: string; from: string; to: string;
+    date: string; departureTime: string;
+    busName: string; status: string; totalSeats: number;
+  };
+  passengers: BoardingPassenger[];
+  stats: {
+    total: number; boarded: number; absent: number;
+    totalSeats: number; boardedSeats: number; absentSeats: number;
+  };
+}
+
+type MainTab = "billets" | "en_route" | "depart";
 
 export default function EmbarquementScreen() {
   const { user, token } = useAuth();
@@ -100,6 +140,18 @@ export default function EmbarquementScreen() {
   /* ── Tab ──────────────────────────────────────────── */
   const [activeTab, setActiveTab] = useState<MainTab>("billets");
 
+  /* ── Multi-départ: sélecteur de trajet ────────────── */
+  const [todayTrips, setTodayTrips]             = useState<TodayTrip[]>([]);
+  const [tripsLoading, setTripsLoading]         = useState(false);
+  const [selectedTrip, setSelectedTrip]         = useState<TodayTrip | null>(null);
+  const [showTripSelector, setShowTripSelector] = useState(false);
+
+  /* ── Départ tab: boarding status ─────────────────── */
+  const [boardingStatus, setBoardingStatus]     = useState<BoardingStatus | null>(null);
+  const [boardingLoading, setBoardingLoading]   = useState(false);
+  const [closingDeparture, setClosingDeparture] = useState(false);
+  const [departureResult, setDepartureResult]   = useState<{ cancelledCount: number; freedSeats: number } | null>(null);
+
   /* ── En Route passengers ──────────────────────────── */
   const [activeTripId, setActiveTripId]         = useState<string | null>(null);
   const [enRouteList, setEnRouteList]           = useState<EnRoutePassenger[]>([]);
@@ -117,6 +169,82 @@ export default function EmbarquementScreen() {
       </SafeAreaView>
     );
   }
+
+  /* ── Load today's trips from company ─────────────── */
+  const loadTodayTrips = async () => {
+    setTripsLoading(true);
+    try {
+      const data = await apiFetch<TodayTrip[]>("/agent/trips/today", { token: token ?? undefined });
+      setTodayTrips(data || []);
+      /* Auto-select if only one trip */
+      if (data?.length === 1 && !selectedTrip) {
+        setSelectedTrip(data[0]);
+        setActiveTripIdForGps(data[0].id);
+      }
+    } catch {
+      setTodayTrips([]);
+    } finally {
+      setTripsLoading(false);
+    }
+  };
+
+  /* ── Select a trip and load its boarding status ─── */
+  const selectTrip = async (trip: TodayTrip) => {
+    setSelectedTrip(trip);
+    setActiveTripIdForGps(trip.id);
+    setShowTripSelector(false);
+    setDepartureResult(null);
+    await loadBoardingStatus(trip.id);
+  };
+
+  /* ── Load boarding status for a trip ─────────────── */
+  const loadBoardingStatus = async (tripId: string) => {
+    setBoardingLoading(true);
+    try {
+      const data = await apiFetch<BoardingStatus>(`/agent/trip/${tripId}/boarding-status`, { token: token ?? undefined });
+      setBoardingStatus(data);
+    } catch {
+      setBoardingStatus(null);
+    } finally {
+      setBoardingLoading(false);
+    }
+  };
+
+  /* ── Close departure: cancel absents + free seats ─── */
+  const closeDeparture = async () => {
+    if (!selectedTrip) return;
+    Alert.alert(
+      "Clôturer le départ",
+      `Confirmer la clôture du départ ${selectedTrip.from} → ${selectedTrip.to} ?\n\nLes ${boardingStatus?.stats?.absent ?? 0} passager(s) absent(s) seront annulé(s) et leurs sièges libérés.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Clôturer",
+          style: "destructive",
+          onPress: async () => {
+            setClosingDeparture(true);
+            try {
+              const result = await apiFetch<{ cancelledCount: number; freedSeats: number; message: string }>(
+                `/agent/trips/${selectedTrip.id}/close-departure`,
+                { token: token ?? undefined, method: "POST" }
+              );
+              setDepartureResult({ cancelledCount: result.cancelledCount, freedSeats: result.freedSeats });
+              await loadBoardingStatus(selectedTrip.id);
+            } catch (e: any) {
+              Alert.alert("Erreur", e?.message ?? "Impossible de clôturer le départ");
+            } finally {
+              setClosingDeparture(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /* Load trips on mount */
+  useEffect(() => {
+    loadTodayTrips();
+  }, []);
 
   /* ── Fetch active trip for agent's bus ────────────── */
   const fetchActiveTripId = async () => {
@@ -290,7 +418,7 @@ export default function EmbarquementScreen() {
       }>("/agent/scan", {
         token: token ?? undefined,
         method: "POST",
-        body: { qrData: data.trim() },
+        body: { qrData: data.trim(), selectedTripId: selectedTrip?.id ?? undefined },
       });
 
       setScanBusy(false);
@@ -323,6 +451,15 @@ export default function EmbarquementScreen() {
           ref:      e?.bookingRef,
           errorMsg: "Billet non payé — le passager doit régler son paiement avant d'embarquer.",
         });
+      } else if (code === "WRONG_TRIP") {
+        const bTrip = e?.bookingTrip;
+        showScanResult({
+          type:     "refusé",
+          ref:      e?.bookingRef,
+          errorMsg: bTrip
+            ? `⚠️ Mauvais trajet !\nCe billet est pour ${bTrip.from} → ${bTrip.to} (${bTrip.departureTime}), pas pour le trajet sélectionné.`
+            : "Ce billet appartient à un autre trajet.",
+        });
       } else {
         showScanResult({
           type:     "refusé",
@@ -330,7 +467,7 @@ export default function EmbarquementScreen() {
         });
       }
     }
-  }, [scanned, scanBusy, networkStatus.isOnline, token]);
+  }, [scanned, scanBusy, networkStatus.isOnline, token, selectedTrip]);
 
   const lookupPassenger = async (ref: string) => {
     setLoading(true);
@@ -623,24 +760,59 @@ export default function EmbarquementScreen() {
           )}
         </View>
 
+        {/* Selected trip banner */}
+        {selectedTrip ? (
+          <TouchableOpacity style={styles.selectedTripBanner} onPress={() => setShowTripSelector(true)}>
+            <Ionicons name="bus" size={14} color="#34D399" />
+            <Text style={styles.selectedTripText} numberOfLines={1}>
+              {selectedTrip.busName} · {selectedTrip.from} → {selectedTrip.to} · {selectedTrip.departureTime}
+            </Text>
+            <View style={styles.selectedTripCount}>
+              <Text style={styles.selectedTripCountText}>
+                {selectedTrip.boardedPassengers}/{selectedTrip.totalPassengers}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.selectTripPrompt} onPress={() => { loadTodayTrips(); setShowTripSelector(true); }}>
+            <Ionicons name="git-branch-outline" size={14} color="#FCD34D" />
+            <Text style={styles.selectTripPromptText}>
+              {tripsLoading ? "Chargement trajets…" : "Sélectionner un départ →"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Tab toggle */}
         <View style={styles.tabRow}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === "billets" && styles.tabBtnActive]}
             onPress={() => setActiveTab("billets")}
           >
-            <Ionicons name="ticket-outline" size={14} color={activeTab === "billets" ? G_DARK : "rgba(255,255,255,0.6)"} />
+            <Ionicons name="ticket-outline" size={13} color={activeTab === "billets" ? G_DARK : "rgba(255,255,255,0.6)"} />
             <Text style={[styles.tabBtnText, activeTab === "billets" && styles.tabBtnTextActive]}>Billets</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === "en_route" && styles.tabBtnActive]}
             onPress={handleEnRouteTabPress}
           >
-            <Feather name="radio" size={14} color={activeTab === "en_route" ? G_DARK : "rgba(255,255,255,0.6)"} />
+            <Feather name="radio" size={13} color={activeTab === "en_route" ? G_DARK : "rgba(255,255,255,0.6)"} />
             <Text style={[styles.tabBtnText, activeTab === "en_route" && styles.tabBtnTextActive]}>
               En Route {enRouteList.filter(p => p.status === "accepted").length > 0
                 ? `(${enRouteList.filter(p => p.status === "accepted").length})`
                 : ""}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === "depart" && styles.tabBtnActive]}
+            onPress={() => {
+              setActiveTab("depart");
+              if (selectedTrip) loadBoardingStatus(selectedTrip.id);
+            }}
+          >
+            <Ionicons name="checkmark-done" size={13} color={activeTab === "depart" ? G_DARK : "rgba(255,255,255,0.6)"} />
+            <Text style={[styles.tabBtnText, activeTab === "depart" && styles.tabBtnTextActive]}>
+              Départ{boardingStatus?.stats?.absent ? ` (${boardingStatus.stats.absent})` : ""}
             </Text>
           </TouchableOpacity>
         </View>
@@ -783,6 +955,194 @@ export default function EmbarquementScreen() {
             <Text style={styles.tip}>• Vérifier l'identité si nécessaire</Text>
             <Text style={styles.tip}>• Valider avant l'entrée dans le bus</Text>
           </View>
+        </ScrollView>
+      )}
+
+      {/* ── Départ tab ── */}
+      {activeTab === "depart" && (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+          {!selectedTrip ? (
+            <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 32 }]}>
+              <Ionicons name="git-branch-outline" size={44} color="#D1FAE5" />
+              <Text style={[styles.notFoundText, { color: "#64748B" }]}>Aucun trajet sélectionné</Text>
+              <Text style={styles.notFoundSub}>Sélectionnez un départ pour voir les passagers</Text>
+              <TouchableOpacity
+                style={[styles.validateBtn, { marginTop: 12 }]}
+                onPress={() => { loadTodayTrips(); setShowTripSelector(true); }}
+              >
+                <Ionicons name="bus-outline" size={18} color="#fff" />
+                <Text style={styles.validateBtnText}>Sélectionner un trajet</Text>
+              </TouchableOpacity>
+            </View>
+          ) : boardingLoading ? (
+            <View style={styles.centerBox}>
+              <ActivityIndicator size="large" color={G} />
+              <Text style={styles.loadingText}>Chargement de la liste passagers…</Text>
+            </View>
+          ) : boardingStatus ? (
+            <>
+              {/* Trip summary card */}
+              <View style={styles.card}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <View style={[styles.passengerAvatar, { backgroundColor: G_DARK }]}>
+                    <Ionicons name="bus" size={22} color="#34D399" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle}>{boardingStatus.trip.busName}</Text>
+                    <Text style={{ fontSize: 13, color: "#6B7280" }}>
+                      {boardingStatus.trip.from} → {boardingStatus.trip.to} · {boardingStatus.trip.departureTime}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => loadBoardingStatus(selectedTrip.id)} style={{ padding: 6 }}>
+                    <Feather name="refresh-cw" size={16} color={G} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Stats row */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={[styles.statBox, { flex: 1, backgroundColor: G_LIGHT, borderColor: G }]}>
+                    <Text style={[styles.statNum, { color: G }]}>{boardingStatus.stats.boarded}</Text>
+                    <Text style={styles.statLabel}>Embarqués</Text>
+                  </View>
+                  <View style={[styles.statBox, { flex: 1, backgroundColor: boardingStatus.stats.absent > 0 ? "#FEF3C7" : "#F9FAFB", borderColor: boardingStatus.stats.absent > 0 ? "#FCD34D" : "#E5E7EB" }]}>
+                    <Text style={[styles.statNum, { color: boardingStatus.stats.absent > 0 ? "#D97706" : "#6B7280" }]}>{boardingStatus.stats.absent}</Text>
+                    <Text style={styles.statLabel}>Absents</Text>
+                  </View>
+                  <View style={[styles.statBox, { flex: 1 }]}>
+                    <Text style={styles.statNum}>{boardingStatus.stats.total}</Text>
+                    <Text style={styles.statLabel}>Total</Text>
+                  </View>
+                </View>
+
+                {/* Progress bar */}
+                <View style={{ marginTop: 10 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    <Text style={{ fontSize: 12, color: "#374151" }}>Progression embarquement</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: G }}>
+                      {boardingStatus.stats.total > 0 ? Math.round(boardingStatus.stats.boarded / boardingStatus.stats.total * 100) : 0}%
+                    </Text>
+                  </View>
+                  <View style={{ height: 8, backgroundColor: "#E5E7EB", borderRadius: 4, overflow: "hidden" }}>
+                    <View style={{
+                      height: "100%",
+                      backgroundColor: G,
+                      borderRadius: 4,
+                      width: `${boardingStatus.stats.total > 0 ? (boardingStatus.stats.boarded / boardingStatus.stats.total * 100) : 0}%`,
+                    }} />
+                  </View>
+                </View>
+              </View>
+
+              {/* Departure result banner */}
+              {departureResult && (
+                <View style={{ backgroundColor: "#ECFDF5", borderRadius: 12, padding: 16, borderWidth: 2, borderColor: G, alignItems: "center", gap: 4 }}>
+                  <Ionicons name="checkmark-circle" size={32} color={G} />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: G }}>Départ clôturé</Text>
+                  <Text style={{ fontSize: 13, color: G_DARK }}>
+                    {departureResult.cancelledCount} réservation(s) annulée(s) · {departureResult.freedSeats} siège(s) libéré(s)
+                  </Text>
+                </View>
+              )}
+
+              {/* Absents section */}
+              {boardingStatus.stats.absent > 0 && (
+                <>
+                  <Text style={[styles.sectionTitle, { color: "#D97706" }]}>
+                    Passagers absents ({boardingStatus.stats.absent})
+                  </Text>
+                  {boardingStatus.passengers.filter(p => !p.boarded).map(p => (
+                    <View key={p.bookingId} style={[styles.resultCard, { borderColor: "#FCD34D", borderWidth: 1.5 }]}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                        <View style={[styles.passengerAvatar, { backgroundColor: "#FEF3C7" }]}>
+                          <Ionicons name="person" size={22} color="#D97706" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.passengerName}>{p.name}</Text>
+                          <Text style={styles.passengerPhone}>{p.phone}</Text>
+                          {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s): {p.seats.join(", ")}</Text>}
+                        </View>
+                        <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>Absent</Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity style={styles.callBtn} onPress={() => callPassenger(p.phone)}>
+                          <Ionicons name="call-outline" size={15} color="#0369A1" />
+                          <Text style={styles.callBtnText}>Appeler</Text>
+                        </TouchableOpacity>
+                        <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", textAlignVertical: "center", alignSelf: "center" }}>
+                          Réf: {p.bookingRef}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+
+                  {/* Close departure button */}
+                  {!departureResult && (
+                    <TouchableOpacity
+                      style={[styles.validateBtn, { backgroundColor: "#DC2626" }, closingDeparture && { opacity: 0.6 }]}
+                      onPress={closeDeparture}
+                      disabled={closingDeparture}
+                    >
+                      {closingDeparture ? <ActivityIndicator color="#fff" /> : (
+                        <>
+                          <Ionicons name="close-circle-outline" size={20} color="#fff" />
+                          <Text style={styles.validateBtnText}>
+                            Clôturer le départ ({boardingStatus.stats.absent} absent{boardingStatus.stats.absent > 1 ? "s" : ""})
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+              {/* Embarked section */}
+              <Text style={styles.sectionTitle}>
+                Embarqués ({boardingStatus.stats.boarded})
+              </Text>
+              {boardingStatus.passengers.filter(p => p.boarded).length === 0 ? (
+                <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 20 }]}>
+                  <Ionicons name="people-outline" size={32} color="#D1FAE5" />
+                  <Text style={[styles.notFoundSub, { marginTop: 6 }]}>Aucun passager embarqué</Text>
+                </View>
+              ) : (
+                boardingStatus.passengers.filter(p => p.boarded).map(p => (
+                  <View key={p.bookingId} style={[styles.resultCard, { borderColor: "#6EE7B7", borderWidth: 1.5 }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={styles.passengerAvatar}>
+                        <Ionicons name="checkmark-circle" size={22} color={G} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.passengerName}>{p.name}</Text>
+                        <Text style={styles.passengerPhone}>{p.phone}</Text>
+                        {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s): {p.seats.join(", ")}</Text>}
+                      </View>
+                      <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>Embarqué ✓</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+
+              {boardingStatus.stats.absent === 0 && boardingStatus.stats.boarded > 0 && !departureResult && (
+                <View style={{ backgroundColor: G_LIGHT, borderRadius: 12, padding: 16, alignItems: "center", borderWidth: 1.5, borderColor: G }}>
+                  <Ionicons name="checkmark-circle" size={32} color={G} />
+                  <Text style={{ color: G_DARK, fontWeight: "700", fontSize: 15, marginTop: 6 }}>Tous les passagers sont à bord !</Text>
+                  <Text style={{ color: G, fontSize: 12, marginTop: 4 }}>Prêt pour le départ.</Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 28 }]}>
+              <Ionicons name="cloud-offline-outline" size={36} color="#D1FAE5" />
+              <Text style={[styles.notFoundSub, { marginTop: 8 }]}>Impossible de charger les données</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={() => selectedTrip && loadBoardingStatus(selectedTrip.id)}>
+                <Text style={styles.retryBtnText}>Réessayer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -937,6 +1297,97 @@ export default function EmbarquementScreen() {
           </View>
         </ScrollView>
       )}
+      {/* ── Trip Selector Modal ── */}
+      {showTripSelector && (
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <Text style={styles.modalTitle}>Sélectionner un départ</Text>
+              <TouchableOpacity onPress={() => { loadTodayTrips(); }}>
+                <Feather name="refresh-cw" size={16} color={G} />
+              </TouchableOpacity>
+            </View>
+
+            {tripsLoading ? (
+              <View style={{ alignItems: "center", padding: 24 }}>
+                <ActivityIndicator color={G} size="large" />
+                <Text style={{ color: "#6B7280", marginTop: 8 }}>Chargement des trajets…</Text>
+              </View>
+            ) : todayTrips.length === 0 ? (
+              <View style={{ alignItems: "center", padding: 24, gap: 8 }}>
+                <Ionicons name="calendar-outline" size={40} color="#D1FAE5" />
+                <Text style={{ color: "#6B7280", fontSize: 14, textAlign: "center" }}>
+                  Aucun départ prévu aujourd'hui
+                </Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }}
+                  onPress={loadTodayTrips}
+                >
+                  <Text style={{ color: G, fontWeight: "600", fontSize: 13 }}>Actualiser</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={{ maxHeight: 420 }}>
+                {todayTrips.map(trip => {
+                  const isSelected = selectedTrip?.id === trip.id;
+                  const tripStatusColor = trip.status === "en_route" ? G : trip.status === "scheduled" ? "#D97706" : "#6B7280";
+                  const tripStatusLabel = trip.status === "en_route" ? "En route" : trip.status === "scheduled" ? "Programmé" : trip.status;
+
+                  return (
+                    <TouchableOpacity
+                      key={trip.id}
+                      style={[styles.tripCard, isSelected && { borderColor: G, borderWidth: 2, backgroundColor: G_LIGHT }]}
+                      onPress={() => selectTrip(trip)}
+                    >
+                      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                        <View style={[styles.tripIcon, { backgroundColor: isSelected ? G : G_DARK }]}>
+                          <Ionicons name="bus" size={18} color={isSelected ? "#fff" : "#34D399"} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Text style={[styles.tripBusName, isSelected && { color: G_DARK }]}>{trip.busName}</Text>
+                            <View style={{ backgroundColor: isSelected ? G : tripStatusColor + "22", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                              <Text style={{ fontSize: 10, fontWeight: "700", color: isSelected ? "#fff" : tripStatusColor }}>{tripStatusLabel}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.tripRoute}>
+                            {trip.from} → {trip.to}
+                          </Text>
+                          <View style={{ flexDirection: "row", gap: 12, marginTop: 3 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Ionicons name="time-outline" size={11} color="#9CA3AF" />
+                              <Text style={styles.tripMeta}>{trip.departureTime}</Text>
+                            </View>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Ionicons name="people-outline" size={11} color="#9CA3AF" />
+                              <Text style={styles.tripMeta}>{trip.totalPassengers} passager{trip.totalPassengers > 1 ? "s" : ""}</Text>
+                            </View>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                              <Ionicons name={trip.absentPassengers === 0 ? "checkmark-circle-outline" : "alert-circle-outline"} size={11} color={trip.absentPassengers === 0 ? G : "#D97706"} />
+                              <Text style={[styles.tripMeta, { color: trip.absentPassengers === 0 ? G : "#D97706" }]}>
+                                {trip.boardedPassengers}/{trip.totalPassengers} à bord
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                        {isSelected && <Ionicons name="checkmark-circle" size={22} color={G} />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity
+              style={[styles.retryBtn, { marginTop: 12 }]}
+              onPress={() => setShowTripSelector(false)}
+            >
+              <Text style={styles.retryBtnText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -1025,4 +1476,30 @@ const styles = StyleSheet.create({
   scanBox: { width: 220, height: 220, borderWidth: 3, borderColor: "#34D399", borderRadius: 12 },
   cancelScan: { position: "absolute", top: 20, right: 20 },
   scanHint: { position: "absolute", bottom: 40, alignSelf: "center", color: "#fff", fontSize: 14, backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
+
+  /* ── Trip selector banner ── */
+  selectedTripBanner: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 10, borderWidth: 1, borderColor: "rgba(52,211,153,0.3)" },
+  selectedTripText: { flex: 1, color: "#fff", fontSize: 12, fontWeight: "500" },
+  selectedTripCount: { backgroundColor: "rgba(52,211,153,0.2)", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2 },
+  selectedTripCountText: { color: "#34D399", fontSize: 11, fontWeight: "700" },
+  selectTripPrompt: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(252,211,77,0.1)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 10, borderWidth: 1, borderColor: "rgba(252,211,77,0.3)" },
+  selectTripPromptText: { color: "#FCD34D", fontSize: 12, fontWeight: "600" },
+
+  /* ── Trip selector modal ── */
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end", zIndex: 100 },
+  modalSheet: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+  modalHandle: { width: 36, height: 4, backgroundColor: "#D1D5DB", borderRadius: 2, alignSelf: "center", marginBottom: 16 },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: "#111827" },
+
+  /* ── Trip cards in selector ── */
+  tripCard: { backgroundColor: "#F9FAFB", borderRadius: 12, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: "#E5E7EB" },
+  tripIcon: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  tripBusName: { fontSize: 14, fontWeight: "700", color: "#111827" },
+  tripRoute: { fontSize: 13, color: "#374151", marginTop: 2 },
+  tripMeta: { fontSize: 11, color: "#6B7280" },
+
+  /* ── Boarding stats ── */
+  statBox: { alignItems: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, borderColor: "#E5E7EB", paddingVertical: 8, backgroundColor: "#F9FAFB" },
+  statNum: { fontSize: 22, fontWeight: "800", color: "#111827" },
+  statLabel: { fontSize: 11, color: "#6B7280", marginTop: 2 },
 });

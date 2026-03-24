@@ -357,6 +357,214 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ─── GET /agent/trips/today — today's trips for the company ─── */
+router.get("/trips/today", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRecord = agentRows[0];
+    const companyId = agentRecord?.companyId ?? null;
+
+    const today = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+    /* Include today + yesterday (for late departures) */
+    let trips = companyId
+      ? await db.select().from(tripsTable)
+          .where(and(eq(tripsTable.companyId, companyId)))
+          .orderBy(desc(tripsTable.date))
+          .limit(30)
+      : await db.select().from(tripsTable)
+          .orderBy(desc(tripsTable.date))
+          .limit(20);
+
+    /* Filter client-side to today/yesterday + only actionable statuses */
+    trips = trips.filter(t =>
+      (t.date === today || t.date === yesterday) &&
+      !["arrived", "cancelled"].includes(t.status ?? "")
+    );
+
+    /* For each trip, count bookings */
+    const enriched = await Promise.all(trips.map(async (trip) => {
+      const bookings = await db.select().from(bookingsTable)
+        .where(and(
+          eq(bookingsTable.tripId, trip.id),
+          inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+        ));
+      const totalPax = bookings.reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length : 1), 0);
+      const boardedPax = bookings
+        .filter(b => b.status === "boarded" || b.status === "validated")
+        .reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length : 1), 0);
+
+      return {
+        id: trip.id,
+        from: trip.from,
+        to: trip.to,
+        date: trip.date,
+        departureTime: trip.departureTime,
+        arrivalTime: trip.arrivalTime,
+        busName: trip.busName,
+        busType: trip.busType,
+        status: trip.status,
+        totalSeats: trip.totalSeats,
+        busId: (trip as any).busId ?? null,
+        totalPassengers: totalPax,
+        boardedPassengers: boardedPax,
+        absentPassengers: totalPax - boardedPax,
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("trips/today error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ─── GET /agent/trip/:tripId/boarding-status — full passenger list ─── */
+router.get("/trip/:tripId/boarding-status", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const bookings = await db.select().from(bookingsTable)
+      .where(and(
+        eq(bookingsTable.tripId, tripId),
+        inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé", "pending"])
+      ))
+      .orderBy(desc(bookingsTable.createdAt));
+
+    const passengers: {
+      bookingId: string;
+      bookingRef: string;
+      name: string;
+      phone: string;
+      seats: string[];
+      status: string;
+      boarded: boolean;
+      amount: number;
+    }[] = [];
+
+    for (const b of bookings) {
+      const pList = Array.isArray(b.passengers) ? (b.passengers as any[]) : [];
+      const seatNums = Array.isArray(b.seatNumbers) ? (b.seatNumbers as string[]) : [];
+      const isBoarded = b.status === "boarded" || b.status === "validated";
+
+      passengers.push({
+        bookingId: b.id,
+        bookingRef: b.bookingRef ?? "",
+        name: pList[0]?.name ?? "Passager",
+        phone: pList[0]?.phone ?? b.contactPhone ?? "—",
+        seats: seatNums,
+        status: b.status ?? "confirmed",
+        boarded: isBoarded,
+        amount: b.totalAmount ?? 0,
+      });
+    }
+
+    const boarded = passengers.filter(p => p.boarded);
+    const absent = passengers.filter(p => !p.boarded);
+
+    res.json({
+      trip: {
+        id: trip.id, from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName, status: trip.status,
+        totalSeats: trip.totalSeats,
+      },
+      passengers,
+      stats: {
+        total: passengers.length,
+        boarded: boarded.length,
+        absent: absent.length,
+        totalSeats: passengers.reduce((acc, p) => acc + p.seats.length, 0),
+        boardedSeats: boarded.reduce((acc, p) => acc + p.seats.length, 0),
+        absentSeats: absent.reduce((acc, p) => acc + p.seats.length, 0),
+      },
+    });
+  } catch (err) {
+    console.error("boarding-status error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/trips/:tripId/close-departure — cancel absents + free seats ─── */
+router.post("/trips/:tripId/close-departure", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    /* Find all non-boarded bookings */
+    const absentBookings = await db.select().from(bookingsTable).where(and(
+      eq(bookingsTable.tripId, tripId),
+      inArray(bookingsTable.status, ["confirmed", "pending", "payé"])
+    ));
+
+    let cancelledCount = 0;
+    let freedSeats = 0;
+    const cancelledRefs: string[] = [];
+
+    for (const b of absentBookings) {
+      await db.update(bookingsTable)
+        .set({ status: "cancelled" })
+        .where(eq(bookingsTable.id, b.id));
+
+      const seatCount = Array.isArray(b.seatNumbers) ? b.seatNumbers.length : 1;
+      freedSeats += seatCount;
+      cancelledCount++;
+      cancelledRefs.push(b.bookingRef ?? b.id);
+
+      /* Free seats in seats table */
+      if (Array.isArray(b.seatNumbers) && b.seatNumbers.length > 0) {
+        for (const seatNum of b.seatNumbers as string[]) {
+          await db.update(seatsTable)
+            .set({ status: "available", bookingId: null } as any)
+            .where(and(eq(seatsTable.tripId, tripId), eq(seatsTable.seatNumber, seatNum)))
+            .catch(() => {});
+        }
+      }
+
+      /* Notify absent passengers */
+      const userRows = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+      sendExpoPush(
+        userRows[0]?.pushToken,
+        "GoBooking — Réservation annulée",
+        `Votre réservation ${b.bookingRef} a été annulée (départ clôturé sans présentation).`
+      ).catch(() => {});
+    }
+
+    auditLog(
+      { userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CANCEL, tripId, "trip",
+      { cancelledCount, freedSeats, cancelledRefs, tripFrom: trip.from, tripTo: trip.to }
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      cancelledCount,
+      freedSeats,
+      cancelledRefs,
+      message: `${cancelledCount} réservation(s) annulée(s), ${freedSeats} siège(s) libéré(s)`,
+    });
+  } catch (err) {
+    console.error("close-departure error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── Passengers for a given trip (route agent) ─────────── */
 router.get("/trip/:tripId/passengers", async (req, res) => {
   try {
@@ -1014,7 +1222,7 @@ router.post("/scan", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { qrData } = req.body as { qrData?: string | Record<string, unknown> };
+    const { qrData, selectedTripId } = req.body as { qrData?: string | Record<string, unknown>; selectedTripId?: string };
     if (!qrData) {
       res.status(400).json({ error: "qrData requis", code: "MISSING_DATA" });
       return;
@@ -1069,6 +1277,23 @@ router.post("/scan", async (req, res) => {
     }
 
     const booking = bookings[0];
+
+    /* ── 2b. Trip mismatch guard — if agent specified a selectedTripId ── */
+    if (selectedTripId && booking.tripId && booking.tripId !== selectedTripId) {
+      auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.QR_SCAN, booking.id, "booking", {
+        bookingRef: booking.bookingRef, reason: "WRONG_TRIP",
+        bookingTripId: booking.tripId, selectedTripId,
+      }, true).catch(() => {});
+      const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
+      const bTrip = trips[0];
+      res.status(422).json({
+        error: `Ce billet est pour le trajet ${bTrip?.from ?? "?"} → ${bTrip?.to ?? "?"} (départ ${bTrip?.departureTime ?? "?"}), pas pour le trajet sélectionné.`,
+        code: "WRONG_TRIP",
+        bookingRef: booking.bookingRef,
+        bookingTrip: bTrip ? { from: bTrip.from, to: bTrip.to, departureTime: bTrip.departureTime, busName: bTrip.busName } : null,
+      });
+      return;
+    }
 
     /* ── 3. Anti double-scan ── */
     if (booking.status === "boarded" || booking.status === "validated") {
