@@ -93,12 +93,12 @@ export default function BookingDetailScreen() {
 
   const handleCancel = () => {
     Alert.alert(
-      "Cancel Booking",
-      "Are you sure you want to cancel this booking? This action cannot be undone.",
+      "Annuler la réservation",
+      "Êtes-vous sûr de vouloir annuler cette réservation ? Cette action est irréversible.",
       [
-        { text: "Keep Booking", style: "cancel" },
+        { text: "Conserver", style: "cancel" },
         {
-          text: "Cancel Booking",
+          text: "Annuler la réservation",
           style: "destructive",
           onPress: async () => {
             setCancelling(true);
@@ -110,8 +110,8 @@ export default function BookingDetailScreen() {
               setBooking(data);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : "Cancellation failed";
-              Alert.alert("Error", msg);
+              const msg = err instanceof Error ? err.message : "Impossible d'annuler la réservation";
+              Alert.alert("Erreur", msg);
             } finally {
               setCancelling(false);
             }
@@ -157,7 +157,7 @@ export default function BookingDetailScreen() {
   if (!booking) {
     return (
       <View style={[styles.center, { paddingTop: topPad }]}>
-        <Text style={styles.errorText}>Booking not found</Text>
+        <Text style={styles.errorText}>Réservation introuvable</Text>
       </View>
     );
   }

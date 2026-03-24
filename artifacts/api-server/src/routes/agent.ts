@@ -453,8 +453,40 @@ router.get("/trips", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const trips = await db.select().from(tripsTable).orderBy(desc(tripsTable.date)).limit(10);
-    res.json(trips);
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRecord = agentRows[0];
+    const companyId = agentRecord?.companyId ?? null;
+
+    const trips = companyId
+      ? await db.select().from(tripsTable)
+          .where(and(eq(tripsTable.companyId, companyId)))
+          .orderBy(desc(tripsTable.date))
+          .limit(30)
+      : await db.select().from(tripsTable)
+          .orderBy(desc(tripsTable.date))
+          .limit(20);
+
+    const enriched = await Promise.all(trips.map(async (trip) => {
+      const availableCount = await db.select().from(seatsTable)
+        .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
+      return {
+        id: trip.id,
+        from: trip.from,
+        to: trip.to,
+        date: trip.date,
+        departureTime: trip.departureTime,
+        arrivalTime: trip.arrivalTime,
+        price: trip.price,
+        busName: trip.busName,
+        busType: trip.busType,
+        status: trip.status,
+        totalSeats: trip.totalSeats,
+        availableSeats: availableCount.length,
+      };
+    }));
+
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

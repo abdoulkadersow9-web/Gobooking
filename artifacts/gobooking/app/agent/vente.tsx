@@ -44,19 +44,6 @@ export default function VenteScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState<{ bookingRef: string; total: number } | null>(null);
 
-  if (user && user.role !== "agent") {
-    return (
-      <SafeAreaView style={styles.denied}>
-        <Ionicons name="lock-closed" size={48} color="#EF4444" />
-        <Text style={styles.deniedText}>Accès réservé aux agents</Text>
-      </SafeAreaView>
-    );
-  }
-
-  useEffect(() => {
-    fetchTrips();
-  }, []);
-
   const fetchTrips = async () => {
     setLoadingTrips(true);
     try {
@@ -68,6 +55,19 @@ export default function VenteScreen() {
       setLoadingTrips(false);
     }
   };
+
+  useEffect(() => {
+    fetchTrips();
+  }, []);
+
+  if (user && user.role !== "agent") {
+    return (
+      <SafeAreaView style={styles.denied}>
+        <Ionicons name="lock-closed" size={48} color="#EF4444" />
+        <Text style={styles.deniedText}>Accès réservé aux agents</Text>
+      </SafeAreaView>
+    );
+  }
 
   const handleSubmit = async () => {
     if (!selectedTrip) { Alert.alert("Erreur", "Sélectionnez un trajet."); return; }

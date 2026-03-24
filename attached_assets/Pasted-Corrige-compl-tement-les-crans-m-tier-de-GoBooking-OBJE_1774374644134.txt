@@ -1,0 +1,68 @@
+Corrige complètement les écrans métier de GoBooking.
+
+OBJECTIF :
+Faire fonctionner correctement toutes les actions principales de l’application.
+
+PROBLÈMES ACTUELS :
+- le client n’arrive pas à réserver un billet
+- l’entreprise ou l’agent n’arrive pas à enregistrer un colis
+- certains écrans sont bloqués
+- l’écran agent ne scroll pas correctement
+- certaines actions ne répondent pas
+
+À VÉRIFIER ET CORRIGER :
+
+1. Réservation billet client
+- vérifier le formulaire de réservation
+- vérifier les champs obligatoires
+- vérifier l’enregistrement en base
+- vérifier le bouton de validation
+- vérifier que la réservation est bien créée sans erreur
+
+2. Enregistrement colis
+- vérifier le formulaire colis
+- vérifier que l’agent/entreprise peut créer un colis
+- vérifier l’enregistrement en base
+- vérifier que les champs sont bien liés au bon companyId / agenceId / agentId
+
+3. Scroll des écrans
+- corriger tous les écrans bloqués
+- ajouter ScrollView ou FlatList correctement là où nécessaire
+- vérifier surtout l’espace agent
+- s’assurer que tous les boutons du bas sont accessibles
+
+4. Boutons et actions
+- vérifier tous les boutons principaux
+- corriger les boutons qui ne répondent pas
+- ajouter logs console pour identifier les actions qui échouent
+
+5. Données et états
+- vérifier les states React
+- vérifier les données null / undefined
+- éviter les écrans figés à cause d’un mauvais state
+- ajouter valeurs par défaut si nécessaire
+
+6. Validation backend / frontend
+- vérifier que les requêtes API ou Firebase passent bien
+- corriger les erreurs silencieuses
+- afficher un message si une action échoue
+
+7. UX minimale
+- après réservation réussie : afficher “Réservation créée”
+- après colis créé : afficher “Colis enregistré”
+- si erreur : afficher message clair
+
+8. Test global
+Merci de tester vous-même ces cas :
+- client crée une réservation billet
+- entreprise crée un colis
+- agent crée un colis
+- agent scrolle l’écran
+- tous les formulaires principaux fonctionnent
+
+RÉSULTAT ATTENDU :
+- le client peut réserver
+- les colis peuvent être créés
+- les écrans scrollent correctement
+- les boutons fonctionnent
+- l’application est stable sur les écrans métier
