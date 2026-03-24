@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -1510,6 +1510,43 @@ router.post("/sms/send", async (req, res) => {
   } catch (err) {
     console.error("SMS send error:", err);
     res.status(500).json({ error: "Erreur envoi SMS" });
+  }
+});
+
+/* ─────────────── MARKETING LOGS ─────────────── */
+
+router.get("/marketing/logs", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+
+    /* Marketing logs are global (not per-company in MVP) — filter by recent */
+    const limit = Math.min(parseInt(req.query.limit as string || "100"), 500);
+    const campaign = req.query.campaign as string | undefined;
+
+    let query = db.select().from(marketingLogsTable).$dynamic();
+    if (campaign) query = query.where(eq(marketingLogsTable.campaign, campaign));
+    const logs = await query.orderBy(desc(marketingLogsTable.createdAt)).limit(limit);
+
+    /* Aggregate stats */
+    const all = await db.select().from(marketingLogsTable).orderBy(desc(marketingLogsTable.createdAt)).limit(1000);
+    const stats = {
+      total:        all.length,
+      sent:         all.filter(l => l.status === "sent").length,
+      byCampaign: {
+        reengagement:   all.filter(l => l.campaign === "reengagement").length,
+        post_trip:      all.filter(l => l.campaign === "post_trip").length,
+        low_occupancy:  all.filter(l => l.campaign === "low_occupancy").length,
+        birthday:       all.filter(l => l.campaign === "birthday").length,
+        parcel_arrived: all.filter(l => l.campaign === "parcel_arrived").length,
+      },
+    };
+
+    res.json({ logs, stats });
+  } catch (err) {
+    console.error("Marketing logs error:", err);
+    res.status(500).json({ error: "Erreur historique marketing" });
   }
 });
 

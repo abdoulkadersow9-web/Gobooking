@@ -23,3 +23,4 @@ export * from "./scans";
 export * from "./agent_alerts";
 export * from "./sms_logs";
 export * from "./points_history";
+export * from "./marketing_logs";

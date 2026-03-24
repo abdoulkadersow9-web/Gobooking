@@ -30,6 +30,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="alertes" />
       <Stack.Screen name="analytiques" />
       <Stack.Screen name="sms" />
+      <Stack.Screen name="marketing" />
     </Stack>
   );
 }

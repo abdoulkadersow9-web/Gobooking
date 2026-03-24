@@ -380,6 +380,7 @@ export default function EntrepriseDashboard() {
               { icon: "alert-octagon", label: "Alertes",      route: "/entreprise/alertes",        color: "#DC2626" },
               { icon: "bar-chart-2",   label: "Analytics",    route: "/entreprise/analytiques",    color: "#059669" },
               { icon: "send",          label: "SMS Marketing",route: "/entreprise/sms",            color: "#D97706" },
+              { icon: "zap",           label: "Marketing Auto",route: "/entreprise/marketing",     color: "#7C3AED" },
               { icon: "settings",      label: "Gestion",      route: "/dashboard/company",         color: AMBER },
             ].map(it => (
               <Pressable

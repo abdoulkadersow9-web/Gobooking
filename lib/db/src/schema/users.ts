@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { date, integer, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,7 @@ export const usersTable = pgTable("users", {
   walletBalance:  integer("wallet_balance").notNull().default(0),
   totalTrips:    integer("total_trips").notNull().default(0),
   loyaltyPoints: integer("loyalty_points").notNull().default(0),
+  birthdate:     date("birthdate"),
   createdAt:    timestamp("created_at").notNull().defaultNow(),
 });
 
