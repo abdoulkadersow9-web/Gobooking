@@ -81,7 +81,13 @@ export default function CinetPayScreen() {
         } else if (attempts >= MAX) {
           clearInterval(verifyRef.current!);
           verifyRef.current = null;
-          setError("Le paiement n'a pas été confirmé. Vérifiez votre solde et réessayez.");
+          const msg = "Le paiement n'a pas été confirmé dans le délai imparti. Vérifiez votre solde et réessayez.";
+          /* Persist failure in DB so booking shows correct status */
+          apiFetch("/payment/failed", {
+            token: token ?? undefined, method: "POST",
+            body: { bookingId, reason: "Délai de confirmation dépassé" },
+          }).catch(() => {});
+          setError(msg);
           setStep("failed");
         }
       } catch {

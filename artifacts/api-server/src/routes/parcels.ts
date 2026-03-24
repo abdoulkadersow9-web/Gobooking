@@ -76,6 +76,7 @@ router.post("/", async (req, res) => {
       description,
       deliveryType,
       paymentMethod,
+      paymentStatus: reqPaymentStatus,
       notes,
       trackingRef: clientTrackingRef,
     } = req.body;
@@ -111,7 +112,7 @@ router.post("/", async (req, res) => {
       amount,
       commissionAmount,
       paymentMethod: paymentMethod || "orange",
-      paymentStatus: "paid",
+      paymentStatus: (reqPaymentStatus === "pending" || reqPaymentStatus === "failed") ? reqPaymentStatus : "paid",
       status: "en_attente",
       notes: notes || null,
     }).returning();

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { db, bookingsTable, paymentsTable, notificationsTable, usersTable, tripsTable } from "@workspace/db";
+import { db, bookingsTable, paymentsTable, notificationsTable, usersTable, tripsTable, parcelsTable } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { tokenStore } from "./auth";
 import { auditLog, ACTIONS } from "../audit";
@@ -270,6 +270,229 @@ router.post("/verify", async (req: Request, res: Response) => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
+   POST /payment/failed
+   Called by the mobile client when payment times out or user cancels.
+   Marks the booking as paymentStatus=failed so it won't block the user.
+──────────────────────────────────────────────────────────────────────── */
+router.post("/failed", async (req: Request, res: Response) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
+
+    const { bookingId, reason } = req.body as { bookingId?: string; reason?: string };
+    if (!bookingId) { res.status(400).json({ error: "bookingId requis" }); return; }
+
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+    if (booking.userId !== userId) { res.status(403).json({ error: "Non autorisé" }); return; }
+    if (booking.paymentStatus === "paid") { res.status(400).json({ error: "Cette réservation est déjà payée" }); return; }
+
+    await db.update(bookingsTable)
+      .set({ paymentStatus: "failed" })
+      .where(eq(bookingsTable.id, bookingId));
+
+    /* In-app notification */
+    await db.insert(notificationsTable).values({
+      id: generateId(), userId, type: "payment_failed",
+      title: "Paiement échoué ❌",
+      message: `Le paiement pour la réservation #${booking.bookingRef} a échoué. ${reason ? reason : "Veuillez réessayer."}`,
+      read: false, refId: bookingId, refType: "booking",
+    }).catch(() => {});
+
+    console.log(`[PAYMENT] ❌ Booking ${booking.bookingRef} marked as failed`);
+    res.json({ ok: true, bookingId, paymentStatus: "failed" });
+  } catch (err) {
+    console.error("[PAYMENT] failed error:", err);
+    res.status(500).json({ error: "Erreur lors de la mise à jour du statut" });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   POST /payment/simulate
+   Directly simulate a successful payment without opening a browser.
+   Useful for testing and for agents processing walk-in cash payments.
+   Body: { bookingId, paymentMethod? }
+──────────────────────────────────────────────────────────────────────── */
+router.post("/simulate", async (req: Request, res: Response) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
+
+    const { bookingId, paymentMethod = "wave" } = req.body as { bookingId?: string; paymentMethod?: string };
+    if (!bookingId) { res.status(400).json({ error: "bookingId requis" }); return; }
+
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+    if (booking.userId !== userId) { res.status(403).json({ error: "Non autorisé" }); return; }
+    if (booking.paymentStatus === "paid") {
+      const existing = await db.select({ id: paymentsTable.id })
+        .from(paymentsTable).where(and(eq(paymentsTable.refId, bookingId), eq(paymentsTable.status, "paid"))).limit(1);
+      res.json({ ok: true, already: true, paymentId: existing[0]?.id ?? null, bookingRef: booking.bookingRef, amount: booking.totalAmount });
+      return;
+    }
+
+    const txId = generateTxId();
+    await db.update(bookingsTable)
+      .set({ status: "confirmed", paymentStatus: "paid", paymentMethod })
+      .where(eq(bookingsTable.id, bookingId));
+    await creditCompanyWallet(bookingId).catch(() => {});
+
+    const payId = await recordPayment(booking.userId ?? "", bookingId, booking.totalAmount, paymentMethod, txId);
+    await notifyPaymentSuccess(booking.userId ?? "", booking.bookingRef, booking.totalAmount, payId).catch(() => {});
+
+    const commission = Math.round(booking.totalAmount * 0.1);
+    console.log(`[PAYMENT SIMULATE] ✅ Booking ${booking.bookingRef} — amount: ${booking.totalAmount} FCFA, commission: ${commission} FCFA, txId: ${txId}`);
+    res.json({ ok: true, paymentId: payId, transactionId: txId, bookingRef: booking.bookingRef, amount: booking.totalAmount, commission, paymentStatus: "paid" });
+  } catch (err) {
+    console.error("[PAYMENT] simulate error:", err);
+    res.status(500).json({ error: "Erreur lors de la simulation du paiement" });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   POST /payment/init-parcel
+   Initiates CinetPay payment for a parcel (same flow as booking).
+   Body: { parcelId, paymentMethod }
+──────────────────────────────────────────────────────────────────────── */
+router.post("/init-parcel", async (req: Request, res: Response) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
+
+    const { parcelId, paymentMethod } = req.body as { parcelId?: string; paymentMethod?: string };
+    if (!parcelId || !paymentMethod) { res.status(400).json({ error: "parcelId et paymentMethod requis" }); return; }
+
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, parcelId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Colis introuvable" }); return; }
+    const parcel = rows[0];
+    if (parcel.userId !== userId) { res.status(403).json({ error: "Non autorisé" }); return; }
+    if (parcel.paymentStatus === "paid") { res.status(400).json({ error: "Ce colis est déjà payé" }); return; }
+
+    await db.update(parcelsTable).set({ paymentMethod, paymentStatus: "pending" }).where(eq(parcelsTable.id, parcelId));
+
+    /* ── DEMO MODE ── */
+    if (DEMO_MODE) {
+      const txId    = generateTxId();
+      const domain  = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:8080";
+      const payUrl  = `https://${domain}/api/payment/demo-redirect-parcel?txId=${txId}&parcelId=${parcelId}&amount=${parcel.amount}&method=${paymentMethod}`;
+      console.log(`[PAYMENT DEMO] parcel=${parcel.trackingRef} tx=${txId} amount=${parcel.amount} FCFA`);
+      res.json({ demo: true, transactionId: txId, paymentUrl: payUrl, amount: parcel.amount, currency: "XOF", trackingRef: parcel.trackingRef });
+      return;
+    }
+
+    /* ── PRODUCTION MODE ── */
+    const txId      = generateTxId();
+    const domain    = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    const notifyUrl = `https://${domain}/api/payment/notify-parcel`;
+    const returnUrl = `https://${domain}/api/payment/demo-redirect-parcel?parcelId=${parcelId}&txId=${txId}`;
+    const channelMap: Record<string, string> = { wave: "WAVE_CI", orange: "ORANGE_MONEY_CI", mtn: "MTN_MONEY_CI", card: "CARD" };
+
+    const cpRes = await fetch(`${CINETPAY_BASE_URL}/payment`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apikey: CINETPAY_API_KEY, site_id: CINETPAY_SITE_ID, transaction_id: txId, amount: parcel.amount, currency: "XOF", description: `GoBooking - Colis ${parcel.trackingRef}`, return_url: returnUrl, notify_url: notifyUrl, customer_id: userId, channels: channelMap[paymentMethod] ?? "ALL" }),
+    });
+    const cpData = await cpRes.json() as { code: string; message: string; data?: { payment_url?: string } };
+    if (cpData.code !== "201") { res.status(502).json({ error: "CinetPay: " + (cpData.message ?? "Erreur inconnue") }); return; }
+
+    res.json({ demo: false, transactionId: txId, paymentUrl: cpData.data?.payment_url ?? "", amount: parcel.amount, currency: "XOF", trackingRef: parcel.trackingRef });
+  } catch (err) {
+    console.error("[PAYMENT] init-parcel error:", err);
+    res.status(500).json({ error: "Erreur lors de l'initialisation du paiement colis" });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   GET /payment/demo-redirect-parcel
+──────────────────────────────────────────────────────────────────────── */
+router.get("/demo-redirect-parcel", async (req: Request, res: Response) => {
+  if (!DEMO_MODE) { res.status(404).json({ error: "Disponible en mode démo uniquement" }); return; }
+  const { parcelId, txId, amount, method } = req.query as { parcelId?: string; txId?: string; amount?: string; method?: string };
+  if (!parcelId || !txId) { res.status(400).send("Paramètres manquants"); return; }
+
+  try {
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, parcelId)).limit(1);
+    if (!rows.length) { res.status(404).send("Colis introuvable"); return; }
+    const parcel = rows[0];
+
+    if (parcel.paymentStatus === "paid") {
+      res.send(buildParcelSuccessHtml(parcel.trackingRef, Number(amount || parcel.amount), txId, true));
+      return;
+    }
+
+    const commission = Math.round(parcel.amount * 0.1);
+    await db.update(parcelsTable)
+      .set({ paymentStatus: "paid", commissionAmount: commission, paymentMethod: method || parcel.paymentMethod })
+      .where(eq(parcelsTable.id, parcelId));
+
+    /* Record in payments table */
+    const payId = generateId();
+    await db.insert(paymentsTable).values({
+      id: payId, userId: parcel.userId, refId: parcelId, refType: "parcel",
+      amount: Number(amount || parcel.amount), method: method || parcel.paymentMethod,
+      status: "paid", transactionId: txId,
+    }).catch(() => {});
+
+    /* Notification */
+    await db.insert(notificationsTable).values({
+      id: generateId(), userId: parcel.userId, type: "payment_success",
+      title: "Colis confirmé ✅",
+      message: `Votre colis ${parcel.trackingRef} (${parcel.fromCity} → ${parcel.toCity}) est confirmé. Montant payé : ${Number(amount || parcel.amount).toLocaleString()} FCFA.`,
+      read: false, refId: payId, refType: "payment",
+    }).catch(() => {});
+
+    const userRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+    if (userRows[0]?.pushToken) {
+      sendExpoPush(userRows[0].pushToken, "Colis confirmé ✅", `Votre colis ${parcel.trackingRef} est enregistré. Bon envoi !`).catch(() => {});
+    }
+
+    console.log(`[PAYMENT DEMO] ✅ Parcel ${parcel.trackingRef} confirmed — commission: ${commission} FCFA`);
+    res.send(buildParcelSuccessHtml(parcel.trackingRef, Number(amount || parcel.amount), txId, false));
+  } catch (err) {
+    console.error("[PAYMENT DEMO] parcel redirect error:", err);
+    res.status(500).send("Erreur lors de la confirmation");
+  }
+});
+
+function buildParcelSuccessHtml(trackingRef: string, amount: number, txId: string, alreadyPaid: boolean): string {
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Colis confirmé</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#EFF6FF 0%,#DBEAFE 100%);padding:24px}.card{background:white;border-radius:24px;padding:40px 32px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.12);text-align:center}.circle{width:88px;height:88px;border-radius:50%;background:#DBEAFE;display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 20px}h1{color:#1E3A8A;font-size:24px;margin-bottom:8px}p{color:#4B5563;font-size:14px;line-height:1.5;margin-bottom:20px}.ref{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 20px;margin-bottom:8px}.ref-label{font-size:10px;color:#6B7280;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}.ref-value{font-size:22px;font-weight:700;color:#1E3A8A}.amount{font-size:16px;font-weight:600;color:#6B7280;margin-bottom:24px}.btn{display:block;background:#0369A1;color:white;border:none;padding:14px 28px;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;text-decoration:none;width:100%}</style></head><body><div class="card"><div class="circle">${alreadyPaid ? "📦" : "🎉"}</div><h1>Colis ${alreadyPaid ? "déjà confirmé" : "confirmé !"}</h1><p>Votre colis est enregistré et sera pris en charge prochainement.</p><div class="ref"><div class="ref-label">Référence de suivi</div><div class="ref-value">${trackingRef}</div></div><div class="amount">${amount.toLocaleString()} FCFA · ${txId}</div></div></body></html>`;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   POST /payment/verify-parcel
+   Mobile polls this after returning from parcel payment page.
+──────────────────────────────────────────────────────────────────────── */
+router.post("/verify-parcel", async (req: Request, res: Response) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Non authentifié" }); return; }
+
+    const { parcelId } = req.body as { parcelId?: string };
+    if (!parcelId) { res.status(400).json({ error: "parcelId requis" }); return; }
+
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, parcelId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Colis introuvable" }); return; }
+    const parcel = rows[0];
+    if (parcel.userId !== userId) { res.status(403).json({ error: "Non autorisé" }); return; }
+
+    let paymentId: string | null = null;
+    if (parcel.paymentStatus === "paid") {
+      const payments = await db.select({ id: paymentsTable.id })
+        .from(paymentsTable)
+        .where(and(eq(paymentsTable.refId, parcelId), eq(paymentsTable.status, "paid")))
+        .orderBy(desc(paymentsTable.createdAt)).limit(1);
+      paymentId = payments[0]?.id ?? null;
+    }
+
+    res.json({ parcelId: parcel.id, trackingRef: parcel.trackingRef, paymentStatus: parcel.paymentStatus, paid: parcel.paymentStatus === "paid", paymentId });
+  } catch (err) {
+    console.error("[PAYMENT] verify-parcel error:", err);
+    res.status(500).json({ error: "Erreur de vérification" });
+  }
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
    GET /payment/receipts
    List all payment receipts for the authenticated user.
 ──────────────────────────────────────────────────────────────────────── */
@@ -282,39 +505,31 @@ router.get("/receipts", async (req: Request, res: Response) => {
       .where(eq(paymentsTable.userId, userId))
       .orderBy(desc(paymentsTable.createdAt));
 
-    /* Enrich with booking details */
+    /* Enrich with booking/parcel details */
     const enriched = await Promise.all(payments.map(async (p) => {
-      if (p.refType !== "booking") return { ...p, booking: null };
-      const bookings = await db
-        .select({
-          bookingRef:  bookingsTable.bookingRef,
-          seatNumbers: bookingsTable.seatNumbers,
-          totalAmount: bookingsTable.totalAmount,
-          status:      bookingsTable.status,
-          tripId:      bookingsTable.tripId,
-        })
-        .from(bookingsTable).where(eq(bookingsTable.id, p.refId)).limit(1);
+      if (p.refType === "booking") {
+        const bookings = await db
+          .select({ bookingRef: bookingsTable.bookingRef, seatNumbers: bookingsTable.seatNumbers, totalAmount: bookingsTable.totalAmount, status: bookingsTable.status, paymentStatus: bookingsTable.paymentStatus, tripId: bookingsTable.tripId })
+          .from(bookingsTable).where(eq(bookingsTable.id, p.refId)).limit(1);
 
-      if (!bookings.length) return { ...p, booking: null };
-      const b = bookings[0];
+        if (!bookings.length) return { ...p, booking: null, parcel: null };
+        const b = bookings[0];
+        const trips = await db
+          .select({ from: tripsTable.from, to: tripsTable.to, date: tripsTable.date, departureTime: tripsTable.departureTime })
+          .from(tripsTable).where(eq(tripsTable.id, b.tripId ?? "")).limit(1);
+        const t = trips[0] ?? null;
+        return { ...p, booking: { bookingRef: b.bookingRef, seatNumbers: b.seatNumbers, status: b.status, paymentStatus: b.paymentStatus, from: t?.from ?? "—", to: t?.to ?? "—", date: t?.date ?? "—", departureTime: t?.departureTime ?? "—" }, parcel: null };
+      }
 
-      const trips = await db
-        .select({ from: tripsTable.from, to: tripsTable.to, date: tripsTable.date, departureTime: tripsTable.departureTime })
-        .from(tripsTable).where(eq(tripsTable.id, b.tripId ?? "")).limit(1);
-      const t = trips[0] ?? null;
+      if (p.refType === "parcel") {
+        const parcels = await db.select({ trackingRef: parcelsTable.trackingRef, fromCity: parcelsTable.fromCity, toCity: parcelsTable.toCity, status: parcelsTable.status, paymentStatus: parcelsTable.paymentStatus, parcelType: parcelsTable.parcelType })
+          .from(parcelsTable).where(eq(parcelsTable.id, p.refId)).limit(1);
+        if (!parcels.length) return { ...p, booking: null, parcel: null };
+        const c = parcels[0];
+        return { ...p, booking: null, parcel: { trackingRef: c.trackingRef, from: c.fromCity, to: c.toCity, status: c.status, paymentStatus: c.paymentStatus, parcelType: c.parcelType } };
+      }
 
-      return {
-        ...p,
-        booking: {
-          bookingRef:  b.bookingRef,
-          seatNumbers: b.seatNumbers,
-          status:      b.status,
-          from:        t?.from ?? "—",
-          to:          t?.to ?? "—",
-          date:        t?.date ?? "—",
-          departureTime: t?.departureTime ?? "—",
-        },
-      };
+      return { ...p, booking: null, parcel: null };
     }));
 
     res.json(enriched);

@@ -96,15 +96,15 @@ export default function ParcelPaymentScreen() {
   const handlePay = async () => {
     setLoading(true);
     try {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      // Generate the ref client-side so it's available immediately
       const clientRef = generateTrackingRef();
       let confirmedRef = clientRef;
+      let parcelId: string | null = null;
 
-      // Save to DB and let the server confirm (or keep) the tracking ref
       if (token) {
         try {
+          /* Create parcel with paymentStatus=pending so CinetPay flow can confirm it */
           const saved = await apiFetch<{ trackingRef: string; id: string }>("/parcels", {
             method: "POST",
             token,
@@ -121,21 +121,31 @@ export default function ParcelPaymentScreen() {
               deliveryType: parcel.deliveryType,
               paymentMethod: method,
               trackingRef: clientRef,
+              paymentStatus: "pending",
             }),
           });
-          // Use the ref the server actually stored
           if (saved?.trackingRef) confirmedRef = saved.trackingRef;
+          if (saved?.id) parcelId = saved.id;
         } catch {
-          // API failed — the client ref will still work via context fallback
+          /* API unavailable — fall back to local confirmation */
         }
       }
 
       updateParcel({ paymentMethod: method, trackingRef: confirmedRef });
 
-      router.replace({
-        pathname: "/parcel/confirmation/[parcelId]",
-        params: { parcelId: "local", trackingRef: confirmedRef },
-      });
+      /* If we have a parcelId from server, go through the CinetPay payment flow */
+      if (parcelId) {
+        router.replace({
+          pathname: "/parcel/cinetpay",
+          params: { parcelId, amount: String(parcel.amount ?? 0), trackingRef: confirmedRef },
+        });
+      } else {
+        /* Offline / unauthenticated — go straight to local confirmation */
+        router.replace({
+          pathname: "/parcel/confirmation/[parcelId]",
+          params: { parcelId: "local", trackingRef: confirmedRef },
+        });
+      }
     } catch {
       const trackingRef = generateTrackingRef();
       updateParcel({ paymentMethod: method, trackingRef });

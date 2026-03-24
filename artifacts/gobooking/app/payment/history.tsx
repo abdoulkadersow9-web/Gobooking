@@ -24,8 +24,15 @@ const METHOD_LABELS: Record<string, { label: string; color: string; emoji: strin
   card:   { label: "Carte bancaire",color: "#1A56DB", emoji: "💳" },
 };
 
+const STATUS_BADGE: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  paid:    { label: "Payé",    color: "#065F46", bg: "#D1FAE5", icon: "check-circle" },
+  pending: { label: "En attente", color: "#92400E", bg: "#FEF3C7", icon: "clock" },
+  failed:  { label: "Échoué", color: "#991B1B", bg: "#FEE2E2", icon: "x-circle" },
+};
+
 interface PaymentItem {
   id: string;
+  refType: string;
   transactionId: string | null;
   amount: number;
   method: string;
@@ -38,6 +45,15 @@ interface PaymentItem {
     date: string;
     departureTime: string;
     status: string;
+    paymentStatus?: string;
+  } | null;
+  parcel: {
+    trackingRef: string;
+    from: string;
+    to: string;
+    status: string;
+    paymentStatus?: string;
+    parcelType?: string;
   } | null;
 }
 
@@ -69,29 +85,37 @@ export default function PaymentHistoryScreen() {
 
   const renderItem = ({ item }: { item: PaymentItem }) => {
     const m = METHOD_LABELS[item.method] ?? { label: item.method, color: "#6B7280", emoji: "💳" };
-    const date = new Date(item.createdAt).toLocaleDateString("fr-FR", {
-      day: "2-digit", month: "short", year: "numeric",
-    });
+    const date = new Date(item.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
     const time = new Date(item.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const isParcel = item.refType === "parcel";
+
+    /* Derive effective paymentStatus from nested booking/parcel or from payment record itself */
+    const payStatus = isParcel
+      ? (item.parcel?.paymentStatus ?? item.status)
+      : (item.booking?.paymentStatus ?? item.status);
+    const badge = STATUS_BADGE[payStatus] ?? STATUS_BADGE.paid;
 
     return (
       <Pressable
         style={({ pressed }) => [ss.card, pressed && { opacity: 0.88 }]}
-        onPress={() => {
-          Haptics.selectionAsync();
-          router.push({ pathname: "/payment/receipt/[id]", params: { id: item.id } });
-        }}
+        onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/payment/receipt/[id]", params: { id: item.id } }); }}
       >
         <View style={ss.cardLeft}>
-          <View style={[ss.methodIcon, { backgroundColor: m.color + "20" }]}>
-            <Text style={{ fontSize: 22 }}>{m.emoji}</Text>
+          <View style={[ss.methodIcon, { backgroundColor: isParcel ? "#DBEAFE" : m.color + "20" }]}>
+            {isParcel
+              ? <Feather name="package" size={22} color="#1D4ED8" />
+              : <Text style={{ fontSize: 22 }}>{m.emoji}</Text>
+            }
           </View>
           <View style={{ flex: 1 }}>
-            {item.booking ? (
+            {isParcel && item.parcel ? (
               <>
-                <Text style={ss.route} numberOfLines={1}>
-                  {item.booking.from} → {item.booking.to}
-                </Text>
+                <Text style={ss.route} numberOfLines={1}>📦 {item.parcel.from} → {item.parcel.to}</Text>
+                <Text style={ss.ref} numberOfLines={1}>{item.parcel.trackingRef}</Text>
+              </>
+            ) : item.booking ? (
+              <>
+                <Text style={ss.route} numberOfLines={1}>{item.booking.from} → {item.booking.to}</Text>
                 <Text style={ss.ref} numberOfLines={1}>#{item.booking.bookingRef} · {item.booking.date}</Text>
               </>
             ) : (
@@ -106,9 +130,9 @@ export default function PaymentHistoryScreen() {
         </View>
         <View style={ss.cardRight}>
           <Text style={ss.amount}>{item.amount.toLocaleString()} F</Text>
-          <View style={ss.paidBadge}>
-            <Feather name="check-circle" size={10} color="#065F46" />
-            <Text style={ss.paidText}>Payé</Text>
+          <View style={[ss.statusBadge, { backgroundColor: badge.bg }]}>
+            <Feather name={badge.icon as never} size={10} color={badge.color} />
+            <Text style={[ss.statusText, { color: badge.color }]}>{badge.label}</Text>
           </View>
           <Feather name="chevron-right" size={16} color="#CBD5E1" style={{ marginTop: 4 }} />
         </View>
@@ -179,8 +203,8 @@ const ss = StyleSheet.create({
   dateLabel:    { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
   cardRight:    { alignItems: "flex-end", gap: 2 },
   amount:       { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0B3C5D" },
-  paidBadge:    { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
-  paidText:     { fontSize: 10, fontFamily: "Inter_700Bold", color: "#065F46" },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 3, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  statusText:   { fontSize: 10, fontFamily: "Inter_700Bold" },
   emptyIcon:    { width: 72, height: 72, borderRadius: 36, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle:   { fontSize: 18, fontFamily: "Inter_600SemiBold", color: "#374151" },
   emptySub:     { fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center", maxWidth: 260, lineHeight: 19 },
