@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, bookingsTable, tripsTable, seatsTable, usersTable } from "@workspace/db";
+import { db, bookingsTable, tripsTable, seatsTable, usersTable, parcelsTable, companiesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
@@ -25,9 +25,13 @@ router.get("/stats", async (req, res) => {
       return;
     }
 
-    const allBookings = await db.select().from(bookingsTable);
-    const allUsers = await db.select().from(usersTable);
-    const allTrips = await db.select().from(tripsTable);
+    const [allBookings, allUsers, allTrips, allParcels, allCompanies] = await Promise.all([
+      db.select().from(bookingsTable),
+      db.select().from(usersTable),
+      db.select().from(tripsTable),
+      db.select().from(parcelsTable),
+      db.select().from(companiesTable),
+    ]);
 
     const today = new Date().toISOString().split("T")[0];
     const todayBookings = allBookings.filter((b) =>
@@ -35,14 +39,14 @@ router.get("/stats", async (req, res) => {
     );
 
     const totalRevenue = allBookings
-      .filter((b) => b.status !== "cancelled")
+      .filter((b) => b.status !== "cancelled" && b.status !== "annulé")
       .reduce((sum, b) => sum + b.totalAmount, 0);
 
     const todayRevenue = todayBookings
-      .filter((b) => b.status !== "cancelled")
+      .filter((b) => b.status !== "cancelled" && b.status !== "annulé")
       .reduce((sum, b) => sum + b.totalAmount, 0);
 
-    const activeTrips = allTrips.length;
+    const activeTrips = allTrips.filter((t) => t.status === "active" || t.status === "en_route").length;
 
     const recentBookings = await Promise.all(
       allBookings
@@ -66,16 +70,30 @@ router.get("/stats", async (req, res) => {
         })
     );
 
-    res.json({
-      totalBookings: allBookings.length,
+    const statsPayload = {
+      totalBookings:   allBookings.length,
       totalRevenue,
-      totalUsers: allUsers.length,
-      totalTrips: allTrips.length,
+      totalUsers:      allUsers.length,
+      totalTrips:      allTrips.length,
+      totalParcels:    allParcels.length,
+      totalCompanies:  allCompanies.length,
       activeTrips,
-      todayBookings: todayBookings.length,
+      todayBookings:   todayBookings.length,
       todayRevenue,
       recentBookings,
-    });
+      /* snake_case aliases for mobile screen compatibility */
+      total_bookings:  allBookings.length,
+      total_revenue:   totalRevenue,
+      total_users:     allUsers.length,
+      total_trips:     allTrips.length,
+      total_parcels:   allParcels.length,
+      total_companies: allCompanies.length,
+      active_trips:    activeTrips,
+      bookings_today:  todayBookings.length,
+      revenue_today:   todayRevenue,
+    };
+
+    res.json(statsPayload);
   } catch (err) {
     console.error("Admin stats error:", err);
     res.status(500).json({ error: "Failed to get stats" });

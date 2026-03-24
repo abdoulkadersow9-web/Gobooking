@@ -1643,8 +1643,8 @@ router.post("/alert", async (req, res) => {
     const resolvedBusId = busId ?? agentRow?.busId;
     let busName: string | undefined;
     if (resolvedBusId) {
-      const buses = await db.select({ name: busesTable.name }).from(busesTable).where(eq(busesTable.id, resolvedBusId)).limit(1);
-      busName = buses[0]?.name;
+      const buses = await db.select({ busName: busesTable.busName }).from(busesTable).where(eq(busesTable.id, resolvedBusId)).limit(1);
+      busName = buses[0]?.busName;
     }
 
     const alertId = Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
@@ -1708,6 +1708,50 @@ router.post("/alert", async (req, res) => {
     res.json({ success: true, alertId });
   } catch (err) {
     console.error("Alert error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/incident — Signalement incident en route (accident/panne/obstacle/controle) */
+router.post("/incident", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId, type, lat, lon, description } = req.body as {
+      tripId?: string; type: string;
+      lat?: number; lon?: number; description?: string;
+    };
+
+    if (!type) { res.status(400).json({ error: "Type requis" }); return; }
+
+    const agentRows = await db.select({
+      companyId: agentsTable.companyId,
+      busId:     agentsTable.busId,
+    }).from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRow = agentRows[0];
+
+    const incidentId = Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+
+    await db.insert(agentAlertsTable).values({
+      id:        incidentId,
+      type:      "urgence",
+      agentId:   user.id,
+      agentName: user.name,
+      companyId: agentRow?.companyId ?? null,
+      tripId:    tripId ?? null,
+      busId:     agentRow?.busId ?? null,
+      busName:   null,
+      lat:       typeof lat === "number" ? lat : null,
+      lon:       typeof lon === "number" ? lon : null,
+      message:   `Incident [${type}]${description ? `: ${description}` : ""}`,
+      status:    "active",
+    });
+
+    console.log(`[Incident] 🚨 ${type.toUpperCase()} — agent: ${user.name} tripId: ${tripId}`);
+    res.json({ success: true, incidentId });
+  } catch (err) {
+    console.error("Incident error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

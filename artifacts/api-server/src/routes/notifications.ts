@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { sql } from "drizzle-orm";
+import { db, notificationsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
 import { tokenStore } from "./auth";
 
 const router: IRouter = Router();
@@ -17,15 +17,23 @@ router.get("/", async (req, res) => {
     const userId = getUserIdFromToken(req.headers.authorization);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const rows = await db.execute(sql`
-      SELECT id, user_id, type, title, message, data, read, created_at
-      FROM notifications
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
-      LIMIT 50
-    `);
+    const rows = await db
+      .select()
+      .from(notificationsTable)
+      .where(eq(notificationsTable.userId, userId))
+      .orderBy(desc(notificationsTable.createdAt))
+      .limit(50);
 
-    res.json(rows.rows);
+    res.json(rows.map((n) => ({
+      id:        n.id,
+      type:      n.type,
+      title:     n.title,
+      message:   n.message,
+      read:      n.read,
+      refId:     n.refId,
+      refType:   n.refType,
+      createdAt: n.createdAt?.toISOString() ?? new Date().toISOString(),
+    })));
   } catch (err) {
     console.error("Get notifications error:", err);
     res.status(500).json({ error: "Failed" });
@@ -38,12 +46,13 @@ router.get("/unread-count", async (req, res) => {
     const userId = getUserIdFromToken(req.headers.authorization);
     if (!userId) { res.json({ count: 0 }); return; }
 
-    const rows = await db.execute(sql`
-      SELECT COUNT(*) as count FROM notifications
-      WHERE user_id = ${userId} AND read = false
-    `);
+    const rows = await db
+      .select()
+      .from(notificationsTable)
+      .where(eq(notificationsTable.userId, userId));
 
-    res.json({ count: Number((rows.rows[0] as any)?.count ?? 0) });
+    const count = rows.filter((n) => !n.read).length;
+    res.json({ count });
   } catch {
     res.json({ count: 0 });
   }
@@ -55,9 +64,10 @@ router.patch("/read-all", async (req, res) => {
     const userId = getUserIdFromToken(req.headers.authorization);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    await db.execute(sql`
-      UPDATE notifications SET read = true WHERE user_id = ${userId}
-    `);
+    await db
+      .update(notificationsTable)
+      .set({ read: true })
+      .where(eq(notificationsTable.userId, userId));
 
     res.json({ success: true });
   } catch (err) {
@@ -72,10 +82,10 @@ router.patch("/:id/read", async (req, res) => {
     const userId = getUserIdFromToken(req.headers.authorization);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    await db.execute(sql`
-      UPDATE notifications SET read = true
-      WHERE id = ${req.params.id} AND user_id = ${userId}
-    `);
+    await db
+      .update(notificationsTable)
+      .set({ read: true })
+      .where(eq(notificationsTable.id, req.params.id));
 
     res.json({ success: true });
   } catch (err) {
