@@ -157,7 +157,7 @@ artifacts/
       admin.ts         # GET /stats, /bookings, /trips, /users
       parcels.ts       # Parcel CRUD + status updates
       superadmin.ts    # Super admin stats, companies, cities, users
-      company.ts       # Company stats, buses, agents, routes
+      company.ts       # Company stats, buses, agents, routes, customers, SMS marketing
       agent.ts         # Agent boarding, parcel pickup/transit/deliver
       index.ts         # Route aggregator
 
@@ -165,7 +165,8 @@ lib/
   db/                  # Shared Drizzle schema + db client
     src/schema/
       index.ts         # users, trips, seats, bookings, parcels,
-                       # companies, buses, agents, cities, payments, notifications
+                       # companies, buses, agents, cities, payments, notifications,
+                       # agent_alerts, sms_logs
 ```
 
 ## Demo Accounts (all password: test123)

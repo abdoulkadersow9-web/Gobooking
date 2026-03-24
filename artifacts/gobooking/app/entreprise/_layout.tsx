@@ -29,6 +29,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="live-tracking" />
       <Stack.Screen name="alertes" />
       <Stack.Screen name="analytiques" />
+      <Stack.Screen name="sms" />
     </Stack>
   );
 }

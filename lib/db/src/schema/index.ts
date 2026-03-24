@@ -21,3 +21,4 @@ export * from "./referrals";
 export * from "./promos";
 export * from "./scans";
 export * from "./agent_alerts";
+export * from "./sms_logs";

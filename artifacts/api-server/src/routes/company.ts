@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable } from "@workspace/db";
-import { eq, desc, and, inArray, gte, sql } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable } from "@workspace/db";
+import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
+import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
 import { locationStore } from "../locationStore";
 
@@ -1340,6 +1341,195 @@ router.get("/scan-stats", async (req, res) => {
   } catch (err) {
     console.error("Scan stats error:", err);
     res.status(500).json({ error: "Erreur stats scan" });
+  }
+});
+
+/* ─────────────── CUSTOMERS (base clients fidélité) ─────────────── */
+
+router.get("/customers", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+
+    /* Trajets de la compagnie */
+    const trips = await db.select({ id: tripsTable.id })
+      .from(tripsTable).where(eq(tripsTable.companyId, companyId));
+    const tripIds = trips.map(t => t.id);
+
+    if (tripIds.length === 0) { res.json([]); return; }
+
+    /* Réservations sur ces trajets */
+    const bookings = await db.select({
+      userId:       bookingsTable.userId,
+      totalAmount:  bookingsTable.totalAmount,
+      status:       bookingsTable.status,
+      createdAt:    bookingsTable.createdAt,
+      tripId:       bookingsTable.tripId,
+      contactPhone: bookingsTable.contactPhone,
+    }).from(bookingsTable).where(inArray(bookingsTable.tripId, tripIds));
+
+    /* Agréger par userId */
+    const map = new Map<string, {
+      userId: string; tripCount: number; totalSpent: number;
+      lastTrip: Date; phones: Set<string>;
+    }>();
+
+    for (const b of bookings) {
+      if (b.status === "cancelled") continue;
+      const existing = map.get(b.userId);
+      if (existing) {
+        existing.tripCount++;
+        existing.totalSpent += b.totalAmount;
+        if (b.createdAt > existing.lastTrip) existing.lastTrip = b.createdAt;
+        if (b.contactPhone) existing.phones.add(b.contactPhone);
+      } else {
+        map.set(b.userId, {
+          userId: b.userId, tripCount: 1, totalSpent: b.totalAmount,
+          lastTrip: b.createdAt, phones: new Set(b.contactPhone ? [b.contactPhone] : []),
+        });
+      }
+    }
+
+    /* Enrichir avec les données utilisateur */
+    const userIds = [...map.keys()];
+    const users = userIds.length
+      ? await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
+          .from(usersTable).where(inArray(usersTable.id, userIds))
+      : [];
+
+    const usersById = new Map(users.map(u => [u.id, u]));
+    const now = new Date();
+    const cutoffRecent  = new Date(now.getTime() - 30  * 24 * 60 * 60 * 1000); // 30 jours
+    const cutoffInactive = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); // 90 jours
+
+    const customers = [...map.values()].map(c => {
+      const user = usersById.get(c.userId);
+      const phone = user?.phone ?? [...c.phones][0] ?? "";
+      let segment = "recent";
+      if (c.tripCount >= 5) segment = "loyal";
+      else if (c.lastTrip < cutoffInactive) segment = "inactive";
+      else if (c.lastTrip >= cutoffRecent) segment = "recent";
+      else segment = "inactive";
+
+      return {
+        userId:     c.userId,
+        name:       user?.name ?? "Client inconnu",
+        email:      user?.email ?? "",
+        phone,
+        tripCount:  c.tripCount,
+        totalSpent: Math.round(c.totalSpent),
+        lastTrip:   c.lastTrip,
+        segment,
+      };
+    });
+
+    customers.sort((a, b) => b.tripCount - a.tripCount);
+    res.json(customers);
+  } catch (err) {
+    console.error("Customers error:", err);
+    res.status(500).json({ error: "Erreur chargement clients" });
+  }
+});
+
+/* ─────────────── SMS — ENVOI ─────────────── */
+
+router.post("/sms/send", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId, user } = ctx;
+
+    const { message, segment } = req.body as { message: string; segment: string };
+    if (!message?.trim()) { res.status(400).json({ error: "Message requis" }); return; }
+    if (!["all", "loyal", "recent", "inactive"].includes(segment)) {
+      res.status(400).json({ error: "Segment invalide" }); return;
+    }
+
+    /* Charger la base clients */
+    const trips = await db.select({ id: tripsTable.id })
+      .from(tripsTable).where(eq(tripsTable.companyId, companyId));
+    const tripIds = trips.map(t => t.id);
+
+    let phones: string[] = [];
+    if (tripIds.length > 0) {
+      const bookings = await db.select({
+        userId: bookingsTable.userId, contactPhone: bookingsTable.contactPhone,
+        totalAmount: bookingsTable.totalAmount, status: bookingsTable.status, createdAt: bookingsTable.createdAt,
+      }).from(bookingsTable).where(inArray(bookingsTable.tripId, tripIds));
+
+      const now = new Date();
+      const cutoffRecent   = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const cutoffInactive = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      const map = new Map<string, { count: number; lastTrip: Date; phone: string }>();
+      for (const b of bookings) {
+        if (b.status === "cancelled" || !b.contactPhone) continue;
+        const ex = map.get(b.userId);
+        if (ex) {
+          ex.count++;
+          if (b.createdAt > ex.lastTrip) ex.lastTrip = b.createdAt;
+        } else {
+          map.set(b.userId, { count: 1, lastTrip: b.createdAt, phone: b.contactPhone });
+        }
+      }
+
+      const filtered = [...map.values()].filter(c => {
+        if (segment === "all") return true;
+        if (segment === "loyal") return c.count >= 5;
+        if (segment === "recent") return c.count < 5 && c.lastTrip >= cutoffRecent;
+        if (segment === "inactive") return c.lastTrip < cutoffInactive;
+        return false;
+      });
+
+      phones = [...new Set(filtered.map(c => c.phone))];
+    }
+
+    /* Envoyer les SMS */
+    const { sent, failed } = phones.length > 0
+      ? await sendBulkSMS(phones, message)
+      : { sent: 0, failed: 0 };
+
+    /* Récupérer le nom de la compagnie */
+    const [company] = await db.select({ name: companiesTable.name })
+      .from(companiesTable).where(eq(companiesTable.id, companyId)).limit(1);
+
+    /* Logger */
+    await db.insert(smsLogsTable).values({
+      id:          `sms-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      companyId,
+      companyName: company?.name ?? null,
+      segment,
+      message:     message.trim(),
+      recipients:  sent,
+      status:      failed > 0 && sent === 0 ? "failed" : "sent",
+      sentBy:      user.id,
+    });
+
+    res.json({ sent, failed, total: phones.length });
+  } catch (err) {
+    console.error("SMS send error:", err);
+    res.status(500).json({ error: "Erreur envoi SMS" });
+  }
+});
+
+/* ─────────────── SMS — HISTORIQUE ─────────────── */
+
+router.get("/sms/logs", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+
+    const logs = await db.select().from(smsLogsTable)
+      .where(eq(smsLogsTable.companyId, companyId))
+      .orderBy(desc(smsLogsTable.createdAt))
+      .limit(100);
+
+    res.json(logs);
+  } catch (err) {
+    console.error("SMS logs error:", err);
+    res.status(500).json({ error: "Erreur historique SMS" });
   }
 });
 
