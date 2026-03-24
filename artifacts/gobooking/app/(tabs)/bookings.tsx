@@ -32,31 +32,87 @@ interface Booking {
   };
   seatNumbers: string[];
   totalAmount: number;
-  status: "confirmed" | "cancelled" | "completed";
+  status: "pending" | "confirmed" | "boarded" | "cancelled" | "completed";
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
+  paymentMethod?: string;
   createdAt: string;
 }
 
-const STATUS_CONFIG = {
-  confirmed: { color: Colors.light.primary, bg: Colors.light.primaryLight, label: "Confirmé" },
-  cancelled: { color: Colors.light.error, bg: "#FEF2F2", label: "Annulé" },
-  completed: { color: Colors.light.success, bg: "#ECFDF5", label: "Terminé" },
-};
+/* ─── Computed 5-state status ─────────────────────────────────────────── */
+type DisplayState = "en_attente" | "confirmé" | "payé" | "embarqué" | "annulé";
 
-const PAY_CONFIG = {
-  paid:    { color: "#059669", bg: "#ECFDF5", label: "Payé", icon: "check-circle" as const },
-  pending: { color: "#D97706", bg: "#FFFBEB", label: "Paiement requis", icon: "alert-circle" as const },
-  failed:  { color: "#EF4444", bg: "#FEF2F2", label: "Paiement échoué", icon: "x-circle" as const },
-  refunded:{ color: "#6B7280", bg: "#F3F4F6", label: "Remboursé", icon: "rotate-ccw" as const },
+function computeState(b: Booking): DisplayState {
+  if (b.status === "cancelled") return "annulé";
+  if (b.status === "boarded" || b.status === "completed") return "embarqué";
+  if (b.status === "confirmed" && b.paymentStatus === "paid") return "payé";
+  if (b.status === "confirmed") return "confirmé";
+  return "en_attente";
+}
+
+const STATE_CONFIG: Record<DisplayState, { color: string; bg: string; label: string; icon: string }> = {
+  en_attente: { color: "#B45309", bg: "#FFFBEB", label: "En attente",  icon: "clock"         },
+  confirmé:   { color: "#0B3C5D", bg: "#E0F2FE", label: "Confirmé",    icon: "check"         },
+  payé:       { color: "#047857", bg: "#ECFDF5", label: "Payé",        icon: "check-circle"  },
+  embarqué:   { color: "#6D28D9", bg: "#F5F3FF", label: "Embarqué",    icon: "user-check"    },
+  annulé:     { color: "#DC2626", bg: "#FEF2F2", label: "Annulé",      icon: "x-circle"      },
 };
 
 const METHOD_LABELS: Record<string, string> = {
   orange: "Orange Money",
-  mtn: "MTN MoMo",
-  wave: "Wave",
-  card: "Carte bancaire",
+  mtn:    "MTN MoMo",
+  wave:   "Wave",
+  card:   "Carte bancaire",
 };
 
+/* ─── Timeline steps ──────────────────────────────────────────────────── */
+type Step = { key: DisplayState; label: string };
+const STEPS: Step[] = [
+  { key: "en_attente", label: "Réservé"   },
+  { key: "confirmé",   label: "Confirmé"  },
+  { key: "payé",       label: "Payé"      },
+  { key: "embarqué",   label: "Embarqué"  },
+];
+const STATE_ORDER: Record<DisplayState, number> = {
+  en_attente: 0, confirmé: 1, payé: 2, embarqué: 3, annulé: -1,
+};
+
+function BookingTimeline({ state }: { state: DisplayState }) {
+  if (state === "annulé") return null;
+  const cur = STATE_ORDER[state];
+  return (
+    <View style={tl.row}>
+      {STEPS.map((s, i) => {
+        const done    = STATE_ORDER[s.key] <= cur;
+        const active  = STATE_ORDER[s.key] === cur;
+        const cfg     = STATE_CONFIG[s.key];
+        return (
+          <React.Fragment key={s.key}>
+            <View style={tl.step}>
+              <View style={[tl.dot, done && { backgroundColor: cfg.color, borderColor: cfg.color }, active && tl.dotActive]}>
+                {done && <Feather name="check" size={8} color="white" />}
+              </View>
+              <Text style={[tl.label, done && { color: cfg.color, fontFamily: "Inter_600SemiBold" }]}>{s.label}</Text>
+            </View>
+            {i < STEPS.length - 1 && (
+              <View style={[tl.line, STATE_ORDER[STEPS[i + 1].key] <= cur && { backgroundColor: STATE_CONFIG[STEPS[i + 1].key].color }]} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+const tl = StyleSheet.create({
+  row:      { flexDirection: "row", alignItems: "flex-start", marginBottom: 12, paddingTop: 4 },
+  step:     { alignItems: "center", width: 56 },
+  dot:      { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
+  dotActive:{ borderWidth: 3 },
+  line:     { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 8 },
+  label:    { fontSize: 9, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 3, textAlign: "center" },
+});
+
+/* ─── Screen ──────────────────────────────────────────────────────────── */
 export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -77,22 +133,20 @@ export default function BookingsScreen() {
     }
   };
 
-  useEffect(() => {
-    fetch();
-  }, [token]);
+  useEffect(() => { fetch(); }, [token]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetch();
-  };
+  const onRefresh = () => { setRefreshing(true); fetch(); };
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 100 : insets.bottom + 100;
 
   const renderBooking = ({ item }: { item: Booking }) => {
-    const status = STATUS_CONFIG[item.status] || STATUS_CONFIG.confirmed;
-    const pay = PAY_CONFIG[item.paymentStatus] || PAY_CONFIG.pending;
-    const isPaid = item.paymentStatus === "paid";
+    const state   = computeState(item);
+    const cfg     = STATE_CONFIG[state];
+    const isPaid  = item.paymentStatus === "paid";
+    const needsPay = state === "confirmé";   /* confirmed by company but not yet paid */
+    const isWaiting = state === "en_attente"; /* created, not confirmed yet */
+
     return (
       <Pressable
         style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
@@ -101,20 +155,23 @@ export default function BookingsScreen() {
           router.push({ pathname: "/booking/[id]", params: { id: item.id } });
         }}
       >
+        {/* Header */}
         <View style={styles.cardHeader}>
           <View>
             <Text style={styles.refText}>#{item.bookingRef}</Text>
-            <Text style={styles.dateText}>{item.trip.date}</Text>
+            <Text style={styles.dateText}>{item.trip?.date ?? "—"}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
+            <Feather name={cfg.icon as any} size={11} color={cfg.color} />
+            <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
         </View>
 
+        {/* Route */}
         <View style={styles.routeRow}>
           <View style={styles.cityBlock}>
-            <Text style={styles.timeText}>{item.trip.departureTime}</Text>
-            <Text style={styles.cityText}>{item.trip.from}</Text>
+            <Text style={styles.timeText}>{item.trip?.departureTime ?? "—"}</Text>
+            <Text style={styles.cityText}>{item.trip?.from ?? "—"}</Text>
           </View>
           <View style={styles.routeMiddle}>
             <View style={styles.routeLine} />
@@ -122,24 +179,39 @@ export default function BookingsScreen() {
             <View style={styles.routeLine} />
           </View>
           <View style={[styles.cityBlock, { alignItems: "flex-end" }]}>
-            <Text style={styles.timeText}>{item.trip.arrivalTime}</Text>
-            <Text style={styles.cityText}>{item.trip.to}</Text>
+            <Text style={styles.timeText}>{item.trip?.arrivalTime ?? "—"}</Text>
+            <Text style={styles.cityText}>{item.trip?.to ?? "—"}</Text>
           </View>
         </View>
 
+        {/* Timeline (hidden for cancelled) */}
+        <BookingTimeline state={state} />
+
+        {/* Footer */}
         <View style={styles.cardFooter}>
-          <View style={[styles.payBadge, { backgroundColor: pay.bg }]}>
-            <Feather name={pay.icon} size={11} color={pay.color} />
-            <Text style={[styles.payBadgeText, { color: pay.color }]}>{pay.label}</Text>
+          <View>
+            {item.paymentMethod && isPaid && (
+              <View style={styles.methodRow}>
+                <Feather name="credit-card" size={11} color={Colors.light.textMuted} />
+                <Text style={styles.methodText}>{METHOD_LABELS[item.paymentMethod] ?? item.paymentMethod}</Text>
+              </View>
+            )}
+            {item.seatNumbers?.length > 0 && (
+              <View style={styles.seatRow}>
+                <Feather name="map-pin" size={11} color={Colors.light.textMuted} />
+                <Text style={styles.seatText}>Sièges : {item.seatNumbers.join(", ")}</Text>
+              </View>
+            )}
           </View>
           <Text style={[styles.amountText, { color: isPaid ? Colors.light.primary : "#D97706" }]}>
             {item.totalAmount.toLocaleString()} FCFA
           </Text>
         </View>
 
-        {!isPaid && (
+        {/* CTA: pay now if confirmed but not paid */}
+        {needsPay && (
           <Pressable
-            style={styles.payNowBtn}
+            style={[styles.ctaBtn, { backgroundColor: "#0B3C5D" }]}
             onPress={(e) => {
               e.stopPropagation?.();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -147,8 +219,16 @@ export default function BookingsScreen() {
             }}
           >
             <Feather name="credit-card" size={13} color="white" />
-            <Text style={styles.payNowText}>Payer maintenant</Text>
+            <Text style={styles.ctaText}>Payer maintenant</Text>
           </Pressable>
+        )}
+
+        {/* Info: waiting for company confirmation */}
+        {isWaiting && (
+          <View style={styles.waitingRow}>
+            <Feather name="info" size={11} color="#B45309" />
+            <Text style={styles.waitingText}>En attente de confirmation par la compagnie</Text>
+          </View>
         )}
       </Pressable>
     );
@@ -158,6 +238,9 @@ export default function BookingsScreen() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mes Réservations</Text>
+        {bookings.length > 0 && (
+          <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""}</Text>
+        )}
       </View>
 
       {loading ? (
@@ -179,10 +262,7 @@ export default function BookingsScreen() {
               <Feather name="bookmark" size={48} color={Colors.light.textMuted} />
               <Text style={styles.emptyTitle}>Aucune réservation</Text>
               <Text style={styles.emptySubtitle}>Vos réservations de voyage apparaîtront ici</Text>
-              <Pressable
-                style={styles.bookNowBtn}
-                onPress={() => router.push("/(tabs)")}
-              >
+              <Pressable style={styles.bookNowBtn} onPress={() => router.push("/(tabs)")}>
                 <Text style={styles.bookNowText}>Réserver un trajet</Text>
               </Pressable>
             </View>
@@ -194,172 +274,37 @@ export default function BookingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    paddingTop: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-    backgroundColor: Colors.light.card,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  card: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  refText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
-  },
-  dateText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 1,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  statusText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  routeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  cityBlock: {
-    flex: 1,
-  },
-  timeText: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
-  },
-  cityText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 2,
-  },
-  routeMiddle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  routeLine: {
-    width: 24,
-    height: 1,
-    backgroundColor: Colors.light.border,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  seatInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  seatText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
-  amountText: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.primary,
-  },
-  payBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  payBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-  },
-  payNowBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 10,
-    backgroundColor: "#D97706",
-    borderRadius: 10,
-    paddingVertical: 9,
-  },
-  payNowText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "white",
-  },
-  empty: {
-    alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.light.text,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.light.textSecondary,
-  },
-  bookNowBtn: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginTop: 8,
-  },
-  bookNowText: {
-    color: "white",
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
+  container:    { flex: 1, backgroundColor: Colors.light.background },
+  header:       { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: Colors.light.card, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  center:       { flex: 1, justifyContent: "center", alignItems: "center" },
+  card:         { backgroundColor: Colors.light.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  cardPressed:  { transform: [{ scale: 0.98 }] },
+  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  refText:      { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
+  dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  statusText:   { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  cityBlock:    { flex: 1 },
+  timeText:     { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  cityText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
+  routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
+  routeLine:    { width: 24, height: 1, backgroundColor: Colors.light.border },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
+  methodRow:    { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
+  methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textMuted },
+  seatRow:      { flexDirection: "row", alignItems: "center", gap: 4 },
+  seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  amountText:   { fontSize: 17, fontFamily: "Inter_700Bold" },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 10, borderRadius: 10, paddingVertical: 9 },
+  ctaText:      { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
+  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, backgroundColor: "#FFFBEB", borderRadius: 8, padding: 8 },
+  waitingText:  { fontSize: 11, fontFamily: "Inter_400Regular", color: "#B45309", flex: 1 },
+  empty:        { alignItems: "center", paddingTop: 80, gap: 12 },
+  emptyTitle:   { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
+  emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  bookNowBtn:   { backgroundColor: Colors.light.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12, marginTop: 8 },
+  bookNowText:  { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });

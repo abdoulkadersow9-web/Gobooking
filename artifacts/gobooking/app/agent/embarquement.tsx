@@ -316,6 +316,13 @@ export default function EmbarquementScreen() {
           ref:      e?.bookingRef,
           errorMsg: "Ce billet a déjà été validé — passager déjà embarqué.",
         });
+      } else if (code === "NOT_PAID") {
+        showScanResult({
+          type:     "refusé",
+          name:     e?.passenger?.name,
+          ref:      e?.bookingRef,
+          errorMsg: "Billet non payé — le passager doit régler son paiement avant d'embarquer.",
+        });
       } else {
         showScanResult({
           type:     "refusé",

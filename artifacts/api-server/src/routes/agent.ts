@@ -886,6 +886,16 @@ router.post("/scan", async (req, res) => {
       res.status(422).json({ error: "Réservation annulée — embarquement refusé", code: "CANCELLED" }); return;
     }
 
+    /* ── 3b. Block scan if booking not paid ── */
+    if (booking.paymentStatus !== "paid") {
+      res.status(402).json({
+        error:      "Paiement requis — ce billet n'a pas encore été payé",
+        code:       "NOT_PAID",
+        bookingRef: booking.bookingRef,
+        passenger:  { name: (Array.isArray(booking.passengers) ? (booking.passengers as any[])[0]?.name : null) ?? "—" },
+      }); return;
+    }
+
     /* ── 4. Fetch trip info ── */
     let trip = null;
     if (booking.tripId) {

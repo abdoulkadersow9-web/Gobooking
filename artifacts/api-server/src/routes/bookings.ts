@@ -279,13 +279,19 @@ router.post("/:bookingId/confirm", async (req, res) => {
       res.status(403).json({ error: "Non autorisé" });
       return;
     }
-    if (booking.status === "confirmed") {
+    if (booking.status === "boarded") {
       const full = await getFullBooking(bookingId);
       res.json(full);
       return;
     }
-    if (booking.status !== "pending") {
-      res.status(400).json({ error: `Impossible de confirmer une réservation "${booking.status}"` });
+    /* Accept payment on "pending" OR "confirmed" (company may have pre-confirmed) */
+    if (!["pending", "confirmed"].includes(booking.status)) {
+      res.status(400).json({ error: `Impossible de payer une réservation "${booking.status}"` });
+      return;
+    }
+    if (booking.paymentStatus === "paid") {
+      const full = await getFullBooking(bookingId);
+      res.json(full);
       return;
     }
 
@@ -556,7 +562,7 @@ router.post("/:bookingId/company-confirm", async (req, res) => {
     if (!bookings.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
 
     const booking = bookings[0];
-    if (booking.status === "confirmed") {
+    if (booking.status === "boarded") {
       const full = await getFullBooking(bookingId);
       res.json(full);
       return;
@@ -565,12 +571,23 @@ router.post("/:bookingId/company-confirm", async (req, res) => {
       res.status(400).json({ error: "Impossible de confirmer une réservation annulée" });
       return;
     }
+    /* Already confirmed — idempotent */
+    if (booking.status === "confirmed") {
+      const full = await getFullBooking(bookingId);
+      res.json(full);
+      return;
+    }
 
+    /* Company confirms the booking — does NOT set paymentStatus to "paid".
+       The client still needs to pay separately. Only credit the wallet
+       once the client actually pays (handled in /confirm endpoint). */
     await db.update(bookingsTable)
-      .set({ status: "confirmed", paymentStatus: "paid" })
+      .set({ status: "confirmed" })
       .where(eq(bookingsTable.id, bookingId));
 
-    await creditCompanyWallet(bookingId);
+    auditLog({ userId, userRole: "compagnie", req }, ACTIONS.BOOKING_CONFIRM, bookingId, "booking", {
+      bookingRef: booking.bookingRef, note: "company-confirm",
+    }).catch(() => {});
 
     const full = await getFullBooking(bookingId);
     res.json(full);
