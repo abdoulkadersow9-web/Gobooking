@@ -32,6 +32,9 @@ interface Trip {
   availableSeats: number;
   duration: string;
   amenities: string[];
+  companyId?: string | null;
+  companyName?: string | null;
+  companyCity?: string | null;
   isFallback?: boolean;
 }
 
@@ -124,11 +127,9 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 export default function SearchResultsScreen() {
   const insets = useSafeAreaInsets();
-  const { from, to, date, passengers } = useLocalSearchParams<{
-    from: string;
-    to: string;
-    date: string;
-    passengers: string;
+  const { from, to, date, passengers, companyId, companyName: paramCompanyName } = useLocalSearchParams<{
+    from: string; to: string; date: string; passengers: string;
+    companyId?: string; companyName?: string;
   }>();
   const { updateBooking } = useBooking();
 
@@ -145,17 +146,17 @@ export default function SearchResultsScreen() {
     const load = async () => {
       setUsingFallback(false);
       try {
-        const data = await apiFetch<Trip[]>(
-          `/trips/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}&passengers=${passengers}`
-        );
-        if (data.length === 0 && isAbidjanBouake) {
+        let url = `/trips/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}&passengers=${passengers}`;
+        if (companyId) url += `&companyId=${encodeURIComponent(companyId)}`;
+        const data = await apiFetch<Trip[]>(url);
+        if (data.length === 0 && isAbidjanBouake && !companyId) {
           setTrips(FALLBACK_TRIPS.map((t) => ({ ...t, date })));
           setUsingFallback(true);
         } else {
           setTrips(data);
         }
       } catch {
-        if (isAbidjanBouake) {
+        if (isAbidjanBouake && !companyId) {
           setTrips(FALLBACK_TRIPS.map((t) => ({ ...t, date })));
           setUsingFallback(true);
         } else {
@@ -166,7 +167,7 @@ export default function SearchResultsScreen() {
       }
     };
     load();
-  }, [from, to, date, passengers]);
+  }, [from, to, date, passengers, companyId]);
 
   const sorted = [...trips].sort((a, b) => {
     if (sortBy === "price") return a.price - b.price;
@@ -199,7 +200,8 @@ export default function SearchResultsScreen() {
   };
 
   const renderTrip = ({ item, index }: { item: Trip; index: number }) => {
-    const colors = getCompanyColor(item.busName);
+    const displayName = item.companyName ?? item.busName;
+    const colors = getCompanyColor(displayName);
     const isLowSeat = item.availableSeats <= 5;
 
     return (
@@ -211,10 +213,13 @@ export default function SearchResultsScreen() {
               colors={colors as [string, string]}
               style={styles.companyBadge}
             >
-              <Text style={styles.companyInitials}>{getInitials(item.busName)}</Text>
+              <Text style={styles.companyInitials}>{getInitials(displayName)}</Text>
             </LinearGradient>
             <View style={styles.companyInfo}>
-              <Text style={styles.companyName}>{item.busName}</Text>
+              <Text style={styles.companyName}>{displayName}</Text>
+              {item.companyCity && (
+                <Text style={{ fontSize: 11, color: "#94A3B8", marginBottom: 2 }}>{item.companyCity}</Text>
+              )}
               <View style={[
                 styles.typePill,
                 item.busType === "Premium" && styles.typePillPremium,
@@ -320,6 +325,20 @@ export default function SearchResultsScreen() {
           </Text>
         </View>
       </LinearGradient>
+
+      {/* Company filter chip */}
+      {!!companyId && !!paramCompanyName && (
+        <View style={styles.companyFilterBar}>
+          <Feather name="briefcase" size={13} color="#0B3C5D" />
+          <Text style={styles.companyFilterText}>{paramCompanyName}</Text>
+          <Pressable
+            onPress={() => router.setParams({ companyId: undefined, companyName: undefined })}
+            style={styles.companyFilterRemove}
+          >
+            <Feather name="x" size={13} color="#94A3B8" />
+          </Pressable>
+        </View>
+      )}
 
       {/* Sort Bar */}
       <View style={styles.sortBar}>
@@ -442,6 +461,13 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.75)",
     marginTop: 3,
   },
+  companyFilterBar: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "#EFF6FF", borderBottomWidth: 1, borderBottomColor: "#BFDBFE",
+    paddingHorizontal: 16, paddingVertical: 8,
+  },
+  companyFilterText: { flex: 1, fontSize: 13, fontWeight: "600", color: "#0B3C5D" },
+  companyFilterRemove: { padding: 4 },
   sortBar: {
     flexDirection: "row",
     alignItems: "center",

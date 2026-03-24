@@ -12,10 +12,12 @@ import firebaseBookingRouter from "./firebase-booking";
 import subscriptionsRouter from "./subscriptions";
 import growthRouter from "./growth";
 import paymentRouter from "./payment";
+import publicRouter from "./public";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(publicRouter);
 router.use("/auth", authRouter);
 router.use("/trips", tripsRouter);
 router.use("/bookings", bookingsRouter);

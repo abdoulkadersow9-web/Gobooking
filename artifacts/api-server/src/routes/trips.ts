@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
+import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable, busPositionsTable, boardingRequestsTable, companiesTable } from "@workspace/db";
 import { eq, and, ilike, inArray, desc, sql } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
@@ -34,18 +34,41 @@ function setLiveCache(key: string, data: unknown[], ttlMs = 30_000) {
 
 router.get("/search", async (req, res) => {
   try {
-    const { from, to, date } = req.query as { from: string; to: string; date: string };
+    const { from, to, date, companyId } = req.query as {
+      from: string; to: string; date: string; companyId?: string;
+    };
 
+    const conditions: ReturnType<typeof and>[] = [
+      ilike(tripsTable.from, `%${from}%`),
+      ilike(tripsTable.to, `%${to}%`),
+      eq(tripsTable.date, date),
+    ];
+    if (companyId) conditions.push(eq(tripsTable.companyId, companyId));
+
+    /* Join with companies to get real company names */
     const trips = await db
-      .select()
+      .select({
+        id:            tripsTable.id,
+        from:          tripsTable.from,
+        to:            tripsTable.to,
+        departureTime: tripsTable.departureTime,
+        arrivalTime:   tripsTable.arrivalTime,
+        date:          tripsTable.date,
+        price:         tripsTable.price,
+        busType:       tripsTable.busType,
+        busName:       tripsTable.busName,
+        totalSeats:    tripsTable.totalSeats,
+        duration:      tripsTable.duration,
+        amenities:     tripsTable.amenities,
+        companyId:     tripsTable.companyId,
+        status:        tripsTable.status,
+        companyName:   companiesTable.name,
+        companyCity:   companiesTable.city,
+        companyPhone:  companiesTable.phone,
+      })
       .from(tripsTable)
-      .where(
-        and(
-          ilike(tripsTable.from, `%${from}%`),
-          ilike(tripsTable.to, `%${to}%`),
-          eq(tripsTable.date, date)
-        )
-      );
+      .leftJoin(companiesTable, eq(tripsTable.companyId, companiesTable.id))
+      .where(and(...conditions));
 
     const tripsWithSeats = await Promise.all(
       trips.map(async (trip) => {
@@ -53,27 +76,28 @@ router.get("/search", async (req, res) => {
           .select()
           .from(seatsTable)
           .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
-        return {
-          ...trip,
-          availableSeats: seats.length,
-        };
+        return { ...trip, availableSeats: seats.length };
       })
     );
 
     res.json(tripsWithSeats.map((t) => ({
-      id: t.id,
-      from: t.from,
-      to: t.to,
+      id:            t.id,
+      from:          t.from,
+      to:            t.to,
       departureTime: t.departureTime,
-      arrivalTime: t.arrivalTime,
-      date: t.date,
-      price: t.price,
-      busType: t.busType,
-      busName: t.busName,
-      totalSeats: t.totalSeats,
+      arrivalTime:   t.arrivalTime,
+      date:          t.date,
+      price:         t.price,
+      busType:       t.busType,
+      busName:       t.busName,
+      totalSeats:    t.totalSeats,
       availableSeats: t.availableSeats,
-      duration: t.duration,
-      amenities: t.amenities,
+      duration:      t.duration,
+      amenities:     t.amenities,
+      companyId:     t.companyId ?? null,
+      companyName:   t.companyName ?? t.busName,
+      companyCity:   t.companyCity ?? null,
+      companyPhone:  t.companyPhone ?? null,
     })));
   } catch (err) {
     console.error("Search error:", err);

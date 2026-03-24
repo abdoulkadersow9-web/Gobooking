@@ -989,6 +989,14 @@ export default function HomeScreen() {
           <Text style={styles.quickSub}>Trajets & billets</Text>
         </Pressable>
 
+        <Pressable style={styles.quickCard} onPress={() => router.push("/client/compagnies" as never)}>
+          <LinearGradient colors={["#E0F2FE", "#BAE6FD"]} style={styles.quickIcon}>
+            <Feather name="briefcase" size={22} color="#0369A1" />
+          </LinearGradient>
+          <Text style={styles.quickLabel}>Compagnies</Text>
+          <Text style={styles.quickSub}>Opérateurs & trajets</Text>
+        </Pressable>
+
         <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/colis")}>
           <LinearGradient colors={["#ECFDF5", "#D1FAE5"]} style={styles.quickIcon}>
             <Feather name="package" size={22} color="#059669" />
