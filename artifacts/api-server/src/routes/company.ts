@@ -417,17 +417,21 @@ router.get("/rentabilite", async (req, res) => {
       return;
     }
 
-    /* Recettes réservations — all bookings for these trips */
+    /* Recettes réservations + passenger count per trip */
     const allBookings = await db.select({
       tripId: bookingsTable.tripId,
       totalAmount: bookingsTable.totalAmount,
       paymentStatus: bookingsTable.paymentStatus,
+      passengers: bookingsTable.passengers,
     }).from(bookingsTable).where(and(inArray(bookingsTable.tripId, tripIds), eq(bookingsTable.paymentStatus, "paid")));
 
     const bookingRev: Record<string, number> = {};
+    const bookedSeatsMap: Record<string, number> = {};
     for (const b of allBookings) {
       if (!b.tripId) continue;
       bookingRev[b.tripId] = (bookingRev[b.tripId] ?? 0) + (b.totalAmount ?? 0);
+      const pax = Array.isArray(b.passengers) ? b.passengers.length : 0;
+      bookedSeatsMap[b.tripId] = (bookedSeatsMap[b.tripId] ?? 0) + pax;
     }
 
     /* Recettes colis */
@@ -475,6 +479,8 @@ router.get("/rentabilite", async (req, res) => {
         status: t.status,
         totalRecettes, recettesReservations: recBil, recettesColis: recCol,
         totalDepenses, benefice,
+        bookedSeats: bookedSeatsMap[t.id] ?? 0,
+        totalSeats: t.totalSeats ?? 0,
         expenses: expenses.map(e => ({ id: e.id, type: e.type, amount: e.amount, description: e.description, date: e.date })),
       };
     });

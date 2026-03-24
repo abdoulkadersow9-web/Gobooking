@@ -52,7 +52,20 @@ interface TripRent {
   recettesColis: number;
   totalDepenses: number;
   benefice: number;
+  bookedSeats: number;
+  totalSeats: number;
   expenses: TripExpense[];
+}
+
+function getConseil(trip: TripRent): { label: string; icon: string; color: string; bg: string; border: string } {
+  const fillRate = trip.totalSeats > 0 ? trip.bookedSeats / trip.totalSeats : 0;
+  if (fillRate < 0.5) {
+    return { label: "Bus peu rempli", icon: "⚠️", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A" };
+  }
+  if (trip.benefice < 0) {
+    return { label: "Trajet non rentable", icon: "🔴", color: LOSS_RED, bg: "#FEF2F2", border: "#FECACA" };
+  }
+  return { label: "Trajet rentable", icon: "🟢", color: PROFIT_GREEN, bg: "#F0FDF4", border: "#BBF7D0" };
 }
 
 interface Summary {
@@ -309,6 +322,8 @@ export default function RentabiliteScreen() {
           {trips.map(trip => {
             const profit = trip.benefice >= 0;
             const isOpen = expanded === trip.tripId;
+            const conseil = getConseil(trip);
+            const fillPct = trip.totalSeats > 0 ? Math.round((trip.bookedSeats / trip.totalSeats) * 100) : 0;
 
             return (
               <View key={trip.tripId} style={S.card}>
@@ -331,6 +346,17 @@ export default function RentabiliteScreen() {
                 <View style={S.cardMeta}>
                   <Text style={S.cardMetaText}>🚌 {trip.busName} · {trip.busType}</Text>
                   <Text style={S.cardMetaText}>📅 {fmtDate(trip.date)} à {trip.departureTime}</Text>
+                </View>
+
+                {/* Conseil automatique */}
+                <View style={[S.conseilBadge, { backgroundColor: conseil.bg, borderColor: conseil.border }]}>
+                  <Text style={S.conseilIcon}>{conseil.icon}</Text>
+                  <Text style={[S.conseilLabel, { color: conseil.color }]}>{conseil.label}</Text>
+                  {trip.totalSeats > 0 && (
+                    <Text style={[S.conseilSub, { color: conseil.color }]}>
+                      · {trip.bookedSeats}/{trip.totalSeats} places ({fillPct}%)
+                    </Text>
+                  )}
                 </View>
 
                 {/* Recettes vs Dépenses bar */}
@@ -559,6 +585,12 @@ const S = StyleSheet.create({
   cancelText: { fontSize: 14, fontWeight: "600", color: "#64748B" },
   saveBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, backgroundColor: PRIMARY, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   saveText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+
+  /* Conseil */
+  conseilBadge: { flexDirection: "row", alignItems: "center", gap: 6, marginHorizontal: 14, marginBottom: 10, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  conseilIcon: { fontSize: 14 },
+  conseilLabel: { fontSize: 12, fontWeight: "700" },
+  conseilSub: { fontSize: 11, fontWeight: "500", opacity: 0.8 },
 
   /* Simulateur */
   sectionLabel: { fontSize: 11, fontWeight: "700", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 6, marginBottom: 2 },
