@@ -397,37 +397,43 @@ router.get("/agents", async (req, res) => {
 
     const rows = await db
       .select({
-        id:        agentsTable.id,
-        userId:    agentsTable.userId,
-        companyId: agentsTable.companyId,
-        busId:     agentsTable.busId,
-        tripId:    agentsTable.tripId,
-        agentCode: agentsTable.agentCode,
-        agentRole: agentsTable.agentRole,
-        status:    agentsTable.status,
-        createdAt: agentsTable.createdAt,
-        name:      usersTable.name,
-        email:     usersTable.email,
-        phone:     usersTable.phone,
-        busName:   busesTable.busName,
-        tripFrom:  tripsTable.from,
-        tripTo:    tripsTable.to,
-        tripDate:  tripsTable.date,
-        tripTime:  tripsTable.departureTime,
+        id:         agentsTable.id,
+        userId:     agentsTable.userId,
+        companyId:  agentsTable.companyId,
+        busId:      agentsTable.busId,
+        tripId:     agentsTable.tripId,
+        agentCode:  agentsTable.agentCode,
+        agentRole:  agentsTable.agentRole,
+        agenceId:   agentsTable.agenceId,
+        status:     agentsTable.status,
+        createdAt:  agentsTable.createdAt,
+        name:       usersTable.name,
+        email:      usersTable.email,
+        phone:      usersTable.phone,
+        busName:    busesTable.busName,
+        tripFrom:   tripsTable.from,
+        tripTo:     tripsTable.to,
+        tripDate:   tripsTable.date,
+        tripTime:   tripsTable.departureTime,
+        agenceName: agencesTable.name,
+        agenceCity: agencesTable.city,
       })
       .from(agentsTable)
-      .leftJoin(usersTable,  eq(agentsTable.userId,  usersTable.id))
-      .leftJoin(busesTable,  eq(agentsTable.busId,   busesTable.id))
-      .leftJoin(tripsTable,  eq(agentsTable.tripId,  tripsTable.id))
+      .leftJoin(usersTable,   eq(agentsTable.userId,    usersTable.id))
+      .leftJoin(busesTable,   eq(agentsTable.busId,     busesTable.id))
+      .leftJoin(tripsTable,   eq(agentsTable.tripId,    tripsTable.id))
+      .leftJoin(agencesTable, eq(agentsTable.agenceId,  agencesTable.id))
       .where(eq(agentsTable.companyId, ctx.companyId))
       .orderBy(desc(agentsTable.createdAt));
 
     res.json(rows.map(r => ({
       ...r,
-      bus:      r.busName  ?? "Non assigné",
-      tripName: r.tripFrom && r.tripTo
+      bus:       r.busName  ?? "Non assigné",
+      tripName:  r.tripFrom && r.tripTo
         ? `${r.tripFrom} → ${r.tripTo}${r.tripDate ? " · " + r.tripDate : ""}`
         : "",
+      agenceName: r.agenceName ?? null,
+      agenceCity: r.agenceCity ?? null,
     })));
   } catch (err) {
     console.error("GET /company/agents error:", err);
@@ -807,7 +813,8 @@ router.post("/agents", async (req, res) => {
     };
 
     const VALID_AGENT_ROLES = [
-      "agent_ticket", "agent_embarquement", "agent_colis", "agent_reception", "agent_route",
+      "agent_ticket", "agent_embarquement", "agent_colis", "agent_guichet",
+      "agent_reception", "agent_route",
       "embarquement", "reception_colis", "vente", "validation", "route",
     ];
 

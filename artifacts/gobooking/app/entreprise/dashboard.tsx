@@ -437,6 +437,7 @@ export default function EntrepriseDashboard() {
               { icon: "send",          label: "SMS Marketing",route: "/entreprise/sms",            color: "#D97706" },
               { icon: "zap",           label: "Marketing Auto",route: "/entreprise/marketing",     color: "#7C3AED" },
               { icon: "home",          label: "Agences",      route: "/entreprise/agences",        color: "#0369A1" },
+              { icon: "user-check",    label: "Agents",       route: "/entreprise/agents",         color: "#059669" },
               { icon: "git-branch",    label: "Routes",       route: "/entreprise/routes",         color: "#7C3AED" },
               { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",        color: "#059669" },
               { icon: "clock",         label: "Histo. colis", route: "/entreprise/colis-historique",    color: "#7C3AED" },

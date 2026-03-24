@@ -13,7 +13,7 @@ import { apiFetch } from "@/utils/api";
 import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
-export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis"
+export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
   | "embarquement" | "reception_colis" | "vente" | "validation" | "route";
 
 export interface User {
@@ -33,7 +33,7 @@ export interface User {
 }
 
 export function getAgentPath(agentRole?: AgentRole | null): string {
-  if (agentRole === "agent_ticket"       || agentRole === "vente")           return "/agent/tickets";
+  if (agentRole === "agent_ticket"       || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
   if (agentRole === "agent_embarquement" || agentRole === "embarquement")    return "/agent/embarquement";
   if (agentRole === "agent_colis"        || agentRole === "reception_colis") return "/agent/colis";
   if (agentRole === "validation")        return "/agent/validation";
@@ -42,18 +42,20 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
 }
 
 export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
-  agent_ticket:       "Agent Ticketing",
+  agent_ticket:       "Agent Guichet",
+  agent_guichet:      "Agent Guichet",
   agent_embarquement: "Agent Embarquement",
   agent_colis:        "Agent Colis",
   embarquement:       "Agent Embarquement",
   reception_colis:    "Agent Colis",
-  vente:              "Agent Ticketing",
+  vente:              "Agent Guichet",
   validation:         "Agent Validation",
   route:              "Agent En Route",
 };
 
 export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
   agent_ticket:       { bg: "#FEF3C7", text: "#D97706" },
+  agent_guichet:      { bg: "#FEF3C7", text: "#D97706" },
   agent_embarquement: { bg: "#DCFCE7", text: "#166534" },
   agent_colis:        { bg: "#EDE9FE", text: "#7C3AED" },
   embarquement:       { bg: "#DCFCE7", text: "#166534" },
