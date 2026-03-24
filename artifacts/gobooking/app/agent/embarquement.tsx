@@ -85,7 +85,7 @@ interface BoardingStatus {
 type MainTab = "billets" | "en_route" | "depart";
 
 export default function EmbarquementScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const networkStatus   = useNetworkStatus(BASE_URL);
 
   const isEmbarquementAgent = !user?.agentRole ||
@@ -903,6 +903,17 @@ export default function EmbarquementScreen() {
               </Text>
             </View>
           )}
+          <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginLeft: 6 }}
+            onPress={() =>
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ])
+            }
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Selected trip banner */}

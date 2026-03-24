@@ -38,7 +38,7 @@ interface ReservationInfo {
 }
 
 export default function ValidationScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [scanMode, setScanMode] = useState(false);
@@ -153,10 +153,21 @@ export default function ValidationScreen() {
           <View style={styles.headerIcon}>
             <Ionicons name="shield-checkmark" size={22} color="#fff" />
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Validation</Text>
             <Text style={styles.headerSub}>Confirmer les réservations</Text>
           </View>
+          <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() =>
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ])
+            }
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

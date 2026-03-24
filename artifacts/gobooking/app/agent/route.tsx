@@ -49,7 +49,7 @@ const DEMO_PASSENGERS: Passenger[] = [
 ];
 
 export default function RouteScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
 
   const [trips, setTrips]               = useState<LiveTrip[]>([]);
@@ -216,9 +216,22 @@ export default function RouteScreen() {
           <Text style={S.headerTitle}>Suivi trajet</Text>
           <Text style={S.headerSub}>{user?.name ?? "Agent en route"}</Text>
         </View>
-        <View style={S.gpsPill}>
-          <View style={[S.gpsDot, { backgroundColor: gpsColor }]} />
-          <Text style={S.gpsLabel} numberOfLines={1}>{gpsLabel}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={S.gpsPill}>
+            <View style={[S.gpsDot, { backgroundColor: gpsColor }]} />
+            <Text style={S.gpsLabel} numberOfLines={1}>{gpsLabel}</Text>
+          </View>
+          <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() =>
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ])
+            }
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

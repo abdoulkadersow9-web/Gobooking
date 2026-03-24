@@ -120,7 +120,7 @@ function AgenceCard({ agence }: { agence: Agence }) {
 }
 
 export default function ParametresScreen() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const insets    = useSafeAreaInsets();
 
   const [profile, setProfile]     = useState<CompanyProfile | null>(null);
@@ -328,6 +328,31 @@ export default function ParametresScreen() {
             )}
           </View>
 
+          {/* ── Déconnexion ──────────────────────────────────────── */}
+          <View style={S.logoutSection}>
+            <Text style={S.logoutSectionTitle}>Compte</Text>
+            <Pressable
+              style={({ pressed }) => [S.logoutBtn, pressed && { opacity: 0.8 }]}
+              onPress={() =>
+                Alert.alert(
+                  "Déconnexion",
+                  "Voulez-vous vraiment vous déconnecter de votre compte ?",
+                  [
+                    { text: "Annuler", style: "cancel" },
+                    {
+                      text: "Se déconnecter",
+                      style: "destructive",
+                      onPress: () => logout(),
+                    },
+                  ],
+                )
+              }
+            >
+              <Feather name="log-out" size={18} color="#DC2626" />
+              <Text style={S.logoutBtnTxt}>Se déconnecter</Text>
+            </Pressable>
+          </View>
+
           <View style={{ height: 32 }} />
         </ScrollView>
       )}
@@ -392,4 +417,15 @@ const S = StyleSheet.create({
 
   emptyAgences: { alignItems: "center", paddingVertical: 24, gap: 8 },
   emptyAgencesTxt: { fontSize: 13, color: "#94A3B8" },
+
+  logoutSection: {
+    backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+  },
+  logoutSectionTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A", textTransform: "uppercase", letterSpacing: 0.6 },
+  logoutBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: "#FECACA", backgroundColor: "#FFF5F5",
+  },
+  logoutBtnTxt: { fontSize: 15, fontWeight: "700", color: "#DC2626" },
 });

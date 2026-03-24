@@ -31,7 +31,7 @@ const PAYMENT_METHODS = [
 ];
 
 export default function VenteScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const networkStatus   = useNetworkStatus(BASE_URL);
 
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -176,12 +176,23 @@ export default function VenteScreen() {
           <View style={styles.headerIcon}>
             <Ionicons name="ticket" size={22} color="#fff" />
           </View>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Espace Vente</Text>
             <Text style={styles.headerSub}>
               {networkStatus.isOnline ? "Vente de billets en gare" : "⚡ Mode hors ligne actif"}
             </Text>
           </View>
+          <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            onPress={() =>
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ])
+            }
+          >
+            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
