@@ -60,6 +60,8 @@
     "expo-camera": "^55.0.9",
     "expo-clipboard": "^8.0.8",
     "expo-notifications": "^55.0.13",
+    "expo-print": "^55.0.9",
+    "expo-sharing": "^55.0.14",
     "react-native-webview": "^13.16.1"
   }
 }

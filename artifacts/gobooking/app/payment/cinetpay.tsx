@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -35,6 +34,7 @@ interface VerifyResult {
   paymentStatus: string;
   bookingRef: string;
   bookingId: string;
+  paymentId: string | null;
 }
 
 export default function CinetPayScreen() {
@@ -50,6 +50,7 @@ export default function CinetPayScreen() {
   const [method, setMethod]       = useState<string>("wave");
   const [error, setError]         = useState<string>("");
   const [demo, setDemo]           = useState(false);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
   const verifyRef                 = useRef<ReturnType<typeof setInterval> | null>(null);
   const successAnim               = useRef(new Animated.Value(0)).current;
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -74,6 +75,7 @@ export default function CinetPayScreen() {
           clearInterval(verifyRef.current!);
           verifyRef.current = null;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (data.paymentId) setPaymentId(data.paymentId);
           Animated.spring(successAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }).start();
           setStep("success");
         } else if (attempts >= MAX) {
@@ -152,8 +154,8 @@ export default function CinetPayScreen() {
           <View style={ss.successCircle}>
             <Text style={{ fontSize: 52 }}>✅</Text>
           </View>
-          <Text style={ss.successTitle}>Paiement réussi !</Text>
-          <Text style={ss.successSub}>Votre réservation est confirmée.</Text>
+          <Text style={ss.successTitle}>Paiement confirmé ✅</Text>
+          <Text style={ss.successSub}>Votre billet est prêt. Bon voyage !</Text>
           <View style={ss.successRef}>
             <Text style={ss.successRefLabel}>RÉFÉRENCE</Text>
             <Text style={ss.successRefValue}>#{bookingRef}</Text>
@@ -165,10 +167,31 @@ export default function CinetPayScreen() {
               <Text style={ss.demoText}>Mode simulation — intégrez vos clés CinetPay pour le paiement réel</Text>
             </View>
           )}
-          <Pressable style={ss.successBtn} onPress={goToBooking}>
-            <Feather name="file-text" size={16} color="white" />
-            <Text style={ss.successBtnText}>Voir mon billet</Text>
-          </Pressable>
+          <View style={{ width: "100%", gap: 10 }}>
+            {paymentId && (
+              <Pressable
+                style={ss.successBtn}
+                onPress={() => router.push({ pathname: "/payment/receipt/[id]", params: { id: paymentId! } })}
+              >
+                <Feather name="file-text" size={16} color="white" />
+                <Text style={ss.successBtnText}>Voir le reçu</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={[ss.successBtnOutline]}
+              onPress={goToBooking}
+            >
+              <Feather name="calendar" size={16} color="#0B3C5D" />
+              <Text style={ss.successBtnOutlineText}>Voir mon billet</Text>
+            </Pressable>
+            <Pressable
+              style={ss.historyLink}
+              onPress={() => router.push("/payment/history")}
+            >
+              <Feather name="clock" size={13} color="#64748B" />
+              <Text style={ss.historyLinkText}>Historique des paiements</Text>
+            </Pressable>
+          </View>
         </Animated.View>
       </View>
     );
@@ -318,8 +341,12 @@ const ss = StyleSheet.create({
   successAmount:     { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#6B7280", marginBottom: 20 },
   demoBadge:         { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "#EFF6FF", borderRadius: 10, padding: 10, marginBottom: 20, maxWidth: 320 },
   demoText:          { fontSize: 11, fontFamily: "Inter_400Regular", color: "#0369A1", flex: 1 },
-  successBtn:        { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#059669", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, gap: 8 },
+  successBtn:        { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#059669", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 32, gap: 8, width: "100%" },
   successBtnText:    { fontSize: 16, fontFamily: "Inter_700Bold", color: "white" },
+  successBtnOutline: { flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#EFF6FF", borderRadius: 14, paddingVertical: 13, paddingHorizontal: 32, gap: 8, width: "100%", borderWidth: 1, borderColor: "#BFDBFE" },
+  successBtnOutlineText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0B3C5D" },
+  historyLink:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 6 },
+  historyLinkText:   { fontSize: 13, fontFamily: "Inter_500Medium", color: "#64748B" },
   failedCircle:      { width: 100, height: 100, borderRadius: 50, backgroundColor: "#FEE2E2", alignItems: "center", justifyContent: "center", marginBottom: 20 },
   failedTitle:       { fontSize: 24, fontFamily: "Inter_700Bold", color: "#B91C1C", marginBottom: 8 },
   failedSub:         { fontSize: 14, fontFamily: "Inter_400Regular", color: "#374151", textAlign: "center", lineHeight: 20 },

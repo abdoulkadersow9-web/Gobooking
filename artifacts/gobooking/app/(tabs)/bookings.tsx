@@ -244,10 +244,19 @@ export default function BookingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mes Réservations</Text>
-        {bookings.length > 0 && (
-          <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""}</Text>
-        )}
+        <View>
+          <Text style={styles.headerTitle}>Mes Réservations</Text>
+          {bookings.length > 0 && (
+            <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""}</Text>
+          )}
+        </View>
+        <Pressable
+          style={styles.historyBtn}
+          onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
+        >
+          <Feather name="clock" size={15} color={Colors.light.primary} />
+          <Text style={styles.historyBtnText}>Paiements</Text>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -282,9 +291,11 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: Colors.light.card, flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
-  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text },
-  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  header:         { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: Colors.light.border, backgroundColor: Colors.light.card, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:    { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  headerSub:      { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  historyBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: Colors.light.primaryLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
+  historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
   card:         { backgroundColor: Colors.light.card, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   cardPressed:  { transform: [{ scale: 0.98 }] },
