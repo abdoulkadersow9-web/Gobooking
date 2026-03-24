@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import Colors from "@/constants/colors";
 
@@ -10,24 +10,32 @@ function TabIcon({
   name,
   focused,
   color,
+  label,
 }: {
   name: React.ComponentProps<typeof Feather>["name"];
   focused: boolean;
   color: string;
+  label: string;
 }) {
   return (
-    <View
-      style={{
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: focused ? Colors.light.primaryLight : "transparent",
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 5,
-        marginTop: 2,
-      }}
-    >
-      <Feather name={name} size={22} color={color} />
+    <View style={styles.tabItem}>
+      <View
+        style={[
+          styles.iconPill,
+          focused && styles.iconPillActive,
+        ]}
+      >
+        <Feather name={name} size={20} color={color} />
+      </View>
+      <Text
+        style={[
+          styles.tabLabel,
+          { color: focused ? Colors.light.primary : "#64748B" },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -36,43 +44,38 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: "#94A3B8",
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarStyle: {
           position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
           backgroundColor: isIOS ? "transparent" : "white",
           borderTopWidth: 1,
           borderTopColor: "#E2E8F0",
-          elevation: 12,
+          elevation: 20,
           shadowColor: "#0B3C5D",
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.10,
-          shadowRadius: 16,
-          height: isWeb ? 76 : 66,
-          paddingBottom: isWeb ? 14 : 10,
-          paddingTop: 4,
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.12,
+          shadowRadius: 12,
+          height: Platform.OS === "web" ? 72 : 64,
+          zIndex: 1000,
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
+              intensity={95}
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: "white" }]} />
           ),
-        tabBarLabelStyle: {
-          fontFamily: "Inter_600SemiBold",
-          fontSize: 10,
-          marginTop: 1,
-        },
       }}
     >
       <Tabs.Screen
@@ -80,7 +83,7 @@ export default function TabLayout() {
         options={{
           title: "Accueil",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="home" focused={focused} color={color} />
+            <TabIcon name="home" focused={focused} color={color} label="Accueil" />
           ),
         }}
       />
@@ -89,7 +92,7 @@ export default function TabLayout() {
         options={{
           title: "Trajets",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="bookmark" focused={focused} color={color} />
+            <TabIcon name="map" focused={focused} color={color} label="Trajets" />
           ),
         }}
       />
@@ -98,7 +101,7 @@ export default function TabLayout() {
         options={{
           title: "Colis",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="package" focused={focused} color={color} />
+            <TabIcon name="package" focused={focused} color={color} label="Colis" />
           ),
         }}
       />
@@ -107,7 +110,7 @@ export default function TabLayout() {
         options={{
           title: "Suivi",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="map-pin" focused={focused} color={color} />
+            <TabIcon name="map-pin" focused={focused} color={color} label="Suivi" />
           ),
         }}
       />
@@ -116,7 +119,7 @@ export default function TabLayout() {
         options={{
           title: "Profil",
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="user" focused={focused} color={color} />
+            <TabIcon name="user" focused={focused} color={color} label="Profil" />
           ),
         }}
       />
@@ -129,3 +132,29 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingTop: 4,
+  },
+  iconPill: {
+    width: 44,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  iconPillActive: {
+    backgroundColor: Colors.light.primaryLight,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.2,
+    textAlign: "center",
+  },
+});

@@ -1,0 +1,87 @@
+Corrige complètement l’espace client de GoBooking, surtout la barre de navigation du bas et le nettoyage de l’interface client.
+
+OBJECTIF :
+Rendre l’espace client propre, fonctionnel, sans éléments de démo ni anciens espaces visibles.
+
+PROBLÈMES À CORRIGER :
+
+1. Barre de navigation du bas
+- les icônes du bas ne s’affichent pas correctement
+- les labels Accueil / Trajets / Colis / Suivi / Profil sont mal visibles
+- le style de la bottom tab bar est cassé
+- certaines pages ne répondent pas correctement quand on clique
+
+2. Nettoyage espace client
+- supprimer complètement de l’espace client tous les textes, boutons, cartes ou liens de démo liés à :
+  - espace entreprise
+  - espace agent
+  - espace admin
+- le client ne doit jamais voir ces éléments
+
+3. Vérifier navigation client
+Corriger les routes du menu bas :
+- Accueil -> /client/home
+- Trajets -> /client/trajets
+- Colis -> /client/colis
+- Suivi -> /client/suivi
+- Profil -> /client/profil
+
+4. Corriger la bottom tab bar
+- vérifier que les icônes sont bien importées
+- vérifier que les couleurs sont correctes
+- vérifier que le texte n’est pas blanc sur fond clair ou invisible
+- vérifier que la tab bar n’est pas recouverte par un autre composant
+- vérifier le zIndex / position / backgroundColor / borderTop
+
+5. Style de la bottom bar
+Je veux une barre du bas propre et moderne :
+- fond visible
+- icônes visibles
+- label visible
+- onglet actif bien coloré
+- pas d’éléments qui flottent au-dessus
+
+6. Vérifier les composants superposés
+- vérifier qu’aucun composant absolute/fixed ne bloque la barre du bas
+- vérifier qu’aucune ScrollView ou card ne recouvre la tab bar
+- vérifier les SafeAreaView
+
+7. Nettoyage contenu client
+Dans l’accueil client, garder seulement :
+- bonjour utilisateur
+- réserver un trajet
+- envoyer un colis
+- voir les cars en route
+- car recommandé
+- menu bas client
+
+8. Vérifier tous les boutons de l’espace client
+Tester et corriger :
+- Réserver un trajet
+- Rechercher des bus
+- Envoyer un colis
+- Voir les cars en route
+- Voir tous
+- tous les onglets du menu bas
+
+9. Debug
+Ajouter des console.log pour vérifier :
+- quelle route est ouverte
+- quel onglet est actif
+- quelles données sont chargées
+
+10. Test final obligatoire
+Merci de tester vous-même :
+- Accueil client OK
+- Trajets client OK
+- Colis client OK
+- Suivi client OK
+- Profil client OK
+- plus aucun texte de démo entreprise/agent/admin visible
+- barre du bas visible et fonctionnelle
+
+RÉSULTAT ATTENDU :
+- espace client propre
+- barre du bas visible et fonctionnelle
+- aucune trace des espaces entreprise/agent/admin
+- tous les boutons client fonctionnent

@@ -299,42 +299,6 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Tableaux de bord */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tableaux de bord</Text>
-        <View style={styles.dashGrid}>
-          <Pressable style={[styles.dashCard, { borderColor: "#C7D2FE" }]} onPress={() => router.push("/dashboard/company")}>
-            <View style={[styles.dashIcon, { backgroundColor: "#EEF2FF" }]}>
-              <Feather name="briefcase" size={20} color={Colors.light.primary} />
-            </View>
-            <Text style={styles.dashLabel}>Entreprise</Text>
-            <Text style={styles.dashSub}>Gestion de flotte</Text>
-          </Pressable>
-          <Pressable style={[styles.dashCard, { borderColor: "#BBF7D0" }]} onPress={() => router.push("/dashboard/agent")}>
-            <View style={[styles.dashIcon, { backgroundColor: "#ECFDF5" }]}>
-              <Feather name="user" size={20} color="#059669" />
-            </View>
-            <Text style={styles.dashLabel}>Agent</Text>
-            <Text style={styles.dashSub}>Embarquement & colis</Text>
-          </Pressable>
-          <Pressable style={[styles.dashCard, { borderColor: "#E9D5FF" }]} onPress={() => router.push("/dashboard/super-admin")}>
-            <View style={[styles.dashIcon, { backgroundColor: "#F5F3FF" }]}>
-              <Feather name="shield" size={20} color="#7C3AED" />
-            </View>
-            <Text style={styles.dashLabel}>Super Admin</Text>
-            <Text style={styles.dashSub}>Global & stats</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {isAdmin && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t.administration}</Text>
-          <View style={styles.menuCard}>
-            <MenuItem icon="settings" label={t.adminDashboard} onPress={() => router.push("/admin/dashboard")} />
-          </View>
-        </View>
-      )}
 
       {/* Support */}
       <View style={styles.section}>

@@ -88,12 +88,6 @@ function fmtDist(km: number): string {
   return `${Math.round(km)} km`;
 }
 
-const DASHBOARD_CARDS = [
-  { label: "Espace compagnie", sub: "Gérer bus, trajets & agents", icon: "briefcase", color: Colors.light.primary, bg: "#EEF2FF", path: "/dashboard/company" },
-  { label: "Espace agent", sub: "Mission, sièges & colis", icon: "user", color: "#059669", bg: "#ECFDF5", path: "/dashboard/agent" },
-  { label: "Espace admin", sub: "Plateforme GoBooking CI", icon: "shield", color: "#7C3AED", bg: "#F5F3FF", path: "/dashboard/super-admin" },
-] as const;
-
 const POPULAR_ROUTES = [
   { from: "Abidjan", to: "Bouaké",       duration: "5h 30m", price: 3500 },
   { from: "Abidjan", to: "Yamoussoukro", duration: "2h 30m", price: 2000 },
@@ -1064,33 +1058,6 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {/* ── Professional Spaces ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Espaces professionnels</Text>
-        {DASHBOARD_CARDS.map((card) => (
-          <TouchableOpacity
-            key={card.path}
-            style={[styles.dashCard, dashboardPath === card.path && { borderWidth: 2, borderColor: card.color }]}
-            activeOpacity={0.85}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(card.path as never); }}
-          >
-            <View style={[styles.dashCardIcon, { backgroundColor: card.bg }]}>
-              <Feather name={card.icon as never} size={20} color={card.color} />
-            </View>
-            <View style={styles.dashCardText}>
-              <Text style={[styles.dashCardTitle, { color: card.color }]}>{card.label}</Text>
-              <Text style={styles.dashCardSub}>{card.sub}</Text>
-            </View>
-            {dashboardPath === card.path && (
-              <View style={[styles.dashCardBadge, { backgroundColor: card.bg }]}>
-                <Text style={[styles.dashCardBadgeText, { color: card.color }]}>Mon espace</Text>
-              </View>
-            )}
-            <Feather name="chevron-right" size={16} color={card.color} />
-          </TouchableOpacity>
-        ))}
-      </View>
-
       {/* ── Popular routes ── */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Trajets populaires</Text>
@@ -1102,7 +1069,7 @@ export default function HomeScreen() {
               setFrom(route.from);
               setTo(route.to);
               setMode("trajet");
-              router.push({ pathname: "/search-results", params: { from: route.from, to: route.to, date, passengers: "1" } });
+              router.push({ pathname: "/client/resultats", params: { from: route.from, to: route.to, date, passengers: "1" } } as never);
             }}
           >
             <View style={styles.routeCardLeft}>
