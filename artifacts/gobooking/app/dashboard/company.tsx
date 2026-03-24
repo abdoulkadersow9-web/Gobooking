@@ -393,14 +393,16 @@ export default function CompanyDashboard() {
       apiFetch<Parcel[]>("/company/parcels",{ token }),
       apiFetch<WalletData>("/company/wallet",{ token }),
       apiFetch<Analytics>("/company/analytics", { token }),
-    ]).then(([s, b, t, r, p, w, a]) => {
-      if (s.status === "fulfilled") setStats(s.value);
-      if (b.status === "fulfilled" && b.value.length > 0) setBuses(b.value);
-      if (t.status === "fulfilled" && t.value.length > 0) setTrips(t.value);
-      if (r.status === "fulfilled" && r.value.length > 0) setReservations(r.value);
-      if (p.status === "fulfilled" && p.value.length > 0) setParcels(p.value);
-      if (w.status === "fulfilled") setWalletData(w.value);
-      if (a.status === "fulfilled") setAnalytics(a.value);
+      apiFetch<AgentItem[]>("/company/agents", { token }),
+    ]).then(([s, b, t, r, p, w, a, ag]) => {
+      if (s.status  === "fulfilled") setStats(s.value);
+      if (b.status  === "fulfilled" && b.value.length > 0) setBuses(b.value);
+      if (t.status  === "fulfilled" && t.value.length > 0) setTrips(t.value);
+      if (r.status  === "fulfilled" && r.value.length > 0) setReservations(r.value);
+      if (p.status  === "fulfilled" && p.value.length > 0) setParcels(p.value);
+      if (w.status  === "fulfilled") setWalletData(w.value);
+      if (a.status  === "fulfilled") setAnalytics(a.value);
+      if (ag.status === "fulfilled" && ag.value.length > 0) setAgents(ag.value);
     });
     loadBoardingRequests();
     loadInvoices();

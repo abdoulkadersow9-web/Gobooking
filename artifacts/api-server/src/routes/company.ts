@@ -120,13 +120,27 @@ router.get("/agents", async (req, res) => {
         name:      usersTable.name,
         email:     usersTable.email,
         phone:     usersTable.phone,
+        busName:   busesTable.busName,
+        tripFrom:  tripsTable.from,
+        tripTo:    tripsTable.to,
+        tripDate:  tripsTable.date,
+        tripTime:  tripsTable.departureTime,
       })
       .from(agentsTable)
-      .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+      .leftJoin(usersTable,  eq(agentsTable.userId,  usersTable.id))
+      .leftJoin(busesTable,  eq(agentsTable.busId,   busesTable.id))
+      .leftJoin(tripsTable,  eq(agentsTable.tripId,  tripsTable.id))
       .orderBy(desc(agentsTable.createdAt));
 
-    res.json(rows);
+    res.json(rows.map(r => ({
+      ...r,
+      bus:      r.busName  ?? "Non assigné",
+      tripName: r.tripFrom && r.tripTo
+        ? `${r.tripFrom} → ${r.tripTo}${r.tripDate ? " · " + r.tripDate : ""}`
+        : "",
+    })));
   } catch (err) {
+    console.error("GET /company/agents error:", err);
     res.status(500).json({ error: "Failed" });
   }
 });
