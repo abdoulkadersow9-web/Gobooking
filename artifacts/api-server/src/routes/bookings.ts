@@ -158,6 +158,81 @@ function generateQRPayload(bookingRef: string, tripId: string): string {
   return JSON.stringify({ ref: bookingRef, type: "passager", ts, trajetId: tripId, sig });
 }
 
+/* ── Réservation rapide (sans sièges ni paiement) ─────────────────────────
+   POST /bookings/quick
+   Body: { tripId }
+   - Crée une réservation directe avec status:"pending", paymentStatus:"pending"
+   - seatIds/passengers vides — à confirmer plus tard
+   - Utilise email/téléphone du compte connecté
+─────────────────────────────────────────────────────────────────────────── */
+router.post("/quick", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Connexion requise pour réserver" }); return; }
+
+    const role = await getUserRole(userId);
+    if (role && ["agent", "agent_ticket", "agent_embarquement", "agent_colis", "compagnie", "company_admin"].includes(role ?? "")) {
+      res.status(403).json({ error: "Accès refusé — seuls les clients peuvent réserver" });
+      return;
+    }
+
+    const { tripId } = req.body;
+    if (!tripId) { res.status(400).json({ error: "tripId requis" }); return; }
+
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    const userRows = await db.select({ email: usersTable.email, phone: usersTable.phone, name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const userInfo = userRows[0] ?? { email: "", phone: "", name: "" };
+
+    const companyId = trip.companyId ?? null;
+    const newBookingId  = generateId();
+    const newBookingRef = generateRef();
+    const qrCode        = generateQRPayload(newBookingRef, tripId);
+
+    console.log("[POST /bookings/quick] userId:", userId, "tripId:", tripId, "companyId:", companyId);
+
+    await db.insert(bookingsTable).values({
+      id: newBookingId,
+      bookingRef: newBookingRef,
+      userId,
+      tripId,
+      companyId,
+      seatIds:      [],
+      seatNumbers:  [],
+      passengers:   [],
+      totalAmount:  trip.price ?? 0,
+      commissionAmount: 0,
+      commissionRate: 0,
+      paymentMethod: "wave",
+      paymentStatus: "pending",
+      status: "pending",
+      contactEmail: userInfo.email,
+      contactPhone: userInfo.phone,
+      qrCode,
+    } as any);
+
+    console.log("[POST /bookings/quick] Booking created:", newBookingRef);
+
+    res.status(201).json({
+      id: newBookingId,
+      bookingRef: newBookingRef,
+      tripId,
+      from: trip.from,
+      to: trip.to,
+      date: trip.date,
+      departureTime: trip.departureTime,
+      price: trip.price,
+      status: "pending",
+    });
+  } catch (err: any) {
+    console.error("[POST /bookings/quick] error:", err);
+    res.status(500).json({ error: err?.message || "Erreur lors de la réservation" });
+  }
+});
+
 /* ── Créer une réservation (statut: pending) ───────────────────────────────
    POST /bookings
    - Vérifie en transaction que chaque siège n'est PAS "booked"

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
@@ -132,11 +134,39 @@ export default function SearchResultsScreen() {
     companyId?: string; companyName?: string;
   }>();
   const { updateBooking } = useBooking();
+  const { token } = useAuth();
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<SortKey>("price");
   const [usingFallback, setUsingFallback] = useState(false);
+  const [quickStates, setQuickStates] = useState<Record<string, "idle" | "loading" | "success">>({});
+
+  const handleQuickBook = async (item: Trip) => {
+    if (!token) {
+      Alert.alert("Connexion requise", "Veuillez vous connecter pour réserver.");
+      router.push("/(auth)/login" as any);
+      return;
+    }
+    if (item.isFallback) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setQuickStates(s => ({ ...s, [item.id]: "loading" }));
+    try {
+      await apiFetch<{ bookingRef: string }>("/bookings/quick", {
+        method: "POST",
+        token: token ?? undefined,
+        body: { tripId: item.id },
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setQuickStates(s => ({ ...s, [item.id]: "success" }));
+      setTimeout(() => {
+        router.push("/client/mes-reservations" as any);
+      }, 1000);
+    } catch (err: any) {
+      setQuickStates(s => ({ ...s, [item.id]: "idle" }));
+      Alert.alert("Erreur", err?.message ?? "Impossible de créer la réservation.");
+    }
+  };
 
   const isAbidjanBouake =
     from?.toLowerCase().includes("abidjan") &&
@@ -289,15 +319,37 @@ export default function SearchResultsScreen() {
           </View>
         </View>
 
-        {/* Select Seat Button */}
-        <Pressable
-          style={({ pressed }) => [styles.selectBtn, pressed && styles.selectBtnPressed]}
-          onPress={() => handleSelectSeat(item)}
-        >
-          <Feather name="grid" size={16} color="white" />
-          <Text style={styles.selectBtnText}>Choisir un siège</Text>
-          <Feather name="arrow-right" size={16} color="white" />
-        </Pressable>
+        {/* Action Buttons */}
+        <View style={styles.cardActions}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickBtn,
+              pressed && styles.selectBtnPressed,
+              quickStates[item.id] === "loading" && { opacity: 0.8 },
+              quickStates[item.id] === "success" && { backgroundColor: "#16A34A" },
+            ]}
+            onPress={() => handleQuickBook(item)}
+            disabled={quickStates[item.id] === "loading" || quickStates[item.id] === "success"}
+          >
+            {quickStates[item.id] === "loading" ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : quickStates[item.id] === "success" ? (
+              <Feather name="check-circle" size={15} color="white" />
+            ) : (
+              <Feather name="calendar" size={15} color="white" />
+            )}
+            <Text style={styles.selectBtnText}>
+              {quickStates[item.id] === "loading" ? "En cours…" : quickStates[item.id] === "success" ? "Réservé !" : "Réserver"}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.selectBtn, pressed && styles.selectBtnPressed, { flex: 1 }]}
+            onPress={() => handleSelectSeat(item)}
+          >
+            <Feather name="grid" size={15} color="white" />
+            <Text style={styles.selectBtnText}>Choisir siège</Text>
+          </Pressable>
+        </View>
       </View>
     );
   };
@@ -734,15 +786,35 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
   },
 
-  // Button
+  // Buttons
+  cardActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  quickBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#D97706",
+    borderRadius: 14,
+    paddingVertical: 13,
+    shadowColor: "#D97706",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   selectBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: Colors.light.accent,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 13,
     shadowColor: Colors.light.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
@@ -52,6 +54,8 @@ export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [trip, setTrip] = useState<TripDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [booking, setBooking] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const { token, user } = useAuth();
   const { updateBooking } = useBooking();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
@@ -83,6 +87,39 @@ export default function TripDetailScreen() {
       totalAmount: trip.price,
     });
     router.push({ pathname: "/seats/[tripId]", params: { tripId: trip.id } });
+  };
+
+  const handleQuickBook = async () => {
+    if (!trip) return;
+    if (!token) {
+      Alert.alert("Connexion requise", "Veuillez vous connecter pour réserver.");
+      router.push("/(auth)/login" as any);
+      return;
+    }
+    console.log("[Réserver] bouton cliqué — tripId:", trip.id, "user:", user?.email);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setBooking("loading");
+    try {
+      const result = await apiFetch<{ id: string; bookingRef: string; from: string; to: string }>("/bookings/quick", {
+        method: "POST",
+        token: token ?? undefined,
+        body: { tripId: trip.id },
+      });
+      console.log("[Réserver] succès:", result.bookingRef, result.from, "→", result.to);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setBooking("success");
+      setTimeout(() => {
+        router.push("/client/mes-reservations" as any);
+      }, 1200);
+    } catch (err: any) {
+      console.error("[Réserver] erreur:", err);
+      setBooking("error");
+      Alert.alert(
+        "Erreur de réservation",
+        err?.message ?? "Impossible de créer la réservation. Veuillez réessayer.",
+        [{ text: "OK", onPress: () => setBooking("idle") }]
+      );
+    }
   };
 
   if (loading) {
@@ -234,16 +271,38 @@ export default function TripDetailScreen() {
 
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
-          <Text style={styles.totalLabel}>Total Price</Text>
-          <Text style={styles.totalPrice}>{trip.price.toLocaleString()} <Text style={styles.totalSub}>FCFA/siège</Text></Text>
+          <Text style={styles.totalLabel}>Prix par siège</Text>
+          <Text style={styles.totalPrice}>{trip.price.toLocaleString()} <Text style={styles.totalSub}>FCFA</Text></Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.bookBtn, pressed && styles.bookBtnPressed]}
-          onPress={handleBook}
-        >
-          <Text style={styles.bookBtnText}>Select Seats</Text>
-          <Feather name="arrow-right" size={18} color="white" />
-        </Pressable>
+        <View style={styles.btnGroup}>
+          {/* Bouton réservation rapide */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.quickBookBtn,
+              pressed && styles.bookBtnPressed,
+              booking === "loading" && { opacity: 0.8 },
+              booking === "success" && { backgroundColor: "#16A34A" },
+            ]}
+            onPress={handleQuickBook}
+            disabled={booking === "loading" || booking === "success"}
+          >
+            {booking === "loading" ? (
+              <><ActivityIndicator size="small" color="white" /><Text style={styles.bookBtnText}>En cours…</Text></>
+            ) : booking === "success" ? (
+              <><Feather name="check-circle" size={16} color="white" /><Text style={styles.bookBtnText}>Réservé !</Text></>
+            ) : (
+              <><Feather name="calendar" size={16} color="white" /><Text style={styles.bookBtnText}>Réserver</Text></>
+            )}
+          </Pressable>
+          {/* Bouton sélection siège */}
+          <Pressable
+            style={({ pressed }) => [styles.bookBtn, pressed && styles.bookBtnPressed]}
+            onPress={handleBook}
+          >
+            <Feather name="grid" size={16} color="white" />
+            <Text style={styles.bookBtnText}>Siège</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -497,13 +556,32 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
   },
+  btnGroup: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  quickBookBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#D97706",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    shadowColor: "#D97706",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   bookBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 7,
     backgroundColor: Colors.light.primary,
     borderRadius: 14,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     shadowColor: Colors.light.primary,
     shadowOffset: { width: 0, height: 4 },
@@ -516,7 +594,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.97 }],
   },
   bookBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "white",
   },
