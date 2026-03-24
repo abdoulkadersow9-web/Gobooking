@@ -1,5 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import router from "./routes";
@@ -9,8 +11,24 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
+/* ── Security headers (helmet) ──────────────────────────────── */
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
 /* ── CORS ───────────────────────────────────────────────────── */
 app.use(cors());
+
+/* ── Global rate limiter (500 req / 15 min per IP) ──────────── */
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de requêtes. Veuillez réessayer dans quelques minutes." },
+  skip: (req) => req.path === "/api/ping",
+}));
 
 /* ── Body parsers ───────────────────────────────────────────── */
 app.use(express.json());

@@ -2,10 +2,31 @@ import { Router, type IRouter } from "express";
 import { db, usersTable, agentsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import { auditLog, ACTIONS } from "../audit";
 import { recordReferral } from "./growth";
 
 const router: IRouter = Router();
+
+/* ── Rate limiter: max 10 login attempts / 15 min per IP ──────── */
+const loginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de tentatives de connexion. Réessayez dans 15 minutes." },
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim() ?? req.socket?.remoteAddress ?? "unknown"),
+});
+
+/* ── Rate limiter: max 5 register attempts / 15 min per IP ───── */
+const registerRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Trop de créations de compte. Réessayez dans 15 minutes." },
+});
 
 const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
 const generateToken = () => crypto.randomBytes(32).toString("hex");
@@ -22,7 +43,7 @@ const tokenStore = new Map<string, string>();
 
 const RESTRICTED_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
 
-router.post("/register", async (req, res) => {
+router.post("/register", registerRateLimit, async (req, res) => {
   try {
     const { name, email, phone, password, role } = req.body;
 
@@ -88,7 +109,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginRateLimit, async (req, res) => {
   try {
     const { email, password } = req.body;
 

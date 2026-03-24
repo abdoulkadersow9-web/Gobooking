@@ -16,27 +16,37 @@ async function requireCompanyAdmin(authHeader: string | undefined) {
   return users[0];
 }
 
+async function requireCompanyWithCompanyId(authHeader: string | undefined): Promise<{ user: typeof usersTable.$inferSelect; companyId: string } | null> {
+  const user = await requireCompanyAdmin(authHeader);
+  if (!user) return null;
+  const company = await getOrCreateCompany(user);
+  return { user, companyId: company.id };
+}
+
 router.get("/stats", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
 
     const [buses, agents, trips, bookings, parcels] = await Promise.all([
-      db.select().from(busesTable),
-      db.select().from(agentsTable),
-      db.select().from(tripsTable),
+      db.select().from(busesTable).where(eq(busesTable.companyId, companyId)),
+      db.select().from(agentsTable).where(eq(agentsTable.companyId, companyId)),
+      db.select().from(tripsTable).where(eq(tripsTable.companyId, companyId)),
       db.select().from(bookingsTable),
       db.select().from(parcelsTable),
     ]);
 
-    const revenue = bookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0)
+    const tripIds = new Set(trips.map(t => t.id));
+    const companyBookings = bookings.filter(b => tripIds.has(b.tripId));
+    const revenue = companyBookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0)
       + parcels.reduce((s, p) => s + p.amount, 0);
 
     res.json({
       totalBuses: buses.length,
       totalAgents: agents.length,
       totalTrips: trips.length,
-      totalReservations: bookings.length,
+      totalReservations: companyBookings.length,
       totalParcels: parcels.length,
       totalRevenue: revenue,
       activeBuses: buses.filter(b => b.status === "active").length,
@@ -48,9 +58,11 @@ router.get("/stats", async (req, res) => {
 
 router.get("/buses", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const buses = await db.select().from(busesTable).orderBy(desc(busesTable.createdAt));
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const buses = await db.select().from(busesTable)
+      .where(eq(busesTable.companyId, ctx.companyId))
+      .orderBy(desc(busesTable.createdAt));
     res.json(buses);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -92,8 +104,12 @@ router.post("/buses", async (req, res) => {
 
 router.delete("/buses/:id", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, req.params.id)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé — ce bus n'appartient pas à votre compagnie" }); return;
+    }
     await db.delete(busesTable).where(eq(busesTable.id, req.params.id));
     res.json({ success: true });
   } catch (err) {
@@ -103,8 +119,8 @@ router.delete("/buses/:id", async (req, res) => {
 
 router.get("/agents", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
 
     const rows = await db
       .select({
@@ -130,6 +146,7 @@ router.get("/agents", async (req, res) => {
       .leftJoin(usersTable,  eq(agentsTable.userId,  usersTable.id))
       .leftJoin(busesTable,  eq(agentsTable.busId,   busesTable.id))
       .leftJoin(tripsTable,  eq(agentsTable.tripId,  tripsTable.id))
+      .where(eq(agentsTable.companyId, ctx.companyId))
       .orderBy(desc(agentsTable.createdAt));
 
     res.json(rows.map(r => ({
@@ -263,9 +280,11 @@ router.put("/agents/:id/assign", async (req, res) => {
 
 router.get("/trips", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const trips = await db.select().from(tripsTable).orderBy(desc(tripsTable.date));
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const trips = await db.select().from(tripsTable)
+      .where(eq(tripsTable.companyId, ctx.companyId))
+      .orderBy(desc(tripsTable.date));
     res.json(trips);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -274,9 +293,15 @@ router.get("/trips", async (req, res) => {
 
 router.get("/bookings", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const companyTrips = await db.select({ id: tripsTable.id }).from(tripsTable)
+      .where(eq(tripsTable.companyId, ctx.companyId));
+    const tripIds = companyTrips.map(t => t.id);
+    if (!tripIds.length) { res.json([]); return; }
+    const bookings = await db.select().from(bookingsTable)
+      .where(inArray(bookingsTable.tripId, tripIds))
+      .orderBy(desc(bookingsTable.createdAt));
     res.json(bookings.map(b => ({ id: b.id, bookingRef: b.bookingRef, tripId: b.tripId, totalAmount: b.totalAmount, status: b.status, passengers: b.passengers, createdAt: b.createdAt?.toISOString() })));
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -296,9 +321,9 @@ router.get("/parcels", async (req, res) => {
 
 router.post("/trips", async (req, res) => {
   try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    if (user.role !== "compagnie") {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    if (ctx.user.role !== "compagnie") {
       res.status(403).json({ error: "Accès refusé — seules les compagnies peuvent créer des trajets" });
       return;
     }
@@ -309,6 +334,7 @@ router.post("/trips", async (req, res) => {
       id, from, to, date, departureTime: departureTime || "08:00", arrivalTime: arrivalTime || "12:00",
       price: Number(price), busName: busName || "Bus GoBooking", busType: busType || "Standard",
       totalSeats: totalSeats || 44, duration: duration || "4h00", amenities: [], stops: [], policies: [],
+      companyId: ctx.companyId,
     }).returning();
     res.json(trip[0]);
   } catch (err) {

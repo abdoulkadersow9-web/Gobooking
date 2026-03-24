@@ -131,6 +131,14 @@ router.post("/", async (req, res) => {
       return;
     }
 
+    const role = await getUserRole(userId);
+    if (role && ["agent", "compagnie", "company_admin"].includes(role)) {
+      auditLog({ userId, userRole: role ?? "unknown", req }, ACTIONS.PERMISSION_DENIED, undefined, "booking",
+        { reason: "agents_and_companies_cannot_create_bookings_as_clients", path: req.path }, true).catch(() => {});
+      res.status(403).json({ error: "Accès refusé — les agents et compagnies ne peuvent pas créer de réservations clients" });
+      return;
+    }
+
     const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {

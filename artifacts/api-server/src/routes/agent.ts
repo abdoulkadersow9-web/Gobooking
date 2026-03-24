@@ -47,11 +47,21 @@ router.get("/boarding", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const today = new Date().toISOString().split("T")[0];
-    const bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
-    const todayBookings = bookings.slice(0, 20);
+    const agents = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRecord = agents[0];
 
-    res.json(todayBookings.map(b => ({
+    let bookings;
+    if (agentRecord?.tripId) {
+      bookings = await db.select().from(bookingsTable)
+        .where(eq(bookingsTable.tripId, agentRecord.tripId))
+        .orderBy(desc(bookingsTable.createdAt));
+    } else {
+      bookings = await db.select().from(bookingsTable)
+        .orderBy(desc(bookingsTable.createdAt))
+        .limit(20);
+    }
+
+    res.json(bookings.map(b => ({
       id: b.id,
       bookingRef: b.bookingRef,
       passengers: b.passengers,

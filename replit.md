@@ -97,6 +97,26 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Register screen: role selector grid (4 colored cards), password strength indicator, security note
 - Demo accounts: compagnie@test.com, agent@test.com, admin@test.com, user@test.com (all: test123)
 
+## Security & Access Control (Added 2026-03)
+- **helmet.js** — 5 security headers on all responses (X-Frame-Options, X-Content-Type, Referrer-Policy, CORP, COOP)
+- **Global rate limiter** — 500 req / 15 min per IP; skips /api/ping
+- **Login rate limiter** — max 10 attempts / 15 min per IP → HTTP 429
+- **Register rate limiter** — max 5 attempts / 15 min per IP
+- **Centralized auth middleware** — `src/middleware/auth.ts`: `requireAuth`, `requireRole(...roles)`, `requireSelf(getUserId)`, `getAuthUser`
+- **Role guards on all routes**:
+  - `POST /bookings` — blocks `agent`, `compagnie`, `company_admin` (they can't create client bookings)
+  - `POST /trips/:id/seats/hold` — requires any authenticated user
+  - `POST /company/trips` — requires `role === "compagnie"` (only company can create trips); stores `companyId`
+  - `DELETE /buses/:id` — verifies bus belongs to requesting company
+  - `requireAgent()` — checks `role in ["admin","agent"]` + `status !== "inactive"`
+  - `requireCompanyAdmin()` — checks `role in ["admin","company_admin","compagnie"]` + status
+  - `requireSuperAdmin()` — checks `role in ["admin","super_admin"]`
+- **Company data isolation** — `GET /company/buses`, `/agents`, `/trips`, `/bookings`, `/stats` all filter by `companyId`
+- **Agent data isolation** — `GET /agent/boarding` returns only bookings for the agent's assigned trip
+- **PERMISSION_DENIED audit logging** — all role violations logged to `audit_logs` with `flagged: true`, IP, reason, and path
+- **Server-side payment verification** — transactions verified on backend before booking confirmed (CinetPay)
+- **Inactive account block** — `status === "inactive"` blocks login and all API calls
+
 ## Project Structure
 ```
 artifacts/

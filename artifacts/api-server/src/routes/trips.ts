@@ -90,6 +90,13 @@ router.get("/search", async (req, res) => {
 ─────────────────────────────────────────────────────────────────────────── */
 router.post("/:tripId/seats/hold", async (req, res) => {
   try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token || !tokenStore.has(token)) {
+      res.status(401).json({ error: "Authentification requise pour réserver des sièges" });
+      return;
+    }
+
     const { tripId } = req.params;
     const { seatIds } = req.body as { seatIds: string[] };
 
