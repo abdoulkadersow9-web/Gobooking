@@ -1,4 +1,4 @@
-import { Linking, Platform } from "react-native";
+import { Linking } from "react-native";
 
 function encodeWA(text: string): string {
   return encodeURIComponent(text);

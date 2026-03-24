@@ -101,7 +101,7 @@ function BookingCard({ item }: { item: Booking }) {
       <Pressable
         style={({ pressed }) => [S.waBtn, pressed && { opacity: 0.85 }]}
         onPress={(e) => {
-          e.stopPropagation();
+          e.stopPropagation?.();
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           const phone = item.contactPhone ?? "";
           if (!phone) return;
