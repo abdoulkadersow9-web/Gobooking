@@ -154,6 +154,60 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ─── Passengers for a given trip (route agent) ─────────── */
+router.get("/trip/:tripId/passengers", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+
+    // Fetch confirmed bookings for this trip
+    const bookings = await db.select().from(bookingsTable)
+      .where(eq(bookingsTable.tripId, tripId));
+
+    // Also fetch accepted boarding requests (for boarding-point info)
+    const bRequests = await db.select().from(boardingRequestsTable)
+      .where(
+        and(
+          eq(boardingRequestsTable.tripId, tripId),
+          inArray(boardingRequestsTable.status, ["accepted", "embarqué"])
+        )
+      );
+
+    // Build passenger list from bookings
+    const result: { name: string; seatNumber: string; status: string; phone?: string; boardingPoint?: string }[] = [];
+
+    for (const b of bookings) {
+      if (!["confirmed", "boarded", "validated"].includes(b.status ?? "")) continue;
+      const passengers = Array.isArray(b.passengers) ? b.passengers : [];
+      const seats = Array.isArray(b.seatNumbers) ? b.seatNumbers : [];
+      passengers.forEach((p: any, i: number) => {
+        result.push({
+          name: p.name ?? "Passager",
+          seatNumber: seats[i] ?? "?",
+          status: b.status === "boarded" ? "boarded" : "confirmed",
+        });
+      });
+    }
+
+    // Merge boarding request passengers (add phone + boardingPoint)
+    for (const r of bRequests) {
+      result.push({
+        name: r.clientName,
+        seatNumber: "—",
+        status: "boarded",
+        phone: r.clientPhone ?? undefined,
+        boardingPoint: r.boardingPoint ?? undefined,
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── Start / Arrive trip ───────────────────────────────── */
 router.post("/trip/:tripId/start", async (req, res) => {
   try {

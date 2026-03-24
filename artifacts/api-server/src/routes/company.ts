@@ -105,8 +105,27 @@ router.get("/agents", async (req, res) => {
   try {
     const user = await requireCompanyAdmin(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const agents = await db.select().from(agentsTable).orderBy(desc(agentsTable.createdAt));
-    res.json(agents);
+
+    const rows = await db
+      .select({
+        id:        agentsTable.id,
+        userId:    agentsTable.userId,
+        companyId: agentsTable.companyId,
+        busId:     agentsTable.busId,
+        tripId:    agentsTable.tripId,
+        agentCode: agentsTable.agentCode,
+        agentRole: agentsTable.agentRole,
+        status:    agentsTable.status,
+        createdAt: agentsTable.createdAt,
+        name:      usersTable.name,
+        email:     usersTable.email,
+        phone:     usersTable.phone,
+      })
+      .from(agentsTable)
+      .leftJoin(usersTable, eq(agentsTable.userId, usersTable.id))
+      .orderBy(desc(agentsTable.createdAt));
+
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }
@@ -186,6 +205,45 @@ router.post("/agents", async (req, res) => {
   } catch (err) {
     console.error("Create agent error:", err);
     res.status(500).json({ error: "Impossible de créer l'agent" });
+  }
+});
+
+/* ── Assigner un agent à un bus et/ou trajet ──────────────────────────────
+   PUT /company/agents/:id/assign
+   Body : { busId?, tripId? }
+─────────────────────────────────────────────────────────────────────────── */
+router.put("/agents/:id/assign", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentId = req.params.id;
+    const { busId, tripId } = req.body as { busId?: string | null; tripId?: string | null };
+
+    const updates: Record<string, string | null> = {};
+    if (busId  !== undefined) updates.busId  = busId  || null;
+    if (tripId !== undefined) updates.tripId = tripId || null;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: "busId ou tripId requis" });
+      return;
+    }
+
+    const result = await db
+      .update(agentsTable)
+      .set(updates as any)
+      .where(eq(agentsTable.id, agentId))
+      .returning();
+
+    if (!result.length) {
+      res.status(404).json({ error: "Agent introuvable" });
+      return;
+    }
+
+    res.json({ success: true, agent: result[0] });
+  } catch (err) {
+    console.error("Assign agent error:", err);
+    res.status(500).json({ error: "Impossible d'assigner l'agent" });
   }
 });
 

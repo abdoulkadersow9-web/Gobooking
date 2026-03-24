@@ -35,7 +35,18 @@ interface Passenger {
   name: string;
   seatNumber: string;
   status: string;
+  phone?: string;
+  boardingPoint?: string;
 }
+
+const DEMO_PASSENGERS: Passenger[] = [
+  { name: "Kouassi Ama",     seatNumber: "A3", status: "boarded",  phone: "07 01 11 22 33", boardingPoint: "Gare routière Adjamé" },
+  { name: "Traoré Youssouf", seatNumber: "A4", status: "boarded",  phone: "05 04 44 55 66", boardingPoint: "Gare routière Adjamé" },
+  { name: "Bamba Koffi",     seatNumber: "B1", status: "boarded",  phone: "01 01 77 88 99", boardingPoint: "Arrêt Cocody" },
+  { name: "Diallo Mariam",   seatNumber: "C2", status: "boarded",  phone: "07 07 22 33 44", boardingPoint: "Gare routière Adjamé" },
+  { name: "Coulibaly Jean",  seatNumber: "D5", status: "pending",  phone: "05 05 55 66 77", boardingPoint: "Arrêt Marcory" },
+  { name: "Assiéta Koné",    seatNumber: "E1", status: "pending",  phone: "01 01 88 99 00", boardingPoint: "Arrêt Marcory" },
+];
 
 export default function RouteScreen() {
   const { user, token } = useAuth();
@@ -49,7 +60,10 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"trajet" | "passagers">("trajet");
+  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts">("trajet");
+
+  const assignedTripId = user?.tripId ?? null;
+  const assignedBusId  = user?.busId  ?? null;
 
   const gps = useAgentGps(activeTrip?.id ?? null, token);
 
@@ -58,10 +72,13 @@ export default function RouteScreen() {
     setLoading(true);
     try {
       const data = await apiFetch<LiveTrip[]>("/trips/live", { token });
-      setTrips(data.filter(t => t.status === "en_route"));
-      if (!activeTrip && data.length > 0) {
-        const enRoute = data.find(t => t.status === "en_route");
-        if (enRoute) setActiveTrip(enRoute);
+      const allTrips = data.filter(t => t.status === "en_route");
+      setTrips(allTrips);
+      if (!activeTrip) {
+        const matched = assignedTripId
+          ? allTrips.find(t => t.id === assignedTripId)
+          : allTrips[0];
+        if (matched) setActiveTrip(matched);
       }
     } catch {
       const demo: LiveTrip[] = [
@@ -74,22 +91,16 @@ export default function RouteScreen() {
     } finally {
       setLoading(false);
     }
-  }, [token, activeTrip]);
+  }, [token, activeTrip, assignedTripId]);
 
   const loadPassengers = useCallback(async (tripId: string) => {
     if (!token) return;
     setPassLoading(true);
     try {
       const data = await apiFetch<Passenger[]>(`/agent/trip/${tripId}/passengers`, { token });
-      setPassengers(data);
+      setPassengers(data.length > 0 ? data : DEMO_PASSENGERS);
     } catch {
-      setPassengers([
-        { name: "Kouassi Ama",       seatNumber: "A3", status: "boarded" },
-        { name: "Traoré Youssouf",   seatNumber: "A4", status: "boarded" },
-        { name: "Bamba Koffi",       seatNumber: "B1", status: "boarded" },
-        { name: "Diallo Mariam",     seatNumber: "C2", status: "boarded" },
-        { name: "Coulibaly Jean",    seatNumber: "D5", status: "boarded" },
-      ]);
+      setPassengers(DEMO_PASSENGERS);
     } finally {
       setPassLoading(false);
     }
@@ -271,12 +282,30 @@ export default function RouteScreen() {
             </View>
           )}
 
+          {/* Assigned trip/bus badge if set */}
+          {(assignedTripId || assignedBusId) && (
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, marginBottom: 8, flexWrap: "wrap" }}>
+              {assignedBusId && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Feather name="truck" size={11} color="#059669" />
+                  <Text style={{ fontSize: 11, color: "#047857", fontWeight: "600" }}>Bus assigné</Text>
+                </View>
+              )}
+              {assignedTripId && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F0F9FF", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Feather name="navigation" size={11} color="#0369A1" />
+                  <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "600" }}>Trajet assigné</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Tabs */}
           <View style={S.tabs}>
-            {(["trajet", "passagers"] as const).map(t => (
+            {(["trajet", "passagers", "contacts"] as const).map(t => (
               <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
                 <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                  {t === "trajet" ? "📍 Trajet" : "👥 Passagers"}
+                  {t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : "📞 Contacts"}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -363,10 +392,59 @@ export default function RouteScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={S.passengerName}>{p.name}</Text>
                       <Text style={S.passengerSeat}>Siège {p.seatNumber}</Text>
+                      {p.boardingPoint && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                          <Ionicons name="location-outline" size={11} color="#7C3AED" />
+                          <Text style={{ fontSize: 11, color: "#7C3AED" }}>{p.boardingPoint}</Text>
+                        </View>
+                      )}
                     </View>
-                    <View style={[S.badge, { backgroundColor: "#DCFCE7" }]}>
-                      <Text style={[S.badgeTxt, { color: "#166534" }]}>À bord</Text>
+                    <View style={[S.badge, {
+                      backgroundColor: p.status === "boarded" ? "#DCFCE7" : "#FEF9C3",
+                    }]}>
+                      <Text style={[S.badgeTxt, { color: p.status === "boarded" ? "#166534" : "#713F12" }]}>
+                        {p.status === "boarded" ? "À bord" : "En attente"}
+                      </Text>
                     </View>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {tab === "contacts" && (
+              <>
+                <Text style={S.sectionTitle}>Contacts clients ({passengers.length})</Text>
+                {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
+                {!passLoading && passengers.length === 0 && (
+                  <Text style={S.emptySub}>Aucun contact disponible</Text>
+                )}
+                {!passLoading && passengers.map((p, i) => (
+                  <View key={i} style={[S.passengerRow, { gap: 10 }]}>
+                    <View style={[S.passengerAvatar, { backgroundColor: "#EFF6FF" }]}>
+                      <Text style={[S.passengerAvatarTxt, { color: "#1E40AF" }]}>{p.name.charAt(0)}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={S.passengerName}>{p.name}</Text>
+                      <Text style={S.passengerSeat}>Siège {p.seatNumber}</Text>
+                      {p.boardingPoint && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Ionicons name="location-outline" size={11} color="#64748B" />
+                          <Text style={{ fontSize: 11, color: "#64748B" }}>{p.boardingPoint}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {p.phone ? (
+                      <TouchableOpacity
+                        style={{ backgroundColor: "#ECFDF5", borderRadius: 10, padding: 8, alignItems: "center", justifyContent: "center" }}
+                        onPress={() => Alert.alert("Appel", `Appeler ${p.name} au ${p.phone} ?`)}
+                      >
+                        <Feather name="phone" size={18} color={G} />
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ backgroundColor: "#F1F5F9", borderRadius: 10, padding: 8 }}>
+                        <Feather name="phone-off" size={18} color="#94A3B8" />
+                      </View>
+                    )}
                   </View>
                 ))}
               </>

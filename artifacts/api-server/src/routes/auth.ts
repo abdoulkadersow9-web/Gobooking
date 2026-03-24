@@ -121,9 +121,17 @@ router.post("/login", async (req, res) => {
     tokenStore.set(token, user.id);
 
     let agentRole: string | null = null;
+    let busId: string | null = null;
+    let tripId: string | null = null;
+    let companyId: string | null = null;
     if (user.role === "agent") {
       const agentRecord = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
-      if (agentRecord.length > 0) agentRole = agentRecord[0].agentRole ?? null;
+      if (agentRecord.length > 0) {
+        agentRole  = agentRecord[0].agentRole  ?? null;
+        busId      = agentRecord[0].busId      ?? null;
+        tripId     = agentRecord[0].tripId     ?? null;
+        companyId  = agentRecord[0].companyId  ?? null;
+      }
     }
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.LOGIN_OK, user.id, "user", { email: user.email }).catch(() => {});
@@ -137,6 +145,9 @@ router.post("/login", async (req, res) => {
         phone: user.phone,
         role: user.role,
         agentRole,
+        busId,
+        tripId,
+        companyId,
         status: user.status,
         referralCode: user.referralCode ?? user.id.slice(0, 6).toUpperCase(),
         walletBalance: user.walletBalance ?? 0,
@@ -179,9 +190,17 @@ router.get("/me", async (req, res) => {
     }
 
     let agentRole: string | null = null;
+    let busId: string | null = null;
+    let tripId: string | null = null;
+    let companyId: string | null = null;
     if (user.role === "agent") {
       const agentRecord = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
-      if (agentRecord.length > 0) agentRole = agentRecord[0].agentRole ?? null;
+      if (agentRecord.length > 0) {
+        agentRole  = agentRecord[0].agentRole  ?? null;
+        busId      = agentRecord[0].busId      ?? null;
+        tripId     = agentRecord[0].tripId     ?? null;
+        companyId  = agentRecord[0].companyId  ?? null;
+      }
     }
 
     res.json({
@@ -191,6 +210,9 @@ router.get("/me", async (req, res) => {
       phone: user.phone,
       role: user.role,
       agentRole,
+      busId,
+      tripId,
+      companyId,
       status: user.status,
       referralCode: user.referralCode ?? user.id.slice(0, 6).toUpperCase(),
       walletBalance: user.walletBalance ?? 0,

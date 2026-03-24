@@ -40,7 +40,7 @@ interface Trip { id: string; from: string; to: string; date: string; departureTi
 interface Reservation { id: string; bookingRef: string; tripId: string; totalAmount: number; status: string; paymentMethod: string; passengers: { name: string; seatNumber: string }[]; seatNumbers: string[]; createdAt: string }
 interface SeatItem { id: string; number: string; row: number; column: number; type: string; status: string; price: number; bookingRef?: string | null; bookingStatus?: string | null; passenger?: { name: string; seatNumber: string } | null }
 interface Parcel { id: string; trackingRef: string; fromCity: string; toCity: string; senderName: string; receiverName: string; weight: number; status: string; amount: number }
-interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; status: string; agentRole?: string; email?: string }
+interface AgentItem { id: string; name: string; agentCode: string; phone: string; bus: string; busId: string; tripId?: string; tripName?: string; status: string; agentRole?: string; email?: string }
 interface WalletTx { id: string; bookingRef?: string | null; type: string; grossAmount: number; commissionAmount: number; netAmount: number; description?: string | null; createdAt: string }
 interface WalletData { balance: number; totalGross: number; totalCommission: number; totalNet: number; transactions: WalletTx[] }
 interface Invoice { id: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
@@ -100,12 +100,12 @@ const DEMO_PARCELS: Parcel[] = [
 ];
 
 const DEMO_AGENTS: AgentItem[] = [
-  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", status: "active",   agentRole: "embarquement" },
-  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", status: "active",   agentRole: "vente" },
-  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", status: "active",   agentRole: "reception_colis" },
-  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   status: "inactive", agentRole: "vente" },
-  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", status: "active",   agentRole: "route" },
-  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", status: "active",   agentRole: "validation" },
+  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", tripId: "t1", tripName: "Abidjan → Bouaké",    status: "active",   agentRole: "embarquement" },
+  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", tripId: "t1", tripName: "Abidjan → Bouaké",    status: "active",   agentRole: "vente" },
+  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", tripId: "t3", tripName: "Korhogo → Abidjan",   status: "active",   agentRole: "reception_colis" },
+  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   tripId: "",   tripName: "",                    status: "inactive", agentRole: "vente" },
+  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", tripId: "t2", tripName: "Abidjan → Yamoussoukro", status: "active", agentRole: "route" },
+  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", tripId: "t4", tripName: "Abidjan → San Pedro", status: "active",   agentRole: "validation" },
 ];
 
 /* ─── Seat grid generator ────────────────────────────────── */
@@ -292,6 +292,7 @@ export default function CompanyDashboard() {
   const [addTripModal, setAddTripModal] = useState(false);
   const [addAgentModal, setAddAgentModal] = useState(false);
   const [assignAgentModal, setAssignAgentModal] = useState<AgentItem | null>(null);
+  const [assignState, setAssignState] = useState<{ busId: string; busName: string; tripId: string; tripName: string; saving: boolean; error: string }>({ busId: "", busName: "", tripId: "", tripName: "", saving: false, error: "" });
   const [addReservationModal, setAddReservationModal] = useState(false);
   const [addParcelModal, setAddParcelModal] = useState(false);
 
@@ -602,9 +603,30 @@ export default function CompanyDashboard() {
     setNewAgent({ name: "", phone: "", email: "", password: "", agentCode: "", busId: "", busName: "", agentRole: "" });
   };
 
-  const handleAssignAgent = (agent: AgentItem, bus: Bus) => {
-    setAgents(p => p.map(a => a.id === agent.id ? { ...a, bus: bus.busName, busId: bus.id, status: "active" } : a));
-    setAssignAgentModal(null);
+  const openAssignModal = (agent: AgentItem) => {
+    setAssignState({ busId: agent.busId || "", busName: agent.bus || "", tripId: agent.tripId || "", tripName: agent.tripName || "", saving: false, error: "" });
+    setAssignAgentModal(agent);
+  };
+
+  const handleSaveAssignment = async () => {
+    if (!assignAgentModal) return;
+    setAssignState(p => ({ ...p, saving: true, error: "" }));
+    try {
+      if (token) {
+        await apiFetch(`/company/agents/${assignAgentModal.id}/assign`, {
+          token,
+          method: "PUT",
+          body: { busId: assignState.busId || null, tripId: assignState.tripId || null },
+        });
+      }
+      setAgents(p => p.map(a => a.id === assignAgentModal.id
+        ? { ...a, bus: assignState.busName || "Non assigné", busId: assignState.busId, tripId: assignState.tripId, tripName: assignState.tripName, status: assignState.busId ? "active" : a.status }
+        : a
+      ));
+      setAssignAgentModal(null);
+    } catch {
+      setAssignState(p => ({ ...p, error: "Erreur lors de l'assignation. Veuillez réessayer.", saving: false }));
+    }
   };
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -1200,6 +1222,12 @@ export default function CompanyDashboard() {
               <View style={{ flex: 1 }}>
                 <Text style={S.listTitle}>{agent.name}</Text>
                 <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
+                {agent.tripName ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                    <Feather name="navigation" size={10} color="#7C3AED" />
+                    <Text style={[S.listSub, { color: "#7C3AED", fontSize: 11 }]}>{agent.tripName}</Text>
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
                   {agent.agentRole && (
                     <View style={[S.badge, { backgroundColor: roleMeta.bg }]}>
@@ -1218,7 +1246,7 @@ export default function CompanyDashboard() {
                     {agent.status === "active" ? "Actif" : "Inactif"}
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => setAssignAgentModal(agent)} style={S.assignBtn}>
+                <TouchableOpacity onPress={() => openAssignModal(agent)} style={S.assignBtn}>
                   <Feather name="link" size={10} color="#7C3AED" />
                   <Text style={S.assignBtnText}>Assigner</Text>
                 </TouchableOpacity>
@@ -1949,20 +1977,97 @@ export default function CompanyDashboard() {
         </View>
       </Modal>
 
-      {/* ─────────── Assign Agent to Bus Modal ─────────── */}
+      {/* ─────────── Assign Agent to Bus + Trip Modal ─────────── */}
       {assignAgentModal && (
         <Modal visible={true} transparent animationType="slide">
           <View style={S.modalOverlay}>
             <ScrollView contentContainerStyle={S.modalCard} keyboardShouldPersistTaps="handled">
               <View style={S.modalHeader}>
-                <Text style={S.modalTitle}>Assigner {assignAgentModal.name}</Text>
+                <View>
+                  <Text style={S.modalTitle}>Assigner {assignAgentModal.name}</Text>
+                  {assignAgentModal.agentRole && (
+                    <View style={[S.badge, { backgroundColor: AGENT_ROLE_META[assignAgentModal.agentRole]?.bg || "#F1F5F9", marginTop: 4 }]}>
+                      <Text style={[S.badgeText, { color: AGENT_ROLE_META[assignAgentModal.agentRole]?.text || "#64748B" }]}>
+                        {AGENT_ROLE_META[assignAgentModal.agentRole]?.label || assignAgentModal.agentRole}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 <Pressable onPress={() => setAssignAgentModal(null)}><Feather name="x" size={20} color="#64748B" /></Pressable>
               </View>
-              <Text style={[S.subLabel, { marginBottom: 12 }]}>Choisissez le bus à assigner à cet agent :</Text>
-              <BusSelector buses={buses} selected={assignAgentModal.busId} onSelect={bus => handleAssignAgent(assignAgentModal, bus)} />
-              <Pressable style={[S.modalCancel, { marginTop: 8 }]} onPress={() => setAssignAgentModal(null)}>
-                <Text style={S.modalCancelText}>Fermer</Text>
-              </Pressable>
+
+              {/* Bus Selector */}
+              <Text style={S.subLabel}>Bus assigné</Text>
+              <BusSelector
+                buses={buses}
+                selected={assignState.busId}
+                onSelect={bus => setAssignState(p => ({ ...p, busId: bus.id, busName: bus.busName }))}
+              />
+
+              {/* Trip Selector */}
+              <Text style={[S.subLabel, { marginTop: 16 }]}>Trajet assigné</Text>
+              {trips.length === 0 ? (
+                <Text style={[S.listSub, { marginBottom: 8, color: "#94A3B8" }]}>Aucun trajet disponible</Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
+                  <Pressable
+                    onPress={() => setAssignState(p => ({ ...p, tripId: "", tripName: "" }))}
+                    style={[S.chipBase, { borderColor: !assignState.tripId ? "#7C3AED" : "#E2E8F0", backgroundColor: !assignState.tripId ? "#F5F3FF" : "#F8FAFC" }]}
+                  >
+                    <Text style={[S.chipText, { color: !assignState.tripId ? "#7C3AED" : "#64748B" }]}>Aucun</Text>
+                  </Pressable>
+                  {trips.map(t => {
+                    const sel = assignState.tripId === t.id;
+                    const label = `${t.from} → ${t.to}`;
+                    return (
+                      <Pressable
+                        key={t.id}
+                        onPress={() => setAssignState(p => ({ ...p, tripId: t.id, tripName: label }))}
+                        style={[S.chipBase, { borderColor: sel ? "#7C3AED" : "#E2E8F0", backgroundColor: sel ? "#F5F3FF" : "#F8FAFC" }]}
+                      >
+                        <Feather name="navigation" size={11} color={sel ? "#7C3AED" : "#94A3B8"} />
+                        <View>
+                          <Text style={[S.chipText, { color: sel ? "#7C3AED" : "#475569" }]}>{label}</Text>
+                          <Text style={[S.chipText, { color: "#94A3B8", fontSize: 10 }]}>{t.date} · {t.departureTime}</Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {/* Current assignment summary */}
+              {(assignState.busId || assignState.tripId) && (
+                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 10, padding: 12, marginTop: 8, gap: 4 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: "#065F46" }}>Assignation actuelle :</Text>
+                  {assignState.busId ? (
+                    <Text style={{ fontSize: 12, color: "#047857" }}>Bus : {assignState.busName}</Text>
+                  ) : null}
+                  {assignState.tripId ? (
+                    <Text style={{ fontSize: 12, color: "#047857" }}>Trajet : {assignState.tripName}</Text>
+                  ) : null}
+                </View>
+              )}
+
+              {assignState.error ? (
+                <Text style={{ color: "#EF4444", fontSize: 12, marginTop: 8 }}>{assignState.error}</Text>
+              ) : null}
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+                <Pressable style={[S.modalCancel, { flex: 1 }]} onPress={() => setAssignAgentModal(null)}>
+                  <Text style={S.modalCancelText}>Annuler</Text>
+                </Pressable>
+                <Pressable
+                  style={[S.modalSubmit, { flex: 1, backgroundColor: "#7C3AED", opacity: assignState.saving ? 0.6 : 1 }]}
+                  onPress={handleSaveAssignment}
+                  disabled={assignState.saving}
+                >
+                  {assignState.saving
+                    ? <ActivityIndicator size="small" color="#FFF" />
+                    : <Text style={S.modalSubmitText}>Enregistrer</Text>
+                  }
+                </Pressable>
+              </View>
             </ScrollView>
           </View>
         </Modal>
@@ -2227,6 +2332,9 @@ const S = StyleSheet.create({
 
   badge:          { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   badgeText:      { fontSize: 11, fontWeight: "600" },
+
+  chipBase:       { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  chipText:       { fontSize: 12, fontWeight: "600" },
 
   agentAvatar:    { width: 42, height: 42, borderRadius: 21, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
   agentAvatarText:{ fontSize: 16, fontWeight: "700", color: PRIMARY },
