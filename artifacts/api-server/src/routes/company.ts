@@ -855,6 +855,119 @@ router.get("/analytics", async (req, res) => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD — Statistiques consolidées (filtrées par companyId)
+   GET /company/dashboard
+═══════════════════════════════════════════════════════════════════════════ */
+
+router.get("/dashboard", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { companyId } = ctx;
+
+    // ── Fetch raw data filtered by company ─────────────────────────────
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.companyId, companyId));
+    const tripIds = trips.map(t => t.id);
+
+    const [bookings, parcels, buses] = await Promise.all([
+      tripIds.length
+        ? db.select().from(bookingsTable).where(inArray(bookingsTable.tripId, tripIds))
+        : Promise.resolve([] as (typeof bookingsTable.$inferSelect)[]),
+      db.select().from(parcelsTable).where(eq(parcelsTable.companyId, companyId)),
+      db.select().from(busesTable).where(eq(busesTable.companyId, companyId)),
+    ]);
+
+    // ── Booking stats ─────────────────────────────────────────────────
+    const bookingStats = {
+      total:     bookings.length,
+      confirmed: bookings.filter(b => b.status === "confirmed").length,
+      paid:      bookings.filter(b => b.paymentStatus === "payé" || b.paymentStatus === "paid").length,
+      boarded:   bookings.filter(b => b.status === "boarded").length,
+      cancelled: bookings.filter(b => b.status === "cancelled").length,
+      pending:   bookings.filter(b => b.status === "pending").length,
+    };
+
+    // ── Parcel stats ──────────────────────────────────────────────────
+    const parcelStats = {
+      total:       parcels.length,
+      créé:        parcels.filter(p => p.status === "créé").length,
+      en_gare:     parcels.filter(p => p.status === "en_gare").length,
+      chargé_bus:  parcels.filter(p => p.status === "chargé_bus").length,
+      en_transit:  parcels.filter(p => p.status === "en_transit").length,
+      arrivé:      parcels.filter(p => p.status === "arrivé").length,
+      livré:       parcels.filter(p => p.status === "livré").length,
+      annulé:      parcels.filter(p => p.status === "annulé").length,
+    };
+
+    // ── Revenue ───────────────────────────────────────────────────────
+    const paidBookings = bookings.filter(b =>
+      b.paymentStatus === "payé" || b.paymentStatus === "paid"
+    );
+    const bookingRevenue = paidBookings.reduce((s, b) => s + (b.totalAmount || 0), 0);
+    const parcelRevenue  = parcels.filter(p => p.status !== "annulé").reduce((s, p) => s + (p.amount || 0), 0);
+    const totalRevenue   = bookingRevenue + parcelRevenue;
+
+    // ── Active trips (en_cours) ───────────────────────────────────────
+    const activeTrips = trips
+      .filter(t => t.status === "en_cours")
+      .map(t => ({
+        id: t.id,
+        from: t.from,
+        to: t.to,
+        date: t.date,
+        departureTime: t.departureTime,
+        busName: t.busName,
+        status: t.status,
+        totalSeats: t.totalSeats,
+      }));
+
+    // ── Daily data: last 7 days ───────────────────────────────────────
+    const today = new Date();
+    const dailyData: { date: string; count: number; revenue: number; parcels: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+
+      const dayBooks = bookings.filter(b => {
+        const bd = b.createdAt ? new Date(b.createdAt).toISOString().slice(0, 10) : "";
+        return bd === key;
+      });
+      const dayParcels = parcels.filter(p => {
+        const pd = p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : "";
+        return pd === key;
+      });
+
+      dailyData.push({
+        date: key,
+        count: dayBooks.length,
+        revenue: dayBooks
+          .filter(b => b.paymentStatus === "payé" || b.paymentStatus === "paid")
+          .reduce((s, b) => s + (b.totalAmount || 0), 0),
+        parcels: dayParcels.length,
+      });
+    }
+
+    res.json({
+      bookingStats,
+      parcelStats,
+      revenue: { totalRevenue, bookingRevenue, parcelRevenue },
+      activeTrips,
+      dailyData,
+      summary: {
+        totalBuses: buses.length,
+        activeBuses: buses.filter(b => b.status === "active").length,
+        totalTrips: trips.length,
+        activeTripsCount: activeTrips.length,
+      },
+    });
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
    FACTURATION — Invoices
    GET  /company/invoices          — list company invoices
    POST /company/invoices/generate — generate/refresh invoice for a period
