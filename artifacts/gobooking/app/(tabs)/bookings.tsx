@@ -250,13 +250,22 @@ export default function BookingsScreen() {
             <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""}</Text>
           )}
         </View>
-        <Pressable
-          style={styles.historyBtn}
-          onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
-        >
-          <Feather name="clock" size={15} color={Colors.light.primary} />
-          <Text style={styles.historyBtnText}>Paiements</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+            style={styles.historyBtn}
+            onPress={() => { Haptics.selectionAsync(); router.push("/client/factures" as any); }}
+          >
+            <Feather name="file-text" size={15} color={Colors.light.primary} />
+            <Text style={styles.historyBtnText}>Factures</Text>
+          </Pressable>
+          <Pressable
+            style={styles.historyBtn}
+            onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
+          >
+            <Feather name="clock" size={15} color={Colors.light.primary} />
+            <Text style={styles.historyBtnText}>Paiements</Text>
+          </Pressable>
+        </View>
       </View>
 
       {loading ? (

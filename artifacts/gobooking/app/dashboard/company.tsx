@@ -22,6 +22,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 import DashboardCharts from "@/components/DashboardCharts";
+import { downloadCompanyInvoice, type CompanyInvoiceData } from "@/utils/invoicePdf";
 
 const PRIMARY = Colors.light.primary;
 const DARK = Colors.light.primaryDark;
@@ -272,6 +273,7 @@ export default function CompanyDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invLoading, setInvLoading] = useState(false);
   const [invGenerating, setInvGenerating] = useState(false);
+  const [invDownloadingId, setInvDownloadingId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<CompanySubscription | null>(null);
   const [subLoading, setSubLoading] = useState(false);
   const [subChanging, setSubChanging] = useState(false);
@@ -1442,16 +1444,45 @@ export default function CompanyDashboard() {
                   </Text>
                 )}
 
-                <TouchableOpacity
-                  style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 6 }}
-                  onPress={() => Share.share({
-                    title: `Facture GoBooking — ${moLabel}`,
-                    message: `Facture GoBooking — ${moLabel}\n\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
-                  })}
-                >
-                  <Feather name="share-2" size={13} color="#64748B" />
-                  <Text style={[S.listSub, { color: PRIMARY }]}>Partager la facture</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#0B3C5D", paddingVertical: 9, borderRadius: 10, opacity: invDownloadingId === inv.id ? 0.6 : 1 }}
+                    disabled={invDownloadingId === inv.id}
+                    onPress={async () => {
+                      setInvDownloadingId(inv.id);
+                      const data: CompanyInvoiceData = {
+                        invoiceId: inv.id,
+                        companyName: user?.name || "Ma Compagnie",
+                        period: inv.period,
+                        totalGross: inv.totalGross,
+                        totalCommission: inv.totalCommission,
+                        totalNet: inv.totalNet,
+                        transactionCount: inv.transactionCount,
+                        status: inv.status,
+                        paidAt: inv.paidAt,
+                        createdAt: inv.createdAt,
+                      };
+                      await downloadCompanyInvoice(data);
+                      setInvDownloadingId(null);
+                    }}
+                  >
+                    {invDownloadingId === inv.id
+                      ? <ActivityIndicator size={13} color="#fff" />
+                      : <Feather name="download" size={13} color="#fff" />}
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#fff" }}>
+                      {invDownloadingId === inv.id ? "Génération…" : "Télécharger PDF"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, backgroundColor: "#F1F5F9", flexDirection: "row", alignItems: "center", gap: 6 }}
+                    onPress={() => Share.share({
+                      title: `Facture GoBooking — ${moLabel}`,
+                      message: `Facture GoBooking — ${moLabel}\n\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
+                    })}
+                  >
+                    <Feather name="share-2" size={13} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}

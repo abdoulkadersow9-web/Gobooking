@@ -25,6 +25,7 @@ export default function ClientLayout() {
       <Stack.Screen name="home" />
       <Stack.Screen name="reservation" />
       <Stack.Screen name="colis" />
+      <Stack.Screen name="factures" />
     </Stack>
   );
 }

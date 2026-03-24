@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import { downloadReceipt, type ReceiptData } from "@/utils/invoicePdf";
 
 interface Booking {
   id: string;
@@ -63,10 +64,11 @@ const METHOD_ICONS: Record<string, { label: string; color: string }> = {
 export default function BookingDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
   useEffect(() => {
@@ -112,6 +114,31 @@ export default function BookingDetailScreen() {
         },
       ]
     );
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!booking) return;
+    setGeneratingPdf(true);
+    const baseAmount = booking.totalAmount - (booking.bagagePrice || 0);
+    const receiptData: ReceiptData = {
+      bookingRef: booking.bookingRef,
+      transactionId: booking.id,
+      clientName: user?.name ?? "Client",
+      clientEmail: booking.contactEmail,
+      clientPhone: booking.contactPhone,
+      trip: booking.trip,
+      passengers: booking.passengers,
+      seatNumbers: booking.seatNumbers,
+      baseAmount,
+      bagageAmount: booking.bagagePrice || 0,
+      totalAmount: booking.totalAmount,
+      paymentMethod: booking.paymentMethod,
+      paymentStatus: booking.paymentStatus,
+      status: booking.status,
+      createdAt: booking.createdAt,
+    };
+    await downloadReceipt(receiptData);
+    setGeneratingPdf(false);
   };
 
   if (loading) {
@@ -353,6 +380,24 @@ export default function BookingDetailScreen() {
           >
             <Feather name="credit-card" size={16} color="white" />
             <Text style={styles.payNowBtnText}>Payer {booking.totalAmount.toLocaleString()} FCFA</Text>
+          </Pressable>
+        )}
+
+        {/* Télécharger la facture — disponible si payé */}
+        {booking.paymentStatus === "paid" && (
+          <Pressable
+            style={({ pressed }) => [styles.downloadInvoiceBtn, pressed && { opacity: 0.8 }, generatingPdf && { opacity: 0.7 }]}
+            onPress={handleDownloadPdf}
+            disabled={generatingPdf}
+          >
+            {generatingPdf ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Feather name="download" size={16} color="#fff" />
+                <Text style={styles.downloadInvoiceBtnText}>Télécharger la facture</Text>
+              </>
+            )}
           </Pressable>
         )}
 
@@ -688,6 +733,21 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
+  },
+  downloadInvoiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#0B3C5D",
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  downloadInvoiceBtnText: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   cancelBtn: {
     flexDirection: "row",

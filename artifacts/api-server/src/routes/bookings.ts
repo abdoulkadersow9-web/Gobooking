@@ -548,6 +548,67 @@ router.get("/recommendations", async (req, res) => {
   }
 });
 
+/* ── GET /bookings/my-receipts — liste des reçus du client connecté ─────────── */
+router.get("/my-receipts", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const userRow = await db
+      .select({ name: usersTable.name, email: usersTable.email, phone: usersTable.phone })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+    const user = userRow[0];
+
+    const bookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(eq(bookingsTable.userId, userId))
+      .orderBy(desc(bookingsTable.createdAt));
+
+    const receipts = await Promise.all(
+      bookings.map(async (b) => {
+        const tripRows = await db
+          .select()
+          .from(tripsTable)
+          .where(eq(tripsTable.id, b.tripId))
+          .limit(1);
+        const trip = tripRows[0];
+        return {
+          id: b.id,
+          bookingRef: b.bookingRef,
+          status: b.status,
+          paymentStatus: b.paymentStatus,
+          totalAmount: b.totalAmount,
+          bagagePrice: (b as any).bagagePrice || 0,
+          paymentMethod: b.paymentMethod,
+          createdAt: b.createdAt?.toISOString() || new Date().toISOString(),
+          trip: trip ? {
+            from: trip.from,
+            to: trip.to,
+            date: trip.date,
+            departureTime: trip.departureTime,
+            arrivalTime: trip.arrivalTime,
+            busName: trip.busName,
+            busType: trip.busType,
+          } : null,
+          passengers: b.passengers,
+          seatNumbers: b.seatNumbers,
+          clientName: user?.name || "Client",
+          clientEmail: user?.email || b.contactEmail,
+          clientPhone: user?.phone || b.contactPhone,
+        };
+      })
+    );
+
+    res.json(receipts);
+  } catch (err) {
+    console.error("My receipts error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 router.get("/:bookingId", async (req, res) => {
   try {
     const full = await getFullBooking(req.params.bookingId);
