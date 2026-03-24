@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, tripsTable, seatsTable, positionsTable, agentsTable, usersTable, busesTable, busPositionsTable, boardingRequestsTable } from "@workspace/db";
-import { eq, and, ilike, inArray, desc } from "drizzle-orm";
+import { eq, and, ilike, inArray, desc, sql } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
 import { tokenStore } from "./auth";
@@ -460,6 +460,13 @@ router.post("/:tripId/request", async (req, res) => {
       boardingPoint:  boardingPoint.trim(),
       seatsRequested: String(seats),
       status:         "pending",
+    }).then(() => {
+      /* Store GPS pickup location (extra columns added via SQL migration) */
+      if (typeof pickupLat === "number" && typeof pickupLon === "number") {
+        return db.execute(
+          sql`UPDATE boarding_requests SET pickup_lat = ${pickupLat}, pickup_lon = ${pickupLon} WHERE id = ${id}`
+        );
+      }
     }).catch(err => console.error("boarding_requests insert error:", err));
 
     res.status(201).json({ success: true, requestId: id });

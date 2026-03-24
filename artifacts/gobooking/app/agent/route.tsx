@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -436,7 +436,8 @@ export default function RouteScreen() {
                     {p.phone ? (
                       <TouchableOpacity
                         style={{ backgroundColor: "#ECFDF5", borderRadius: 10, padding: 8, alignItems: "center", justifyContent: "center" }}
-                        onPress={() => Alert.alert("Appel", `Appeler ${p.name} au ${p.phone} ?`)}
+                        onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                        activeOpacity={0.7}
                       >
                         <Feather name="phone" size={18} color={G} />
                       </TouchableOpacity>

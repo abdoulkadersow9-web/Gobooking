@@ -325,6 +325,64 @@ router.post("/trip/:tripId/location", async (req, res) => {
     })
     .catch(err => console.error("bus_positions upsert error:", err));
 
+    /* ── 4. Proximity notifications — "Bus proche" ───────────────────────
+       After persisting the position, check if any pending boarding_requests
+       for this trip have a pickup location (pickup_lat / pickup_lon) within
+       NEARBY_KM km. If so, send a push notification once (notified_nearby).
+    ──────────────────────────────────────────────────────────────────────── */
+    const NEARBY_KM = 5;
+    const haversineKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2
+              + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+              * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    /* Run proximity check asynchronously — don't block the response */
+    const tripIdForProx = req.params.tripId;
+    (async () => {
+      try {
+        /* Get pending boarding_requests with a pickup location, not yet notified */
+        const nearby = await db.execute(
+          sql`SELECT br.id, br.user_id, br.client_name, br.boarding_point,
+                     br.pickup_lat, br.pickup_lon, u.push_token
+              FROM boarding_requests br
+              LEFT JOIN users u ON u.id = br.user_id
+              WHERE br.trip_id = ${tripIdForProx}
+                AND br.status IN ('pending', 'accepted')
+                AND br.notified_nearby IS NOT TRUE
+                AND br.pickup_lat IS NOT NULL
+                AND br.pickup_lon IS NOT NULL`
+        );
+        const rows = (nearby as any).rows ?? nearby ?? [];
+        for (const row of (Array.isArray(rows) ? rows : [])) {
+          const pLat = Number(row.pickup_lat);
+          const pLon = Number(row.pickup_lon);
+          if (isNaN(pLat) || isNaN(pLon)) continue;
+          const dist = haversineKm(lat, lon, pLat, pLon);
+          if (dist <= NEARBY_KM) {
+            /* Mark as notified first (prevents duplicate sends on rapid GPS) */
+            await db.execute(
+              sql`UPDATE boarding_requests SET notified_nearby = true WHERE id = ${row.id}`
+            );
+            /* Send push notification if user has a push token */
+            if (row.push_token) {
+              sendExpoPush(
+                row.push_token,
+                "GoBooking 🚌 Bus proche !",
+                `Votre bus arrive dans environ ${Math.round(dist * 10) / 10} km de votre position. Préparez-vous !`
+              ).catch(() => {});
+            }
+          }
+        }
+      } catch {
+        /* Proximity check is best-effort — never block the GPS response */
+      }
+    })();
+
     res.json({ success: true, updatedAt: Date.now() });
   } catch (err) {
     console.error("GPS push error:", err);
