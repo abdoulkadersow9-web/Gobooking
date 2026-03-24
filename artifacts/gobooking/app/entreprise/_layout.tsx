@@ -42,6 +42,7 @@ export default function EntrepriseLayout() {
       <Stack.Screen name="carburant" />
       <Stack.Screen name="bus-agents" />
       <Stack.Screen name="rentabilite" />
+      <Stack.Screen name="comparaison" />
     </Stack>
   );
 }
