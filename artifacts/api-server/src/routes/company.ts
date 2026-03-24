@@ -1022,6 +1022,30 @@ router.post("/trips", async (req, res) => {
       companyId: ctx.companyId,
       busId: busId || null,
     } as any).returning();
+
+    /* Générer les sièges automatiquement */
+    const colLabels = ["A", "B", "C", "D"];
+    const numRows = Math.ceil(resolvedSeats / 4);
+    const seatRows: any[] = [];
+    for (let row = 1; row <= numRows; row++) {
+      for (let col = 1; col <= 4; col++) {
+        if ((row - 1) * 4 + col > resolvedSeats) break;
+        seatRows.push({
+          id:     `${id}-r${row}c${col}`,
+          tripId: id,
+          number: `${row}${colLabels[col - 1]}`,
+          row,
+          column: col,
+          type:   col === 1 || col === 4 ? "window" : "aisle",
+          status: "available",
+          price:  Number(price),
+        });
+      }
+    }
+    if (seatRows.length > 0) {
+      await db.insert(seatsTable).values(seatRows).onConflictDoNothing();
+    }
+
     res.json(trip[0]);
   } catch (err) {
     res.status(500).json({ error: "Failed to create trip" });
@@ -1068,21 +1092,6 @@ router.post("/trips/:id/end", async (req, res) => {
     res.json({ success: true, status: "completed" });
   } catch (err) {
     res.status(500).json({ error: "Impossible de terminer le trajet" });
-  }
-});
-
-router.get("/reservations", async (req, res) => {
-  try {
-    const user = await requireCompanyAdmin(req.headers.authorization);
-    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const bookings = await db.select().from(bookingsTable).orderBy(desc(bookingsTable.createdAt));
-    res.json(bookings.map(b => ({
-      id: b.id, bookingRef: b.bookingRef, tripId: b.tripId, totalAmount: b.totalAmount,
-      status: b.status, paymentMethod: b.paymentMethod, passengers: b.passengers,
-      seatNumbers: b.seatNumbers, createdAt: b.createdAt?.toISOString(),
-    })));
-  } catch (err) {
-    res.status(500).json({ error: "Failed" });
   }
 });
 
@@ -1145,6 +1154,73 @@ router.post("/reservations", async (req, res) => {
   } catch (err) {
     console.error("Company create reservation error:", err);
     res.status(500).json({ error: "Échec de la création de la réservation" });
+  }
+});
+
+/* ── Lister les réservations de la compagnie (données enrichies) ──────────
+   GET /company/reservations
+   Retourne les réservations avec infos client, trajet et paiement
+─────────────────────────────────────────────────────────────────────────── */
+router.get("/reservations", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    /* Récupérer tous les trajets de la compagnie */
+    const companyTrips = await db.select().from(tripsTable)
+      .where(eq(tripsTable.companyId, ctx.companyId));
+    const tripIds = companyTrips.map(t => t.id);
+    const tripMap = new Map(companyTrips.map(t => [t.id, t]));
+
+    if (!tripIds.length) { res.json([]); return; }
+
+    /* Récupérer les réservations pour ces trajets */
+    const bookings = await db.select().from(bookingsTable)
+      .where(inArray(bookingsTable.tripId, tripIds))
+      .orderBy(desc(bookingsTable.createdAt));
+
+    if (!bookings.length) { res.json([]); return; }
+
+    /* Récupérer les infos utilisateurs */
+    const userIds = [...new Set(bookings.map(b => b.userId))];
+    const users = await db.select({ id: usersTable.id, name: usersTable.name, phone: usersTable.phone, email: usersTable.email })
+      .from(usersTable).where(inArray(usersTable.id, userIds));
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    const enriched = bookings.map(b => {
+      const trip = tripMap.get(b.tripId);
+      const user = userMap.get(b.userId);
+      const firstPassenger = Array.isArray(b.passengers) && b.passengers.length > 0
+        ? (b.passengers[0] as any) : null;
+      const clientName = user?.name || firstPassenger?.name || "Client";
+      const clientPhone = b.contactPhone || user?.phone || "";
+      const clientEmail = b.contactEmail || user?.email || "";
+
+      return {
+        id:            b.id,
+        bookingRef:    b.bookingRef,
+        clientName,
+        clientPhone,
+        clientEmail,
+        tripId:        b.tripId,
+        tripFrom:      trip?.from ?? "",
+        tripTo:        trip?.to ?? "",
+        tripDate:      trip?.date ?? "",
+        tripDeparture: trip?.departureTime ?? "",
+        totalAmount:   b.totalAmount,
+        paymentMethod: b.paymentMethod,
+        paymentStatus: b.paymentStatus,
+        status:        b.status,
+        seatNumbers:   b.seatNumbers,
+        passengers:    b.passengers,
+        createdAt:     b.createdAt?.toISOString(),
+      };
+    });
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("GET /company/reservations error:", err);
+    res.status(500).json({ error: "Échec de la récupération des réservations" });
   }
 });
 

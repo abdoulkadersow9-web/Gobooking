@@ -384,7 +384,38 @@ router.get("/:tripId", async (req, res) => {
 router.get("/:tripId/seats", async (req, res) => {
   try {
     const { tripId } = req.params;
-    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
+    let seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
+
+    /* Si aucun siège n'existe pour ce trajet, les générer automatiquement */
+    if (seats.length === 0) {
+      const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+      if (trips.length) {
+        const trip = trips[0];
+        const totalSeats = trip.totalSeats || 44;
+        const colLabels = ["A", "B", "C", "D"];
+        const numRows = Math.ceil(totalSeats / 4);
+        const seatRows: any[] = [];
+        for (let row = 1; row <= numRows; row++) {
+          for (let col = 1; col <= 4; col++) {
+            if ((row - 1) * 4 + col > totalSeats) break;
+            seatRows.push({
+              id:     `${tripId}-r${row}c${col}`,
+              tripId,
+              number: `${row}${colLabels[col - 1]}`,
+              row,
+              column: col,
+              type:   col === 1 || col === 4 ? "window" : "aisle",
+              status: "available",
+              price:  trip.price || 0,
+            });
+          }
+        }
+        if (seatRows.length > 0) {
+          await db.insert(seatsTable).values(seatRows).onConflictDoNothing();
+          seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, tripId));
+        }
+      }
+    }
 
     res.json(seats.map((s) => ({
       id:     s.id,

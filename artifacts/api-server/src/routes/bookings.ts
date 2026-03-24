@@ -268,6 +268,10 @@ router.post("/", async (req, res) => {
     const newBookingRef = generateRef();
     const qrCode        = generateQRPayload(newBookingRef, tripId);
 
+    /* Récupérer le companyId depuis le trajet */
+    const tripRows = await db.select({ companyId: tripsTable.companyId }).from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    const companyId = tripRows[0]?.companyId ?? null;
+
     await db
       .insert(bookingsTable)
       .values({
@@ -275,6 +279,7 @@ router.post("/", async (req, res) => {
         bookingRef: newBookingRef,
         userId,
         tripId,
+        companyId,
         seatIds,
         seatNumbers,
         passengers,
