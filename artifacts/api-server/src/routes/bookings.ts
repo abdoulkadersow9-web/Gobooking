@@ -100,6 +100,7 @@ async function getFullBooking(bookingId: string) {
       availableSeats: 0,
       duration: trip.duration,
       amenities: trip.amenities,
+      companyId: (trip as any).companyId ?? null,
     } : null,
     seatIds: booking.seatIds,
     seatNumbers: booking.seatNumbers,

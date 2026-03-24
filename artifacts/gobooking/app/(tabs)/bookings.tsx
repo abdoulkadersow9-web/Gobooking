@@ -29,6 +29,7 @@ interface Booking {
     arrivalTime: string;
     date: string;
     busName: string;
+    companyId?: string | null;
   };
   seatNumbers: string[];
   totalAmount: number;
@@ -116,15 +117,20 @@ const tl = StyleSheet.create({
 export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [bookings,  setBookings]  = useState<Booking[]>([]);
+  const [loading,   setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [reviewed,  setReviewed]  = useState<Set<string>>(new Set());
 
   const fetch = async () => {
     if (!token) return;
     try {
-      const data = await apiFetch<Booking[]>("/bookings", { token });
+      const [data, reviewedIds] = await Promise.all([
+        apiFetch<Booking[]>("/bookings", { token }),
+        apiFetch<string[]>("/reviews/my-reviews", { token }).catch(() => [] as string[]),
+      ]);
       setBookings(data);
+      setReviewed(new Set(reviewedIds));
     } catch {
       // ignore
     } finally {
@@ -144,8 +150,10 @@ export default function BookingsScreen() {
     const state   = computeState(item);
     const cfg     = STATE_CONFIG[state];
     const isPaid  = item.paymentStatus === "paid";
-    const needsPay = state === "confirmé";   /* confirmed by company but not yet paid */
-    const isWaiting = state === "en_attente"; /* created, not confirmed yet */
+    const needsPay = state === "confirmé";
+    const isWaiting = state === "en_attente";
+    const canReview = state === "embarqué" && !reviewed.has(item.id);
+    const alreadyReviewed = state === "embarqué" && reviewed.has(item.id);
 
     return (
       <Pressable
@@ -235,6 +243,37 @@ export default function BookingsScreen() {
           <View style={styles.waitingRow}>
             <Feather name="info" size={11} color="#B45309" />
             <Text style={styles.waitingText}>En attente de confirmation par la compagnie</Text>
+          </View>
+        )}
+
+        {/* CTA: leave a review for completed trips */}
+        {canReview && (
+          <Pressable
+            style={[styles.ctaBtn, { backgroundColor: "#FBBF24", marginTop: 10 }]}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({
+                pathname: "/client/review",
+                params: {
+                  bookingId:   item.id,
+                  tripId:      item.tripId,
+                  companyId:   item.trip?.companyId ?? "",
+                  from:        item.trip?.from ?? "",
+                  to:          item.trip?.to ?? "",
+                  date:        item.trip?.date ?? "",
+                },
+              });
+            }}
+          >
+            <Text style={{ fontSize: 16, color: "#7C2D12" }}>★</Text>
+            <Text style={[styles.ctaText, { color: "#7C2D12" }]}>Laisser un avis</Text>
+          </Pressable>
+        )}
+        {alreadyReviewed && (
+          <View style={[styles.waitingRow, { backgroundColor: "#F0FDF4" }]}>
+            <Feather name="check-circle" size={11} color="#16A34A" />
+            <Text style={[styles.waitingText, { color: "#16A34A" }]}>Vous avez déjà laissé un avis pour ce trajet</Text>
           </View>
         )}
       </Pressable>

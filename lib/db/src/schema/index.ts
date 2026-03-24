@@ -27,3 +27,4 @@ export * from "./marketing_logs";
 export * from "./agences";
 export * from "./routes";
 export * from "./colis_logs";
+export * from "./reviews";

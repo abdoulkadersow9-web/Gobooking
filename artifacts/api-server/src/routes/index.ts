@@ -15,6 +15,7 @@ import paymentRouter from "./payment";
 import publicRouter from "./public";
 import loyaltyRouter from "./loyalty";
 import notificationsRouter from "./notifications";
+import reviewsRouter from "./reviews";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(growthRouter);
 router.use("/payment", paymentRouter);
 router.use("/loyalty", loyaltyRouter);
 router.use("/notifications", notificationsRouter);
+router.use("/reviews", reviewsRouter);
 
 export default router;
