@@ -37,27 +37,42 @@ const DELIVERY_TYPES = [
 ];
 
 const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
-  créé:        { label: "Créé",        color: "#6B7280", bg: "#F3F4F6" },
-  en_attente:  { label: "En attente",  color: "#6B7280", bg: "#F3F4F6" },
-  en_gare:     { label: "En gare",     color: "#D97706", bg: "#FEF3C7" },
-  "chargé_bus":{ label: "Chargé bus",  color: "#7C3AED", bg: "#EDE9FE" },
-  en_transit:  { label: "En transit",  color: "#2563EB", bg: "#DBEAFE" },
-  arrivé:      { label: "Arrivé",      color: G,         bg: "#D1FAE5" },
-  livré:       { label: "Livré ✓",     color: "#065F46", bg: "#ECFDF5" },
-  livre:       { label: "Livré ✓",     color: "#065F46", bg: "#ECFDF5" },
-  annulé:      { label: "Annulé",      color: "#DC2626", bg: "#FEE2E2" },
-  arrive_gare_depart: { label: "Arrivé gare", color: G,   bg: "#D1FAE5" },
+  créé:          { label: "Créé",           color: "#6B7280", bg: "#F3F4F6" },
+  en_attente:    { label: "En attente",     color: "#6B7280", bg: "#F3F4F6" },
+  en_gare:       { label: "En gare",        color: "#D97706", bg: "#FEF3C7" },
+  "chargé_bus":  { label: "Chargé bus",     color: "#7C3AED", bg: "#EDE9FE" },
+  en_transit:    { label: "En transit",     color: "#2563EB", bg: "#DBEAFE" },
+  arrivé:        { label: "Arrivé",         color: G,         bg: "#D1FAE5" },
+  en_livraison:  { label: "En livraison 🛵",color: "#EA580C", bg: "#FFF7ED" },
+  livré:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
+  livre:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
+  retiré:        { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5" },
+  annulé:        { label: "Annulé",         color: "#DC2626", bg: "#FEE2E2" },
+  arrive_gare_depart: { label: "Arrivé gare", color: G,       bg: "#D1FAE5" },
 };
 
-const NEXT_ACTION: Record<string, { label: string; route: string; color: string }> = {
-  créé:       { label: "Enregistrer en gare", route: "en-gare",    color: "#D97706" },
-  en_attente: { label: "Enregistrer en gare", route: "en-gare",    color: "#D97706" },
-  en_gare:    { label: "Charger dans bus",     route: "charge-bus", color: P },
-  "chargé_bus":{ label: "Déclarer en transit", route: "transit",    color: "#2563EB" },
-  en_transit: { label: "Confirmer arrivée",    route: "arrive",     color: G },
-  arrivé:     { label: "Confirmer livraison",  route: "deliver",    color: "#065F46" },
-  arrive_gare_depart: { label: "Charger dans bus", route: "charge-bus", color: P },
-};
+type NextAction = { label: string; route: string; color: string };
+
+function getNextAction(parcel: Parcel): NextAction | null {
+  const s = parcel.status;
+  const isHomeDelivery = parcel.deliveryType === "livraison_domicile";
+  if (s === "créé" || s === "en_attente")
+    return { label: "Enregistrer en gare", route: "en-gare",          color: "#D97706" };
+  if (s === "en_gare" || s === "arrive_gare_depart")
+    return { label: "Charger dans bus",    route: "charge-bus",        color: P };
+  if (s === "chargé_bus")
+    return { label: "Déclarer en transit", route: "transit",           color: "#2563EB" };
+  if (s === "en_transit")
+    return { label: "Confirmer arrivée",   route: "arrive",            color: G };
+  if (s === "arrivé") {
+    if (isHomeDelivery)
+      return { label: "🛵 Lancer livraison", route: "lancer-livraison", color: "#EA580C" };
+    return { label: "✅ Retrait en gare",  route: "retirer",           color: "#065F46" };
+  }
+  if (s === "en_livraison")
+    return { label: "✅ Marquer comme livré", route: "deliver",         color: "#065F46" };
+  return null;
+}
 
 interface Parcel {
   id: string;
@@ -481,8 +496,6 @@ function ListTab({ token }: { token: string | null }) {
   const [filter, setFilter]     = useState("tous");
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const FILTERS = ["tous", "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "livré"];
-
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -500,7 +513,7 @@ function ListTab({ token }: { token: string | null }) {
   useEffect(() => { load(); }, [filter]);
 
   const handleStatusUpdate = async (parcel: Parcel) => {
-    const next = NEXT_ACTION[parcel.status];
+    const next = getNextAction(parcel);
     if (!next) { Alert.alert("Info", "Ce colis ne peut plus être mis à jour."); return; }
     Alert.alert(next.label, `Confirmer pour : ${parcel.trackingRef} ?`, [
       { text: "Annuler", style: "cancel" },
@@ -518,6 +531,8 @@ function ListTab({ token }: { token: string | null }) {
     ]);
   };
 
+  const FILTERS = ["tous", "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "en_livraison", "retiré", "livré"];
+
   return (
     <View style={{ flex: 1, backgroundColor: "#F5F3FF" }}>
       {/* Filter chips */}
@@ -525,7 +540,7 @@ function ListTab({ token }: { token: string | null }) {
         {FILTERS.map(f => (
           <TouchableOpacity key={f} style={[SL.chip, filter === f && SL.chipActive]} onPress={() => setFilter(f)}>
             <Text style={[SL.chipTxt, filter === f && SL.chipTxtActive]}>
-              {STATUSES[f]?.label ?? "Tous"}
+              {f === "tous" ? "Tous" : (STATUSES[f]?.label ?? f)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -540,50 +555,61 @@ function ListTab({ token }: { token: string | null }) {
         </View>
       )}
       <ScrollView contentContainerStyle={{ padding: 12, gap: 10 }}>
-        {parcels.map(p => (
-          <View key={p.id} style={SL.card}>
-            <View style={SL.cardTop}>
-              <View style={{ flex: 1 }}>
-                <Text style={SL.ref}>{p.trackingRef}</Text>
-                <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
-                <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+        {parcels.map(p => {
+          const nextAction = getNextAction(p);
+          return (
+            <View key={p.id} style={SL.card}>
+              <View style={SL.cardTop}>
+                <View style={{ flex: 1 }}>
+                  <Text style={SL.ref}>{p.trackingRef}</Text>
+                  <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
+                  <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+                </View>
+                <StatusBadge status={p.status} />
               </View>
-              <StatusBadge status={p.status} />
-            </View>
-            <View style={SL.meta}>
-              <Text style={SL.metaTxt}>{p.parcelType} {p.weight ? `· ${p.weight}kg` : ""}</Text>
-              <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {NEXT_ACTION[p.status] && (
+              <View style={SL.meta}>
+                <Text style={SL.metaTxt}>{p.parcelType} {p.weight ? `· ${p.weight}kg` : ""}</Text>
+                <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
+              </View>
+              {/* Delivery type badge */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ backgroundColor: p.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: p.deliveryType === "livraison_domicile" ? "#EA580C" : "#065F46" }}>
+                    {p.deliveryType === "livraison_domicile" ? "🛵 Domicile" : "🏠 Gare"}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {nextAction && (
+                  <TouchableOpacity
+                    style={[SL.actionBtn, { borderColor: nextAction.color, flex: 1 }]}
+                    onPress={() => handleStatusUpdate(p)}
+                    disabled={updating === p.id}
+                  >
+                    {updating === p.id ? <ActivityIndicator size="small" color={nextAction.color} /> : (
+                      <Text style={[SL.actionTxt, { color: nextAction.color }]}>
+                        {nextAction.label}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
-                  style={[SL.actionBtn, { borderColor: NEXT_ACTION[p.status].color, flex: 1 }]}
-                  onPress={() => handleStatusUpdate(p)}
-                  disabled={updating === p.id}
+                  style={[SL.actionBtn, { borderColor: "#7C3AED", paddingHorizontal: 12 }]}
+                  onPress={() => printLabel({
+                    trackingRef: p.trackingRef,
+                    senderName: p.senderName, senderPhone: p.senderPhone,
+                    receiverName: p.receiverName, receiverPhone: p.receiverPhone,
+                    fromCity: p.fromCity, toCity: p.toCity,
+                    parcelType: p.parcelType, weight: p.weight ? String(p.weight) : "",
+                    amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
+                  })}
                 >
-                  {updating === p.id ? <ActivityIndicator size="small" color={NEXT_ACTION[p.status].color} /> : (
-                    <Text style={[SL.actionTxt, { color: NEXT_ACTION[p.status].color }]}>
-                      {NEXT_ACTION[p.status].label}
-                    </Text>
-                  )}
+                  <Ionicons name="print-outline" size={16} color="#7C3AED" />
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={[SL.actionBtn, { borderColor: "#7C3AED", paddingHorizontal: 12 }]}
-                onPress={() => printLabel({
-                  trackingRef: p.trackingRef,
-                  senderName: p.senderName, senderPhone: p.senderPhone,
-                  receiverName: p.receiverName, receiverPhone: p.receiverPhone,
-                  fromCity: p.fromCity, toCity: p.toCity,
-                  parcelType: p.parcelType, weight: p.weight ?? "",
-                  amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
-                })}
-              >
-                <Ionicons name="print-outline" size={16} color="#7C3AED" />
-              </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -627,7 +653,7 @@ function ScannerTab({ token, networkStatus }: { token: string | null; networkSta
 
   const handleStatusUpdate = async () => {
     if (!colis) return;
-    const next = NEXT_ACTION[colis.status];
+    const next = getNextAction(colis);
     if (!next) { Alert.alert("Info", "Ce colis ne peut plus être mis à jour."); return; }
     Alert.alert(next.label, `Confirmer pour : ${colis.trackingRef} ?`, [
       { text: "Annuler", style: "cancel" },
@@ -709,15 +735,18 @@ function ScannerTab({ token, networkStatus }: { token: string | null; networkSta
               <Text style={{ fontSize: 13, fontWeight: "600", color: "#111827", flexShrink: 1, textAlign: "right" }}>{r.val}</Text>
             </View>
           ))}
-          {NEXT_ACTION[colis.status] && (
-            <TouchableOpacity
-              style={[SS.updateBtn, { borderColor: NEXT_ACTION[colis.status].color, backgroundColor: NEXT_ACTION[colis.status].color + "15" }]}
-              onPress={handleStatusUpdate} disabled={updating}>
-              {updating ? <ActivityIndicator size="small" color={NEXT_ACTION[colis.status].color} /> : (
-                <Text style={[SS.updateTxt, { color: NEXT_ACTION[colis.status].color }]}>{NEXT_ACTION[colis.status].label}</Text>
-              )}
-            </TouchableOpacity>
-          )}
+          {(() => {
+            const na = getNextAction(colis);
+            return na ? (
+              <TouchableOpacity
+                style={[SS.updateBtn, { borderColor: na.color, backgroundColor: na.color + "15" }]}
+                onPress={handleStatusUpdate} disabled={updating}>
+                {updating ? <ActivityIndicator size="small" color={na.color} /> : (
+                  <Text style={[SS.updateTxt, { color: na.color }]}>{na.label}</Text>
+                )}
+              </TouchableOpacity>
+            ) : null;
+          })()}
         </View>
       )}
     </ScrollView>

@@ -27,6 +27,7 @@ export const parcelsTable = pgTable("parcels", {
   tripId: text("trip_id"),
   companyId: text("company_id"),
   statusUpdatedAt: timestamp("status_updated_at"),
+  location: text("location"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

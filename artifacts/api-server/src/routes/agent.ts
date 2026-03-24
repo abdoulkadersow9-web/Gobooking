@@ -214,12 +214,13 @@ router.post("/parcels", async (req, res) => {
     } = req.body;
 
     if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
-        !fromCity || !toCity || !parcelType || !weight || !deliveryType) {
+        !fromCity || !toCity || !parcelType || !deliveryType) {
       res.status(400).json({ error: "Champs obligatoires manquants" });
       return;
     }
 
-    const amount = calculateParcelPrice(fromCity, toCity, parseFloat(weight), deliveryType);
+    const parsedWeight = weight ? parseFloat(weight) : 1;
+    const amount = calculateParcelPrice(fromCity, toCity, isNaN(parsedWeight) ? 1 : parsedWeight, deliveryType);
     const commissionAmount = Math.round(amount * 0.05);
 
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -233,7 +234,7 @@ router.post("/parcels", async (req, res) => {
       id, trackingRef, userId: user.id,
       senderName, senderPhone, receiverName, receiverPhone,
       fromCity, toCity, parcelType,
-      weight: parseFloat(weight),
+      weight: isNaN(parsedWeight) ? 1 : parsedWeight,
       description: description || null,
       deliveryType, amount, commissionAmount,
       paymentMethod: paymentMethod || "orange",
@@ -435,6 +436,117 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
     res.json({ success: true, status: "livré" });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/parcels/:id/retirer — client picks up parcel at station */
+router.post("/parcels/:parcelId/retirer", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
+
+    await db.update(parcelsTable).set({ status: "retiré", statusUpdatedAt: new Date(),
+      location: `Retiré à la gare de ${parcel.toCity}` } as any)
+      .where(eq(parcelsTable.id, parcel.id));
+
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef ?? null, action: "retiré",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId,
+      notes: `Retiré à la gare de ${parcel.toCity}` }).catch(() => {});
+    if (parcel.userId) {
+      const uRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
+      sendParcelNotification({ userId: parcel.userId, pushToken: uRows[0]?.pushToken, status: "livré",
+        trackingRef: parcel.trackingRef ?? "", fromCity: parcel.fromCity, toCity: parcel.toCity,
+        receiverName: parcel.receiverName }).catch(() => {});
+    }
+    res.json({ success: true, status: "retiré" });
+  } catch (err) {
+    console.error("Agent retirer parcel error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/parcels/:id/lancer-livraison — agent starts home delivery */
+router.post("/parcels/:parcelId/lancer-livraison", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const agentRecord = await getAgentCompany(user.id);
+    const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
+    if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
+
+    await db.update(parcelsTable).set({ status: "en_livraison", statusUpdatedAt: new Date(),
+      location: `En livraison à ${parcel.toCity}` } as any)
+      .where(eq(parcelsTable.id, parcel.id));
+
+    logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef ?? null, action: "en_livraison",
+      agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId,
+      notes: `Livraison lancée vers ${parcel.toCity}` }).catch(() => {});
+    res.json({ success: true, status: "en_livraison" });
+  } catch (err) {
+    console.error("Agent lancer-livraison error:", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /agent/reservations — agent guichet creates a ticket booking */
+router.post("/reservations", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod } = req.body as {
+      clientName: string; clientPhone: string; tripId: string;
+      seatCount: number; paymentMethod: string;
+    };
+
+    if (!clientName?.trim() || !tripId || !seatCount) {
+      res.status(400).json({ error: "Champs obligatoires manquants (clientName, tripId, seatCount)" }); return;
+    }
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const count  = Math.max(1, Math.min(10, Number(seatCount) || 1));
+    const amount = trip.price * count;
+    const ref    = "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
+    const id     = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const passengers = Array.from({ length: count }, (_, i) =>
+      i === 0 ? { name: clientName.trim() } : { name: `Passager ${i + 1}` }
+    );
+
+    const [booking] = await db.insert(bookingsTable).values({
+      id,
+      bookingRef:       ref,
+      userId:           user.id,
+      tripId,
+      passengers,
+      seatIds:          [],
+      seatNumbers:      [],
+      totalAmount:      amount,
+      paymentMethod:    paymentMethod || "cash",
+      paymentStatus:    "paid",
+      status:           "confirmed",
+      contactPhone:     clientPhone || null,
+      commissionAmount: Math.round(amount * 0.10),
+    }).returning();
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CREATE, booking.id, "booking",
+      { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod }).catch(() => {});
+
+    res.status(201).json({
+      id: booking.id, bookingRef: booking.bookingRef, tripId: booking.tripId,
+      totalAmount: booking.totalAmount, status: booking.status,
+      paymentMethod: booking.paymentMethod, passengers: booking.passengers,
+      seatNumbers: booking.seatNumbers, createdAt: booking.createdAt?.toISOString(),
+    });
+  } catch (err) {
+    console.error("Agent create reservation error:", err);
+    res.status(500).json({ error: "Échec de la création de la réservation" });
   }
 });
 

@@ -10,6 +10,7 @@ export const notificationsTable = pgTable("notifications", {
   type: varchar("type", { length: 30 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
+  data: text("data"),
   read: boolean("read").notNull().default(false),
   refId: text("ref_id"),
   refType: varchar("ref_type", { length: 20 }),

@@ -1,0 +1,110 @@
+Corrige les problèmes des modules Agent Ticketing et Agent Colis dans mon application GoBooking.
+
+CONTEXTE :
+- J’ai déjà accès aux modules Agent Ticketing et Agent Colis
+- Les interfaces s’affichent correctement
+- Mais les actions ne fonctionnent pas
+
+PROBLÈMES ACTUELS :
+
+1. MODULE AGENT TICKETING
+- Quand je remplis les informations (nom, téléphone, nombre de passagers, paiement)
+- Et que je clique sur "Valider la vente"
+- Rien ne se passe ou la page part sur un comportement incorrect
+
+OBJECTIF :
+- Corriger la fonction "Valider la vente"
+- Elle doit :
+  1. Créer un ticket en base de données
+  2. Décrémenter les places disponibles du trajet
+  3. Générer un code ticket unique (ex: GB-0001)
+  4. Retourner une confirmation visuelle
+  5. Rediriger vers une page ticket imprimable
+
+- Ajouter un bouton "Imprimer le ticket"
+- Le ticket doit contenir :
+  - Nom client
+  - Trajet
+  - Date / Heure
+  - Nombre de passagers
+  - Prix total
+  - Code ticket
+  - QR code si possible
+
+---
+
+2. MODULE AGENT COLIS
+- Quand je remplis les informations et que je clique sur créer
+- Le colis ne se crée pas
+
+OBJECTIF :
+- Corriger la fonction création colis
+- Elle doit :
+  1. Créer un colis en base de données
+  2. Générer un code colis unique (ex: GB-C001)
+  3. Ajouter un statut initial : "En attente"
+
+---
+
+3. AJOUT LOGIQUE MÉTIER COLIS (IMPORTANT)
+
+Je veux ajouter un système de retrait / livraison :
+
+Chaque colis doit avoir un champ :
+- mode_reception = "gare" ou "domicile"
+
+CAS 1 : RETRAIT EN GARE
+- Quand le colis arrive :
+  - Le statut devient : "Arrivé"
+- Quand le client vient récupérer :
+  - L’agent clique "Retirer colis"
+  - Le statut devient : "Retiré"
+
+CAS 2 : LIVRAISON À DOMICILE
+- Quand le colis arrive :
+  - Le statut devient : "Arrivé"
+- L’agent lance une livraison :
+  - statut = "En livraison"
+- Quand livré :
+  - statut = "Livré"
+
+---
+
+4. ACTIONS À AJOUTER DANS L’INTERFACE
+
+MODULE COLIS :
+- Bouton "Créer colis"
+- Bouton "Imprimer étiquette"
+- Bouton "Marquer comme retiré"
+- Bouton "Lancer livraison"
+- Bouton "Marquer comme livré"
+
+---
+
+5. ÉTIQUETTE COLIS (IMPORTANT)
+Créer une vue imprimable contenant :
+- Code colis
+- Expéditeur
+- Destinataire
+- Destination
+- QR code
+
+---
+
+CONTRAINTES :
+- Ne pas casser l’interface existante
+- Corriger uniquement la logique backend / actions
+- Vérifier les handlers (onClick, submit, API)
+- Vérifier que les formulaires envoient bien les données
+- Vérifier les routes API si utilisées
+
+---
+
+À LA FIN :
+- expliquer pourquoi ça ne marchait pas
+- montrer les fonctions corrigées
+- indiquer comment tester :
+  - création ticket
+  - création colis
+  - impression
+  - retrait / livraison

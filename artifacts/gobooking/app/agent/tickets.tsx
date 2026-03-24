@@ -192,7 +192,7 @@ export default function TicketsScreen() {
           seatCount: count, trip: selectedTrip, paymentLabel: pmLabel });
         return;
       }
-      const res = await apiFetch<{ bookingRef?: string; id?: string }>("/company/reservations", {
+      const res = await apiFetch<{ bookingRef?: string; id?: string }>("/agent/reservations", {
         token: token ?? undefined, method: "POST",
         body: { tripId: selectedTrip.id, clientName: passengerName.trim(),
           clientPhone: passengerPhone.trim(), seatCount: count, paymentMethod },
