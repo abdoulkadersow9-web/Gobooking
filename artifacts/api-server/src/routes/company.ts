@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -249,6 +249,91 @@ router.patch("/buses/:id/maintenance", async (req, res) => {
   } catch (err) {
     console.error("[buses/maintenance PATCH]", err);
     res.status(500).json({ error: "Failed to update maintenance" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════
+   FUEL LOGS
+═══════════════════════════════════════════════════════ */
+
+/* GET /company/fuel-logs — list all fuel logs with bus info & totals */
+router.get("/fuel-logs", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = await db.execute(sql`
+      SELECT
+        fl.id, fl.bus_id, fl.amount, fl.cost, fl.date, fl.notes, fl.created_at,
+        b.bus_name, b.plate_number, b.bus_type
+      FROM fuel_logs fl
+      JOIN buses b ON b.id = fl.bus_id
+      WHERE fl.company_id = ${ctx.companyId}
+      ORDER BY fl.date DESC, fl.created_at DESC
+    `);
+
+    const logs = (rows as any).rows ?? rows;
+
+    const totalLitres  = logs.reduce((s: number, r: any) => s + parseFloat(r.amount  ?? 0), 0);
+    const totalCost    = logs.reduce((s: number, r: any) => s + parseInt(r.cost      ?? 0), 0);
+
+    res.json({ logs, totalLitres, totalCost });
+  } catch (err) {
+    console.error("[fuel-logs GET]", err);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* POST /company/fuel-logs — add a fuel entry */
+router.post("/fuel-logs", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { busId, amount, cost, date, notes } = req.body;
+    if (!busId || !amount || !cost) {
+      res.status(400).json({ error: "busId, amount et cost sont obligatoires" }); return;
+    }
+
+    const bus = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+    if (!bus.length || bus[0].companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Bus introuvable ou non autorisé" }); return;
+    }
+
+    const id = Date.now().toString() + Math.random().toString(36).slice(2, 7);
+    const logDate = date || new Date().toISOString().split("T")[0];
+
+    await db.insert(fuelLogsTable).values({
+      id, companyId: ctx.companyId, busId,
+      amount: String(amount), cost: Number(cost),
+      date: logDate, notes: notes || null,
+    } as any);
+
+    const created = await db.execute(sql`
+      SELECT fl.*, b.bus_name, b.plate_number FROM fuel_logs fl
+      JOIN buses b ON b.id = fl.bus_id WHERE fl.id = ${id}
+    `);
+    res.status(201).json(((created as any).rows ?? created)[0]);
+  } catch (err) {
+    console.error("[fuel-logs POST]", err);
+    res.status(500).json({ error: "Failed to save fuel log" });
+  }
+});
+
+/* DELETE /company/fuel-logs/:id */
+router.delete("/fuel-logs/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const log = await db.select().from(fuelLogsTable).where(eq(fuelLogsTable.id, req.params.id)).limit(1);
+    if (!log.length || (log[0] as any).companyId !== ctx.companyId) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+    await db.delete(fuelLogsTable).where(eq(fuelLogsTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed" });
   }
 });
 

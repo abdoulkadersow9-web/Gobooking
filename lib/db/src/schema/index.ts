@@ -28,3 +28,4 @@ export * from "./agences";
 export * from "./routes";
 export * from "./colis_logs";
 export * from "./reviews";
+export * from "./fuel_logs";

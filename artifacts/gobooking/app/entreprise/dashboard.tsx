@@ -388,6 +388,7 @@ export default function EntrepriseDashboard() {
               { icon: "star",          label: "Avis clients",  route: "/entreprise/avis",           color: "#FBBF24" },
               { icon: "truck",         label: "Suivi Engins",  route: "/entreprise/bus-suivi",     color: "#22C55E" },
               { icon: "tool",          label: "Maintenance",   route: "/entreprise/maintenance-bus", color: "#F59E0B" },
+              { icon: "droplet",       label: "Carburant",     route: "/entreprise/carburant",       color: "#16A34A" },
               { icon: "settings",      label: "Gestion",       route: "/dashboard/company",        color: AMBER },
             ].map(it => (
               <Pressable
