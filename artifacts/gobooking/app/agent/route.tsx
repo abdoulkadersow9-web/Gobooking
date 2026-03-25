@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput,
@@ -86,6 +86,8 @@ export default function RouteScreen() {
   }
   const [stopData, setStopData]         = useState<StopWithPassengers[]>([]);
   const [stopLoading, setStopLoading]   = useState(false);
+  const [lastSync, setLastSync]         = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const assignedTripId = user?.tripId ?? null;
   const assignedBusId  = user?.busId  ?? null;
@@ -96,8 +98,22 @@ export default function RouteScreen() {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiFetch<LiveTrip[]>("/trips/live", { token });
-      const allTrips = data.filter(t => t.status === "en_route");
+      const raw = await apiFetch<any[]>("/trips/live", { token });
+      /* Normalize API response (fromCity/toCity → from/to) */
+      const allTrips: LiveTrip[] = raw.map(t => ({
+        id:            t.id,
+        from:          t.from ?? t.fromCity ?? "—",
+        to:            t.to   ?? t.toCity   ?? "—",
+        departureTime: t.departureTime ?? "—",
+        arrivalTime:   t.arrivalTime   ?? t.estimatedArrival,
+        busName:       t.busName       ?? "Bus",
+        status:        "en_route",
+        passengers:    t.totalSeats ? (t.totalSeats - (t.availableSeats ?? 0)) : undefined,
+        totalSeats:    t.totalSeats,
+        lat:           t.lat,
+        lon:           t.lon,
+        speed:         t.speed,
+      }));
       setTrips(allTrips);
       if (!activeTrip) {
         const matched = assignedTripId
@@ -107,9 +123,9 @@ export default function RouteScreen() {
       }
     } catch {
       const demo: LiveTrip[] = [
-        { id: "t1", from: "Abidjan", to: "Bouaké", departureTime: "08h00", arrivalTime: "12h00",
-          busName: "Express Abidjan 01", status: "en_route", passengers: 38, totalSeats: 49,
-          lat: 5.9, lon: -5.1, speed: 87 },
+        { id: "trip-sim-001", from: "Abidjan", to: "Bouaké", departureTime: "07:00",
+          arrivalTime: "11:00", busName: "Daloa Express 07", status: "en_route",
+          passengers: 7, totalSeats: 49, lat: 5.9, lon: -5.1, speed: 87 },
       ];
       setTrips(demo);
       if (!activeTrip) setActiveTrip(demo[0]);
@@ -118,16 +134,17 @@ export default function RouteScreen() {
     }
   }, [token, activeTrip, assignedTripId]);
 
-  const loadPassengers = useCallback(async (tripId: string) => {
+  const loadPassengers = useCallback(async (tripId: string, silent = false) => {
     if (!token) return;
-    setPassLoading(true);
+    if (!silent) setPassLoading(true);
     try {
       const data = await apiFetch<Passenger[]>(`/agent/trip/${tripId}/passengers`, { token });
       setPassengers(data.length > 0 ? data : DEMO_PASSENGERS);
+      setLastSync(new Date());
     } catch {
-      setPassengers(DEMO_PASSENGERS);
+      if (!silent) setPassengers(DEMO_PASSENGERS);
     } finally {
-      setPassLoading(false);
+      if (!silent) setPassLoading(false);
     }
   }, [token]);
 
@@ -202,16 +219,23 @@ export default function RouteScreen() {
     }
   };
 
+  /* Initial load */
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
+  /* Auto-refresh passengers every 15 seconds */
   useEffect(() => {
-    /* Prefer agent's own assigned tripId for passenger loading */
     const tripIdToLoad = assignedTripId ?? activeTrip?.id ?? null;
-    if (tripIdToLoad) {
-      loadPassengers(tripIdToLoad);
-      loadStopData(tripIdToLoad);
-    }
-  }, [activeTrip?.id, assignedTripId]);
+    if (!tripIdToLoad) return;
+    loadPassengers(tripIdToLoad);
+    loadStopData(tripIdToLoad);
+
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      loadPassengers(tripIdToLoad, true);
+      loadMyDeparture();
+    }, 15000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [activeTrip?.id, assignedTripId, loadPassengers, loadMyDeparture]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -289,7 +313,11 @@ export default function RouteScreen() {
       <View style={S.header}>
         <View>
           <Text style={S.headerTitle}>Suivi trajet</Text>
-          <Text style={S.headerSub}>{user?.name ?? "Agent en route"}</Text>
+          <Text style={S.headerSub}>
+            {lastSync
+              ? `🟢 Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
+              : (user?.name ?? "Agent en route")}
+          </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View style={S.gpsPill}>

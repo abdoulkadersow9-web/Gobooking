@@ -1,0 +1,122 @@
+Nous devons améliorer le système actuel sans rien casser.
+
+IMPORTANT :
+- Ne pas casser les fonctionnalités existantes
+- Corriger et améliorer le comportement actuel
+- Respecter toute la logique métier déjà définie
+
+---
+
+1. PROBLÈME ACTUEL
+
+Dans l’espace Agent Réservation :
+- les informations s’affichent correctement
+
+Mais dans l’espace Agent En Route :
+- les informations ne sont pas toujours actualisées
+- certaines données ne remontent pas en temps réel
+
+---
+
+2. TEMPS RÉEL (TRÈS IMPORTANT)
+
+Toutes les données doivent être synchronisées en temps réel entre :
+- client
+- agent réservation
+- agent en route
+- entreprise
+
+Quand une réservation est créée ou validée :
+- elle doit apparaître immédiatement chez l’agent en route
+- sans rechargement manuel
+- sans délai
+
+---
+
+3. SUPPRIMER LES LIMITES (CRITIQUE)
+
+Actuellement, il y a des limites (ex: 10 éléments affichés).
+
+À corriger :
+- ne pas limiter à 10
+- ne pas limiter les listes
+- afficher toutes les données disponibles
+
+Cela concerne :
+- réservations
+- passagers
+- départs
+- colis
+
+---
+
+4. LOGIQUE COMPLÈTE À RESPECTER
+
+Toujours appliquer la logique complète :
+
+Quand un client réserve :
+→ agent réservation reçoit
+→ agent réservation valide
+→ agent en route reçoit automatiquement
+
+Quand agent en route ajoute un passager :
+→ agent réservation voit
+→ entreprise voit
+→ historique mis à jour
+
+Aucune rupture dans la logique.
+
+---
+
+5. DONNÉES TOUJOURS VISIBLES
+
+Ne jamais afficher des écrans vides.
+
+Toujours :
+- afficher des données (réelles ou simulées)
+- garder la cohérence avec les départs
+
+---
+
+6. COMPTES TEST (TRÈS IMPORTANT)
+
+Fournir tous les comptes test utilisés dans l’application :
+
+- comptes client
+- comptes agent réservation
+- comptes agent en route
+- comptes entreprise / admin
+
+Pour chaque compte fournir :
+- email
+- mot de passe
+- rôle
+
+---
+
+7. TEXTE ET AFFICHAGE
+
+Ne pas fixer de limite sur les textes.
+
+- afficher toutes les informations complètes
+- ne pas couper les données importantes
+- respecter toute la logique affichée dans les réservations
+
+---
+
+8. OBJECTIF FINAL
+
+Un système fluide où :
+- toutes les données sont visibles
+- aucune limite bloquante
+- synchronisation en temps réel
+- logique complète respectée
+- comptes test disponibles pour validation
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Corriger, améliorer et compléter le système existant.
+Supprimer toutes les limitations inutiles.

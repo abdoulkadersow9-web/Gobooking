@@ -104,8 +104,7 @@ router.get("/boarding", async (req, res) => {
         .orderBy(desc(bookingsTable.createdAt));
     } else {
       bookings = await db.select().from(bookingsTable)
-        .orderBy(desc(bookingsTable.createdAt))
-        .limit(20);
+        .orderBy(desc(bookingsTable.createdAt));
     }
 
     res.json(bookings.map(b => ({
@@ -169,7 +168,7 @@ router.get("/parcels", async (req, res) => {
       ? await db.select().from(parcelsTable)
           .where(eq(parcelsTable.companyId, companyId))
           .orderBy(desc(parcelsTable.createdAt))
-      : await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt)).limit(50);
+      : await db.select().from(parcelsTable).orderBy(desc(parcelsTable.createdAt));
 
     const { status } = req.query;
     const filtered = status ? parcels.filter(p => p.status === status) : parcels;
@@ -656,15 +655,12 @@ router.get("/online-bookings", async (req, res) => {
     const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
     const companyId = agentRows[0]?.companyId ?? null;
 
-    const conditions = [
-      inArray(bookingsTable.bookingSource, ["online", "mobile"]),
-    ];
-    if (companyId) conditions.push(eq(bookingsTable.companyId, companyId));
-
-    const bookings = await db.select().from(bookingsTable)
-      .where(and(...conditions))
-      .orderBy(desc(bookingsTable.createdAt))
-      .limit(50);
+    const bookings = companyId
+      ? await db.select().from(bookingsTable)
+          .where(eq(bookingsTable.companyId, companyId))
+          .orderBy(desc(bookingsTable.createdAt))
+      : await db.select().from(bookingsTable)
+          .orderBy(desc(bookingsTable.createdAt));
 
     const enriched = await Promise.all(bookings.map(async (b) => {
       const trip = b.tripId
@@ -899,10 +895,10 @@ router.get("/parcels/pending-validation", async (req, res) => {
       ? await db.select().from(parcelsTable).where(and(
           inArray(parcelsTable.status, ["en_attente_validation"]),
           eq(parcelsTable.companyId, companyId)
-        )).orderBy(desc(parcelsTable.createdAt)).limit(50)
+        )).orderBy(desc(parcelsTable.createdAt))
       : await db.select().from(parcelsTable).where(
           inArray(parcelsTable.status, ["en_attente_validation"])
-        ).orderBy(desc(parcelsTable.createdAt)).limit(50);
+        ).orderBy(desc(parcelsTable.createdAt));
 
     res.json(parcels);
   } catch (err) {
@@ -1047,8 +1043,7 @@ router.get("/reports", async (req, res) => {
 
     const reports = await db.select().from(agentReportsTable)
       .where(eq(agentReportsTable.agentId, user.id))
-      .orderBy(desc(agentReportsTable.createdAt))
-      .limit(50);
+      .orderBy(desc(agentReportsTable.createdAt));
 
     res.json(reports);
   } catch (err) {
@@ -1081,10 +1076,8 @@ router.get("/trips", async (req, res) => {
       ? await db.select().from(tripsTable)
           .where(and(eq(tripsTable.companyId, companyId)))
           .orderBy(desc(tripsTable.date))
-          .limit(30)
       : await db.select().from(tripsTable)
-          .orderBy(desc(tripsTable.date))
-          .limit(20);
+          .orderBy(desc(tripsTable.date));
 
     const enriched = await Promise.all(trips.map(async (trip) => {
       const availableCount = await db.select().from(seatsTable)

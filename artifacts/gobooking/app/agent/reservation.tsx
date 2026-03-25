@@ -1,7 +1,7 @@
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -88,6 +88,8 @@ export default function AgentReservation() {
   const [filter, setFilter]     = useState<"all" | "pending" | "confirmed">("pending");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* Cancel modal state */
   const [cancelModal, setCancelModal] = useState<OnlineBooking | null>(null);
@@ -97,7 +99,8 @@ export default function AgentReservation() {
     if (!silent) setLoading(true);
     try {
       const data = await apiFetch<OnlineBooking[]>("/agent/online-bookings", { token: token ?? undefined });
-      setBookings(data);
+      setBookings(Array.isArray(data) ? data : []);
+      setLastSync(new Date());
     } catch (e: any) {
       if (!silent) Alert.alert("Erreur", e?.message ?? "Impossible de charger les réservations");
     } finally {
@@ -106,7 +109,12 @@ export default function AgentReservation() {
     }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  /* Auto-polling every 15 seconds */
+  useEffect(() => {
+    load();
+    pollRef.current = setInterval(() => { load(true); }, 15000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [load]);
 
   const displayed = bookings.filter(b => {
     if (filter === "pending")   return b.status === "pending";
@@ -191,8 +199,12 @@ export default function AgentReservation() {
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={S.headerTitle}>Réservations en ligne</Text>
-          <Text style={S.headerSub}>🌐 En ligne uniquement · {user?.name}</Text>
+          <Text style={S.headerTitle}>Réservations</Text>
+          <Text style={S.headerSub}>
+            {lastSync
+              ? `🟢 Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
+              : `⏳ Chargement… · ${user?.name}`}
+          </Text>
         </View>
         <TouchableOpacity onPress={() => load()} style={S.refreshBtn}>
           <Feather name="refresh-cw" size={17} color="#fff" />
