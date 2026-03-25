@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   useDashboard, useScanStats, useCompanyReports, useUpdateReport, useCompanyAlerts,
   useSuperAdminStats, useSuperAdminBookingStats, useSuperAdminAnalytics, useSuperAdminCompanies,
-  useRecentActivity,
+  useRecentActivity, useCompanyAgences,
 } from "@/hooks/use-company";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -180,6 +180,107 @@ function ColisSection({ parcelStats }: { parcelStats: any }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── SECTION AGENCES ── */
+const ROLE_LABEL: Record<string, string> = {
+  agent_guichet:      "Guichet",
+  agent_ticket:       "Guichet",
+  agent_embarquement: "Embarquement",
+  agent_colis:        "Colis",
+  agent_reservation:  "Réservation",
+  agent_route:        "En route",
+  logistique:         "Logistique",
+  suivi:              "Suivi",
+  validation:         "Validation",
+};
+const ROLE_COLOR: Record<string, string> = {
+  agent_guichet:      "#2563EB",
+  agent_ticket:       "#2563EB",
+  agent_embarquement: "#D97706",
+  agent_colis:        "#7C3AED",
+  agent_reservation:  "#059669",
+  agent_route:        "#DC2626",
+  logistique:         "#0369A1",
+  suivi:              "#6B7280",
+  validation:         "#059669",
+};
+
+function AgencesSection() {
+  const { data: agences = [], isLoading } = useCompanyAgences();
+
+  if (isLoading) return null;
+  const withAgents = agences.filter((a: any) => (a.agents ?? []).length > 0);
+  const vides = agences.filter((a: any) => (a.agents ?? []).length === 0);
+
+  return (
+    <div className="space-y-3">
+      <SectionTitle emoji="🏢" title="Agences" href="/admin/agences" color="#D97706" />
+
+      {agences.length === 0 ? (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
+          <p className="text-sm text-amber-700 font-medium">Aucune agence enregistrée.</p>
+          <Link href="/admin/agences" className="text-xs text-amber-600 font-semibold underline mt-1 inline-block">
+            Créer une agence
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {withAgents.map((agence: any) => {
+            const agents: any[] = agence.agents ?? [];
+            const roleGroups: Record<string, number> = {};
+            agents.forEach((ag: any) => {
+              const r = ag.agentRole ?? "autre";
+              roleGroups[r] = (roleGroups[r] ?? 0) + 1;
+            });
+            return (
+              <div key={agence.id} className="bg-card rounded-xl border border-amber-200 p-3">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                      <Building2 size={16} className="text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground leading-tight">{agence.name}</p>
+                      <p className="text-[11px] text-muted-foreground">{agence.city}</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
+                    {agents.length} agent{agents.length > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(roleGroups).map(([role, count]) => (
+                    <span
+                      key={role}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: (ROLE_COLOR[role] ?? "#6B7280") + "20",
+                        color: ROLE_COLOR[role] ?? "#6B7280",
+                      }}
+                    >
+                      {count}× {ROLE_LABEL[role] ?? role.replace(/_/g, " ")}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {vides.length > 0 && (
+            <div className="rounded-xl bg-muted/40 border border-dashed border-border p-3 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {vides.length} agence{vides.length > 1 ? "s" : ""} sans agent
+                {vides.length <= 2 && ` (${vides.map((a: any) => a.name).join(", ")})`}
+              </p>
+              <Link href="/admin/agents" className="text-[11px] text-amber-600 font-semibold underline">
+                Affecter
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -435,6 +536,9 @@ function CompanyDashboard() {
 
       {/* ── 📦 COLIS ── */}
       <ColisSection parcelStats={parcelStats} />
+
+      {/* ── 🏢 AGENCES ── */}
+      <AgencesSection />
 
       {/* ── 👥 AGENTS ── */}
       <AgentsSection reports={reports as any[]} />

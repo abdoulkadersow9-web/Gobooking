@@ -1,0 +1,217 @@
+Ne rien remplacer inutilement.
+Ne rien supprimer sans raison.
+Ne rien casser.
+Ne pas sortir de la logique du programme.
+
+Mais il faut appliquer réellement tous les changements demandés jusqu’ici.
+
+---
+
+PROBLÈME ACTUEL :
+
+Je constate encore que plusieurs changements demandés ne sont pas réellement appliqués dans l’interface.
+
+Exemple visible :
+- dans la création de trajet, je vois encore "Prix par place (FCFA)"
+- alors que la logique correcte demandée est une tarification selon les villes / trajets, basée sur les grilles tarifaires réelles en Côte d’Ivoire
+- donc cela montre que la correction n’est pas complètement appliquée dans l’interface
+
+Même chose pour d’autres parties :
+- certaines adaptations GPS / suivi ne se reflètent pas correctement
+- certaines modifications demandées pour les agents ne sont pas complètement visibles
+- certains éléments anciens restent affichés alors qu’ils ne suivent pas la logique du programme
+
+---
+
+OBJECTIF PRINCIPAL :
+
+Appliquer réellement tous les changements déjà demandés, dans le code ET dans l’interface, sans casser le système.
+
+S’il y a un problème de :
+- cache
+- mémoire
+- état local
+- données simulées
+- mock data
+- liaison frontend/backend
+- composants non rafraîchis
+- ancienne version encore affichée
+
+Alors il faut identifier le problème et le corriger pour que les changements soient vraiment visibles et effectifs.
+
+---
+
+1. TARIFICATION À CORRIGER ET FORCER
+
+Dans la création de trajet et partout ailleurs :
+
+- ne plus utiliser la logique "prix par place" comme base métier
+- appliquer la logique correcte :
+  - tarif défini selon ville de départ → ville d’arrivée
+  - selon les grilles tarifaires réelles du transport en Côte d’Ivoire
+
+Le nombre de places ne doit servir qu’au calcul du total, pas à définir le prix du trajet.
+
+Exemple :
+- Abidjan → Bouaké = prix défini par la grille
+- 2 places = prix trajet x 2
+
+Il faut que cela soit visible dans l’interface, pas seulement corrigé en interne.
+
+---
+
+2. APPLIQUER TOUS LES CHANGEMENTS DEMANDÉS SUR LES AGENTS
+
+Respecter la logique réelle du programme :
+
+- agents classés selon leurs vrais rôles
+- agents en route
+- agents guichet
+- agents embarquement
+- agent colis incluant réception / retrait
+- autres agents utiles seulement
+
+Supprimer uniquement les éléments inutiles visuellement, sans casser les données ni la logique.
+
+---
+
+3. AGENT COLIS / RÉCEPTION
+
+Appliquer réellement la logique demandée :
+
+- agent réception doit être inclus dans agent colis
+- dans le même module, il doit y avoir :
+  - création colis
+  - retrait colis
+  - validation par code / mot de passe de retrait
+
+Cela doit suivre exactement la logique terrain du programme.
+
+---
+
+4. GPS / SUIVI / AGENT EN ROUTE
+
+Appliquer réellement les adaptations déjà demandées :
+
+- visibilité correcte des informations
+- stabilité des icônes
+- onglets lisibles
+- logique de montée en cours de route
+- synchronisation des passagers
+- alertes / arrêts simulés si nécessaire pour test
+
+S’il y a un blocage technique, il faut le corriger au lieu de laisser l’ancienne version affichée.
+
+---
+
+5. DASHBOARD ENTREPRISE À RÉORGANISER SELON LES AGENCES
+
+Créer / adapter les dashboards entreprise selon la logique réelle des agences.
+
+Le dashboard entreprise doit suivre cette logique :
+
+- vue claire par agence
+- agents liés aux agences
+- départs liés aux agences
+- activités visibles par agence
+- organisation propre selon le programme réel
+
+Tout ce qui n’est pas important ou qui ne suit pas la logique métier doit être retiré de l’affichage.
+
+Mais :
+- sans casser le système
+- sans casser les données
+- sans casser la structure
+
+---
+
+6. DONNÉES DE SIMULATION
+
+Quand des éléments ne s’affichent pas encore :
+
+- simuler les données réelles nécessaires
+- selon la logique du programme
+- selon le transport en Côte d’Ivoire
+- selon les trajets et tarifs réels
+- selon les rôles réels des agents
+- selon les arrêts / alertes / suivis nécessaires pour tester
+
+Je dois pouvoir entrer dans l’application et voir immédiatement les éléments testables.
+
+---
+
+7. GESTION DES DOUBLONS (TRÈS IMPORTANT)
+
+Éviter tout doublon dans le système.
+
+- ne pas dupliquer les agents
+- ne pas dupliquer les trajets
+- ne pas dupliquer les données simulées
+- ne pas créer plusieurs versions du même élément
+
+Si des doublons existent :
+
+👉 les détecter automatiquement  
+👉 les corriger automatiquement selon la logique métier  
+👉 garder une seule source propre et cohérente
+
+Travailler avec la logique pour maintenir un système propre, organisé et sans répétition.
+
+---
+
+8. FORCER L’APPLICATION RÉELLE DES MODIFICATIONS
+
+Il faut vérifier pourquoi certaines demandes semblent notées mais ne s’appliquent pas réellement.
+
+Vérifier et corriger si le problème vient de :
+
+- composants non mis à jour
+- ancienne UI encore utilisée
+- données mock non branchées
+- mauvais mapping frontend/backend
+- écran non connecté à la nouvelle logique
+- cache ou état persistant
+- problème de re-render
+- problème de mémoire
+
+---
+
+9. IMPORTANT
+
+Ne pas casser.
+Ne pas refaire n’importe comment.
+Ne pas modifier la logique métier.
+
+Mais il faut :
+- appliquer réellement les changements
+- respecter le programme
+- respecter la logique métier
+- réorganiser proprement
+- enlever ce qui n’est pas important visuellement
+- garder le système stable
+
+---
+
+OBJECTIF FINAL :
+
+Je veux une application qui suit réellement le programme GoBooking :
+
+- tarifs par villes et grilles tarifaires Côte d’Ivoire
+- agents organisés selon les vrais rôles
+- agent colis = création + réception + retrait
+- dashboards entreprise organisés selon les agences
+- suivi et GPS réellement adaptés
+- données simulées visibles pour tester
+- aucun doublon dans le système
+- interface cohérente avec la logique métier
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne pas casser le système existant.
+Ne pas ignorer les demandes déjà faites.
+Corriger les blocages techniques.
+Éviter tout doublon.
+Appliquer réellement tous les changements dans l’interface et dans le fonctionnement.

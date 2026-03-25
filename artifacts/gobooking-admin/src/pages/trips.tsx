@@ -132,7 +132,7 @@ export default function Trips() {
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><Clock size={14}/> {trip.date} • {trip.departureTime}</span>
                     <span>Bus: <strong className="text-foreground">{trip.busName}</strong> ({trip.busType})</span>
-                    <span>Prix: <strong className="text-primary">{formatCurrency(trip.price)}</strong> / siège</span>
+                    <span>Tarif: <strong className="text-primary">{formatCurrency(trip.price)}</strong> / passager</span>
                   </div>
                 </div>
               </div>
@@ -199,10 +199,10 @@ export default function Trips() {
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                Prix par siège (FCFA) *
+                Tarif de la ligne (FCFA / passager) *
                 {priceSource === "grid" && (
                   <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 font-normal">
-                    <Info size={12} /> Suggéré par la grille tarifaire
+                    <Info size={12} /> Grille officielle CI
                   </span>
                 )}
               </label>
@@ -211,12 +211,15 @@ export default function Trips() {
                 min="0"
                 step="500"
                 className={inputCls}
-                placeholder="Ex : 3500"
+                placeholder="Ex : 2500"
                 value={form.price}
                 onChange={(e) => { setForm((f) => ({ ...f, price: e.target.value })); setPriceSource("manual"); }}
               />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Prix unitaire par passager — ex : Abidjan → Bouaké = 2 500 FCFA
+              </p>
               {form.from && form.to && getGridPrice(form.from, form.to) == null && (
-                <p className="text-xs text-amber-600 mt-1">Ce trajet n'est pas dans la grille — entrez le prix manuellement.</p>
+                <p className="text-xs text-amber-600 mt-1">Trajet hors grille — saisir le prix manuellement.</p>
               )}
             </div>
 
