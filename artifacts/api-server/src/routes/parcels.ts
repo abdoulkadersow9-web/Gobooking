@@ -128,6 +128,61 @@ router.post("/", async (req, res) => {
   }
 });
 
+// POST /parcels/create-remote — client creates parcel remotely with photo (anti-fraud)
+router.post("/create-remote", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const {
+      senderName, senderPhone, receiverName, receiverPhone,
+      fromCity, toCity, parcelType, weight, description,
+      deliveryType, paymentMethod, declaredValue, photoUrl,
+    } = req.body;
+
+    if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
+        !fromCity || !toCity || !parcelType || !weight || !deliveryType) {
+      res.status(400).json({ error: "Champs obligatoires manquants" }); return;
+    }
+
+    const amount = calculateParcelPrice(fromCity, toCity, parseFloat(weight), deliveryType);
+    const trackingRef = generateTrackingRef();
+
+    const [parcel] = await db.insert(parcelsTable).values({
+      id: generateId(),
+      trackingRef,
+      userId,
+      senderName,
+      senderPhone,
+      receiverName,
+      receiverPhone,
+      fromCity,
+      toCity,
+      parcelType,
+      weight: parseFloat(weight),
+      description: description || null,
+      deliveryType,
+      amount,
+      commissionAmount: Math.round(amount * 0.05),
+      paymentMethod: paymentMethod || "orange",
+      paymentStatus: "pending",
+      status: "en_attente_validation",
+      photoUrl: photoUrl || null,
+      declaredValue: parseFloat(declaredValue) || 0,
+      createdByClient: "true",
+    }).returning();
+
+    auditLog({ userId, userRole: "client", req }, ACTIONS.PARCEL_CREATE, parcel.id, "parcel", {
+      trackingRef, fromCity, toCity, type: "remote", haPhoto: !!photoUrl,
+    }).catch(() => {});
+
+    res.status(201).json(parcel);
+  } catch (err) {
+    console.error("Create remote parcel error:", err);
+    res.status(500).json({ error: "Échec de la création du colis à distance" });
+  }
+});
+
 // GET /parcels — list user's parcels
 router.get("/", async (req, res) => {
   try {

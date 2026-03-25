@@ -40,16 +40,21 @@ interface Parcel {
 type Filter = "tous" | "en_cours" | "livres";
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string; label: string }> = {
-  en_attente:          { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B", label: "En attente" },
-  confirme:            { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Confirmé" },
-  en_cours_ramassage:  { color: "#7C3AED", bg: "#F5F3FF", strip: "#8B5CF6", label: "Ramassage" },
-  arrive_gare_depart:  { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "Gare départ" },
-  pris_en_charge:      { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Pris en charge" },
-  en_transit:          { color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6", label: "En transit" },
-  arrive_destination:  { color: "#D97706", bg: "#FEF3C7", strip: "#F59E0B", label: "Arrivé dest." },
-  en_livraison:        { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "En livraison" },
-  livre:               { color: "#065F46", bg: "#ECFDF5", strip: "#10B981", label: "Livré" },
-  annule:              { color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444", label: "Annulé" },
+  en_attente:            { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B", label: "En attente" },
+  en_attente_validation: { color: "#D97706", bg: "#FEF9C3", strip: "#F59E0B", label: "⏳ En validation" },
+  valide:                { color: "#059669", bg: "#D1FAE5", strip: "#10B981", label: "✅ Validé" },
+  refuse:                { color: "#DC2626", bg: "#FEE2E2", strip: "#EF4444", label: "❌ Refusé" },
+  en_attente_ramassage:  { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "🛵 Ramassage" },
+  ramassage_en_cours:    { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "🛵 En cours ramassage" },
+  confirme:              { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Confirmé" },
+  en_cours_ramassage:    { color: "#7C3AED", bg: "#F5F3FF", strip: "#8B5CF6", label: "Ramassage" },
+  arrive_gare_depart:    { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "Gare départ" },
+  pris_en_charge:        { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Pris en charge" },
+  en_transit:            { color: "#6D28D9", bg: "#F5F3FF", strip: "#8B5CF6", label: "En transit" },
+  arrive_destination:    { color: "#D97706", bg: "#FEF3C7", strip: "#F59E0B", label: "Arrivé dest." },
+  en_livraison:          { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "En livraison" },
+  livre:                 { color: "#065F46", bg: "#ECFDF5", strip: "#10B981", label: "Livré" },
+  annule:                { color: "#991B1B", bg: "#FEF2F2", strip: "#EF4444", label: "Annulé" },
 };
 
 const IN_PROGRESS = ["en_attente", "confirme", "en_cours_ramassage", "arrive_gare_depart", "pris_en_charge", "en_transit", "arrive_destination", "en_livraison"];
@@ -292,6 +297,24 @@ export default function ColisScreen() {
               </TouchableOpacity>
             </View>
           }
+          ListHeaderComponent={
+            token ? (
+              <TouchableOpacity
+                style={styles.remoteBanner}
+                activeOpacity={0.85}
+                onPress={() => router.push("/client/colis-distance" as never)}
+              >
+                <View style={styles.remoteBannerIcon}>
+                  <Text style={{ fontSize: 28 }}>📷</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.remoteBannerTitle}>Déposer à distance</Text>
+                  <Text style={styles.remoteBannerSub}>Photographiez votre colis, nous validons pour vous</Text>
+                </View>
+                <Feather name="arrow-right" size={18} color="#0E7490" />
+              </TouchableOpacity>
+            ) : null
+          }
           ListFooterComponent={
             !token ? (
               <TouchableOpacity
@@ -478,4 +501,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 7,
   },
   loginBannerBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
+
+  remoteBanner: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: "#ECFEFF", borderRadius: 14,
+    padding: 14, marginBottom: 12,
+    borderWidth: 1.5, borderColor: "#A5F3FC",
+  },
+  remoteBannerIcon: {
+    width: 50, height: 50, borderRadius: 14, backgroundColor: "#fff",
+    justifyContent: "center", alignItems: "center",
+    borderWidth: 1, borderColor: "#A5F3FC",
+  },
+  remoteBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0E7490" },
+  remoteBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#06B6D4", marginTop: 2 },
 });

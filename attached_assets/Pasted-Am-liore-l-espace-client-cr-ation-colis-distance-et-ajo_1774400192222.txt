@@ -1,0 +1,196 @@
+Améliore l’espace client (création colis à distance) et ajoute un système de rapports pour tous les agents dans mon application GoBooking.
+
+-----------------------------------
+1. COLIS À DISTANCE AVEC PHOTO (ANTI-FRAUDE)
+-----------------------------------
+
+OBJECTIF :
+Permettre au client de créer un colis à distance avec une photo pour validation par l’agent colis.
+
+À FAIRE :
+
+1. Formulaire côté client (création colis) :
+Ajouter champs :
+- expediteurNom
+- expediteurTel
+- destinataireNom
+- destinataireTel
+- villeDepart
+- villeArrivee
+- descriptionColis
+- valeurDeclaree
+- modeReception ("gare" | "domicile")
+- photoColis (upload image)
+
+2. Stockage :
+- stocker la photo (URL)
+- stocker toutes les infos
+
+3. Statut initial :
+- statut = "en_attente_validation"
+
+-----------------------------------
+2. VALIDATION PAR AGENT COLIS
+-----------------------------------
+
+Créer page :
+👉 "Colis à valider"
+
+Afficher :
+- toutes les infos
+- photo du colis
+- valeur déclarée
+
+Actions :
+
+Bouton "Valider colis"
+→ statut = "valide"
+→ définir prix réel (frais transport)
+
+Bouton "Refuser colis"
+→ statut = "refuse"
+
+-----------------------------------
+3. LOGIQUE ENLÈVEMENT (DOMICILE)
+-----------------------------------
+
+Si modeReception = "domicile"
+
+Après validation :
+→ statut = "en_attente_ramassage"
+
+Ajouter bouton :
+👉 "Envoyer livreur"
+
+→ statut = "ramassage_en_cours"
+
+-----------------------------------
+4. VISIBILITÉ COMPAGNIE
+-----------------------------------
+
+Créer vue entreprise :
+
+Afficher :
+- colis validés
+- colis en attente
+- colis refusés
+
+-----------------------------------
+5. NOTIFICATIONS CLIENT
+
+Créer fonction :
+
+sendNotification(tel, message)
+
+Envoyer messages :
+
+- "Votre colis est en attente de validation"
+- "Votre colis a été validé"
+- "Votre colis a été refusé"
+- "Un livreur est en route"
+
+-----------------------------------
+6. SYSTÈME DE RAPPORT AGENTS (TRÈS IMPORTANT)
+-----------------------------------
+
+Créer un système de rapport pour TOUS les agents :
+
+ROLES concernés :
+- agent_guichet
+- agent_embarquement
+- agent_colis
+- agent_logistique
+- agent_suivi
+- agent_route
+- agent_reservation
+
+-----------------------------------
+7. STRUCTURE RAPPORT
+
+report = {
+  id,
+  agentId,
+  role,
+  type: "embarquement" | "vente" | "colis" | "logistique",
+  description,
+  relatedId, // trajet, colis, bus
+  statut: "soumis" | "validé" | "rejeté",
+  createdAt
+}
+
+-----------------------------------
+8. LOGIQUE RAPPORT PAR RÔLE
+
+AGENT EMBARQUEMENT :
+- après départ du bus
+→ rapport embarquement
+
+AGENT GUICHET :
+- après vente / départ
+→ rapport vente
+
+AGENT COLIS :
+- après traitement colis
+→ rapport colis
+
+AGENT LOGISTIQUE :
+- état bus / anomalies
+→ rapport logistique
+
+AGENT SUIVI :
+- gestion alertes
+→ rapport incident
+
+-----------------------------------
+9. INTERFACE AGENT
+
+Ajouter bouton sur chaque module :
+
+👉 "Faire rapport"
+
+Formulaire :
+- description
+- type
+- bouton "Envoyer"
+
+-----------------------------------
+10. VALIDATION PAR COMPAGNIE
+
+Créer écran entreprise :
+
+👉 "Rapports agents"
+
+Afficher :
+- liste rapports
+- agent
+- type
+- description
+
+Actions :
+
+Bouton "Valider"
+→ statut = "validé"
+
+Bouton "Rejeter"
+→ statut = "rejeté"
+
+-----------------------------------
+11. CONTRAINTES
+
+- Ne pas casser les modules existants
+- Relier correctement colis → agent
+- Relier rapports → compagnie
+- Vérifier upload image fonctionne
+- Vérifier statuts mis à jour
+
+-----------------------------------
+À LA FIN
+
+- expliquer flux colis (client → agent → validation)
+- expliquer flux rapport (agent → compagnie)
+- expliquer comment tester :
+  1. créer colis avec photo
+  2. valider colis
+  3. envoyer livreur
+  4. créer rapport
+  5. valider rapport

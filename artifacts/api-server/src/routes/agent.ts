@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -717,6 +717,181 @@ router.get("/trips/capacity/:tripId", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Erreur capacité trajet" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COLIS À DISTANCE — VALIDATION PAR AGENT
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* GET /agent/parcels/pending-validation — list parcels awaiting agent validation */
+router.get("/parcels/pending-validation", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId = agentRows[0]?.companyId ?? null;
+
+    const parcels = companyId
+      ? await db.select().from(parcelsTable).where(and(
+          inArray(parcelsTable.status, ["en_attente_validation"]),
+          eq(parcelsTable.companyId, companyId)
+        )).orderBy(desc(parcelsTable.createdAt)).limit(50)
+      : await db.select().from(parcelsTable).where(
+          inArray(parcelsTable.status, ["en_attente_validation"])
+        ).orderBy(desc(parcelsTable.createdAt)).limit(50);
+
+    res.json(parcels);
+  } catch (err) {
+    console.error("pending-validation error:", err);
+    res.status(500).json({ error: "Erreur chargement colis à valider" });
+  }
+});
+
+/* POST /agent/parcels/:id/validate — agent validates parcel + sets real price */
+router.post("/parcels/:id/validate", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const colisId = req.params.id;
+    const { prixReel, notes } = req.body as { prixReel?: number; notes?: string };
+
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, colisId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Colis introuvable" }); return; }
+    const colis = rows[0];
+
+    const isHomeDelivery = colis.deliveryType === "livraison_domicile";
+    const nextStatus = isHomeDelivery ? "en_attente_ramassage" : "valide";
+
+    const updateData: any = {
+      status: nextStatus,
+      statusUpdatedAt: new Date(),
+    };
+    if (prixReel && prixReel > 0) updateData.amount = prixReel;
+    if (notes) updateData.notes = notes;
+
+    const [updated] = await db.update(parcelsTable).set(updateData).where(eq(parcelsTable.id, colisId)).returning();
+
+    console.log(`[SMS] → ${colis.senderPhone} : ✅ GoBooking : Votre colis ${colis.trackingRef} a été validé. Prix : ${Number(updated.amount).toLocaleString()} FCFA.`);
+
+    res.json({ id: updated.id, status: updated.status, amount: updated.amount, message: "Colis validé" });
+  } catch (err) {
+    console.error("validate parcel error:", err);
+    res.status(500).json({ error: "Erreur validation colis" });
+  }
+});
+
+/* POST /agent/parcels/:id/refuse — agent refuses parcel */
+router.post("/parcels/:id/refuse", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const colisId = req.params.id;
+    const { reason } = req.body as { reason?: string };
+
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, colisId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Colis introuvable" }); return; }
+    const colis = rows[0];
+
+    const [updated] = await db.update(parcelsTable).set({
+      status: "refuse",
+      statusUpdatedAt: new Date(),
+      notes: reason ? `Refusé : ${reason}` : "Refusé par l'agent",
+    }).where(eq(parcelsTable.id, colisId)).returning();
+
+    console.log(`[SMS] → ${colis.senderPhone} : ❌ GoBooking : Votre colis ${colis.trackingRef} a été refusé. ${reason ? `Motif : ${reason}` : ""}`);
+
+    res.json({ id: updated.id, status: "refuse", message: "Colis refusé" });
+  } catch (err) {
+    console.error("refuse parcel error:", err);
+    res.status(500).json({ error: "Erreur refus colis" });
+  }
+});
+
+/* POST /agent/parcels/:id/send-livreur — agent sends delivery person (domicile) */
+router.post("/parcels/:id/send-livreur", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const colisId = req.params.id;
+    const rows = await db.select().from(parcelsTable).where(eq(parcelsTable.id, colisId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Colis introuvable" }); return; }
+    const colis = rows[0];
+
+    const [updated] = await db.update(parcelsTable).set({
+      status: "ramassage_en_cours",
+      statusUpdatedAt: new Date(),
+    }).where(eq(parcelsTable.id, colisId)).returning();
+
+    console.log(`[SMS] → ${colis.senderPhone} : 🛵 GoBooking : Un livreur est en route pour récupérer votre colis ${colis.trackingRef}.`);
+
+    res.json({ id: updated.id, status: "ramassage_en_cours", message: "Livreur envoyé" });
+  } catch (err) {
+    console.error("send-livreur error:", err);
+    res.status(500).json({ error: "Erreur envoi livreur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SYSTÈME DE RAPPORTS AGENTS
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* POST /agent/reports — create a report */
+router.post("/reports", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentRecord = agentRows[0];
+
+    const { reportType, description, relatedId } = req.body as {
+      reportType: string; description: string; relatedId?: string;
+    };
+
+    if (!reportType || !description?.trim()) {
+      res.status(400).json({ error: "Type et description du rapport obligatoires" }); return;
+    }
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 8);
+    const [report] = await db.insert(agentReportsTable).values({
+      id,
+      agentId: user.id,
+      agentName: user.name,
+      companyId: agentRecord?.companyId ?? null,
+      agentRole: agentRecord?.agentRole ?? user.agentRole ?? null,
+      reportType,
+      description: description.trim(),
+      relatedId: relatedId || null,
+      statut: "soumis",
+    }).returning();
+
+    res.status(201).json(report);
+  } catch (err) {
+    console.error("create report error:", err);
+    res.status(500).json({ error: "Erreur création rapport" });
+  }
+});
+
+/* GET /agent/reports — list my reports */
+router.get("/reports", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const reports = await db.select().from(agentReportsTable)
+      .where(eq(agentReportsTable.agentId, user.id))
+      .orderBy(desc(agentReportsTable.createdAt))
+      .limit(50);
+
+    res.json(reports);
+  } catch (err) {
+    console.error("list reports error:", err);
+    res.status(500).json({ error: "Erreur chargement rapports" });
   }
 });
 

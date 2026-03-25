@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable, agentReportsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -2912,6 +2912,58 @@ router.get("/boarding-logs", async (req, res) => {
     res.json({ logs, trips: companyTrips, total: logs.length });
   } catch (err) {
     console.error("GET /company/boarding-logs error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RAPPORTS AGENTS — VUE COMPAGNIE
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* GET /company/reports — list agent reports for this company */
+router.get("/reports", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const reports = await db.select().from(agentReportsTable)
+      .where(eq(agentReportsTable.companyId, ctx.companyId))
+      .orderBy(desc(agentReportsTable.createdAt))
+      .limit(100);
+
+    res.json(reports);
+  } catch (err) {
+    console.error("GET /company/reports error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* PATCH /company/reports/:id — update report status */
+router.patch("/reports/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { statut } = req.body as { statut: string };
+    const validStatuts = ["soumis", "lu", "en_cours", "traite", "rejete"];
+    if (!statut || !validStatuts.includes(statut)) {
+      res.status(400).json({ error: "Statut invalide" }); return;
+    }
+
+    const rows = await db.select().from(agentReportsTable)
+      .where(eq(agentReportsTable.id, req.params.id)).limit(1);
+    if (!rows.length || rows[0].companyId !== ctx.companyId) {
+      res.status(404).json({ error: "Rapport introuvable" }); return;
+    }
+
+    const [updated] = await db.update(agentReportsTable)
+      .set({ statut })
+      .where(eq(agentReportsTable.id, req.params.id))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    console.error("PATCH /company/reports/:id error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

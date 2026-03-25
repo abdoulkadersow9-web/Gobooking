@@ -216,6 +216,16 @@ export default function AgentHome() {
             <Text style={S.extraBtnText}>Mes gains</Text>
           </Pressable>
         </View>
+
+        {/* Rapport button */}
+        <Pressable
+          style={({ pressed }) => [S.rapportBtn, pressed && { opacity: 0.85 }]}
+          onPress={() => router.push("/agent/rapport" as never)}
+        >
+          <Feather name="alert-triangle" size={18} color="#fff" />
+          <Text style={S.rapportBtnText}>📋 Faire un rapport</Text>
+          <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.7)" />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -257,4 +267,7 @@ const S = StyleSheet.create({
   extraRow:    { flexDirection: "row", gap: 12, marginTop: 6 },
   extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   extraBtnText:{ fontSize: 13, fontWeight: "700", color: NAVY },
+
+  rapportBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 15, marginTop: 4, shadowColor: "#BE123C", shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4 },
+  rapportBtnText: { fontSize: 15, fontWeight: "800", color: "#fff", flex: 1, textAlign: "center" },
 });

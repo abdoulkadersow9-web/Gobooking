@@ -28,11 +28,31 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 ## Agent Roles
 - `agent_ticket` / `vente` / `agent_guichet` → /agent/tickets (guichet vente)
 - `agent_embarquement` / `embarquement` → /agent/embarquement
-- `agent_colis` / `reception_colis` → /agent/colis
+- `agent_colis` / `reception_colis` → /agent/colis (avec onglet "✅ Valider" pour colis à distance)
 - `logistique` → /agent/logistique
 - `route` → /agent/route
 - `suivi` → /agent/suivi
-- `agent_reservation` → /agent/reservation (réservations en ligne) — NEW
+- `agent_reservation` → /agent/reservation (réservations en ligne)
+
+## Colis à Distance (nouveau)
+- Client crée une demande depuis `POST /parcels/create-remote` avec photo base64
+- Statut initial: `en_attente_validation`
+- Agent valide via `POST /agent/parcels/:id/validate` (ajustement prix optionnel) → SMS au client
+- Agent refuse via `POST /agent/parcels/:id/refuse` (motif) → SMS au client
+- Livraison domicile: statut `en_attente_ramassage` → agent envoie livreur via `POST /agent/parcels/:id/send-livreur`
+- Statuts ajoutés: `en_attente_validation`, `valide`, `refuse`, `en_attente_ramassage`, `ramassage_en_cours`
+- Screen client: `app/client/colis-distance.tsx` — formulaire avec photo, villes, poids, valeur déclarée
+- Onglet agent: "✅ Valider" dans `app/agent/colis.tsx` (4ème tab)
+- Bandeau "Déposer à distance" dans `app/(tabs)/colis.tsx`
+
+## Système de Rapports Agents (nouveau)
+- Table `agent_reports` (id, agentId, agentName, companyId, agentRole, reportType, description, relatedId, statut, createdAt)
+- 8 types de rapport: incident_voyage, probleme_colis, probleme_passager, probleme_vehicule, fraude, retard, suggestion, autre
+- Statuts rapport: soumis → lu → en_cours → traite / rejete
+- Agent: `POST /agent/reports`, `GET /agent/reports`
+- Compagnie: `GET /company/reports`, `PATCH /company/reports/:id`
+- Screen agent: `app/agent/rapport.tsx` (Nouveau rapport + Historique)
+- Bouton "📋 Faire un rapport" rouge dans `app/agent/home.tsx`
 
 ## Demo Accounts (password: test123)
 - compagnie@test.com, agent@test.com, admin@test.com

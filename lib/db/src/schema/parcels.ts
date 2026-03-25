@@ -29,6 +29,9 @@ export const parcelsTable = pgTable("parcels", {
   statusUpdatedAt: timestamp("status_updated_at"),
   location: text("location"),
   notes: text("notes"),
+  photoUrl: text("photo_url"),
+  declaredValue: real("declared_value").default(0),
+  createdByClient: text("created_by_client").default("false"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

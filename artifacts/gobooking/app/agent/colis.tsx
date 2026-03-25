@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Modal,
-  KeyboardAvoidingView, Platform,
+  KeyboardAvoidingView, Platform, Image, RefreshControl,
 } from "react-native";
 import * as Print from "expo-print";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -106,7 +106,7 @@ interface Parcel {
   createdAt: string;
 }
 
-type TabType = "creer" | "liste" | "retrait";
+type TabType = "creer" | "liste" | "retrait" | "valider";
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUSES[status] ?? { label: status, color: "#6B7280", bg: "#F3F4F6" };
@@ -160,19 +160,312 @@ export default function ColisScreen() {
 
       {/* Tabs */}
       <View style={S.tabs}>
-        {(["retrait", "liste", "creer"] as TabType[]).map(t => (
+        {(["retrait", "valider", "liste", "creer"] as TabType[]).map(t => (
           <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
             <Text style={[S.tabTxt, tab === t && S.tabTxtActive]}>
-              {t === "retrait" ? "📦 Retrait" : t === "liste" ? "📋 Liste" : "➕ Créer"}
+              {t === "retrait" ? "📦 Retrait"
+               : t === "valider" ? "✅ Valider"
+               : t === "liste" ? "📋 Liste"
+               : "➕ Créer"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {tab === "retrait" && <RetraitTab token={token} networkStatus={networkStatus} />}
+      {tab === "valider" && <ValiderTab token={token} />}
       {tab === "liste"   && <ListTab   token={token} setTab={setTab} />}
       {tab === "creer"   && <CreateTab token={token} networkStatus={networkStatus} />}
     </SafeAreaView>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   TAB — Valider colis à distance
+   ═══════════════════════════════════════════ */
+interface RemoteParcel {
+  id: string;
+  trackingRef: string;
+  senderName: string;
+  senderPhone: string;
+  receiverName: string;
+  receiverPhone: string;
+  fromCity: string;
+  toCity: string;
+  parcelType: string;
+  weight: number;
+  amount: number;
+  deliveryType: string;
+  photoUrl: string | null;
+  declaredValue: number;
+  status: string;
+  createdAt: string;
+}
+
+function ValiderTab({ token }: { token: string | null }) {
+  const [parcels, setParcels] = React.useState<RemoteParcel[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [selected, setSelected] = React.useState<RemoteParcel | null>(null);
+  const [prixReel, setPrixReel] = React.useState("");
+  const [notes, setNotes] = React.useState("");
+  const [refusReason, setRefusReason] = React.useState("");
+  const [showRefusModal, setShowRefusModal] = React.useState(false);
+  const [acting, setActing] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; msg: string } | null>(null);
+
+  const load = React.useCallback(async () => {
+    if (!token) { setLoading(false); return; }
+    try {
+      const data = await apiFetch<RemoteParcel[]>("/agent/parcels/pending-validation", { token });
+      setParcels(Array.isArray(data) ? data : []);
+    } catch { setParcels([]); }
+    finally { setLoading(false); setRefreshing(false); }
+  }, [token]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const handleValidate = async () => {
+    if (!selected || !token) return;
+    setActing(true);
+    try {
+      const body: any = {};
+      if (prixReel.trim() && parseFloat(prixReel) > 0) body.prixReel = parseFloat(prixReel);
+      if (notes.trim()) body.notes = notes.trim();
+      await apiFetch(`/agent/parcels/${selected.id}/validate`, { token, method: "POST", body });
+      setResult({ ok: true, msg: `✅ Colis ${selected.trackingRef} validé. SMS envoyé au client.` });
+      setSelected(null);
+      setPrixReel("");
+      setNotes("");
+      load();
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
+    } finally { setActing(false); }
+  };
+
+  const handleRefuse = async () => {
+    if (!selected || !token) return;
+    setActing(true);
+    try {
+      await apiFetch(`/agent/parcels/${selected.id}/refuse`, { token, method: "POST", body: { reason: refusReason } });
+      setResult({ ok: false, msg: `❌ Colis ${selected.trackingRef} refusé. SMS envoyé au client.` });
+      setSelected(null);
+      setShowRefusModal(false);
+      setRefusReason("");
+      load();
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
+    } finally { setActing(false); }
+  };
+
+  const handleSendLivreur = async (parcel: RemoteParcel) => {
+    if (!token) return;
+    setActing(true);
+    try {
+      await apiFetch(`/agent/parcels/${parcel.id}/send-livreur`, { token, method: "POST", body: {} });
+      setResult({ ok: true, msg: `🛵 Livreur envoyé pour le colis ${parcel.trackingRef}.` });
+      load();
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
+    } finally { setActing(false); }
+  };
+
+  const TEAL = "#0E7490";
+  const TEAL_LT = "#ECFEFF";
+
+  const pendingValidation = parcels.filter(p => p.status === "en_attente_validation");
+  const pendingRamassage  = parcels.filter(p => p.status === "en_attente_ramassage");
+
+  if (loading) {
+    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <ActivityIndicator color={TEAL} size="large" />
+    </View>;
+  }
+
+  return (
+    <ScrollView style={{ flex: 1, backgroundColor: "#F8FAFC" }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+      contentContainerStyle={{ padding: 14, gap: 12 }}>
+
+      {result && (
+        <View style={{ backgroundColor: result.ok ? "#ECFDF5" : "#FFF1F2", borderRadius: 12, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ color: result.ok ? "#065F46" : "#9F1239", fontSize: 14, fontWeight: "600", flex: 1 }}>{result.msg}</Text>
+          <TouchableOpacity onPress={() => setResult(null)}><Ionicons name="close-circle" size={20} color="#94A3B8" /></TouchableOpacity>
+        </View>
+      )}
+
+      {/* À valider */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+        <Ionicons name="time" size={18} color={TEAL} />
+        <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
+          À valider ({pendingValidation.length})
+        </Text>
+      </View>
+
+      {pendingValidation.length === 0 && (
+        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 20, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
+          <Text style={{ fontSize: 32 }}>✅</Text>
+          <Text style={{ color: "#6B7280", fontSize: 14, marginTop: 8 }}>Aucun colis en attente de validation</Text>
+        </View>
+      )}
+
+      {pendingValidation.map(parcel => (
+        <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 2, borderColor: selected?.id === parcel.id ? TEAL : "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
+          <View style={{ backgroundColor: TEAL_LT, padding: 12, borderBottomWidth: 1, borderColor: "#CFFAFE" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="document-text" size={16} color={TEAL} />
+                <Text style={{ fontWeight: "800", color: TEAL, fontSize: 14 }}>{parcel.trackingRef}</Text>
+              </View>
+              <View style={{ backgroundColor: "#FEF9C3", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#854D0E" }}>📷 Créé à distance</Text>
+              </View>
+            </View>
+          </View>
+          <View style={{ padding: 12, gap: 6 }}>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "600" }}>EXPÉDITEUR</Text>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.senderName}</Text>
+                <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.senderPhone}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "600" }}>DESTINATAIRE</Text>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.receiverName}</Text>
+                <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.receiverPhone}</Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+              <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.weight} kg · {parcel.parcelType}</Text>
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={{ backgroundColor: parcel.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0F9FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: parcel.deliveryType === "livraison_domicile" ? "#EA580C" : "#0284C7" }}>
+                  {parcel.deliveryType === "livraison_domicile" ? "🛵 Domicile" : "🏢 Gare"}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#16A34A" }}>
+                {Number(parcel.amount).toLocaleString()} FCFA
+                {parcel.declaredValue > 0 && <Text style={{ fontSize: 11, color: "#6B7280" }}> (déclaré: {Number(parcel.declaredValue).toLocaleString()})</Text>}
+              </Text>
+            </View>
+            {parcel.photoUrl && (
+              <View style={{ borderRadius: 10, overflow: "hidden", marginTop: 4, borderWidth: 1, borderColor: "#E2E8F0" }}>
+                <Image source={{ uri: parcel.photoUrl }} style={{ width: "100%", height: 160 }} resizeMode="cover" />
+                <View style={{ backgroundColor: "#F0FDF4", padding: 6 }}>
+                  <Text style={{ fontSize: 11, color: "#15803D", textAlign: "center", fontWeight: "600" }}>📷 Photo du colis fournie par le client</Text>
+                </View>
+              </View>
+            )}
+            {/* Validation panel */}
+            {selected?.id === parcel.id ? (
+              <View style={{ backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, gap: 8, marginTop: 4, borderWidth: 1, borderColor: TEAL }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: TEAL }}>Ajuster le tarif (optionnel)</Text>
+                <TextInput
+                  value={prixReel}
+                  onChangeText={setPrixReel}
+                  placeholder="Prix réel FCFA (vide = conserver prix calculé)"
+                  keyboardType="numeric"
+                  style={{ backgroundColor: "#fff", borderRadius: 8, borderWidth: 1, borderColor: "#CBD5E1", padding: 10, fontSize: 14 }}
+                />
+                <TextInput
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Notes pour le client (optionnel)"
+                  style={{ backgroundColor: "#fff", borderRadius: 8, borderWidth: 1, borderColor: "#CBD5E1", padding: 10, fontSize: 14 }}
+                />
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: "#DCFCE7", borderRadius: 10, padding: 12, alignItems: "center" }}
+                    onPress={handleValidate} disabled={acting}>
+                    <Text style={{ color: "#15803D", fontWeight: "800", fontSize: 14 }}>✅ Valider</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: "#FEE2E2", borderRadius: 10, padding: 12, alignItems: "center" }}
+                    onPress={() => { setShowRefusModal(true); }}
+                    disabled={acting}>
+                    <Text style={{ color: "#DC2626", fontWeight: "800", fontSize: 14 }}>❌ Refuser</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ backgroundColor: "#F1F5F9", borderRadius: 10, padding: 12 }}
+                    onPress={() => setSelected(null)}>
+                    <Ionicons name="close" size={18} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={{ backgroundColor: TEAL, borderRadius: 10, padding: 12, alignItems: "center", marginTop: 4 }}
+                onPress={() => { setSelected(parcel); setPrixReel(""); setNotes(""); }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>👁 Examiner et décider</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ))}
+
+      {/* À ramasser (domicile) */}
+      {pendingRamassage.length > 0 && (
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+            <Ionicons name="bicycle" size={18} color="#EA580C" />
+            <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
+              Ramassage domicile ({pendingRamassage.length})
+            </Text>
+          </View>
+          {pendingRamassage.map(parcel => (
+            <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FED7AA" }}>
+              <View style={{ backgroundColor: "#FFF7ED", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={{ fontWeight: "800", color: "#EA580C", fontSize: 13 }}>{parcel.trackingRef}</Text>
+                <View style={{ backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}>🛵 À ramasser</Text>
+                </View>
+              </View>
+              <View style={{ padding: 12, gap: 6 }}>
+                <Text style={{ fontSize: 13, color: "#0F172A", fontWeight: "600" }}>{parcel.senderName} — {parcel.senderPhone}</Text>
+                <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                <TouchableOpacity
+                  style={{ backgroundColor: "#EA580C", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 4 }}
+                  onPress={() => handleSendLivreur(parcel)} disabled={acting}>
+                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>🛵 Envoyer livreur</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
+      {/* Refus modal */}
+      <Modal visible={showRefusModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderRadius: 24, padding: 24, gap: 14 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#0F172A" }}>Motif du refus</Text>
+            <TextInput
+              value={refusReason}
+              onChangeText={setRefusReason}
+              placeholder="Expliquer pourquoi le colis est refusé..."
+              multiline
+              style={{ backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", padding: 12, minHeight: 80, fontSize: 14 }}
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, padding: 14, alignItems: "center" }}
+                onPress={handleRefuse} disabled={acting}>
+                {acting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmer le refus</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, padding: 14, alignItems: "center" }}
+                onPress={() => setShowRefusModal(false)}>
+                <Text style={{ color: "#475569", fontWeight: "700", fontSize: 15 }}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <View style={{ height: 40 }} />
+    </ScrollView>
   );
 }
 
