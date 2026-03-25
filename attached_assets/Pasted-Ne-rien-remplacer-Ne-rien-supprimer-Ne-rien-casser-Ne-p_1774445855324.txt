@@ -1,0 +1,145 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Ne pas modifier la logique existante.
+
+Adapter uniquement l’organisation et l’affichage de l’onglet "Agents" dans l’espace Entreprise.
+
+---
+
+OBJECTIF :
+
+Améliorer la lisibilité et l’organisation des agents pour que l’entreprise puisse voir clairement tous les agents, bien classés selon leurs rôles et leurs agences.
+
+---
+
+1. ORGANISATION GÉNÉRALE
+
+Dans l’onglet "Agents" :
+
+- afficher tous les agents existants
+- ne pas perdre les données déjà créées
+- ne pas modifier la structure actuelle des données
+
+Améliorer uniquement l’affichage en regroupant les agents par rôle.
+
+---
+
+2. CLASSER LES AGENTS PAR RÔLE (TRÈS IMPORTANT)
+
+Créer des sections visibles pour chaque rôle :
+
+- Agents en route
+- Agents guichet
+- Agents embarquement
+- Agents colis
+- Agents logistique
+- autres rôles existants
+
+Chaque rôle doit être dans son propre groupe clairement séparé.
+
+---
+
+3. AGENTS EN ROUTE (PRIORITÉ)
+
+Respecter la logique métier :
+
+- 1 départ = 1 agent en route
+- plusieurs agents en route possibles (plusieurs départs)
+
+Dans la section "Agents en route", afficher pour chaque agent :
+
+- nom
+- téléphone
+- agence
+- rôle
+- départ attribué (si existant)
+- statut (actif / inactif / en mission)
+
+L’entreprise doit voir clairement quel agent est lié à quel départ.
+
+---
+
+4. AGENTS GUICHET
+
+Dans la section "Agents guichet" :
+
+- afficher les agents par agence
+- chaque agent doit être clairement identifié
+
+Afficher :
+
+- nom
+- téléphone
+- agence
+- rôle
+
+---
+
+5. AUTRES AGENTS
+
+Appliquer la même logique pour :
+
+- agents colis
+- agents embarquement
+- agents logistique
+- autres rôles
+
+Chaque rôle dans son groupe, sans mélange.
+
+---
+
+6. ORGANISATION PAR AGENCE
+
+Quand c’est nécessaire :
+
+- afficher clairement l’agence de chaque agent
+
+Exemple :
+
+- Agent guichet — Agence Abidjan
+- Agent guichet — Agence Bouaké
+- Agent colis — Agence Yamoussoukro
+
+---
+
+7. VÉRIFICATION DES DONNÉES
+
+- vérifier que tous les agents existants apparaissent
+- ne pas perdre d’agents
+- ne pas masquer certaines données
+
+La liste doit être complète.
+
+---
+
+8. AFFICHAGE
+
+Améliorer uniquement la lisibilité :
+
+- sections bien séparées
+- titres visibles
+- agents affichés clairement (ligne ou carte)
+- éviter le mélange des rôles
+
+---
+
+9. OBJECTIF FINAL
+
+Dans l’espace Entreprise > onglet Agents :
+
+- tous les agents visibles
+- classés par rôle
+- regroupés proprement
+- liés à leurs agences
+- agents en route liés aux départs
+- aucune confusion visuelle
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien modifier dans la logique.
+Ne pas refaire la page.
+Adapter uniquement l’organisation et l’affichage pour respecter la logique métier existante.

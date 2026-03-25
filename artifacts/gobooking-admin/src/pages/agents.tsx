@@ -2,21 +2,182 @@ import React, { useState } from "react";
 import { useAgents, useCreateAgent } from "@/hooks/use-company";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, UserCog, Mail, Phone, Bus, Eye } from "lucide-react";
+import { Plus, UserCog, Mail, Phone, Bus, Eye, MapPin, Navigation, Package, Ticket, ClipboardList, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
+/* ── Mapping rôles → affichage ── */
+const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
+  agent_route:       { label: "Agents En Route",       icon: <Navigation size={16} />, color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
+  agent_guichet:     { label: "Agents Guichet",        icon: <Ticket size={16} />,     color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+  agent_embarquement:{ label: "Agents Embarquement",   icon: <Bus size={16} />,        color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+  agent_colis:       { label: "Agents Colis",          icon: <Package size={16} />,    color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
+  agent_reservation: { label: "Agents Réservation",    icon: <ClipboardList size={16} />, color: "#DB2777", bg: "#FDF2F8", border: "#FBCFE8" },
+  validation:        { label: "Agents Validation",     icon: <Users size={16} />,      color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
+};
+
+const ROLE_ORDER = ["agent_route", "agent_guichet", "agent_embarquement", "agent_colis", "agent_reservation", "validation"];
+
+function statusLabel(s: string) {
+  if (s === "active")   return "Actif";
+  if (s === "inactive") return "Inactif";
+  if (s === "en_mission" || s === "on_trip") return "En mission";
+  return s;
+}
+
+function statusVariant(s: string): "success" | "destructive" | "warning" | "neutral" {
+  if (s === "active")   return "success";
+  if (s === "inactive") return "destructive";
+  if (s === "en_mission" || s === "on_trip") return "warning";
+  return "neutral";
+}
+
+/* ── Carte individuelle d'un agent ── */
+function AgentCard({ agent, isCompany, roleKey }: { agent: any; isCompany: boolean; roleKey: string }) {
+  const cfg = ROLE_CONFIG[roleKey] ?? ROLE_CONFIG["agent_guichet"];
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
+      {/* En-tête */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+            style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.border}` }}
+          >
+            {(agent.name ?? "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="font-bold text-foreground text-sm truncate">{agent.name ?? "—"}</p>
+            <p className="text-[11px] text-muted-foreground font-mono">Code: {agent.agentCode ?? "—"}</p>
+          </div>
+        </div>
+        <Badge variant={statusVariant(agent.status ?? "inactive")}>
+          {statusLabel(agent.status ?? "inactive")}
+        </Badge>
+      </div>
+
+      {/* Détails */}
+      <div className="space-y-1.5 text-xs text-muted-foreground border-t border-border/50 pt-3">
+        {agent.email && (
+          <div className="flex items-center gap-2">
+            <Mail size={12} className="flex-shrink-0" />
+            <span className="truncate">{agent.email}</span>
+          </div>
+        )}
+        {agent.phone && (
+          <div className="flex items-center gap-2">
+            <Phone size={12} className="flex-shrink-0" />
+            <span>{agent.phone}</span>
+          </div>
+        )}
+        {(agent.agenceName || agent.agenceCity) && (
+          <div className="flex items-center gap-2">
+            <MapPin size={12} className="flex-shrink-0" />
+            <span className="font-medium text-foreground">
+              {agent.agenceName ?? ""}
+              {agent.agenceCity ? ` — ${agent.agenceCity}` : ""}
+            </span>
+          </div>
+        )}
+        {/* Info spécifique agent en route */}
+        {roleKey === "agent_route" && agent.tripName && (
+          <div className="flex items-center gap-2 mt-1">
+            <Navigation size={12} className="flex-shrink-0" style={{ color: cfg.color }} />
+            <span className="font-semibold" style={{ color: cfg.color }}>
+              {agent.tripName}
+              {agent.tripTime ? ` · Départ ${agent.tripTime}` : ""}
+            </span>
+          </div>
+        )}
+        {roleKey === "agent_route" && !agent.tripName && (
+          <div className="flex items-center gap-2 mt-1">
+            <Navigation size={12} className="flex-shrink-0 text-muted-foreground" />
+            <span className="italic text-muted-foreground">Aucun départ attribué</span>
+          </div>
+        )}
+        {/* Bus assigné (sauf agent en route où on montre le départ) */}
+        {roleKey !== "agent_route" && agent.busName && agent.busName !== "Non assigné" && (
+          <div className="flex items-center gap-2">
+            <Bus size={12} className="flex-shrink-0 text-blue-500" />
+            <span className="font-medium text-blue-600">{agent.busName}</span>
+          </div>
+        )}
+      </div>
+
+      {!isCompany && (
+        <div className="mt-1">
+          <Button variant="outline" size="sm" className="w-full text-xs">Modifier / Assigner</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Section par rôle ── */
+function RoleSection({ roleKey, agents, isCompany }: { roleKey: string; agents: any[]; isCompany: boolean }) {
+  const cfg = ROLE_CONFIG[roleKey] ?? { label: roleKey, icon: <UserCog size={16} />, color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" };
+
+  return (
+    <div className="space-y-3">
+      {/* Titre de section */}
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 rounded-xl border"
+        style={{ backgroundColor: cfg.bg, borderColor: cfg.border }}
+      >
+        <span style={{ color: cfg.color }}>{cfg.icon}</span>
+        <h3 className="font-bold text-sm" style={{ color: cfg.color }}>{cfg.label}</h3>
+        <span
+          className="ml-auto text-xs font-bold px-2.5 py-0.5 rounded-full"
+          style={{ backgroundColor: cfg.border, color: cfg.color }}
+        >
+          {agents.length}
+        </span>
+      </div>
+
+      {/* Grille d'agents */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-1">
+        {agents.map((agent: any) => (
+          <AgentCard key={agent.id} agent={agent} isCompany={isCompany} roleKey={roleKey} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Page principale ── */
 export default function Agents() {
   const { data: agents, isLoading } = useAgents();
   const [showAdd, setShowAdd] = useState(false);
   const { isCompany } = useAuth();
 
+  /* Grouper par rôle */
+  const grouped = React.useMemo(() => {
+    if (!agents) return {};
+    const map: Record<string, any[]> = {};
+    for (const agent of agents as any[]) {
+      const role = agent.agentRole ?? "agent_guichet";
+      if (!map[role]) map[role] = [];
+      map[role].push(agent);
+    }
+    return map;
+  }, [agents]);
+
+  /* Rôles présents, dans l'ordre défini */
+  const presentRoles = ROLE_ORDER.filter(r => (grouped[r]?.length ?? 0) > 0);
+  const otherRoles   = Object.keys(grouped).filter(r => !ROLE_ORDER.includes(r));
+  const allRoles     = [...presentRoles, ...otherRoles];
+
+  const totalAgents = (agents as any[] | undefined)?.length ?? 0;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── En-tête ── */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-display font-bold">Agents de Compagnie</h2>
-          <p className="text-muted-foreground mt-1">Gérez le personnel au guichet et dans les bus.</p>
+          <p className="text-muted-foreground mt-1">
+            {totalAgents} agent{totalAgents !== 1 ? "s" : ""} · classés par rôle
+          </p>
         </div>
         {isCompany ? (
           <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
@@ -29,65 +190,41 @@ export default function Agents() {
         )}
       </div>
 
-      {showAdd && (
-        <AddAgentForm onClose={() => setShowAdd(false)} />
+      {/* ── Formulaire de création ── */}
+      {showAdd && <AddAgentForm onClose={() => setShowAdd(false)} />}
+
+      {/* ── Contenu ── */}
+      {isLoading ? (
+        <p className="py-12 text-center text-muted-foreground">Chargement des agents…</p>
+      ) : totalAgents === 0 ? (
+        <div className="py-16 text-center text-muted-foreground">
+          <Users className="mx-auto mb-3 opacity-30" size={40} />
+          <p className="font-semibold">Aucun agent enregistré</p>
+          <p className="text-sm mt-1">Créez votre premier agent avec le bouton ci-dessus.</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {allRoles.map(roleKey => (
+            grouped[roleKey]?.length > 0 && (
+              <RoleSection
+                key={roleKey}
+                roleKey={roleKey}
+                agents={grouped[roleKey]}
+                isCompany={isCompany}
+              />
+            )
+          ))}
+        </div>
       )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoading ? (
-          <p className="col-span-full py-8 text-center text-muted-foreground">Chargement...</p>
-        ) : (
-          agents?.map((agent: any) => (
-            <div key={agent.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
-                    {agent.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-foreground">{agent.name}</h3>
-                    <p className="text-xs text-muted-foreground font-mono">Code: {agent.agentCode}</p>
-                  </div>
-                </div>
-                <Badge variant={agent.status === 'active' ? 'success' : 'neutral'}>
-                  {agent.status}
-                </Badge>
-              </div>
-
-              <div className="space-y-2 mt-4 pt-4 border-t border-border/50 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <UserCog size={14} />
-                  <span className="capitalize">{agent.agentRole?.replace('_', ' ') || 'Guichet'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail size={14} />
-                  <span>{agent.email}</span>
-                </div>
-                {agent.busName && (
-                  <div className="flex items-center gap-2 text-secondary font-medium">
-                    <Bus size={14} />
-                    <span>Assigné: {agent.busName}</span>
-                  </div>
-                )}
-              </div>
-              
-              {!isCompany && (
-                <div className="mt-6">
-                  <Button variant="outline" size="sm" className="w-full">Modifier / Assigner</Button>
-                </div>
-              )}
-            </div>
-          ))
-        )}
-      </div>
     </div>
   );
 }
 
+/* ── Formulaire ajout agent (inchangé) ── */
 function AddAgentForm({ onClose }: { onClose: () => void }) {
   const { mutate, isPending } = useCreateAgent();
   const { toast } = useToast();
-  
+
   const [formData, setFormData] = useState({
     name: "", email: "", phone: "", password: "", agentCode: "", agentRole: "guichet"
   });
@@ -110,36 +247,36 @@ function AddAgentForm({ onClose }: { onClose: () => void }) {
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold mb-1">Nom complet</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none" 
-            value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} />
+          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+            value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">Code Agent (Unique)</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none font-mono" 
-            value={formData.agentCode} onChange={e=>setFormData({...formData, agentCode: e.target.value})} />
+          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none font-mono"
+            value={formData.agentCode} onChange={e => setFormData({ ...formData, agentCode: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">Email</label>
-          <input required type="email" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none" 
-            value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} />
+          <input required type="email" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+            value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">Téléphone</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none" 
-            value={formData.phone} onChange={e=>setFormData({...formData, phone: e.target.value})} />
+          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+            value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">Rôle</label>
           <select className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.agentRole} onChange={e=>setFormData({...formData, agentRole: e.target.value})}>
+            value={formData.agentRole} onChange={e => setFormData({ ...formData, agentRole: e.target.value })}>
             <option value="guichet">Agent de Guichet</option>
             <option value="embarquement">Agent d'Embarquement (Bus)</option>
           </select>
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">Mot de passe provisoire</label>
-          <input required type="password" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none" 
-            value={formData.password} onChange={e=>setFormData({...formData, password: e.target.value})} />
+          <input required type="password" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+            value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
         </div>
         <div className="col-span-full flex justify-end gap-3 mt-2">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
