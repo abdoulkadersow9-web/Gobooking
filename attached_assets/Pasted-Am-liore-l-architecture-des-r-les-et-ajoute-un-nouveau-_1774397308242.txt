@@ -1,0 +1,138 @@
+Améliore l’architecture des rôles et ajoute un nouveau module LOGISTIQUE dans mon application GoBooking.
+
+-----------------------------------
+1. AJOUT NOUVEAU RÔLE : AGENT LOGISTIQUE
+-----------------------------------
+
+Contexte :
+J’ai déjà :
+- Agent Guichet (tickets)
+- Agent Embarquement
+- Agent Colis
+
+Je veux ajouter :
+
+NOUVEAU RÔLE :
+- Agent Logistique
+
+OBJECTIF :
+- Gérer les bus
+- Suivre les trajets en temps réel
+- Voir l’état des bus
+
+À FAIRE :
+
+1. Ajouter un rôle :
+"logistique"
+
+2. Permettre qu’un utilisateur puisse avoir plusieurs rôles :
+Exemple :
+roles = ["guichet", "logistique"]
+
+3. Adapter la logique d’autorisation pour accepter plusieurs rôles
+
+-----------------------------------
+2. NOUVEAU MODULE : LOGISTIQUE
+-----------------------------------
+
+Créer un nouvel écran :
+👉 "Agent Logistique"
+
+Contenu :
+
+SECTION 1 : LISTE DES BUS
+- Numéro bus (BUS-001)
+- Compagnie
+- Capacité
+- Statut :
+  - En attente
+  - En route
+  - Arrivé
+  - En panne
+
+SECTION 2 : SUIVI DES TRAJETS
+- Ville départ
+- Ville arrivée
+- Heure départ
+- Statut trajet :
+  - En préparation
+  - En cours
+  - Terminé
+
+SECTION 3 : ACTIONS
+
+Ajouter boutons :
+
+- "Mettre en route"
+→ change statut bus = "En route"
+
+- "Marquer arrivé"
+→ statut = "Arrivé"
+
+- "Signaler panne"
+→ statut = "En panne"
+
+-----------------------------------
+3. AMÉLIORATION VISIBILITÉ COMPAGNIES
+-----------------------------------
+
+Objectif :
+Permettre à chaque compagnie de voir ses données
+
+À FAIRE :
+
+- Associer chaque bus à une compagnie
+- Filtrer les données par compagnie
+
+Exemple :
+if (user.compagnieId) {
+  afficher uniquement les bus de cette compagnie
+}
+
+-----------------------------------
+4. AJOUT 2 NOUVELLES FONCTIONNALITÉS IMPORTANTES
+-----------------------------------
+
+FONCTION 1 : STATUT GLOBAL SYSTÈME
+
+Créer un tableau de bord :
+
+- Nombre de bus en route
+- Nombre de colis en attente
+- Nombre de tickets vendus aujourd’hui
+
+FONCTION 2 : ALERTES
+
+Créer système simple d’alertes :
+
+- Si bus en panne → afficher alerte
+- Si colis non retiré → alerte
+- Si bus plein → alerte
+
+-----------------------------------
+5. INTÉGRATION UI
+
+Dans l’espace agent :
+
+Ajouter une carte :
+
+"Agent Logistique"
+Description :
+Suivi des bus, gestion des trajets et état des véhicules
+
+-----------------------------------
+CONTRAINTES
+-----------------------------------
+
+- Ne pas casser les modules existants
+- Réutiliser la structure actuelle
+- Ajouter proprement les rôles
+- Code clair et modulaire
+
+-----------------------------------
+À LA FIN
+-----------------------------------
+
+- expliquer comment tester Agent Logistique
+- montrer comment créer un agent logistique
+- expliquer comment voir les bus et changer les statuts

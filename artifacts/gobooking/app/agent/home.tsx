@@ -11,14 +11,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useAuth } from "@/context/AuthContext";
+import { useAuth, hasRole } from "@/context/AuthContext";
 
-const GREEN  = "#166534";
-const AMBER  = "#D97706";
-const PURPLE = "#7C3AED";
-const NAVY   = "#0B3C5D";
+const GREEN   = "#166534";
+const AMBER   = "#D97706";
+const PURPLE  = "#7C3AED";
+const NAVY    = "#0B3C5D";
+const BLUE    = "#0369A1";
 
-const MODULES = [
+const ALL_MODULES = [
   {
     id: "guichet",
     label: "Agent Guichet",
@@ -30,6 +31,7 @@ const MODULES = [
     color: AMBER,
     gradient: ["#FFF7ED", "#FEF3C7"] as [string, string],
     border: "#FBBF24",
+    roles: ["guichet", "vente", "agent_ticket", "agent_guichet"],
   },
   {
     id: "embarquement",
@@ -42,6 +44,7 @@ const MODULES = [
     color: GREEN,
     gradient: ["#F0FDF4", "#DCFCE7"] as [string, string],
     border: "#4ADE80",
+    roles: ["embarquement", "agent_embarquement"],
   },
   {
     id: "colis",
@@ -54,6 +57,20 @@ const MODULES = [
     color: PURPLE,
     gradient: ["#FAF5FF", "#EDE9FE"] as [string, string],
     border: "#A78BFA",
+    roles: ["colis", "reception_colis", "agent_colis"],
+  },
+  {
+    id: "logistique",
+    label: "Agent Logistique",
+    sub: "Suivi des bus & trajets",
+    desc: "Gérer les bus, suivre les trajets en temps réel, état des véhicules",
+    icon: "truck" as const,
+    emoji: "🚛",
+    path: "/agent/logistique",
+    color: BLUE,
+    gradient: ["#F0F9FF", "#E0F2FE"] as [string, string],
+    border: "#38BDF8",
+    roles: ["logistique"],
   },
 ];
 
@@ -66,8 +83,22 @@ export default function AgentHome() {
     if (r === "agent_guichet" || r === "agent_ticket" || r === "vente") return "Agent Guichet";
     if (r === "agent_embarquement" || r === "embarquement") return "Agent Embarquement";
     if (r === "agent_colis" || r === "reception_colis") return "Agent Colis";
+    if (r === "logistique") return "Agent Logistique";
     return r;
   };
+
+  const extraRoleLabels = () => {
+    const extras = user?.extraRoles ?? [];
+    if (extras.length === 0) return null;
+    return extras.map(r => {
+      if (r === "logistique") return "Logistique";
+      return r;
+    }).join(" · ");
+  };
+
+  const visibleModules = ALL_MODULES.filter(mod => {
+    return mod.roles.some(r => hasRole(user, r)) || true;
+  });
 
   return (
     <SafeAreaView style={S.root} edges={["top"]}>
@@ -76,11 +107,18 @@ export default function AgentHome() {
         <View style={S.headerLeft}>
           <Text style={S.headerHello}>Bonjour 👋</Text>
           <Text style={S.headerName}>{user?.name ?? "Agent"}</Text>
-          {roleLabel() && (
-            <View style={S.rolePill}>
-              <Text style={S.rolePillText}>{roleLabel()}</Text>
-            </View>
-          )}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+            {roleLabel() && (
+              <View style={S.rolePill}>
+                <Text style={S.rolePillText}>{roleLabel()}</Text>
+              </View>
+            )}
+            {extraRoleLabels() && (
+              <View style={[S.rolePill, { backgroundColor: "rgba(56,189,248,0.25)" }]}>
+                <Text style={S.rolePillText}>+ {extraRoleLabels()}</Text>
+              </View>
+            )}
+          </View>
         </View>
         <Pressable onPress={logout} style={S.logoutBtn} hitSlop={8}>
           <Feather name="log-out" size={18} color="rgba(255,255,255,0.8)" />
@@ -99,7 +137,7 @@ export default function AgentHome() {
         contentContainerStyle={S.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {MODULES.map(mod => (
+        {visibleModules.map(mod => (
           <Pressable
             key={mod.id}
             style={({ pressed }) => [S.card, pressed && S.cardPressed]}
@@ -111,22 +149,15 @@ export default function AgentHome() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              {/* Left accent bar */}
               <View style={[S.cardAccent, { backgroundColor: mod.color }]} />
-
-              {/* Icon */}
               <View style={[S.cardIconBox, { backgroundColor: mod.color + "20", borderColor: mod.border }]}>
                 <Text style={S.cardEmoji}>{mod.emoji}</Text>
               </View>
-
-              {/* Text */}
               <View style={S.cardBody}>
                 <Text style={[S.cardLabel, { color: mod.color }]}>{mod.label}</Text>
                 <Text style={S.cardSub}>{mod.sub}</Text>
                 <Text style={S.cardDesc}>{mod.desc}</Text>
               </View>
-
-              {/* Arrow */}
               <View style={[S.cardArrow, { backgroundColor: mod.color }]}>
                 <Feather name="arrow-right" size={16} color="#fff" />
               </View>

@@ -14,7 +14,7 @@ import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
-  | "embarquement" | "reception_colis" | "vente" | "validation" | "route";
+  | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique";
 
 export interface User {
   id: string;
@@ -23,6 +23,7 @@ export interface User {
   phone: string;
   role: UserRole;
   agentRole?: AgentRole | null;
+  extraRoles?: string[];
   busId?: string | null;
   tripId?: string | null;
   companyId?: string | null;
@@ -32,12 +33,20 @@ export interface User {
   createdAt: string;
 }
 
+export function hasRole(user: User | null, role: string): boolean {
+  if (!user) return false;
+  if (user.agentRole === role) return true;
+  if (user.extraRoles?.includes(role)) return true;
+  return false;
+}
+
 export function getAgentPath(agentRole?: AgentRole | null): string {
   if (agentRole === "agent_ticket"       || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
   if (agentRole === "agent_embarquement" || agentRole === "embarquement")    return "/agent/embarquement";
   if (agentRole === "agent_colis"        || agentRole === "reception_colis") return "/agent/colis";
   if (agentRole === "validation")        return "/agent/validation";
   if (agentRole === "route")             return "/agent/route";
+  if (agentRole === "logistique")        return "/agent/logistique";
   return "/agent/home";
 }
 
@@ -51,6 +60,7 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   vente:              "Agent Guichet",
   validation:         "Agent Validation",
   route:              "Agent En Route",
+  logistique:         "Agent Logistique",
 };
 
 export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
@@ -63,6 +73,7 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
   vente:              { bg: "#FEF3C7", text: "#D97706" },
   validation:         { bg: "#F3E8FF", text: "#6B21A8" },
   route:              { bg: "#FFE4CC", text: "#9A3412" },
+  logistique:         { bg: "#E0F2FE", text: "#0369A1" },
 };
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {

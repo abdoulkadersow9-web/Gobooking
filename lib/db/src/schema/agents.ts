@@ -15,6 +15,7 @@ export const agentsTable = pgTable("agents", {
   tripId: text("trip_id"),
   agentCode: varchar("agent_code", { length: 20 }).notNull().unique(),
   agentRole: varchar("agent_role", { length: 50 }),
+  extraRoles: text("extra_roles"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

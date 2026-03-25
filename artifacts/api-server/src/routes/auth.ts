@@ -142,6 +142,7 @@ router.post("/login", loginRateLimit, async (req, res) => {
     tokenStore.set(token, user.id);
 
     let agentRole: string | null = null;
+    let extraRoles: string[] = [];
     let busId: string | null = null;
     let tripId: string | null = null;
     let companyId: string | null = null;
@@ -152,6 +153,8 @@ router.post("/login", loginRateLimit, async (req, res) => {
         busId      = agentRecord[0].busId      ?? null;
         tripId     = agentRecord[0].tripId     ?? null;
         companyId  = agentRecord[0].companyId  ?? null;
+        const raw  = (agentRecord[0] as any).extra_roles ?? agentRecord[0].extraRoles ?? null;
+        extraRoles = raw ? raw.split(",").map((r: string) => r.trim()).filter(Boolean) : [];
       }
     }
 
@@ -166,6 +169,7 @@ router.post("/login", loginRateLimit, async (req, res) => {
         phone: user.phone,
         role: user.role,
         agentRole,
+        extraRoles,
         busId,
         tripId,
         companyId,
@@ -211,6 +215,7 @@ router.get("/me", async (req, res) => {
     }
 
     let agentRole: string | null = null;
+    let extraRoles: string[] = [];
     let busId: string | null = null;
     let tripId: string | null = null;
     let companyId: string | null = null;
@@ -221,6 +226,8 @@ router.get("/me", async (req, res) => {
         busId      = agentRecord[0].busId      ?? null;
         tripId     = agentRecord[0].tripId     ?? null;
         companyId  = agentRecord[0].companyId  ?? null;
+        const raw  = (agentRecord[0] as any).extra_roles ?? agentRecord[0].extraRoles ?? null;
+        extraRoles = raw ? raw.split(",").map((r: string) => r.trim()).filter(Boolean) : [];
       }
     }
 
@@ -231,6 +238,7 @@ router.get("/me", async (req, res) => {
       phone: user.phone,
       role: user.role,
       agentRole,
+      extraRoles,
       busId,
       tripId,
       companyId,

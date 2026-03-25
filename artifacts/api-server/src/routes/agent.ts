@@ -2079,6 +2079,241 @@ router.post("/validate-qr", async (req, res) => {
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   LOGISTIQUE MODULE — Bus management & trip tracking
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /logistique/overview ─── */
+router.get("/logistique/overview", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Buses — filter by company if agent has one
+    const busesList = user.companyId
+      ? await db.select().from(busesTable).where(eq(busesTable.companyId, user.companyId))
+      : await db.select().from(busesTable).limit(100);
+
+    // Trips today — filter by company
+    const tripsRaw = user.companyId
+      ? await db.select().from(tripsTable).where(and(eq(tripsTable.companyId, user.companyId), eq(tripsTable.date, today)))
+      : await db.select().from(tripsTable).where(eq(tripsTable.date, today)).limit(50);
+
+    // Parcels stats — pending/undelivered
+    const allParcels = await db.execute(sql`
+      SELECT status FROM parcels
+      ${user.companyId ? sql`WHERE company_id = ${user.companyId}` : sql``}
+    `);
+    const parcelsRows = (allParcels as any).rows ?? allParcels;
+    const pendingParcels = parcelsRows.filter((p: any) =>
+      ["créé", "en_gare", "chargé_bus", "en_transit"].includes(p.status)
+    ).length;
+
+    // Tickets sold today
+    const ticketsToday = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM bookings
+      WHERE DATE(created_at) = ${today}::date
+      AND status = 'confirmed'
+      ${user.companyId ? sql`AND company_id = ${user.companyId}` : sql``}
+    `);
+    const ticketsTodayCount = Number(((ticketsToday as any).rows?.[0] ?? ticketsToday[0])?.cnt ?? 0);
+
+    // Active alerts
+    const alertsRaw = await db.select().from(agentAlertsTable)
+      .where(and(
+        eq(agentAlertsTable.status, "active"),
+        user.companyId ? eq(agentAlertsTable.companyId, user.companyId) : sql`1=1`
+      ))
+      .orderBy(desc(agentAlertsTable.createdAt))
+      .limit(10);
+
+    // Auto-generate alerts for broken buses
+    const brokenBuses = busesList.filter((b: any) => b.logistic_status === "en_panne" || b.logisticStatus === "en_panne");
+    const generatedAlerts = brokenBuses.map((b: any) => ({
+      id: `auto-panne-${b.id}`,
+      type: "panne",
+      busId: b.id,
+      busName: b.bus_name ?? b.busName,
+      message: `🚨 Bus ${b.bus_name ?? b.busName ?? b.plate_number ?? b.plateNumber} est en panne`,
+      status: "active",
+      createdAt: new Date().toISOString(),
+    }));
+
+    // Auto-alert for uncollected parcels (arrived > 3 days)
+    const oldParcels = await db.execute(sql`
+      SELECT tracking_ref, receiver_name FROM parcels
+      WHERE status = 'arrivé'
+      AND created_at < NOW() - INTERVAL '3 days'
+      ${user.companyId ? sql`AND company_id = ${user.companyId}` : sql``}
+      LIMIT 5
+    `);
+    const oldParcelsRows = (oldParcels as any).rows ?? oldParcels;
+    const parcelAlerts = oldParcelsRows.map((p: any) => ({
+      id: `auto-colis-${p.tracking_ref}`,
+      type: "colis",
+      message: `📦 Colis ${p.tracking_ref} non retiré depuis 3j (${p.receiver_name})`,
+      status: "active",
+      createdAt: new Date().toISOString(),
+    }));
+
+    // Stats
+    const busStats = {
+      enRoute:     busesList.filter((b: any) => (b.logistic_status ?? b.logisticStatus) === "en_route").length,
+      enAttente:   busesList.filter((b: any) => (b.logistic_status ?? b.logisticStatus) === "en_attente").length,
+      arrive:      busesList.filter((b: any) => (b.logistic_status ?? b.logisticStatus) === "arrivé").length,
+      enPanne:     busesList.filter((b: any) => (b.logistic_status ?? b.logisticStatus) === "en_panne").length,
+      total:       busesList.length,
+    };
+
+    res.json({
+      stats: {
+        busesEnRoute:      busStats.enRoute,
+        busesEnAttente:    busStats.enAttente,
+        busesEnPanne:      busStats.enPanne,
+        colisEnAttente:    pendingParcels,
+        ticketsVendusAuj:  ticketsTodayCount,
+      },
+      buses: busesList.map((b: any) => ({
+        id:              b.id,
+        busName:         b.bus_name ?? b.busName,
+        plateNumber:     b.plate_number ?? b.plateNumber,
+        busType:         b.bus_type ?? b.busType,
+        capacity:        b.capacity,
+        logisticStatus:  b.logistic_status ?? b.logisticStatus,
+        currentLocation: b.current_location ?? b.currentLocation,
+        condition:       b.condition,
+        companyId:       b.company_id ?? b.companyId,
+      })),
+      trips: tripsRaw.map((t: any) => ({
+        id:            t.id,
+        from:          t.from,
+        to:            t.to,
+        departureTime: t.departure_time ?? t.departureTime,
+        date:          t.date,
+        status:        t.status,
+        busId:         t.bus_id ?? t.busId,
+        busName:       t.bus_name ?? t.busName,
+        price:         t.price,
+      })),
+      alerts: [
+        ...generatedAlerts,
+        ...parcelAlerts,
+        ...alertsRaw.map((a: any) => ({
+          id:        a.id,
+          type:      a.type,
+          busId:     a.busId,
+          busName:   a.busName,
+          message:   a.message,
+          status:    a.status,
+          createdAt: a.createdAt?.toISOString?.() ?? a.createdAt,
+        })),
+      ].slice(0, 10),
+    });
+  } catch (err) {
+    console.error("[logistique/overview]", err);
+    res.status(500).json({ error: "Erreur chargement logistique" });
+  }
+});
+
+/* ─── POST /logistique/buses/:busId/mettre-en-route ─── */
+router.post("/logistique/buses/:busId/mettre-en-route", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { busId } = req.params;
+    const { location } = req.body;
+
+    await db.execute(sql`
+      UPDATE buses SET logistic_status = 'en_route',
+        current_location = ${location ?? null}
+      WHERE id = ${busId}
+    `);
+    res.json({ success: true, busId, logisticStatus: "en_route" });
+  } catch (err) {
+    console.error("[logistique/mettre-en-route]", err);
+    res.status(500).json({ error: "Erreur mise en route" });
+  }
+});
+
+/* ─── POST /logistique/buses/:busId/marquer-arrive ─── */
+router.post("/logistique/buses/:busId/marquer-arrive", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { busId } = req.params;
+
+    await db.execute(sql`
+      UPDATE buses SET logistic_status = 'arrivé',
+        current_location = NULL
+      WHERE id = ${busId}
+    `);
+    res.json({ success: true, busId, logisticStatus: "arrivé" });
+  } catch (err) {
+    console.error("[logistique/marquer-arrive]", err);
+    res.status(500).json({ error: "Erreur marquage arrivée" });
+  }
+});
+
+/* ─── POST /logistique/buses/:busId/signaler-panne ─── */
+router.post("/logistique/buses/:busId/signaler-panne", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { busId } = req.params;
+    const { issue, location } = req.body;
+
+    await db.execute(sql`
+      UPDATE buses SET logistic_status = 'en_panne',
+        condition = 'panne',
+        issue = ${issue ?? "Panne signalée par l'agent"},
+        current_location = ${location ?? null}
+      WHERE id = ${busId}
+    `);
+
+    // Create alert
+    const alertId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    const buses = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+    const busName = (buses[0] as any)?.busName ?? busId;
+    await db.insert(agentAlertsTable).values({
+      id: alertId,
+      type: "panne",
+      agentId: user.id,
+      agentName: user.name,
+      companyId: user.companyId ?? undefined,
+      busId,
+      busName,
+      message: `🚨 Panne signalée pour ${busName}${issue ? ` : ${issue}` : ""}`,
+      status: "active",
+    });
+
+    res.json({ success: true, busId, logisticStatus: "en_panne", alertId });
+  } catch (err) {
+    console.error("[logistique/signaler-panne]", err);
+    res.status(500).json({ error: "Erreur signalement panne" });
+  }
+});
+
+/* ─── POST /logistique/buses/:busId/remettre-en-attente ─── */
+router.post("/logistique/buses/:busId/remettre-en-attente", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { busId } = req.params;
+
+    await db.execute(sql`
+      UPDATE buses SET logistic_status = 'en_attente',
+        condition = 'bon', issue = NULL
+      WHERE id = ${busId}
+    `);
+    res.json({ success: true, busId, logisticStatus: "en_attente" });
+  } catch (err) {
+    console.error("[logistique/remettre-en-attente]", err);
+    res.status(500).json({ error: "Erreur" });
+  }
+});
+
 /* ─── PATCH /agent/buses/:busId/update — agent updates bus logistic status & location ─── */
 router.patch("/buses/:busId/update", async (req, res) => {
   try {
