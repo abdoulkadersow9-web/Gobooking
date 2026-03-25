@@ -172,7 +172,7 @@ export default function EmbarquementScreen() {
 
   if (user && user.role !== "agent") {
     return (
-      <SafeAreaView style={styles.denied}>
+      <SafeAreaView style={styles.denied} edges={["top", "bottom"]}>
         <Ionicons name="lock-closed" size={48} color="#EF4444" />
         <Text style={styles.deniedText}>Accès réservé aux agents</Text>
       </SafeAreaView>
@@ -854,7 +854,7 @@ export default function EmbarquementScreen() {
 
   if (!isEmbarquementAgent) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
+      <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
         <StatusBar barStyle="dark-content" />
         <Text style={{ fontSize: 48 }}>🔒</Text>
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>Accès non autorisé</Text>
@@ -868,7 +868,7 @@ export default function EmbarquementScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
       {/* Offline Banner */}

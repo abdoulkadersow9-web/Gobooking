@@ -170,7 +170,7 @@ export default function SuiviScreen() {
   }
 
   return (
-    <SafeAreaView style={S.safe} edges={["top"]}>
+    <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={RED_D} />
 
       {/* Header */}

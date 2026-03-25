@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, Modal,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -531,7 +531,7 @@ export default function RouteScreen() {
   const allAlerts: BusAlert[] = [...busAlerts, ...autoAlerts];
 
   return (
-    <SafeAreaView style={S.safe}>
+    <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
       {/* ── Header ── */}
@@ -783,7 +783,8 @@ export default function RouteScreen() {
         onRequestClose={() => setIsModalOpen(false)}
         presentationStyle="fullScreen"
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+        <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }} edges={["top", "bottom"]}>
           <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
           {/* Header modal */}
@@ -1531,6 +1532,7 @@ export default function RouteScreen() {
 
           </ScrollView>
         </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
 
       {/* ── Bouton Rapport (bas de page) ── */}

@@ -212,7 +212,7 @@ export default function AgentScan() {
   /* ── Camera permission loading ── */
   if (mode === "camera" && !permission) {
     return (
-      <SafeAreaView style={S.safe}>
+      <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
         <View style={S.center}>
           <Text style={S.hintTxt}>Vérification des permissions…</Text>
         </View>
@@ -329,7 +329,7 @@ export default function AgentScan() {
      SCANNER SCREEN
   ═══════════════════════════════════════════════════════════════ */
   return (
-    <SafeAreaView style={S.safe}>
+    <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       {/* Header */}
       <View style={S.header}>
         <Pressable onPress={() => router.replace("/agent/home")} style={S.backBtn}>
