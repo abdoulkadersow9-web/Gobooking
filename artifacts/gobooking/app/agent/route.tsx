@@ -963,8 +963,8 @@ export default function RouteScreen() {
         style={S.rapportBtn}
         onPress={() => router.push("/agent/rapport" as never)}
       >
-        <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+        <Feather name="file-text" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
