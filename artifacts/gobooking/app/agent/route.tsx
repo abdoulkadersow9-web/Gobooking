@@ -622,35 +622,73 @@ export default function RouteScreen() {
 
             {tab === "passagers" && (
               <>
-                <Text style={S.sectionTitle}>Passagers à bord ({passengers.length})</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <Text style={S.sectionTitle}>Passagers à bord</Text>
+                  <View style={{ backgroundColor: G, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>{passengers.length} pers.</Text>
+                  </View>
+                </View>
                 {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
                 {!passLoading && passengers.length === 0 && (
-                  <Text style={S.emptySub}>Aucun passager enregistré</Text>
+                  <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
+                    <Text style={{ fontSize: 32 }}>👥</Text>
+                    <Text style={S.emptySub}>Aucun passager enregistré</Text>
+                  </View>
                 )}
-                {!passLoading && passengers.map((p, i) => (
-                  <View key={i} style={S.passengerRow}>
-                    <View style={S.passengerAvatar}>
-                      <Text style={S.passengerAvatarTxt}>{p.name.charAt(0)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={S.passengerName}>{p.name}</Text>
-                      <Text style={S.passengerSeat}>Siège {p.seatNumber}</Text>
-                      {p.boardingPoint && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
-                          <Ionicons name="location-outline" size={11} color="#7C3AED" />
-                          <Text style={{ fontSize: 11, color: "#7C3AED" }}>{p.boardingPoint}</Text>
+                {!passLoading && passengers.map((p, i) => {
+                  const isBoarded   = p.status === "boarded" || p.status === "confirmed";
+                  const statusBg    = isBoarded ? "#DCFCE7" : "#FEF9C3";
+                  const statusColor = isBoarded ? "#166534" : "#92400E";
+                  const statusText  = isBoarded ? "✅ À bord" : "⏳ En attente";
+                  return (
+                    <View key={i} style={S.passengerCard}>
+                      {/* Ligne 1 : avatar + nom + statut */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <View style={[S.passengerAvatar, { width: 46, height: 46, borderRadius: 23, backgroundColor: isBoarded ? G : "#94A3B8" }]}>
+                          <Text style={[S.passengerAvatarTxt, { fontSize: 19 }]}>{p.name.charAt(0).toUpperCase()}</Text>
                         </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>{p.name}</Text>
+                          {p.phone
+                            ? <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{p.phone}</Text>
+                            : <Text style={{ fontSize: 12, color: "#CBD5E1", marginTop: 2 }}>Pas de téléphone</Text>}
+                        </View>
+                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: statusColor }}>{statusText}</Text>
+                        </View>
+                      </View>
+
+                      {/* Séparateur */}
+                      <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 }} />
+
+                      {/* Ligne 2 : siège + point d'embarquement */}
+                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0FDF4", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                          <Feather name="hash" size={12} color={G} />
+                          <Text style={{ fontSize: 13, color: G_DARK, fontWeight: "700" }}>Siège {p.seatNumber}</Text>
+                        </View>
+                        {p.boardingPoint && (
+                          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                            <Ionicons name="location-outline" size={12} color="#7C3AED" />
+                            <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600", flex: 1 }} numberOfLines={1}>{p.boardingPoint}</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Bouton appel */}
+                      {p.phone && (
+                        <TouchableOpacity
+                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10, backgroundColor: G_LIGHT, borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#A7F3D0" }}
+                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                          activeOpacity={0.75}
+                        >
+                          <Feather name="phone" size={15} color={G} />
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>Appeler — {p.phone}</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
-                    <View style={[S.badge, {
-                      backgroundColor: p.status === "boarded" ? "#DCFCE7" : "#FEF9C3",
-                    }]}>
-                      <Text style={[S.badgeTxt, { color: p.status === "boarded" ? "#166534" : "#713F12" }]}>
-                        {p.status === "boarded" ? "À bord" : "En attente"}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 
@@ -797,38 +835,63 @@ export default function RouteScreen() {
 
             {tab === "contacts" && (
               <>
-                <Text style={S.sectionTitle}>Contacts clients ({passengers.length})</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <Text style={S.sectionTitle}>Contacts clients</Text>
+                  <View style={{ backgroundColor: "#1E40AF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>{passengers.length} contacts</Text>
+                  </View>
+                </View>
                 {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
                 {!passLoading && passengers.length === 0 && (
-                  <Text style={S.emptySub}>Aucun contact disponible</Text>
+                  <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
+                    <Text style={{ fontSize: 32 }}>📞</Text>
+                    <Text style={S.emptySub}>Aucun contact disponible</Text>
+                  </View>
                 )}
                 {!passLoading && passengers.map((p, i) => (
-                  <View key={i} style={[S.passengerRow, { gap: 10 }]}>
-                    <View style={[S.passengerAvatar, { backgroundColor: "#EFF6FF" }]}>
-                      <Text style={[S.passengerAvatarTxt, { color: "#1E40AF" }]}>{p.name.charAt(0)}</Text>
-                    </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <Text style={S.passengerName}>{p.name}</Text>
-                      <Text style={S.passengerSeat}>Siège {p.seatNumber}</Text>
-                      {p.boardingPoint && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                          <Ionicons name="location-outline" size={11} color="#64748B" />
-                          <Text style={{ fontSize: 11, color: "#64748B" }}>{p.boardingPoint}</Text>
+                  <View key={i} style={S.passengerCard}>
+                    {/* En-tête : avatar + infos + bouton appel rapide */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <View style={[S.passengerAvatar, { width: 46, height: 46, borderRadius: 23, backgroundColor: "#1E40AF" }]}>
+                        <Text style={[S.passengerAvatarTxt, { fontSize: 19 }]}>{p.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>{p.name}</Text>
+                        <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Siège {p.seatNumber}</Text>
+                      </View>
+                      {p.phone ? (
+                        <TouchableOpacity
+                          style={{ backgroundColor: "#ECFDF5", borderRadius: 14, padding: 11, alignItems: "center", justifyContent: "center" }}
+                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                          activeOpacity={0.7}
+                        >
+                          <Feather name="phone" size={20} color={G} />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={{ backgroundColor: "#F1F5F9", borderRadius: 14, padding: 11 }}>
+                          <Feather name="phone-off" size={20} color="#94A3B8" />
                         </View>
                       )}
                     </View>
-                    {p.phone ? (
-                      <TouchableOpacity
-                        style={{ backgroundColor: "#ECFDF5", borderRadius: 10, padding: 8, alignItems: "center", justifyContent: "center" }}
-                        onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
-                        activeOpacity={0.7}
-                      >
-                        <Feather name="phone" size={18} color={G} />
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={{ backgroundColor: "#F1F5F9", borderRadius: 10, padding: 8 }}>
-                        <Feather name="phone-off" size={18} color="#94A3B8" />
+
+                    {/* Point d'embarquement */}
+                    {p.boardingPoint && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                        <Ionicons name="location-outline" size={12} color="#7C3AED" />
+                        <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600" }}>{p.boardingPoint}</Text>
                       </View>
+                    )}
+
+                    {/* Bouton appel large */}
+                    {p.phone && (
+                      <TouchableOpacity
+                        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10, backgroundColor: "#ECFDF5", borderRadius: 10, paddingVertical: 11, borderWidth: 1.5, borderColor: "#6EE7B7" }}
+                        onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                        activeOpacity={0.75}
+                      >
+                        <Feather name="phone-call" size={15} color={G} />
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>{p.phone}</Text>
+                      </TouchableOpacity>
                     )}
                   </View>
                 ))}
@@ -933,6 +996,9 @@ const S = StyleSheet.create({
   timelineLabel:    { fontSize: 13, color: "#64748B", paddingTop: 6, flex: 1 },
   timelineLabelActive: { color: G_DARK, fontWeight: "700" },
 
+  passengerCard:    { backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 10,
+                      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+                      borderLeftWidth: 3, borderLeftColor: G },
   passengerRow:     { flexDirection: "row", alignItems: "center", backgroundColor: "white",
                       borderRadius: 10, padding: 12, marginBottom: 8, gap: 10,
                       shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },

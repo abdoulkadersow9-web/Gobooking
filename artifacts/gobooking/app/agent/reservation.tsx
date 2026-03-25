@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -317,51 +318,88 @@ export default function AgentReservation() {
             const hasBaggage = b.baggageCount > 0;
 
             return (
-              <View key={b.id} style={[S.card, isPending && { borderColor: "#FCD34D", borderWidth: 2 }, { marginBottom: 8 }]}>
-                {/* Card header */}
-                <View style={S.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={S.cardRef}>{b.bookingRef}</Text>
-                    {b.trip && (
-                      <Text style={S.cardRoute}>{b.trip.from} → {b.trip.to}</Text>
-                    )}
-                  </View>
+              <View key={b.id} style={[S.card, isPending && { borderColor: "#FCD34D", borderWidth: 2 }, { marginBottom: 10 }]}>
+
+                {/* ── Ligne référence + statut ── */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <Text style={S.cardRef}>{b.bookingRef}</Text>
                   <View style={[S.statusBadge, { backgroundColor: st.bg }]}>
                     <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
                   </View>
                 </View>
 
-                {/* Trip info */}
+                {/* ── Bloc client (nom + téléphone cliquable) ── */}
+                <View style={S.clientBlock}>
+                  <View style={S.clientAvatar}>
+                    <Text style={S.clientAvatarTxt}>{(b.passengers?.[0]?.name ?? "?").charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={S.clientName}>{b.passengers?.[0]?.name ?? "Client inconnu"}</Text>
+                    {b.contactPhone ? (
+                      <TouchableOpacity onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g, "")}`)} activeOpacity={0.7}>
+                        <Text style={S.clientPhone}>📞 {b.contactPhone}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>Pas de téléphone</Text>
+                    )}
+                  </View>
+                  {b.contactPhone && (
+                    <TouchableOpacity
+                      style={S.callBtn}
+                      onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g, "")}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="phone" size={18} color={TEAL} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* ── Trajet (de → à + heure + bus) ── */}
                 {b.trip && (
-                  <View style={S.tripRow}>
-                    <Ionicons name="calendar-outline" size={13} color="#6B7280" />
-                    <Text style={S.tripInfo}>{b.trip.date} à {b.trip.departureTime}</Text>
-                    <Text style={S.tripBus}>· {b.trip.busName}</Text>
+                  <View style={S.tripBlock}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <Ionicons name="bus" size={16} color={TEAL} />
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{b.trip.from} → {b.trip.to}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+                        <Text style={S.tripInfo}>{b.trip.date}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="time-outline" size={13} color="#6B7280" />
+                        <Text style={S.tripInfo}>{b.trip.departureTime}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Feather name="truck" size={12} color="#6B7280" />
+                        <Text style={S.tripBus}>{b.trip.busName}</Text>
+                      </View>
+                    </View>
                   </View>
                 )}
 
-                {/* Seat availability */}
+                {/* ── Places disponibles ── */}
                 {b.trip && (b.trip.guichetSeats > 0 || b.trip.onlineSeats > 0) && (
-                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: "#16A34A", fontWeight: "700" }}>🏢 Guichet</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#166534" }}>{b.trip.guichetSeats} places</Text>
+                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, color: "#16A34A", fontWeight: "700", marginBottom: 2 }}>🏢 Guichet</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "900", color: "#166534" }}>{b.trip.guichetSeats}</Text>
+                      <Text style={{ fontSize: 10, color: "#4ADE80" }}>places dispo</Text>
                     </View>
-                    <View style={{ flex: 1, backgroundColor: TEAL_L, borderRadius: 8, padding: 8, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: TEAL, fontWeight: "700" }}>🌐 En ligne</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#164E63" }}>{b.trip.onlineSeats} places</Text>
+                    <View style={{ flex: 1, backgroundColor: TEAL_L, borderRadius: 10, padding: 10, alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, color: TEAL, fontWeight: "700", marginBottom: 2 }}>🌐 En ligne</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "900", color: "#164E63" }}>{b.trip.onlineSeats}</Text>
+                      <Text style={{ fontSize: 10, color: TEAL }}>places dispo</Text>
                     </View>
                   </View>
                 )}
 
-                {/* Passenger info */}
-                <View style={S.infoGrid}>
-                  <InfoRow icon="person-outline" label="Client" val={b.passengers?.[0]?.name ?? "—"} />
-                  <InfoRow icon="call-outline" label="Téléphone" val={b.contactPhone || "—"} />
-                  <InfoRow icon="people-outline" label="Passagers" val={`${paxCount} personne${paxCount > 1 ? "s" : ""}`} />
-                  <InfoRow icon="seat-outline" label="Sièges" val={seatNums} />
-                  <InfoRow icon="cash-outline" label="Montant" val={`${b.totalAmount.toLocaleString()} FCFA`} />
-                  <InfoRow icon="card-outline" label="Paiement" val={paymentLabel(b.paymentMethod)} />
+                {/* ── Détails réservation ── */}
+                <View style={S.detailsBlock}>
+                  <InfoRow icon="people-outline" label="Passagers"  val={`${paxCount} personne${paxCount > 1 ? "s" : ""}`} />
+                  <InfoRow icon="apps-outline"   label="Sièges"     val={seatNums} />
+                  <InfoRow icon="cash-outline"   label="Montant"    val={`${b.totalAmount.toLocaleString()} FCFA`} />
+                  <InfoRow icon="card-outline"   label="Paiement"   val={paymentLabel(b.paymentMethod)} />
                 </View>
 
                 {/* ── Baggage section ── */}
@@ -525,10 +563,10 @@ export default function AgentReservation() {
 /* ── Info row helper ─────────────────────────────────────────────────────── */
 function InfoRow({ icon, label, val }: { icon: string; label: string; val: string }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
-      <Ionicons name={icon as any} size={14} color="#9CA3AF" />
-      <Text style={{ fontSize: 12, color: "#6B7280", width: 100 }}>{label}</Text>
-      <Text style={{ fontSize: 12, fontWeight: "700", color: "#111827", flex: 1 }}>{val}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
+      <Ionicons name={icon as any} size={15} color="#6B7280" />
+      <Text style={{ fontSize: 13, color: "#6B7280", width: 90 }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827", flex: 1 }}>{val}</Text>
     </View>
   );
 }
@@ -554,16 +592,28 @@ const S = StyleSheet.create({
   chipTxt:     { fontSize: 12, color: "#6B7280", fontWeight: "600" },
   chipTxtActive: { color: "#fff" },
 
-  card: { backgroundColor: "#fff", borderRadius: 16, padding: 14, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3, borderWidth: 1, borderColor: "#E5E7EB" },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  cardRef:    { fontSize: 16, fontWeight: "900", color: TEAL },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#E5E7EB" },
+  cardRef:    { fontSize: 17, fontWeight: "900", color: TEAL, letterSpacing: 0.3 },
   cardRoute:  { fontSize: 13, fontWeight: "700", color: "#374151", marginTop: 2 },
-  tripRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
-  tripInfo:   { fontSize: 12, color: "#6B7280" },
-  tripBus:    { fontSize: 12, color: "#9CA3AF" },
-  statusBadge:{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusBadge:{ paddingHorizontal: 11, paddingVertical: 5, borderRadius: 20 },
   statusTxt:  { fontSize: 12, fontWeight: "700" },
 
+  /* Client block */
+  clientBlock:    { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#F8FAFF", borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#E0E7FF" },
+  clientAvatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: TEAL, alignItems: "center", justifyContent: "center" },
+  clientAvatarTxt:{ fontSize: 19, fontWeight: "800", color: "#fff" },
+  clientName:     { fontSize: 15, fontWeight: "800", color: "#111827" },
+  clientPhone:    { fontSize: 13, color: TEAL, fontWeight: "600", marginTop: 3 },
+  callBtn:        { backgroundColor: TEAL_L, borderRadius: 12, padding: 10, alignItems: "center", justifyContent: "center" },
+
+  /* Trip block */
+  tripBlock:  { backgroundColor: "#F0F9FF", borderRadius: 12, padding: 12, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: TEAL },
+  tripRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 10 },
+  tripInfo:   { fontSize: 12, color: "#374151", fontWeight: "600" },
+  tripBus:    { fontSize: 12, color: "#6B7280" },
+
+  /* Details block */
+  detailsBlock: { backgroundColor: "#FAFAFA", borderRadius: 12, paddingHorizontal: 14, paddingTop: 4, paddingBottom: 4, marginBottom: 12, borderWidth: 1, borderColor: "#F3F4F6" },
   infoGrid:   { gap: 0, marginBottom: 10 },
 
   /* Baggage block */
@@ -581,10 +631,10 @@ const S = StyleSheet.create({
   baggageValidationNote: { fontSize: 11, color: "#059669", fontStyle: "italic", marginTop: 4 },
   noBaggageTxt: { fontSize: 12, color: "#9CA3AF", fontStyle: "italic" },
 
-  confirmBtn: { backgroundColor: TEAL, borderRadius: 12, paddingVertical: 13, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, elevation: 2 },
-  confirmTxt: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  confirmBtn: { backgroundColor: TEAL, borderRadius: 14, paddingVertical: 15, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: TEAL, shadowOpacity: 0.25, shadowRadius: 8 },
+  confirmTxt: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: 0.2 },
 
-  cancelBtn:  { borderRadius: 12, paddingVertical: 11, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 7, borderWidth: 1.5, borderColor: "#FCA5A5", backgroundColor: "#FEF2F2" },
+  cancelBtn:  { borderRadius: 14, paddingVertical: 13, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: "#FCA5A5", backgroundColor: "#FEF2F2" },
   cancelTxt:  { color: "#DC2626", fontSize: 14, fontWeight: "700" },
 
   /* Modal */
