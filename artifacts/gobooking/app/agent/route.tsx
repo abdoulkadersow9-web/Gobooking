@@ -199,27 +199,33 @@ export default function RouteScreen() {
   };
 
   const handleManualBooking = async () => {
+    console.log("[Montée] Bouton cliqué — début validation");
     if (!manualName.trim()) { Alert.alert("Erreur", "Entrez le nom du passager."); return; }
     if (!manualPhone.trim()) { Alert.alert("Erreur", "Entrez le numéro de téléphone."); return; }
     const seats = parseInt(manualSeats, 10);
     if (isNaN(seats) || seats < 1 || seats > 10) { Alert.alert("Erreur", "Nombre de places invalide (1-10)."); return; }
 
+    const payload = {
+      passengerName: manualName.trim(),
+      passengerPhone: manualPhone.trim(),
+      boardingPoint: manualPoint.trim() || undefined,
+      seatCount: seats,
+    };
+    console.log("[Montée] Données envoyées :", JSON.stringify(payload));
+
     setManualSaving(true);
     try {
       const res = await apiFetch<{ bookingRef: string; totalAmount: number }>("/agent/route/manual-booking", {
         token: token ?? undefined, method: "POST",
-        body: {
-          passengerName: manualName.trim(),
-          passengerPhone: manualPhone.trim(),
-          boardingPoint: manualPoint.trim() || undefined,
-          seatCount: seats,
-        },
+        body: payload,
       });
+      console.log("[Montée] Réponse API :", JSON.stringify(res));
       setManualSuccess({ bookingRef: res.bookingRef, total: res.totalAmount });
       setManualName(""); setManualPhone(""); setManualPoint(""); setManualSeats("1");
       if (activeTrip) loadPassengers(activeTrip.id);
     } catch (e: any) {
-      Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation.");
+      console.error("[Montée] Erreur API :", e?.message, e);
+      Alert.alert("Erreur création ticket", e?.message ?? "Impossible de créer la réservation. Vérifiez votre connexion.");
     } finally {
       setManualSaving(false);
     }

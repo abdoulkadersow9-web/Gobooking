@@ -3271,20 +3271,22 @@ router.post("/route/manual-booking", async (req, res) => {
     );
 
     /* Create the booking */
+    const bookingId = `MAN${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
     const [booking] = await db.insert(bookingsTable).values({
+      id: bookingId,
       bookingRef,
       tripId,
       companyId: agent.companyId ?? trip.companyId ?? null,
-      userId: null,
+      userId: user.id,
       status: "confirmed",
       bookingSource: "guichet",
       paymentStatus: "paid",
       paymentMethod: "cash",
       totalAmount: (trip.price ?? 0) * count,
       contactPhone: passengerPhone.trim(),
-      passengers,
+      contactEmail: "",
+      passengers: passengers as any,
       seatNumbers: [],
-      boardingPoint: boardingPoint?.trim() ?? null,
     } as any).returning();
 
     /* SMS to passenger */
