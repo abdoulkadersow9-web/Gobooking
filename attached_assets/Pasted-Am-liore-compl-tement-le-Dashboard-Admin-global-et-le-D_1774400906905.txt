@@ -1,0 +1,184 @@
+Améliore complètement le Dashboard Admin (global) et le Dashboard Entreprise dans mon application GoBooking en intégrant toutes les fonctionnalités existantes, avec un design moderne, clair et sans doublons.
+
+-----------------------------------
+1. OBJECTIF GLOBAL
+-----------------------------------
+
+Créer deux dashboards puissants :
+
+1. Dashboard Admin (supervision totale)
+2. Dashboard Entreprise (gestion compagnie)
+
+Avec :
+- design moderne
+- données en temps réel
+- structure claire
+- aucune duplication
+
+-----------------------------------
+2. NETTOYAGE DU PROJET (TRÈS IMPORTANT)
+-----------------------------------
+
+Avant d’ajouter :
+
+- Supprimer toutes les pages inutiles
+- Supprimer les doublons (pages, routes, composants)
+- Regrouper les modules similaires
+- Nettoyer navigation
+
+Objectif :
+👉 interface fluide, simple, professionnelle
+
+-----------------------------------
+3. DASHBOARD ADMIN (GLOBAL)
+
+Créer un tableau de bord avec :
+
+SECTION 1 : KPIs GLOBAUX
+
+- Nombre total de compagnies
+- Nombre total de bus
+- Nombre de trajets actifs
+- Nombre de tickets vendus aujourd’hui
+- Nombre de colis en cours
+- Nombre d’alertes actives
+- Nombre de rapports en attente
+
+-----------------------------------
+SECTION 2 : ACTIVITÉ EN TEMPS RÉEL
+
+- bus en route
+- alertes en cours
+- colis en attente
+- réservations en attente
+
+-----------------------------------
+SECTION 3 : GRAPHIQUES
+
+- ventes tickets par jour
+- évolution colis
+- utilisation bus
+
+-----------------------------------
+SECTION 4 : ALERTES
+
+- bus en panne
+- colis non retirés
+- anomalies
+
+-----------------------------------
+SECTION 5 : RAPPORTS
+
+- rapports agents en attente validation
+
+-----------------------------------
+4. DASHBOARD ENTREPRISE (COMPAGNIE)
+
+Créer dashboard spécifique :
+
+SECTION 1 : KPIs ENTREPRISE
+
+- bus actifs
+- trajets du jour
+- tickets vendus
+- places restantes (guichet / en ligne)
+- colis traités
+- alertes
+
+-----------------------------------
+SECTION 2 : BUS & LOGISTIQUE
+
+- état des bus
+- statut :
+  - en route
+  - en panne
+  - arrivé
+
+-----------------------------------
+SECTION 3 : RÉSERVATIONS
+
+- places guichet restantes
+- places en ligne restantes
+- réservations confirmées
+
+-----------------------------------
+SECTION 4 : COLIS
+
+- colis en attente validation
+- colis en livraison
+- colis retirés
+
+-----------------------------------
+SECTION 5 : RAPPORTS AGENTS
+
+- liste rapports
+- validation / rejet
+
+-----------------------------------
+5. DESIGN MODERNE
+
+Appliquer :
+
+- cards modernes (bord arrondi)
+- couleurs propres (bleu / vert / orange)
+- icônes claires
+- responsive (mobile + desktop)
+- espacement propre
+
+-----------------------------------
+6. NAVIGATION
+
+Créer menu clair :
+
+ADMIN :
+- Dashboard
+- Compagnies
+- Bus
+- Trajets
+- Colis
+- Tickets
+- Alertes
+- Rapports
+
+ENTREPRISE :
+- Dashboard
+- Bus
+- Trajets
+- Réservations
+- Colis
+- Agents
+- Rapports
+
+-----------------------------------
+7. ÉVITER DOUBLONS
+
+IMPORTANT :
+
+- fusionner pages similaires
+- éviter double routes
+- éviter double logique
+- vérifier cohérence données
+
+-----------------------------------
+8. PERFORMANCE
+
+- optimiser requêtes
+- charger uniquement données utiles
+- éviter re-render inutiles
+
+-----------------------------------
+9. CONTRAINTES
+
+- ne pas casser fonctionnalités existantes
+- garder logique métier (colis, tickets, alertes)
+- respecter rôles agents
+
+-----------------------------------
+À LA FIN
+
+- expliquer structure finale
+- montrer les dashboards
+- expliquer comment tester :
+  - admin
+  - entreprise
+- confirmer qu’il n’y a plus de doublons

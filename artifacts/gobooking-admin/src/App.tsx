@@ -15,6 +15,9 @@ import Trips from "@/pages/trips";
 import Analytics from "@/pages/analytics";
 import Invoices from "@/pages/invoices";
 import Financial from "@/pages/financial";
+import Companies from "@/pages/companies";
+import Reports from "@/pages/reports";
+import AlertsPage from "@/pages/alerts";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -26,14 +29,9 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected Route Wrapper
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { isAuthenticated } = useAuth();
-  
-  if (!isAuthenticated) {
-    return <Redirect to="/admin/login" />;
-  }
-  
+  if (!isAuthenticated) return <Redirect to="/admin/login" />;
   return (
     <AppLayout>
       <Component {...rest} />
@@ -43,24 +41,22 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
 
 function Router() {
   const { isAuthenticated } = useAuth();
-
   return (
     <Switch>
-      {/* Root redirect */}
       <Route path="/">
         <Redirect to={isAuthenticated ? "/admin/dashboard" : "/admin/login"} />
       </Route>
-      
-      {/* Public Auth Route */}
+
       <Route path="/admin/login">
         {isAuthenticated ? <Redirect to="/admin/dashboard" /> : <Login />}
       </Route>
 
-      {/* Protected Routes */}
       <Route path="/admin">
         <Redirect to="/admin/dashboard" />
       </Route>
+
       <Route path="/admin/dashboard"><ProtectedRoute component={Dashboard} /></Route>
+      <Route path="/admin/companies"><ProtectedRoute component={Companies} /></Route>
       <Route path="/admin/reservations"><ProtectedRoute component={Reservations} /></Route>
       <Route path="/admin/colis"><ProtectedRoute component={Parcels} /></Route>
       <Route path="/admin/agents"><ProtectedRoute component={Agents} /></Route>
@@ -68,6 +64,8 @@ function Router() {
       <Route path="/admin/analytics"><ProtectedRoute component={Analytics} /></Route>
       <Route path="/admin/factures"><ProtectedRoute component={Invoices} /></Route>
       <Route path="/admin/financier"><ProtectedRoute component={Financial} /></Route>
+      <Route path="/admin/rapports"><ProtectedRoute component={Reports} /></Route>
+      <Route path="/admin/alertes"><ProtectedRoute component={AlertsPage} /></Route>
 
       <Route component={NotFound} />
     </Switch>

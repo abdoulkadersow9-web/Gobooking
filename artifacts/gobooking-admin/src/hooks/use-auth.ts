@@ -1,6 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, TOKEN_KEY } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+
+export const USER_KEY = "gobooking_admin_user";
 
 export interface User {
   id: string;
@@ -14,56 +16,62 @@ interface LoginResponse {
   user: User;
 }
 
+function getStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 export function useAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!localStorage.getItem(TOKEN_KEY));
+  const [user, setUser] = useState<User | null>(getStoredUser);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const handleAuthChange = () => {
-      setIsAuthenticated(!!localStorage.getItem(TOKEN_KEY));
-    };
-    window.addEventListener('auth-change', handleAuthChange);
-    return () => window.removeEventListener('auth-change', handleAuthChange);
+  const syncState = useCallback(() => {
+    const hasToken = !!localStorage.getItem(TOKEN_KEY);
+    setIsAuthenticated(hasToken);
+    setUser(hasToken ? getStoredUser() : null);
   }, []);
 
+  useEffect(() => {
+    window.addEventListener("auth-change", syncState);
+    return () => window.removeEventListener("auth-change", syncState);
+  }, [syncState]);
+
   const loginMutation = useMutation({
-    mutationFn: (credentials: { email: string; password: string }) => 
-      apiFetch<LoginResponse>('/auth/login', {
-        method: 'POST',
+    mutationFn: (credentials: { email: string; password: string }) =>
+      apiFetch<LoginResponse>("/auth/login", {
+        method: "POST",
         body: JSON.stringify(credentials),
       }),
     onSuccess: (data) => {
       localStorage.setItem(TOKEN_KEY, data.token);
-      queryClient.setQueryData(['current-user'], data.user);
-      window.dispatchEvent(new Event('auth-change'));
-    }
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+      setUser(data.user);
+      queryClient.setQueryData(["current-user"], data.user);
+      window.dispatchEvent(new Event("auth-change"));
+    },
   });
 
   const logout = () => {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
     queryClient.clear();
-    window.dispatchEvent(new Event('auth-change'));
+    window.dispatchEvent(new Event("auth-change"));
   };
 
-  // Pseudo query to get current user info if needed. 
-  // In a real app we might have a /me endpoint, here we rely on cached data from login or local storage wrapper.
-  const { data: user } = useQuery({
-    queryKey: ['current-user'],
-    queryFn: () => {
-       // Mock fetch if we had a /me endpoint, returning null if no token
-       if (!localStorage.getItem(TOKEN_KEY)) return null;
-       return null; // Fallback, normally would fetch /api/auth/me
-    },
-    enabled: isAuthenticated,
-    staleTime: Infinity,
-  });
+  const isSuperAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isCompany = user?.role === "company";
 
   return {
     isAuthenticated,
     user,
+    isSuperAdmin,
+    isCompany,
     login: loginMutation.mutateAsync,
     isLoggingIn: loginMutation.isPending,
     error: loginMutation.error,
-    logout
+    logout,
   };
 }

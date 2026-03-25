@@ -44,7 +44,7 @@ export default function Login() {
               <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 object-contain brightness-0 invert" />
             </div>
             <h1 className="text-2xl font-display font-bold text-foreground">GoBooking Admin</h1>
-            <p className="text-muted-foreground mt-2">Connectez-vous à l'espace compagnie</p>
+            <p className="text-muted-foreground mt-2">Espace Administration — Compagnie & Super Admin</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
