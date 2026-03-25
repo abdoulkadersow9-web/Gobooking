@@ -700,12 +700,72 @@ export default function RouteScreen() {
             </TouchableOpacity>
           )}
 
-          {/* ── Onglets ── */}
+          {/* ── Actions rapides (grille dashboard) ── */}
+          <View style={S.quickGrid}>
+            {/* Scanner ticket */}
+            <TouchableOpacity
+              style={[S.quickBtn, tab === "scan" && S.quickBtnActive]}
+              onPress={() => setTab("scan")}
+              activeOpacity={0.78}
+            >
+              <View style={[S.quickIcon, { backgroundColor: "#EFF6FF" }]}>
+                <Ionicons name="qr-code" size={24} color="#2563EB" />
+              </View>
+              <Text style={S.quickLabel}>Scanner{"\n"}ticket</Text>
+            </TouchableOpacity>
+
+            {/* Ajouter passager */}
+            <TouchableOpacity
+              style={[S.quickBtn, tab === "montee" && S.quickBtnActive]}
+              onPress={() => setTab("montee")}
+              activeOpacity={0.78}
+            >
+              <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
+                <Ionicons name="person-add" size={24} color={G} />
+              </View>
+              <Text style={S.quickLabel}>Ajouter{"\n"}passager</Text>
+            </TouchableOpacity>
+
+            {/* Liste passagers */}
+            <TouchableOpacity
+              style={[S.quickBtn, tab === "passagers" && S.quickBtnActive]}
+              onPress={() => setTab("passagers")}
+              activeOpacity={0.78}
+            >
+              <View style={[S.quickIcon, { backgroundColor: "#F5F3FF" }]}>
+                <Ionicons name="people" size={24} color="#7C3AED" />
+              </View>
+              <Text style={S.quickLabel}>
+                {passengers.length > 0 ? `Passagers\n(${passengers.length})` : "Passagers"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Alertes */}
+            <TouchableOpacity
+              style={[S.quickBtn, tab === "alertes" && S.quickBtnActive]}
+              onPress={() => setTab("alertes")}
+              activeOpacity={0.78}
+            >
+              <View style={[S.quickIcon, { backgroundColor: allAlerts.length > 0 ? "#FEF2F2" : "#F8FAFC" }]}>
+                <Ionicons name="warning" size={24} color={allAlerts.length > 0 ? "#DC2626" : "#94A3B8"} />
+                {allAlerts.length > 0 && (
+                  <View style={S.quickBadge}>
+                    <Text style={S.quickBadgeTxt}>{allAlerts.length}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[S.quickLabel, allAlerts.length > 0 && { color: "#DC2626", fontWeight: "700" }]}>
+                Alertes{allAlerts.length > 0 ? `\n(${allAlerts.length})` : ""}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── Onglets secondaires (navigation fine) ── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
               {([
-                { key: "passagers", label: `👥 Passagers${passengers.length > 0 ? ` (${passengers.length})` : ""}` },
-                { key: "scan",      label: "🔍 Scan ticket" },
+                { key: "passagers", label: "👥 Passagers" },
+                { key: "scan",      label: "🔍 Scan" },
                 { key: "montee",    label: "➕ Montée" },
                 { key: "trajet",    label: "📍 Trajet" },
                 { key: "arrets",    label: `🗺 Arrêts${stopData.length > 0 ? ` (${stopData.length})` : ""}` },
@@ -1519,6 +1579,22 @@ const S = StyleSheet.create({
                   borderWidth: 1, borderColor: "#FECACA" },
   alertBannerIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FEE2E2",
                      justifyContent: "center", alignItems: "center" },
+
+  /* Quick action grid */
+  quickGrid:    { flexDirection: "row", marginHorizontal: 16, marginTop: 10, marginBottom: 4,
+                  gap: 8 },
+  quickBtn:     { flex: 1, alignItems: "center", backgroundColor: "#fff", borderRadius: 14,
+                  paddingVertical: 12, paddingHorizontal: 4,
+                  shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+                  borderWidth: 1.5, borderColor: "#F1F5F9", gap: 6 },
+  quickBtnActive: { borderColor: G, backgroundColor: G_LIGHT },
+  quickIcon:    { width: 46, height: 46, borderRadius: 14, alignItems: "center",
+                  justifyContent: "center", position: "relative" },
+  quickLabel:   { fontSize: 11, fontWeight: "600", color: "#374151", textAlign: "center", lineHeight: 15 },
+  quickBadge:   { position: "absolute", top: -4, right: -4, backgroundColor: "#DC2626",
+                  borderRadius: 10, minWidth: 18, height: 18, alignItems: "center",
+                  justifyContent: "center", paddingHorizontal: 4 },
+  quickBadgeTxt:{ fontSize: 10, fontWeight: "800", color: "#fff" },
 
   /* Tabs */
   tabsScroll:   { flexGrow: 0, borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },

@@ -1,0 +1,159 @@
+Ne rien remplacer inutilement.
+Ne rien supprimer sans raison.
+Ne rien casser.
+Ne pas modifier la logique métier existante.
+
+Mais il faut corriger immédiatement un problème critique d’interface : les actions principales ne sont pas visibles et l’écran n’est pas organisé.
+
+---
+
+PROBLÈME CONSTATÉ (CAPTURE À L’APPUI) :
+
+Sur l’écran Agent en route :
+
+- les actions importantes ne sont pas visibles directement
+- certaines fonctions sont cachées et apparaissent seulement après clic
+- les éléments sont mélangés et pas bien organisés
+- on ne comprend pas rapidement où cliquer
+- l’écran n’est pas fluide
+- certaines parties donnent l’impression qu’il y a plusieurs écrans superposés
+
+👉 ce n’est pas une interface utilisable sur le terrain
+
+---
+
+OBJECTIF :
+
+Créer une interface claire, fluide, organisée comme un dashboard professionnel, où tout est visible directement.
+
+---
+
+1. ACTIONS OBLIGATOIRES VISIBLES (TRÈS IMPORTANT)
+
+Afficher directement à l’écran :
+
+- Scanner ticket
+- Ajouter passager (montée en cours de route)
+- Voir / gérer passagers
+- Répondre aux alertes
+
+👉 aucune action principale ne doit être cachée
+
+---
+
+2. AJOUT DES ICÔNES (OBLIGATOIRE)
+
+Ajouter des icônes visibles pour toutes les actions :
+
+- 📷 Scanner ticket
+- ➕ Ajouter passager
+- 📋 Liste passagers
+- ⚠️ Alertes
+- 📞 Appeler
+
+👉 les icônes doivent être :
+- visibles
+- alignées avec le texte
+- cohérentes
+- non cachées
+
+---
+
+3. ORGANISATION TYPE DASHBOARD
+
+Organiser l’écran comme un dashboard :
+
+- en haut : informations principales (trajet, statut)
+- juste en dessous : barre d’actions visible (comme un menu rapide)
+- ensuite : contenu (passagers, détails)
+
+👉 comme dans les vrais dashboards modernes :
+tout est visible en haut sans avoir à chercher
+
+---
+
+4. BARRE D’ACTIONS VISIBLE
+
+Créer une zone horizontale claire avec les actions :
+
+- boutons alignés
+- bien espacés
+- visibles immédiatement
+- pas cachés dans d’autres écrans
+
+---
+
+5. SUPPRIMER LES ACTIONS CACHÉES
+
+- ne pas cacher les actions dans des onglets invisibles
+- ne pas obliger l’utilisateur à cliquer pour découvrir une fonction
+- éviter les écrans imbriqués ou confus
+
+---
+
+6. FLUIDITÉ
+
+L’utilisateur doit pouvoir :
+
+- voir tout ce qu’il peut faire immédiatement
+- comprendre l’écran sans réfléchir
+- naviguer sans confusion
+- ne pas avoir l’impression que plusieurs écrans sont mélangés
+
+---
+
+7. ADAPTATION INTELLIGENTE DE L’ÉCRAN
+
+Adapter l’affichage selon la taille de l’écran :
+
+- calculer correctement les espaces
+- éviter les éléments coupés ou compressés
+- garder une structure stable
+
+---
+
+8. RESPECT DU PROGRAMME
+
+Respecter la logique métier :
+
+- scan ticket = action principale
+- ajout passager = action principale
+- tout doit être accessible directement
+
+---
+
+9. IMPORTANT
+
+- ne pas modifier le backend
+- ne pas casser les fonctionnalités existantes
+- ne pas supprimer les données
+
+👉 améliorer uniquement :
+- la visibilité
+- l’organisation
+- la fluidité
+- les icônes
+
+---
+
+10. OBJECTIF FINAL
+
+Un écran Agent en route :
+
+- clair
+- fluide
+- organisé
+- toutes les actions visibles
+- toutes les icônes visibles
+- aucune confusion
+- utilisable directement sur le terrain
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne pas ignorer ce problème.
+Réorganiser correctement l’écran.
+Afficher toutes les actions et icônes.
+Créer une interface fluide de type dashboard professionnel.
