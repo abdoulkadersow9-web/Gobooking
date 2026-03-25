@@ -406,8 +406,8 @@ function GererTab({ token, networkStatus }: { token: string | null; networkStatu
           { icon: "bus-outline", label: "Chargé → Déclarer en transit" },
           { icon: "navigate-outline", label: "En transit → Confirmer arrivée à destination" },
           { icon: "checkmark-circle-outline", label: "Arrivé → Confirmer la livraison" },
-        ].map((item, i) => (
-          <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 }}>
+        ].map((item) => (
+          <View key={item.icon} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 }}>
             <Ionicons name={item.icon as any} size={14} color={G} />
             <Text style={styles.tip}>{item.label}</Text>
           </View>

@@ -1,0 +1,102 @@
+Ne rien remplacer.
+Ne rien casser.
+Ne pas changer la logique existante.
+
+Corriger uniquement l’affichage des icônes pour qu’elles soient visibles partout comme dans "Espace Ticketing".
+
+---
+
+PROBLÈME ACTUEL :
+
+Dans certaines pages (ex: Agent En Route) :
+
+- les icônes ne s’affichent pas correctement
+- certaines icônes disparaissent
+- certaines ne s’affichent pas du tout
+- comportement instable (scroll, changement d’écran)
+
+Par contre, dans "Espace Ticketing" :
+- les icônes s’affichent bien
+- elles sont stables
+- elles sont lisibles
+
+---
+
+OBJECTIF :
+
+Uniformiser l’affichage des icônes dans toute l’application.
+
+Je veux que :
+
+- les icônes s’affichent comme dans "Espace Ticketing"
+- elles soient toujours visibles
+- elles soient stables même pendant le scroll
+- aucune icône ne disparaisse
+
+---
+
+À FAIRE :
+
+1. UTILISER LA MÊME LOGIQUE QUE "ESPACE TICKETING"
+
+- reprendre la configuration des icônes qui fonctionne
+- appliquer la même méthode dans :
+  - Agent En Route
+  - Agent Réservation
+  - Agent Colis
+  - autres pages concernées
+
+---
+
+2. VÉRIFIER LES IMPORTS
+
+- vérifier toutes les librairies d’icônes (Feather, MaterialIcons, etc.)
+- corriger les icônes non importées
+- corriger les noms incorrects
+
+---
+
+3. STABILITÉ
+
+- empêcher les icônes de disparaître au scroll
+- éviter les re-render instables
+- garder les icônes fixes dans leur position
+
+---
+
+4. ALIGNEMENT
+
+- icônes bien alignées avec le texte
+- taille cohérente
+- espacement propre
+
+---
+
+5. PERFORMANCE
+
+- optimiser le rendu pour éviter bugs visuels
+- ne pas recréer les icônes inutilement
+
+---
+
+6. IMPORTANT
+
+- ne pas modifier le design
+- ne pas changer les couleurs
+- ne pas changer les composants existants
+- adapter seulement pour que tout s’affiche correctement
+
+---
+
+OBJECTIF FINAL :
+
+Une application où :
+
+- toutes les icônes s’affichent correctement
+- aucun bug d’affichage
+- comportement stable sur toutes les pages
+- même qualité visuelle que "Espace Ticketing"
+
+---
+
+Corriger tous les problèmes d’icônes dans toute l’application et garantir un affichage stable sans bug.

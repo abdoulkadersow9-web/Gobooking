@@ -756,7 +756,7 @@ export default function RouteScreen() {
                     { iconName: "bus"       as const,  iconColor: "#fff",    label: "En route vers " + activeTrip.to, done: true,  active: true  },
                     { iconName: "location"  as const,  iconColor: "#94A3B8", label: "Arrivée à " + activeTrip.to,     done: false, active: false },
                   ]).map((step, i) => (
-                    <View key={i} style={S.timelineRow}>
+                    <View key={step.iconName} style={S.timelineRow}>
                       <View style={[S.timelineDot, step.active && S.timelineDotActive, step.done && !step.active && S.timelineDotDone]}>
                         <Ionicons name={step.iconName} size={13} color={step.active ? "#fff" : step.done ? "#166534" : "#94A3B8"} />
                       </View>
