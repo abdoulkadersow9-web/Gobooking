@@ -1,9 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,7 +20,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
 import { useParcel } from "@/context/ParcelContext";
+import { apiFetch } from "@/utils/api";
 
 const CITIES = [
   "Abidjan", "Bouaké", "Yamoussoukro", "Korhogo",
@@ -87,11 +93,14 @@ const STEPS = [
   "Expéditeur",
   "Destinataire",
   "Colis",
+  "Photos",
   "Livraison",
 ];
+const MAX_PARCEL_PHOTOS = 6;
 
 export default function ParcelSendScreen() {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const { updateParcel } = useParcel();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -108,6 +117,9 @@ export default function ParcelSendScreen() {
   const [description, setDescription] = useState("");
   const [deliveryType, setDeliveryType] = useState("");
 
+  const [parcelPhotos, setParcelPhotos] = useState<{ uri: string; url?: string }[]>([]);
+  const [uploadingPhotoIdx, setUploadingPhotoIdx] = useState<number | null>(null);
+
   const [showFromCities, setShowFromCities] = useState(false);
   const [showToCities, setShowToCities] = useState(false);
 
@@ -120,8 +132,56 @@ export default function ParcelSendScreen() {
     if (step === 1) return senderName.trim() && senderPhone.replace(/\D/g, "").length >= 8;
     if (step === 2) return receiverName.trim() && receiverPhone.replace(/\D/g, "").length >= 8;
     if (step === 3) return parcelType && weight && parseFloat(weight) > 0;
-    if (step === 4) return deliveryType;
+    if (step === 4) return parcelPhotos.length >= 1;
+    if (step === 5) return !!deliveryType;
     return false;
+  };
+
+  const pickParcelPhoto = async () => {
+    if (parcelPhotos.length >= MAX_PARCEL_PHOTOS) {
+      Alert.alert("Maximum atteint", `Vous ne pouvez pas ajouter plus de ${MAX_PARCEL_PHOTOS} photos.`);
+      return;
+    }
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission requise", "Autorisez l'accès à la galerie.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.5,
+        base64: true,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      if ((asset.fileSize ?? 0) > 2 * 1024 * 1024) {
+        Alert.alert("Image trop grande", "Choisissez une image de moins de 2 Mo.");
+        return;
+      }
+      const newIdx = parcelPhotos.length;
+      setParcelPhotos(prev => [...prev, { uri: asset.uri }]);
+      if (asset.base64) {
+        setUploadingPhotoIdx(newIdx);
+        try {
+          const resp = await apiFetch<{ url?: string }>("/bookings/upload-image", {
+            token: token ?? undefined,
+            method: "POST",
+            body: JSON.stringify({ base64: asset.base64, mimeType: asset.mimeType || "image/jpeg" }),
+          });
+          if (resp?.url) {
+            setParcelPhotos(prev => prev.map((p, i) => i === newIdx ? { ...p, url: resp.url } : p));
+          }
+        } catch { /* keep local */ } finally { setUploadingPhotoIdx(null); }
+      }
+    } catch { Alert.alert("Erreur", "Impossible d'accéder à la galerie."); }
+  };
+
+  const removeParcelPhoto = (idx: number) => {
+    setParcelPhotos(prev => prev.filter((_, i) => i !== idx));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const next = () => {
@@ -131,7 +191,8 @@ export default function ParcelSendScreen() {
       setStep(step + 1);
     } else {
       const amount = price ?? 0;
-      updateParcel({ fromCity, toCity, senderName, senderPhone, receiverName, receiverPhone, parcelType, weight, description, deliveryType, amount });
+      const photoUrls = parcelPhotos.map(p => p.url).filter(Boolean) as string[];
+      updateParcel({ fromCity, toCity, senderName, senderPhone, receiverName, receiverPhone, parcelType, weight, description, deliveryType, amount, photoUrls });
       router.push("/parcel/payment");
     }
   };
@@ -375,8 +436,63 @@ export default function ParcelSendScreen() {
             </View>
           )}
 
-          {/* ── STEP 4: Livraison ── */}
+          {/* ── STEP 4: Photos ── */}
           {step === 4 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.stepTitle}>Photos du colis</Text>
+              <Text style={styles.stepDesc}>Ajoutez 1 à {MAX_PARCEL_PHOTOS} photos du colis (obligatoire)</Text>
+
+              <View style={[styles.infoBannerAmber, { flexDirection: "row", alignItems: "flex-start", gap: 8, borderRadius: 10, padding: 10, marginBottom: 16 }]}>
+                <Feather name="camera" size={15} color="#B45309" />
+                <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#92400E", flex: 1 }}>
+                  Les photos permettent à l'agent colis de valider votre colis avant expédition et réduisent les litiges.
+                </Text>
+              </View>
+
+              <View style={styles.photosGrid}>
+                {parcelPhotos.map((photo, idx) => (
+                  <View key={idx} style={styles.photoThumb}>
+                    <Image source={{ uri: photo.uri }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                    {uploadingPhotoIdx === idx && (
+                      <View style={styles.photoOverlay}>
+                        <ActivityIndicator size="small" color="#fff" />
+                      </View>
+                    )}
+                    {uploadingPhotoIdx !== idx && photo.url && (
+                      <View style={[styles.photoOverlay, { backgroundColor: "rgba(5,150,105,0.6)", justifyContent: "center", alignItems: "center" }]}>
+                        <Feather name="check" size={14} color="#fff" />
+                      </View>
+                    )}
+                    {uploadingPhotoIdx !== idx && (
+                      <Pressable style={styles.photoRemoveBtn} onPress={() => removeParcelPhoto(idx)}>
+                        <Feather name="x" size={12} color="#fff" />
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+                {parcelPhotos.length < MAX_PARCEL_PHOTOS && (
+                  <Pressable style={styles.photoAddBtn} onPress={pickParcelPhoto}>
+                    <Feather name="plus" size={22} color={Colors.light.primary} />
+                    <Text style={[styles.photoAddText, { color: Colors.light.primary }]}>Ajouter</Text>
+                  </Pressable>
+                )}
+              </View>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12 }}>
+                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary }}>
+                  {parcelPhotos.length}/{MAX_PARCEL_PHOTOS} photos
+                </Text>
+                {parcelPhotos.length === 0 && (
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#DC2626" }}>
+                    Minimum 1 photo obligatoire
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* ── STEP 5: Livraison ── */}
+          {step === 5 && (
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Type de livraison</Text>
               <Text style={styles.stepDesc}>Comment souhaitez-vous envoyer ce colis ?</Text>
@@ -798,5 +914,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "white",
+  },
+
+  infoBannerAmber: { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: "#FDE68A" },
+
+  photosGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoThumb: {
+    width: 96, height: 96, borderRadius: 12, overflow: "hidden", position: "relative",
+  },
+  photoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center", alignItems: "center",
+  },
+  photoRemoveBtn: {
+    position: "absolute", top: 4, right: 4,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "rgba(220,38,38,0.85)",
+    justifyContent: "center", alignItems: "center",
+  },
+  photoAddBtn: {
+    width: 96, height: 96, borderRadius: 12,
+    borderWidth: 2, borderColor: "#93C5FD", borderStyle: "dashed",
+    justifyContent: "center", alignItems: "center",
+    backgroundColor: "#EFF6FF", gap: 4,
+  },
+  photoAddText: {
+    fontSize: 10, fontFamily: "Inter_600SemiBold",
   },
 });

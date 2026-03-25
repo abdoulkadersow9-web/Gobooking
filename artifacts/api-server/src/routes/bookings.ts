@@ -138,6 +138,8 @@ async function getFullBooking(bookingId: string) {
     bagageStatus: (booking as any).bagageStatus || null,
     bagagePrice: (booking as any).bagagePrice || 0,
     bagageNote: (booking as any).bagageNote || null,
+    baggageCount: (booking as any).baggageCount ?? 0,
+    baggagePhotos: (booking as any).baggagePhotos || [],
     qrCode:     (booking as any).qrCode || null,
     createdAt: booking.createdAt?.toISOString() || new Date().toISOString(),
     agentPhone,
@@ -256,7 +258,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages, fromStopId, toStopId } = req.body;
+    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages, fromStopId, toStopId, baggageCount, baggagePhotos } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
       res.status(400).json({ error: "Champs requis manquants" });
@@ -367,10 +369,17 @@ router.post("/", async (req, res) => {
         contactEmail,
         contactPhone,
         bagages: bagageList as any,
-        bagageStatus: bagageList.length > 0 ? "en_attente" : null,
+        bagageStatus: (() => {
+          const cnt = Number(baggageCount) || bagageList.length;
+          if (cnt === 1) return "accepté";
+          if (cnt >= 2) return "en_attente";
+          return bagageList.length > 0 ? "en_attente" : null;
+        })(),
         bagagePrice,
         fromStopId: fromStopId ?? null,
         toStopId:   toStopId   ?? null,
+        baggageCount: Number(baggageCount) || bagageList.length || null,
+        baggagePhotos: Array.isArray(baggagePhotos) ? baggagePhotos : [],
         qrCode,
       } as any);
 
@@ -858,8 +867,8 @@ router.post("/:bookingId/baggage-review", async (req, res) => {
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     const role = await getUserRole(userId);
-    if (!role || !["compagnie", "company_admin", "admin"].includes(role)) {
-      res.status(403).json({ error: "Accès refusé — réservé aux compagnies" });
+    if (!role || !["compagnie", "company_admin", "admin", "agent"].includes(role)) {
+      res.status(403).json({ error: "Accès refusé — réservé aux compagnies et agents" });
       return;
     }
 
@@ -924,6 +933,53 @@ router.post("/:bookingId/baggage-review", async (req, res) => {
   } catch (err) {
     console.error("Baggage review error:", err);
     res.status(500).json({ error: "Échec de la révision bagages" });
+  }
+});
+
+/* ── Liste des réservations avec bagages en attente (agent) ───────────────
+   GET /bookings/pending-baggage
+─────────────────────────────────────────────────────────────────────────── */
+router.get("/pending-baggage", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const role = await getUserRole(userId);
+    if (!role || !["agent", "compagnie", "company_admin", "admin"].includes(role)) {
+      res.status(403).json({ error: "Accès refusé" }); return;
+    }
+
+    const { rows } = await db.execute(sql`
+      SELECT b.id, b.booking_ref, b.user_id, b.trip_id, b.passengers,
+             b.total_amount, b.status, b.contact_phone, b.created_at,
+             b.bagages, b.bagage_status, b.bagage_note,
+             b.baggage_count, b.baggage_photos,
+             u.name AS client_name, u.phone AS client_phone
+      FROM bookings b
+      LEFT JOIN users u ON u.id = b.user_id
+      WHERE b.bagage_status = 'en_attente'
+      ORDER BY b.created_at DESC
+      LIMIT 50
+    `);
+
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      bookingRef: r.booking_ref,
+      userId: r.user_id,
+      clientName: r.client_name ?? "Client",
+      clientPhone: r.client_phone ?? r.contact_phone,
+      passengers: r.passengers ?? [],
+      totalAmount: r.total_amount,
+      status: r.status,
+      bagageStatus: r.bagage_status,
+      bagageNote: r.bagage_note,
+      baggageCount: r.baggage_count ?? 0,
+      baggagePhotos: r.baggage_photos ?? [],
+      bagages: r.bagages ?? [],
+      createdAt: r.created_at,
+    })));
+  } catch (err) {
+    console.error("Pending baggage error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

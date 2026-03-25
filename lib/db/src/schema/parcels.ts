@@ -1,4 +1,4 @@
-import { pgTable, real, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { jsonb, pgTable, real, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -30,6 +30,7 @@ export const parcelsTable = pgTable("parcels", {
   location: text("location"),
   notes: text("notes"),
   photoUrl: text("photo_url"),
+  photoUrls: jsonb("photo_urls").$type<string[]>().default([]),
   declaredValue: real("declared_value").default(0),
   createdByClient: text("created_by_client").default("false"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

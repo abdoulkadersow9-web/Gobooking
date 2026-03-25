@@ -21,6 +21,14 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - Inter font family
 - Clean card-based UI, Airbnb/Coinbase-inspired
 
+## Bagages & Photos Colis (dernière session)
+- **parcel/send.tsx** : Étape "Photos" (step 4 sur 6) ajoutée — sélection 1–6 photos, upload Firebase, validation obligatoire avant livraison
+- **parcels Drizzle schema** : Colonne `photoUrls` (jsonb) ajoutée, logique `status: en_attente_validation` si photos présentes
+- **ParcelContext** : Champ `photoUrls: string[]` ajouté
+- **parcel/payment.tsx** : `photoUrls` transmis à l'API lors de la création
+- **agent/baggage-review.tsx** : Nouvel écran de validation des bagages passagers (≥2 bagages) avec visionneuse photo zoom, décision accepté/refusé avec note
+- **agent/home.tsx** : Carte "Validation Bagages" ajoutée (pour rôles embarquement/vente)
+
 ## New Artifacts
 - **GoBooking Admin Web** (`artifacts/gobooking-admin`) — React + Vite web dashboard at `/admin/` for company management (bookings, parcels, agents, trips, analytics, invoices). Uses JWT auth.
 - **API Server** (`artifacts/api-server`) — All routes at `/api`, started from `index.ts`.

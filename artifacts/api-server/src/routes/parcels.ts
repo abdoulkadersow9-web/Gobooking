@@ -79,6 +79,7 @@ router.post("/", async (req, res) => {
       paymentStatus: reqPaymentStatus,
       notes,
       trackingRef: clientTrackingRef,
+      photoUrls,
     } = req.body;
 
     if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
@@ -94,6 +95,8 @@ router.post("/", async (req, res) => {
     const trackingRef = (typeof clientTrackingRef === "string" && clientTrackingRef.startsWith("GBX-"))
       ? clientTrackingRef
       : generateTrackingRef();
+
+    const photoUrlsArr = Array.isArray(photoUrls) ? photoUrls.filter((u: string) => typeof u === "string") : [];
 
     const parcel = await db.insert(parcelsTable).values({
       id: generateId(),
@@ -113,8 +116,9 @@ router.post("/", async (req, res) => {
       commissionAmount,
       paymentMethod: paymentMethod || "orange",
       paymentStatus: (reqPaymentStatus === "pending" || reqPaymentStatus === "failed") ? reqPaymentStatus : "paid",
-      status: "en_attente",
+      status: photoUrlsArr.length > 0 ? "en_attente_validation" : "en_attente",
       notes: notes || null,
+      photoUrls: photoUrlsArr,
     }).returning();
 
     auditLog({ userId, userRole: "client", req }, ACTIONS.PARCEL_CREATE, parcel[0].id, "parcel", {

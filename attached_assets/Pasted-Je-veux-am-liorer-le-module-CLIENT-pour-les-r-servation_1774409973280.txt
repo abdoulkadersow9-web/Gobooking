@@ -1,0 +1,155 @@
+Je veux améliorer le module CLIENT pour les réservations de tickets et la création de colis dans mon application GoBooking.
+
+OBJECTIF :
+Ajouter un système intelligent de gestion des bagages + preuve photo pour éviter les litiges et permettre la validation par un agent.
+
+--------------------------------
+1. GESTION DES BAGAGES (TRÈS IMPORTANT)
+--------------------------------
+
+Lorsqu’un client réserve un ticket :
+
+- Ajouter un champ :
+  → Nombre de bagages
+
+- Règles :
+
+1 bagage :
+→ Pas de photo obligatoire
+→ Validation automatique possible
+
+2 à 4 bagages :
+→ Photos obligatoires
+→ Minimum 1 photo
+→ Maximum 6 photos
+→ Validation par agent obligatoire
+
+- Limite maximale :
+→ 4 bagages par client
+
+- Interface :
+→ Sélecteur de nombre de bagages (1 à 4)
+→ Message dynamique :
+   - "1 bagage : pas de photo requise"
+   - "2+ bagages : photos obligatoires pour validation"
+
+--------------------------------
+2. RÉSERVATION DE TICKET (CLIENT)
+--------------------------------
+
+- Si bagages ≥ 2 :
+  → Upload photos obligatoire
+  → Bouton "Ajouter photo"
+  → Aperçu des images
+  → Suppression possible avant validation
+
+- Stockage :
+  → Firebase Storage
+  → Enregistrer URLs dans réservation
+
+--------------------------------
+3. VALIDATION PAR AGENT
+--------------------------------
+
+- Si bagages ≥ 2 :
+  → Statut = EN ATTENTE
+  → Agent doit :
+     • voir photos
+     • valider ou refuser
+
+- Boutons :
+  → ✅ Valider
+  → ❌ Refuser
+
+- Si refus :
+  → champ "motif de refus"
+
+- Si 1 bagage :
+  → validation automatique
+  → statut = VALIDÉ
+
+--------------------------------
+4. CRÉATION DE COLIS (CLIENT)
+--------------------------------
+
+- Photos obligatoires (1 à 6)
+- Même interface que bagages
+
+--------------------------------
+5. VALIDATION COLIS (AGENT COLIS)
+--------------------------------
+
+- Seul AGENT COLIS valide
+
+- Statuts :
+  → EN ATTENTE
+  → VALIDÉ
+  → REFUSÉ
+
+--------------------------------
+6. LOGIQUE DE DONNÉES
+--------------------------------
+
+- Réservations :
+  → module "Réservations"
+  → inclure :
+     • nombre de bagages
+     • photos
+     • statut
+
+- Colis :
+  → module "Historique Colis"
+
+- Photos visibles :
+  → admin
+  → agent concerné
+  → compagnie (lecture seule)
+
+--------------------------------
+7. SÉCURITÉ & RÔLES
+--------------------------------
+
+- CLIENT :
+  → déclare bagages + photos
+
+- AGENT :
+  → valide ou refuse
+
+- COMPAGNIE :
+  → ne valide pas
+  → ne crée pas colis
+
+- ADMIN :
+  → accès complet
+
+--------------------------------
+8. UX (EXPÉRIENCE UTILISATEUR)
+--------------------------------
+
+- Messages dynamiques :
+  → informer client selon bagages
+
+- Empêcher validation si :
+  → bagages ≥ 2 ET pas de photo
+
+- Ajouter loader upload
+
+--------------------------------
+9. OPTIMISATION
+--------------------------------
+
+- Limiter taille image :
+  → max 2MB par image
+  → compression automatique
+
+--------------------------------
+RÉSULTAT ATTENDU
+--------------------------------
+
+- Gestion intelligente des bagages
+- Réduction des litiges
+- Validation automatique ou manuelle selon cas
+- Application professionnelle
+
+Priorité :
+LOGIQUE MÉTIER + CONTRÔLE + FIABILITÉ

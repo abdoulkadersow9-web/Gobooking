@@ -31,6 +31,8 @@ export interface BookingState {
   totalAmount: number;
   bagages: BagageInfo[];
   bagagePrice: number;
+  baggageCount: number;
+  baggagePhotos: string[];
   fromStopId?:   string;
   fromStopName?: string;
   toStopId?:     string;

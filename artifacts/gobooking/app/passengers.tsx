@@ -19,22 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-import { useBooking, type BagageInfo, type BagageType } from "@/context/BookingContext";
+import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
-const PRIX_PAR_KG = 500; // FCFA par kg
-const MAX_BAGAGES = 5;
-
-const BAGAGE_TYPES: { value: BagageType; label: string; icon: string }[] = [
-  { value: "valise", label: "Valise",  icon: "briefcase" },
-  { value: "sac",    label: "Sac",     icon: "shopping-bag" },
-  { value: "colis",  label: "Colis",   icon: "package" },
-  { value: "autre",  label: "Autre",   icon: "box" },
-];
-
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
+const MAX_PHOTOS = 6;
+const MAX_BAGAGES = 4;
 
 export default function PassengersScreen() {
   const insets = useSafeAreaInsets();
@@ -45,11 +34,12 @@ export default function PassengersScreen() {
   const [passengers, setPassengers] = useState(booking?.passengers || []);
   const [contactEmail, setContactEmail] = useState(user?.email || "");
   const [contactPhone, setContactPhone] = useState(user?.phone || "");
-  const [bagages, setBagages] = useState<BagageInfo[]>(booking?.bagages || []);
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const [baggageCount, setBaggageCount] = useState<number>(booking?.baggageCount || 0);
+  const [baggagePhotos, setBaggagePhotos] = useState<{ uri: string; url?: string }[]>([]);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  /* ── helpers ─────────────────────────────────────────────────────── */
   const updatePassenger = (index: number, field: string, value: string) => {
     setPassengers((prev) => {
       const updated = [...prev];
@@ -58,38 +48,11 @@ export default function PassengersScreen() {
     });
   };
 
-  const bagagePrice = bagages.reduce((s, b) => s + b.prix, 0);
-  const ticketPrice = (booking?.totalAmount ?? 0) - (booking?.bagagePrice ?? 0);
-  const totalPrice  = ticketPrice + bagagePrice;
-
-  /* ── bagage actions ──────────────────────────────────────────────── */
-  const addBagage = () => {
-    if (bagages.length >= MAX_BAGAGES) {
-      Alert.alert("Maximum atteint", `Vous ne pouvez pas ajouter plus de ${MAX_BAGAGES} bagages.`);
+  const pickPhoto = async () => {
+    if (baggagePhotos.length >= MAX_PHOTOS) {
+      Alert.alert("Maximum atteint", `Vous ne pouvez pas ajouter plus de ${MAX_PHOTOS} photos.`);
       return;
     }
-    const newBag: BagageInfo = { id: generateId(), type: "valise", poids: 1, prix: PRIX_PAR_KG };
-    setBagages(prev => [...prev, newBag]);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const removeBagage = (id: string) => {
-    setBagages(prev => prev.filter(b => b.id !== id));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
-  const updateBagage = (id: string, field: keyof BagageInfo, value: any) => {
-    setBagages(prev => prev.map(b => {
-      if (b.id !== id) return b;
-      const updated = { ...b, [field]: value };
-      if (field === "poids") {
-        updated.prix = Math.max(1, Number(value) || 0) * PRIX_PAR_KG;
-      }
-      return updated;
-    }));
-  };
-
-  const pickImage = async (bagageId: string) => {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -97,7 +60,7 @@ export default function PassengersScreen() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         quality: 0.5,
         base64: true,
         allowsEditing: true,
@@ -106,10 +69,17 @@ export default function PassengersScreen() {
       if (result.canceled || !result.assets?.[0]) return;
 
       const asset = result.assets[0];
-      setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUri: asset.uri } : b));
+      const fileSize = asset.fileSize ?? 0;
+      if (fileSize > 2 * 1024 * 1024) {
+        Alert.alert("Image trop grande", "La photo dépasse 2 Mo. Veuillez en choisir une plus petite.");
+        return;
+      }
+
+      const newIdx = baggagePhotos.length;
+      setBaggagePhotos(prev => [...prev, { uri: asset.uri }]);
 
       if (asset.base64) {
-        setUploadingId(bagageId);
+        setUploadingIdx(newIdx);
         try {
           const resp = await apiFetch<{ url?: string }>("/bookings/upload-image", {
             token: token ?? undefined,
@@ -117,20 +87,24 @@ export default function PassengersScreen() {
             body: JSON.stringify({ base64: asset.base64, mimeType: asset.mimeType || "image/jpeg" }),
           });
           if (resp?.url) {
-            setBagages(prev => prev.map(b => b.id === bagageId ? { ...b, imageUrl: resp.url } : b));
+            setBaggagePhotos(prev => prev.map((p, i) => i === newIdx ? { ...p, url: resp.url } : p));
           }
         } catch {
-          /* keep local URI only */
+          /* keep local URI */
         } finally {
-          setUploadingId(null);
+          setUploadingIdx(null);
         }
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Erreur", "Impossible d'accéder à la galerie.");
     }
   };
 
-  /* ── continue ────────────────────────────────────────────────────── */
+  const removePhoto = (idx: number) => {
+    setBaggagePhotos(prev => prev.filter((_, i) => i !== idx));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
   const handleContinue = async () => {
     for (const p of passengers) {
       if (!p.name.trim() || !p.age || !p.idNumber.trim()) {
@@ -146,8 +120,17 @@ export default function PassengersScreen() {
       Alert.alert("Erreur", "Informations de trajet manquantes. Recommencez la sélection.");
       return;
     }
+    if (baggageCount >= 2 && baggagePhotos.length === 0) {
+      Alert.alert(
+        "Photos obligatoires",
+        `Avec ${baggageCount} bagages, vous devez ajouter au moins 1 photo pour validation.`
+      );
+      return;
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    updateBooking({ passengers, contactEmail, contactPhone, bagages, bagagePrice, totalAmount: totalPrice });
+    const photoUrls = baggagePhotos.map(p => p.url).filter(Boolean) as string[];
+    updateBooking({ passengers, contactEmail, contactPhone, bagages: [], bagagePrice: 0, baggageCount, baggagePhotos: photoUrls });
 
     setSubmitting(true);
     try {
@@ -163,7 +146,9 @@ export default function PassengersScreen() {
             paymentMethod: "wave",
             contactEmail,
             contactPhone,
-            bagages,
+            bagages: [],
+            baggageCount,
+            baggagePhotos: photoUrls,
             fromStopId:   booking.fromStopId ?? null,
             toStopId:     booking.toStopId   ?? null,
           },
@@ -184,9 +169,11 @@ export default function PassengersScreen() {
     }
   };
 
+  const needsPhotos = baggageCount >= 2;
+  const photosOk = !needsPhotos || baggagePhotos.length > 0;
+
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
@@ -199,7 +186,6 @@ export default function PassengersScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Passengers ─────────────────────────────────────────────── */}
         {passengers.map((p, i) => (
           <View key={i} style={styles.card}>
             <View style={styles.cardHeader}>
@@ -286,7 +272,6 @@ export default function PassengersScreen() {
           </View>
         ))}
 
-        {/* ── Contact ─────────────────────────────────────────────────── */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Coordonnées</Text>
           <Text style={styles.cardSub2}>La confirmation sera envoyée ici</Text>
@@ -323,7 +308,7 @@ export default function PassengersScreen() {
           </View>
         </View>
 
-        {/* ── Bagages ─────────────────────────────────────────────────── */}
+        {/* ── NOUVELLE SECTION BAGAGES ─────────────────────────────────── */}
         <View style={styles.bagSection}>
           <View style={styles.bagHeader}>
             <View style={styles.bagTitleRow}>
@@ -333,119 +318,109 @@ export default function PassengersScreen() {
                 <Text style={styles.bagOptionalText}>Optionnel</Text>
               </View>
             </View>
-            <Text style={styles.bagRate}>{PRIX_PAR_KG} FCFA/kg</Text>
+            <Text style={styles.bagSubtitle}>Sélectionnez le nombre de bagages</Text>
           </View>
 
-          {bagages.length === 0 && (
-            <View style={styles.bagEmpty}>
-              <Feather name="briefcase" size={28} color="#C4B5FD" />
-              <Text style={styles.bagEmptyText}>Aucun bagage ajouté</Text>
-              <Text style={styles.bagEmptySub}>Bagages soumis à validation avant départ</Text>
+          {/* Sélecteur de nombre */}
+          <View style={styles.countRow}>
+            <Pressable
+              style={[styles.countBtn, baggageCount === 0 && styles.countBtnActive]}
+              onPress={() => { setBaggageCount(0); setBaggagePhotos([]); Haptics.selectionAsync(); }}
+            >
+              <Text style={[styles.countBtnText, baggageCount === 0 && styles.countBtnTextActive]}>Aucun</Text>
+            </Pressable>
+            {[1, 2, 3, 4].map((n) => (
+              <Pressable
+                key={n}
+                style={[styles.countBtn, baggageCount === n && styles.countBtnActive]}
+                onPress={() => { setBaggageCount(n); Haptics.selectionAsync(); }}
+              >
+                <Text style={[styles.countBtnText, baggageCount === n && styles.countBtnTextActive]}>{n}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* Bannière info dynamique */}
+          {baggageCount === 1 && (
+            <View style={[styles.infoBanner, styles.infoBannerGreen]}>
+              <Feather name="check-circle" size={15} color="#059669" />
+              <Text style={[styles.infoBannerText, { color: "#065F46" }]}>
+                1 bagage — Validation automatique, pas de photo requise
+              </Text>
+            </View>
+          )}
+          {baggageCount >= 2 && (
+            <View style={[styles.infoBanner, styles.infoBannerAmber]}>
+              <Feather name="camera" size={15} color="#B45309" />
+              <Text style={[styles.infoBannerText, { color: "#92400E" }]}>
+                {baggageCount} bagages — Photos obligatoires (1 à {MAX_PHOTOS}). Un agent validera avant le départ.
+              </Text>
             </View>
           )}
 
-          {bagages.map((b, idx) => (
-            <View key={b.id} style={styles.bagCard}>
-              {/* Bag header */}
-              <View style={styles.bagCardHeader}>
-                <Text style={styles.bagCardTitle}>Bagage {idx + 1}</Text>
-                <Pressable style={styles.bagRemove} onPress={() => removeBagage(b.id)}>
-                  <Feather name="trash-2" size={15} color="#DC2626" />
-                </Pressable>
+          {/* Zone photos (si ≥ 2 bagages) */}
+          {baggageCount >= 2 && (
+            <View style={styles.photosSection}>
+              <View style={styles.photosSectionHeader}>
+                <Text style={styles.photosTitle}>Photos des bagages</Text>
+                <Text style={styles.photosCount}>{baggagePhotos.length}/{MAX_PHOTOS}</Text>
               </View>
 
-              {/* Type selector */}
-              <Text style={styles.fieldLabel}>Type</Text>
-              <View style={[styles.chipRow, { marginBottom: 12 }]}>
-                {BAGAGE_TYPES.map(t => (
-                  <Pressable
-                    key={t.value}
-                    style={[styles.chip, b.type === t.value && styles.chipBagActive]}
-                    onPress={() => updateBagage(b.id, "type", t.value)}
-                  >
-                    <Feather name={t.icon as any} size={12} color={b.type === t.value ? "#7C3AED" : "#6B7280"} />
-                    <Text style={[styles.chipText, b.type === t.value && styles.chipTextBagActive]}>{t.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* Weight + price */}
-              <View style={styles.fieldRow}>
-                <View style={[styles.field, { flex: 1 }]}>
-                  <Text style={styles.fieldLabel}>Poids (kg)</Text>
-                  <TextInput
-                    style={styles.fieldInput}
-                    placeholder="Ex : 5"
-                    placeholderTextColor={Colors.light.textMuted}
-                    value={b.poids > 0 ? String(b.poids) : ""}
-                    onChangeText={(v) => updateBagage(b.id, "poids", Number(v) || 0)}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                <View style={[styles.field, { flex: 1 }]}>
-                  <Text style={styles.fieldLabel}>Prix estimé</Text>
-                  <View style={styles.prixBox}>
-                    <Text style={styles.prixValue}>{b.prix.toLocaleString()} FCFA</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Photo */}
-              <Text style={styles.fieldLabel}>Photo du bagage</Text>
-              <Pressable style={styles.photoBtn} onPress={() => pickImage(b.id)}>
-                {b.imageUri ? (
-                  <View style={styles.photoPreview}>
-                    <Image source={{ uri: b.imageUri }} style={styles.photoImg} contentFit="cover" />
-                    {uploadingId === b.id && (
+              <View style={styles.photosGrid}>
+                {baggagePhotos.map((photo, idx) => (
+                  <View key={idx} style={styles.photoThumb}>
+                    <Image source={{ uri: photo.uri }} style={styles.photoImg} contentFit="cover" />
+                    {uploadingIdx === idx && (
                       <View style={styles.photoOverlay}>
                         <ActivityIndicator size="small" color="#fff" />
-                        <Text style={styles.photoOverlayTxt}>Upload…</Text>
                       </View>
                     )}
-                    {uploadingId !== b.id && b.imageUrl && (
+                    {uploadingIdx !== idx && photo.url && (
                       <View style={[styles.photoOverlay, styles.photoSuccess]}>
-                        <Feather name="check-circle" size={16} color="#fff" />
+                        <Feather name="check" size={14} color="#fff" />
                       </View>
                     )}
+                    {uploadingIdx !== idx && (
+                      <Pressable style={styles.photoRemoveBtn} onPress={() => removePhoto(idx)}>
+                        <Feather name="x" size={12} color="#fff" />
+                      </Pressable>
+                    )}
                   </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Feather name="camera" size={20} color="#7C3AED" />
-                    <Text style={styles.photoPlaceholderTxt}>Ajouter une photo</Text>
-                  </View>
+                ))}
+
+                {baggagePhotos.length < MAX_PHOTOS && (
+                  <Pressable style={styles.photoAddBtn} onPress={pickPhoto}>
+                    <Feather name="plus" size={22} color="#7C3AED" />
+                    <Text style={styles.photoAddText}>Ajouter</Text>
+                  </Pressable>
                 )}
-              </Pressable>
-            </View>
-          ))}
+              </View>
 
-          {bagages.length < MAX_BAGAGES && (
-            <Pressable style={styles.addBagBtn} onPress={addBagage}>
-              <Feather name="plus-circle" size={18} color="#7C3AED" />
-              <Text style={styles.addBagTxt}>Ajouter un bagage</Text>
-            </Pressable>
-          )}
-
-          {bagagePrice > 0 && (
-            <View style={styles.bagPriceRow}>
-              <Feather name="tag" size={14} color="#7C3AED" />
-              <Text style={styles.bagPriceLabel}>Bagages inclus :</Text>
-              <Text style={styles.bagPriceValue}>+{bagagePrice.toLocaleString()} FCFA</Text>
+              {baggagePhotos.length === 0 && (
+                <View style={styles.photoEmptyHint}>
+                  <Feather name="alert-circle" size={14} color="#DC2626" />
+                  <Text style={styles.photoEmptyHintText}>Au moins 1 photo est obligatoire</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
           <Text style={styles.totalLabel}>Total à payer</Text>
-          <Text style={styles.totalAmount}>{totalPrice.toLocaleString()} FCFA</Text>
-          {bagagePrice > 0 && (
-            <Text style={styles.totalSub}>dont {bagagePrice.toLocaleString()} FCFA bagages</Text>
+          <Text style={styles.totalAmount}>{(booking?.totalAmount ?? 0).toLocaleString()} FCFA</Text>
+          {baggageCount >= 2 && !photosOk && (
+            <Text style={styles.totalWarning}>⚠️ Photos requises</Text>
           )}
         </View>
         <Pressable
-          style={({ pressed }) => [styles.continueBtn, (pressed || submitting) && styles.continueBtnPressed]}
+          style={({ pressed }) => [
+            styles.continueBtn,
+            (pressed || submitting || (needsPhotos && !photosOk)) && styles.continueBtnPressed,
+            needsPhotos && !photosOk && styles.continueBtnDisabled,
+          ]}
           onPress={handleContinue}
           disabled={submitting}
         >
@@ -514,10 +489,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.light.border, backgroundColor: Colors.light.background,
   },
   chipActive: { backgroundColor: Colors.light.primaryLight, borderColor: PRIMARY },
-  chipBagActive: { backgroundColor: "#EDE9FE", borderColor: VIOLET },
   chipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
   chipTextActive: { color: PRIMARY },
-  chipTextBagActive: { color: VIOLET },
   inputIcon: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: Colors.light.background, borderRadius: 10,
@@ -526,91 +499,94 @@ const styles = StyleSheet.create({
   },
   iconInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.text },
 
-  /* Bagage section */
+  /* ── Bagages section ── */
   bagSection: {
     backgroundColor: "#FAFAFF", borderRadius: 16, padding: 16, marginBottom: 12,
     borderWidth: 1.5, borderColor: "#EDE9FE",
     shadowColor: VIOLET, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  bagHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  bagTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  bagHeader: { marginBottom: 14 },
+  bagTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   bagTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text },
   bagOptional: { backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
   bagOptionalText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: VIOLET },
-  bagRate: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: VIOLET },
+  bagSubtitle: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
 
-  bagEmpty: { alignItems: "center", paddingVertical: 20, gap: 6 },
-  bagEmptyText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#6B7280" },
-  bagEmptySub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#9CA3AF", textAlign: "center" },
+  /* Count selector */
+  countRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  countBtn: {
+    flex: 1, paddingVertical: 12, borderRadius: 12,
+    alignItems: "center", justifyContent: "center",
+    borderWidth: 1.5, borderColor: "#D8B4FE",
+    backgroundColor: "#fff",
+  },
+  countBtnActive: { backgroundColor: VIOLET, borderColor: VIOLET },
+  countBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#6B7280" },
+  countBtnTextActive: { color: "#fff" },
 
-  bagCard: {
-    backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 10,
-    borderWidth: 1, borderColor: "#E9D5FF",
-    shadowColor: VIOLET, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  /* Info banner */
+  infoBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    borderRadius: 10, padding: 10, marginBottom: 10,
   },
-  bagCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  bagCardTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.text },
-  bagRemove: {
-    width: 30, height: 30, borderRadius: 8,
-    backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center",
-  },
+  infoBannerGreen: { backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0" },
+  infoBannerAmber: { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: "#FDE68A" },
+  infoBannerText: { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
 
-  prixBox: {
-    backgroundColor: "#F5F3FF", borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 11,
-    borderWidth: 1.5, borderColor: "#DDD6FE",
-    justifyContent: "center",
-  },
-  prixValue: { fontSize: 13, fontFamily: "Inter_700Bold", color: VIOLET },
+  /* Photos */
+  photosSection: { marginTop: 4 },
+  photosSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  photosTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
+  photosCount: { fontSize: 12, fontFamily: "Inter_500Medium", color: VIOLET },
 
-  photoBtn: { marginBottom: 4, borderRadius: 10, overflow: "hidden" },
-  photoPlaceholder: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "#EDE9FE", borderRadius: 10, padding: 12,
-    borderWidth: 1.5, borderColor: "#C4B5FD", borderStyle: "dashed",
-  },
-  photoPlaceholderTxt: { fontSize: 13, fontFamily: "Inter_500Medium", color: VIOLET },
-  photoPreview: { width: "100%", height: 120, borderRadius: 10, overflow: "hidden" },
+  photosGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoThumb: { width: 88, height: 88, borderRadius: 12, overflow: "hidden", position: "relative" },
   photoImg: { width: "100%", height: "100%" },
   photoOverlay: {
-    position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center", alignItems: "center", gap: 4,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center", alignItems: "center",
   },
-  photoSuccess: { backgroundColor: "rgba(16,185,129,0.5)" },
-  photoOverlayTxt: { fontSize: 12, color: "#fff", fontFamily: "Inter_600SemiBold" },
-
-  addBagBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: "#EDE9FE", borderRadius: 12, paddingVertical: 12,
-    borderWidth: 1.5, borderColor: "#C4B5FD", borderStyle: "dashed", marginTop: 4,
+  photoSuccess: { backgroundColor: "rgba(5,150,105,0.6)" },
+  photoRemoveBtn: {
+    position: "absolute", top: 4, right: 4,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "rgba(220,38,38,0.85)",
+    justifyContent: "center", alignItems: "center",
   },
-  addBagTxt: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: VIOLET },
+  photoAddBtn: {
+    width: 88, height: 88, borderRadius: 12,
+    borderWidth: 2, borderColor: "#D8B4FE", borderStyle: "dashed",
+    justifyContent: "center", alignItems: "center",
+    backgroundColor: "#F5F3FF", gap: 4,
+  },
+  photoAddText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: VIOLET },
 
-  bagPriceRow: {
+  photoEmptyHint: {
     flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: "#EDE9FE", borderRadius: 10, padding: 10, marginTop: 10,
+    marginTop: 8, paddingHorizontal: 4,
   },
-  bagPriceLabel: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#4C1D95" },
-  bagPriceValue: { fontSize: 14, fontFamily: "Inter_700Bold", color: VIOLET },
+  photoEmptyHintText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#DC2626" },
 
-  /* Bottom bar */
+  /* Bottom */
   bottomBar: {
-    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: Colors.light.card, paddingHorizontal: 20, paddingTop: 16,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingTop: 12,
+    backgroundColor: Colors.light.card,
     borderTopWidth: 1, borderTopColor: Colors.light.border,
-    shadowColor: "#000", shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 8,
   },
   totalLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
-  totalAmount: { fontSize: 22, fontFamily: "Inter_700Bold", color: PRIMARY },
-  totalSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: VIOLET, marginTop: 1 },
+  totalAmount: { fontSize: 20, fontFamily: "Inter_700Bold", color: PRIMARY },
+  totalWarning: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#DC2626", marginTop: 2 },
+
   continueBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: PRIMARY, borderRadius: 14,
-    paddingHorizontal: 20, paddingVertical: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, backgroundColor: PRIMARY, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 24,
     shadowColor: PRIMARY, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  continueBtnPressed: { opacity: 0.9, transform: [{ scale: 0.97 }] },
-  continueBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "white" },
+  continueBtnPressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
+  continueBtnDisabled: { backgroundColor: "#9CA3AF" },
+  continueBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "white" },
 });

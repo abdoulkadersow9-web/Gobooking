@@ -14,6 +14,7 @@ export interface ParcelData {
   paymentMethod: string;
   amount: number;
   trackingRef: string;
+  photoUrls: string[];
 }
 
 interface ParcelContextType {

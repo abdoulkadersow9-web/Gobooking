@@ -122,6 +122,7 @@ export default function ParcelPaymentScreen() {
               paymentMethod: method,
               trackingRef: clientRef,
               paymentStatus: "pending",
+              photoUrls: parcel.photoUrls ?? [],
             }),
           });
           if (saved?.trackingRef) confirmedRef = saved.trackingRef;
