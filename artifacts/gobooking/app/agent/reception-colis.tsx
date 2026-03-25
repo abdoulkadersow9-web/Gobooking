@@ -25,6 +25,7 @@ const STATUSES = {
   en_transit:  { label: "En transit",   color: "#2563EB", bg: "#DBEAFE", icon: "navigate-outline" },
   arrivé:      { label: "Arrivé",       color: "#059669", bg: "#D1FAE5", icon: "location-outline" },
   livré:       { label: "Livré ✓",      color: "#065F46", bg: "#ECFDF5", icon: "checkmark-circle" },
+  retiré:      { label: "Retiré ✓",     color: "#065F46", bg: "#ECFDF5", icon: "hand-left-outline" },
   annulé:      { label: "Annulé",       color: "#DC2626", bg: "#FEE2E2", icon: "close-circle-outline" },
   en_attente:  { label: "En attente",   color: "#6B7280", bg: "#F3F4F6", icon: "time-outline" },
   livre:       { label: "Livré ✓",      color: "#065F46", bg: "#ECFDF5", icon: "checkmark-circle" },
@@ -84,7 +85,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 export default function ReceptionColisScreen() {
   const { user, token } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
-  const [activeTab, setActiveTab] = useState<"gerer" | "creer" | "liste">("gerer");
+  const [activeTab, setActiveTab] = useState<"creer" | "retrait" | "gerer" | "liste">("creer");
 
   if (user && user.role !== "agent") {
     return (
@@ -113,23 +114,27 @@ export default function ReceptionColisScreen() {
           </View>
         </View>
         <View style={styles.tabs}>
-          {(["gerer", "creer", "liste"] as const).map((tab) => (
+          {([
+            { key: "creer",   label: "✚ Créer",   },
+            { key: "retrait", label: "📦 Retrait", },
+            { key: "gerer",   label: "🔍 Gérer",   },
+            { key: "liste",   label: "📋 Liste",   },
+          ] as const).map((t) => (
             <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
+              key={t.key}
+              style={[styles.tab, activeTab === t.key && styles.tabActive]}
+              onPress={() => setActiveTab(t.key)}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === "gerer" ? "Gérer" : tab === "creer" ? "Créer" : "Liste"}
-              </Text>
+              <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {activeTab === "gerer" && <GererTab token={token} networkStatus={networkStatus} />}
-      {activeTab === "creer" && <CreerTab token={token} onCreated={() => setActiveTab("gerer")} />}
-      {activeTab === "liste" && <ListeTab token={token} />}
+      {activeTab === "creer"   && <CreerTab token={token} onCreated={() => setActiveTab("retrait")} />}
+      {activeTab === "retrait" && <RetraitTab token={token} />}
+      {activeTab === "gerer"   && <GererTab token={token} networkStatus={networkStatus} />}
+      {activeTab === "liste"   && <ListeTab token={token} />}
     </SafeAreaView>
   );
 }
@@ -503,6 +508,257 @@ function StatusTracker({ status }: { status: string }) {
         })}
       </View>
     </ScrollView>
+  );
+}
+
+/* ─── Tab Retrait : client vient récupérer son colis ─────────────────────── */
+function RetraitTab({ token }: { token: string | null }) {
+  const [search, setSearch]             = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [confirming, setConfirming]     = useState(false);
+  const [colis, setColis]               = useState<Parcel | null>(null);
+  const [notFound, setNotFound]         = useState(false);
+  const [pickupCode, setPickupCode]     = useState("");
+  const [codeError, setCodeError]       = useState<string | null>(null);
+  const [success, setSuccess]           = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scanMode, setScanMode]         = useState(false);
+  const [scanned, setScanned]           = useState(false);
+
+  const lookupColis = async (ref: string) => {
+    setLoading(true); setColis(null); setNotFound(false); setCodeError(null); setSuccess(false); setPickupCode("");
+    try {
+      const res = await apiFetch<Parcel>(`/parcels/track/${ref.trim()}`, { token: token ?? undefined });
+      setColis(res);
+    } catch { setNotFound(true); }
+    finally { setLoading(false); }
+  };
+
+  const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
+    if (scanned) return;
+    setScanMode(false); setScanned(true);
+    const qrResult = validateQR(data.trim());
+    if (!qrResult.valid) { setNotFound(true); return; }
+    await lookupColis(qrResult.ref);
+  }, [scanned]);
+
+  const openCamera = async () => {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) { Alert.alert("Caméra requise", "Autorisez la caméra pour scanner."); return; }
+    }
+    setScanned(false); setScanMode(true);
+  };
+
+  const handleConfirmRetrait = async () => {
+    if (!colis) return;
+    if (!pickupCode.trim()) { setCodeError("Entrez le code de retrait reçu par SMS."); return; }
+    setConfirming(true); setCodeError(null);
+    try {
+      await apiFetch(`/agent/parcels/${colis.id}/retirer`, {
+        token: token ?? undefined,
+        method: "POST",
+        body: JSON.stringify({ pickupCode: pickupCode.trim() }),
+      });
+      setSuccess(true);
+      setColis(prev => prev ? { ...prev, status: "retiré" } : prev);
+    } catch (e: any) {
+      const msg = e?.message ?? "Erreur lors de la validation.";
+      if (msg.includes("incorrect") || msg.includes("invalide")) {
+        setCodeError("❌ Code incorrect. Vérifiez le SMS envoyé au destinataire.");
+      } else if (msg.includes("requis")) {
+        setCodeError("Le code de retrait est obligatoire.");
+      } else {
+        setCodeError(msg);
+      }
+    } finally { setConfirming(false); }
+  };
+
+  const reset = () => {
+    setColis(null); setNotFound(false); setSearch(""); setPickupCode("");
+    setCodeError(null); setSuccess(false); setScanned(false);
+  };
+
+  if (scanMode) {
+    return (
+      <View style={styles.cameraWrap}>
+        {Platform.OS !== "web" ? (
+          <CameraView style={StyleSheet.absoluteFill} facing="back"
+            onBarcodeScanned={handleBarCodeScanned}
+            barcodeScannerSettings={{ barcodeTypes: ["qr"] }} />
+        ) : (
+          <View style={styles.webCamera}>
+            <Ionicons name="camera-outline" size={64} color="#fff" />
+            <Text style={{ color: "#fff", marginTop: 12 }}>Scanner non disponible sur web</Text>
+          </View>
+        )}
+        <View style={styles.cameraOverlay}><View style={styles.scanBox} /></View>
+        <TouchableOpacity style={styles.cancelScan} onPress={() => setScanMode(false)}>
+          <Ionicons name="close-circle" size={44} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.scanHint}>Scannez le QR du colis</Text>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+
+        {/* ── Intro ── */}
+        <View style={[styles.card, { backgroundColor: "#EDE9FE", borderColor: "#7C3AED", borderWidth: 1 }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <Ionicons name="hand-left" size={22} color="#7C3AED" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: "800", color: "#4C1D95" }}>Retrait de colis</Text>
+              <Text style={{ fontSize: 12, color: "#6D28D9", marginTop: 2 }}>
+                Le destinataire présente son code colis + code de retrait SMS
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Étape 1 : Identifier le colis ── */}
+        {!colis && !success && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Étape 1 — Identifier le colis</Text>
+            <TouchableOpacity style={styles.scanBtn} onPress={openCamera}>
+              <Ionicons name="qr-code-outline" size={24} color="#fff" />
+              <Text style={styles.scanBtnText}>Scanner le QR du colis</Text>
+            </TouchableOpacity>
+            <View style={styles.divider}>
+              <View style={styles.divLine} /><Text style={styles.divText}>ou saisir la référence</Text><View style={styles.divLine} />
+            </View>
+            <View style={styles.searchRow}>
+              <TextInput
+                style={styles.input}
+                placeholder="GBX-XXXX-XXXX"
+                value={search}
+                onChangeText={setSearch}
+                onSubmitEditing={() => search.trim() && lookupColis(search.trim())}
+                autoCapitalize="characters"
+                returnKeyType="search"
+              />
+              <TouchableOpacity style={styles.searchBtn}
+                onPress={() => search.trim() && lookupColis(search.trim())} disabled={loading}>
+                <Ionicons name="search" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {loading && <ActivityIndicator color={G} style={{ marginTop: 12 }} />}
+            {notFound && !loading && (
+              <View style={{ alignItems: "center", gap: 4, marginTop: 12 }}>
+                <Ionicons name="close-circle" size={28} color="#EF4444" />
+                <Text style={{ color: "#EF4444", fontWeight: "700" }}>Colis introuvable</Text>
+                <Text style={{ color: "#6B7280", fontSize: 12 }}>Vérifiez la référence</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Étape 2 : Infos colis + code de retrait ── */}
+        {colis && !success && (
+          <>
+            <View style={[styles.resultCard, { borderColor: "#7C3AED", borderWidth: 1.5 }]}>
+              <View style={styles.colisHeader}>
+                <View style={[styles.colisIcon, { backgroundColor: "#EDE9FE" }]}>
+                  <Ionicons name="cube" size={24} color="#7C3AED" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.trackingRef, { color: "#4C1D95" }]}>{colis.trackingRef}</Text>
+                  <Text style={styles.colisDesc}>{colis.fromCity} → {colis.toCity}</Text>
+                </View>
+                <StatusBadge status={colis.status} />
+              </View>
+
+              <View style={[styles.infoGrid, { marginTop: 8 }]}>
+                <InfoRow icon="person-outline"  label="Expéditeur"   value={`${colis.senderName} · ${colis.senderPhone}`} />
+                <InfoRow icon="person"           label="Destinataire" value={`${colis.receiverName} · ${colis.receiverPhone}`} />
+                {(colis.status === "retiré" || colis.status === "livré" || colis.status === "livre") && (
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, padding: 10, alignItems: "center", marginTop: 4 }}>
+                    <Ionicons name="checkmark-circle" size={22} color={G} />
+                    <Text style={{ color: G, fontWeight: "700", fontSize: 13, marginTop: 2 }}>Ce colis a déjà été retiré</Text>
+                  </View>
+                )}
+              </View>
+
+              {colis.status !== "retiré" && colis.status !== "livré" && colis.status !== "livre" && (
+                <>
+                  <View style={{ height: 1, backgroundColor: "#E5E7EB", marginVertical: 12 }} />
+                  <Text style={[styles.cardTitle, { fontSize: 13 }]}>Étape 2 — Code de retrait</Text>
+                  <Text style={{ fontSize: 12, color: "#6B7280", marginBottom: 8 }}>
+                    Demandez le code à 4 chiffres reçu par SMS par le destinataire
+                  </Text>
+                  <TextInput
+                    style={[styles.formInput, {
+                      fontSize: 22, fontWeight: "800", letterSpacing: 8, textAlign: "center",
+                      color: "#4C1D95", borderColor: codeError ? "#EF4444" : "#7C3AED",
+                      borderWidth: 2, backgroundColor: "#F5F3FF",
+                    }]}
+                    placeholder="• • • •"
+                    value={pickupCode}
+                    onChangeText={v => { setPickupCode(v.replace(/\D/g, "").slice(0, 4)); setCodeError(null); }}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    returnKeyType="done"
+                  />
+                  {codeError && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                      <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                      <Text style={{ color: "#DC2626", fontSize: 12, fontWeight: "600" }}>{codeError}</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: "#7C3AED", marginTop: 14 }, confirming && { opacity: 0.6 }]}
+                    onPress={handleConfirmRetrait}
+                    disabled={confirming || pickupCode.length < 4}
+                  >
+                    {confirming ? <ActivityIndicator color="#fff" size="small" /> : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                        <Text style={styles.actionBtnText}>Valider le retrait</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.retryBtn} onPress={reset}>
+              <Text style={styles.retryBtnText}>Rechercher un autre colis</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ── Succès ── */}
+        {success && colis && (
+          <View style={[styles.resultCard, { borderColor: G, borderWidth: 2, alignItems: "center" }]}>
+            <Ionicons name="checkmark-circle" size={56} color={G} />
+            <Text style={{ fontSize: 18, fontWeight: "800", color: G, marginTop: 8 }}>Retrait validé !</Text>
+            <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827", marginTop: 6, letterSpacing: 2 }}>
+              {colis.trackingRef}
+            </Text>
+            <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 4 }}>
+              {colis.receiverName} — {colis.toCity}
+            </Text>
+            <View style={{ marginTop: 8 }}>
+              <StatusBadge status="retiré" />
+            </View>
+            <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 10, textAlign: "center" }}>
+              Le colis est marqué retiré. Un SMS de confirmation a été envoyé au destinataire.
+            </Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: G, marginTop: 16 }]}
+              onPress={reset}
+            >
+              <Ionicons name="cube-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Nouveau retrait</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

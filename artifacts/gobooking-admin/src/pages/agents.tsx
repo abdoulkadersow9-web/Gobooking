@@ -2,21 +2,26 @@ import React, { useState } from "react";
 import { useAgents, useCreateAgent } from "@/hooks/use-company";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, UserCog, Mail, Phone, Bus, Eye, MapPin, Navigation, Package, Ticket, ClipboardList, Users } from "lucide-react";
+import { Plus, UserCog, Mail, Phone, Bus, Eye, MapPin, Navigation, Package, Ticket, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
-/* ── Mapping rôles → affichage ── */
+/* ── Mapping rôles → affichage ──
+   agent_reservation est fusionné visuellement avec agent_colis (même rôle terrain) */
 const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
-  agent_route:       { label: "Agents En Route",       icon: <Navigation size={16} />, color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
-  agent_guichet:     { label: "Agents Guichet",        icon: <Ticket size={16} />,     color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-  agent_embarquement:{ label: "Agents Embarquement",   icon: <Bus size={16} />,        color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
-  agent_colis:       { label: "Agents Colis",          icon: <Package size={16} />,    color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
-  agent_reservation: { label: "Agents Réservation",    icon: <ClipboardList size={16} />, color: "#DB2777", bg: "#FDF2F8", border: "#FBCFE8" },
-  validation:        { label: "Agents Validation",     icon: <Users size={16} />,      color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
+  agent_route:       { label: "Agents En Route",         icon: <Navigation size={16} />,   color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
+  agent_guichet:     { label: "Agents Guichet",          icon: <Ticket size={16} />,        color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+  agent_embarquement:{ label: "Agents Embarquement",     icon: <Bus size={16} />,           color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
+  agent_colis:       { label: "Agents Colis",            icon: <Package size={16} />,       color: "#7C3AED", bg: "#F5F3FF", border: "#DDD6FE" },
+  validation:        { label: "Agents Validation",       icon: <Users size={16} />,         color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
 };
 
-const ROLE_ORDER = ["agent_route", "agent_guichet", "agent_embarquement", "agent_colis", "agent_reservation", "validation"];
+/* agent_reservation → fusionné dans agent_colis côté affichage */
+const ROLE_DISPLAY_KEY: Record<string, string> = {
+  agent_reservation: "agent_colis",
+};
+
+const ROLE_ORDER = ["agent_route", "agent_guichet", "agent_embarquement", "agent_colis", "validation"];
 
 function statusLabel(s: string) {
   if (s === "active")   return "Actif";
@@ -150,12 +155,13 @@ export default function Agents() {
   const [showAdd, setShowAdd] = useState(false);
   const { isCompany } = useAuth();
 
-  /* Grouper par rôle */
+  /* Grouper par rôle — agent_reservation fusionné dans agent_colis */
   const grouped = React.useMemo(() => {
     if (!agents) return {};
     const map: Record<string, any[]> = {};
     for (const agent of agents as any[]) {
-      const role = agent.agentRole ?? "agent_guichet";
+      const rawRole = agent.agentRole ?? "agent_guichet";
+      const role = ROLE_DISPLAY_KEY[rawRole] ?? rawRole;
       if (!map[role]) map[role] = [];
       map[role].push(agent);
     }
