@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -2362,17 +2362,18 @@ router.get("/suivi/overview", async (req, res) => {
         busName:       t.bus_name ?? t.busName,
       })),
       alerts: alertsRaw.map((a: any) => ({
-        id:          a.id,
-        type:        a.type,
-        busId:       a.busId,
-        busName:     a.busName,
-        agentId:     a.agentId,
-        agentName:   a.agentName,
-        message:     a.message,
-        status:      a.status,
-        response:    (a as any).response ?? null,
-        respondedAt: (a as any).respondedAt?.toISOString?.() ?? null,
-        createdAt:   a.createdAt?.toISOString?.() ?? a.createdAt,
+        id:               a.id,
+        type:             a.type,
+        busId:            a.busId,
+        busName:          a.busName,
+        agentId:          a.agentId,
+        agentName:        a.agentName,
+        message:          a.message,
+        status:           a.status,
+        response:         a.response ?? null,
+        respondedAt:      a.respondedAt?.toISOString?.() ?? null,
+        responseRequested: !!(a.responseRequested ?? a.response_requested),
+        createdAt:        a.createdAt?.toISOString?.() ?? a.createdAt,
       })),
     });
   } catch (err) {
@@ -2466,6 +2467,300 @@ router.post("/suivi/alerts/:id/confirm", async (req, res) => {
   } catch (err) {
     console.error("[suivi/alerts/confirm]", err);
     res.status(500).json({ error: "Erreur confirmation alerte" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   DÉPARTS — Programmation et gestion des départs (logistique)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/logistique/departures — list departures for company ─── */
+router.get("/logistique/departures", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = user.companyId
+      ? await db.select().from(departuresTable).where(eq(departuresTable.companyId, user.companyId)).orderBy(desc(departuresTable.createdAt)).limit(50)
+      : await db.select().from(departuresTable).orderBy(desc(departuresTable.createdAt)).limit(50);
+
+    // Enrich with bus info
+    const busIds = [...new Set(rows.map(r => r.busId).filter(Boolean))] as string[];
+    const buses = busIds.length
+      ? await db.select().from(busesTable).where(inArray(busesTable.id, busIds))
+      : [];
+    const busMap = Object.fromEntries(buses.map((b: any) => [b.id, b]));
+
+    res.json(rows.map(r => ({
+      id:            r.id,
+      busId:         r.busId,
+      busName:       (r.busId && busMap[r.busId] as any)?.busName ?? (r.busId && busMap[r.busId] as any)?.bus_name ?? "—",
+      plateNumber:   (r.busId && busMap[r.busId] as any)?.plateNumber ?? (r.busId && busMap[r.busId] as any)?.plate_number ?? "—",
+      villeDepart:   r.villeDepart,
+      villeArrivee:  r.villeArrivee,
+      heureDepart:   r.heureDepart,
+      chauffeurNom:  r.chauffeurNom,
+      agentRouteNom: r.agentRouteNom,
+      statut:        r.statut,
+      notes:         r.notes,
+      createdAt:     r.createdAt?.toISOString?.() ?? r.createdAt,
+    })));
+  } catch (err) {
+    console.error("[logistique/departures GET]", err);
+    res.status(500).json({ error: "Erreur chargement départs" });
+  }
+});
+
+/* ─── POST /agent/logistique/departures — create a new departure ─── */
+router.post("/logistique/departures", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { busId, villeDepart, villeArrivee, heureDepart, chauffeurNom, agentRouteNom, notes } = req.body as {
+      busId?: string; villeDepart: string; villeArrivee: string; heureDepart: string;
+      chauffeurNom?: string; agentRouteNom?: string; notes?: string;
+    };
+
+    if (!villeDepart || !villeArrivee || !heureDepart) {
+      res.status(400).json({ error: "villeDepart, villeArrivee et heureDepart sont requis" }); return;
+    }
+
+    const id = `dep_${Date.now()}${Math.random().toString(36).substr(2, 5)}`;
+    await db.insert(departuresTable).values({
+      id,
+      busId: busId ?? null,
+      villeDepart,
+      villeArrivee,
+      heureDepart,
+      chauffeurNom: chauffeurNom ?? null,
+      agentRouteNom: agentRouteNom ?? null,
+      companyId: user.companyId ?? undefined,
+      statut: "programmé",
+      notes: notes ?? null,
+    });
+
+    // Update bus status to "programmé" if busId provided
+    if (busId) {
+      await db.execute(sql`
+        UPDATE buses SET logistic_status = 'programmé' WHERE id = ${busId}
+      `);
+    }
+
+    res.status(201).json({ success: true, id, villeDepart, villeArrivee, heureDepart });
+  } catch (err) {
+    console.error("[logistique/departures POST]", err);
+    res.status(500).json({ error: "Erreur création départ" });
+  }
+});
+
+/* ─── PATCH /agent/logistique/departures/:id — update departure status ─── */
+router.patch("/logistique/departures/:id", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    const { statut, notes } = req.body as { statut?: string; notes?: string };
+
+    const updates: Record<string, any> = { updated_at: new Date() };
+    if (statut) updates.statut = statut;
+    if (notes)  updates.notes  = notes;
+
+    await db.execute(sql`
+      UPDATE departures SET
+        statut = COALESCE(${statut ?? null}, statut),
+        notes  = COALESCE(${notes  ?? null}, notes),
+        updated_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    // Sync bus status
+    if (statut) {
+      const dep = await db.select().from(departuresTable).where(eq(departuresTable.id, id)).limit(1);
+      if (dep[0]?.busId) {
+        const busStatut = statut === "en route" ? "en_route" : statut === "terminé" ? "arrivé" : null;
+        if (busStatut) {
+          await db.execute(sql`UPDATE buses SET logistic_status = ${busStatut} WHERE id = ${dep[0].busId}`);
+        }
+      }
+    }
+
+    res.json({ success: true, id, statut });
+  } catch (err) {
+    console.error("[logistique/departures PATCH]", err);
+    res.status(500).json({ error: "Erreur mise à jour départ" });
+  }
+});
+
+/* ─── PATCH /agent/logistique/buses/:id/statut — directly change bus status ─── */
+router.patch("/logistique/buses/:id/statut", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    const { statut } = req.body as { statut: string };
+    const allowed = ["en_attente", "programmé", "en_route", "arrivé", "en_panne"];
+    if (!allowed.includes(statut)) {
+      res.status(400).json({ error: "Statut invalide" }); return;
+    }
+
+    await db.execute(sql`UPDATE buses SET logistic_status = ${statut} WHERE id = ${id}`);
+    res.json({ success: true, busId: id, statut });
+  } catch (err) {
+    console.error("[logistique/buses/statut]", err);
+    res.status(500).json({ error: "Erreur changement statut" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   SUIVI — demander réponse à l'agent en route
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── POST /suivi/alerts/:id/demander-reponse ─── */
+router.post("/suivi/alerts/:id/demander-reponse", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    await db.execute(sql`
+      UPDATE agent_alerts
+      SET response_requested = TRUE, response_requested_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    res.json({ success: true, alertId: id, responseRequested: true });
+  } catch (err) {
+    console.error("[suivi/alerts/demander-reponse]", err);
+    res.status(500).json({ error: "Erreur demande réponse" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   AGENT EN ROUTE — voir son départ + alertes + répondre
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/route/my-departure — route agent sees their departure ─── */
+router.get("/route/my-departure", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    // Find departure for this agent (by agentRouteId) or by bus assigned to user
+    const busId = user.busId ?? null;
+
+    let departure: any = null;
+
+    // First try: find by agentRouteId
+    const byAgent = await db.select().from(departuresTable)
+      .where(eq(departuresTable.agentRouteId, user.id))
+      .orderBy(desc(departuresTable.createdAt)).limit(1);
+    if (byAgent.length) departure = byAgent[0];
+
+    // Second try: find by busId
+    if (!departure && busId) {
+      const byBus = await db.select().from(departuresTable)
+        .where(and(eq(departuresTable.busId, busId), sql`statut NOT IN ('terminé')`))
+        .orderBy(desc(departuresTable.createdAt)).limit(1);
+      if (byBus.length) departure = byBus[0];
+    }
+
+    // Third try: find by companyId (latest active)
+    if (!departure && user.companyId) {
+      const byCompany = await db.select().from(departuresTable)
+        .where(and(eq(departuresTable.companyId, user.companyId), sql`statut NOT IN ('terminé')`))
+        .orderBy(desc(departuresTable.createdAt)).limit(1);
+      if (byCompany.length) departure = byCompany[0];
+    }
+
+    // Get bus info
+    let bus: any = null;
+    if (departure?.busId) {
+      const buses = await db.select().from(busesTable).where(eq(busesTable.id, departure.busId)).limit(1);
+      bus = buses[0] ?? null;
+    } else if (busId) {
+      const buses = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+      bus = buses[0] ?? null;
+    }
+
+    // Get active alerts for this bus
+    const alertBusId = departure?.busId ?? busId;
+    const alerts = alertBusId
+      ? await db.select().from(agentAlertsTable)
+          .where(and(eq(agentAlertsTable.busId, alertBusId), eq(agentAlertsTable.status, "active")))
+          .orderBy(desc(agentAlertsTable.createdAt)).limit(10)
+      : [];
+
+    res.json({
+      departure: departure ? {
+        id:            departure.id,
+        busId:         departure.busId,
+        busName:       (bus as any)?.busName ?? (bus as any)?.bus_name ?? "—",
+        plateNumber:   (bus as any)?.plateNumber ?? (bus as any)?.plate_number ?? "—",
+        villeDepart:   departure.villeDepart,
+        villeArrivee:  departure.villeArrivee,
+        heureDepart:   departure.heureDepart,
+        chauffeurNom:  departure.chauffeurNom,
+        agentRouteNom: departure.agentRouteNom,
+        statut:        departure.statut,
+        notes:         departure.notes,
+        createdAt:     departure.createdAt?.toISOString?.() ?? departure.createdAt,
+      } : null,
+      bus: bus ? {
+        id:             bus.id,
+        busName:        (bus as any).busName ?? (bus as any).bus_name,
+        plateNumber:    (bus as any).plateNumber ?? (bus as any).plate_number,
+        logisticStatus: (bus as any).logisticStatus ?? (bus as any).logistic_status,
+        currentLocation:(bus as any).currentLocation ?? (bus as any).current_location,
+      } : null,
+      alerts: alerts.map((a: any) => ({
+        id:               a.id,
+        type:             a.type,
+        message:          a.message,
+        status:           a.status,
+        response:         a.response ?? null,
+        responseRequested: (a as any).responseRequested ?? (a as any).response_requested ?? false,
+        respondedAt:      a.respondedAt?.toISOString?.() ?? null,
+        createdAt:        a.createdAt?.toISOString?.() ?? a.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("[route/my-departure]", err);
+    res.status(500).json({ error: "Erreur chargement départ" });
+  }
+});
+
+/* ─── POST /agent/route/alerts/:id/respond — route agent responds to alert ─── */
+router.post("/route/alerts/:id/respond", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    const { response } = req.body as { response: "panne" | "controle" | "pause" };
+    if (!["panne", "controle", "pause"].includes(response)) {
+      res.status(400).json({ error: "Réponse invalide (panne | controle | pause)" }); return;
+    }
+
+    await db.execute(sql`
+      UPDATE agent_alerts
+      SET response = ${response}, responded_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    if (response === "panne") {
+      const alertRow = await db.select().from(agentAlertsTable).where(eq(agentAlertsTable.id, id)).limit(1);
+      if (alertRow[0]?.busId) {
+        await db.execute(sql`UPDATE buses SET logistic_status = 'en_panne', condition = 'panne' WHERE id = ${alertRow[0].busId}`);
+      }
+    }
+
+    res.json({ success: true, alertId: id, response });
+  } catch (err) {
+    console.error("[route/alerts/respond]", err);
+    res.status(500).json({ error: "Erreur réponse alerte" });
   }
 });
 

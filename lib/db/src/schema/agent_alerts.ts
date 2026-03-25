@@ -13,9 +13,12 @@ export const agentAlertsTable = pgTable("agent_alerts", {
   lon:         real("lon"),
   message:     text("message"),
   status:      varchar("status", { length: 20 }).notNull().default("active"), // active | resolue
-  response:    varchar("response", { length: 30 }),   // panne | controle | pause (bus agent reply)
-  respondedAt: timestamp("responded_at"),
-  resolvedAt:  timestamp("resolved_at"),
+  response:             varchar("response", { length: 30 }),   // panne | controle | pause (route agent reply)
+  respondedAt:          timestamp("responded_at"),
+  responseRequested:    text("response_requested"),            // "true" when suivi requests response
+  responseRequestedAt:  timestamp("response_requested_at"),
+  departureId:          text("departure_id"),
+  resolvedAt:           timestamp("resolved_at"),
   resolvedBy:  text("resolved_by"),
   createdAt:   timestamp("created_at").notNull().defaultNow(),
 });

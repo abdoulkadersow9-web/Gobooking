@@ -60,7 +60,14 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets">("trajet");
+  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets" | "alertes">("trajet");
+
+  /* ── Departure & Alerts ── */
+  interface MyDeparture { id: string; busId?: string; busName?: string; plateNumber?: string; villeDepart: string; villeArrivee: string; heureDepart: string; chauffeurNom?: string; agentRouteNom?: string; statut: string }
+  interface BusAlert { id: string; type: string; message: string; status: string; response?: string | null; responseRequested?: boolean; createdAt: string }
+  const [myDeparture,  setMyDeparture]  = useState<MyDeparture | null>(null);
+  const [busAlerts,    setBusAlerts]    = useState<BusAlert[]>([]);
+  const [alertActing,  setAlertActing]  = useState<string | null>(null);
 
   interface StopWithPassengers {
     id: string;
@@ -129,7 +136,37 @@ export default function RouteScreen() {
     }
   }, [token]);
 
-  useEffect(() => { loadTrips(); }, []);
+  const loadMyDeparture = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${BASE_URL}/agent/route/my-departure`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setMyDeparture(json.departure ?? null);
+        setBusAlerts(json.alerts ?? []);
+      }
+    } catch {}
+  }, [token]);
+
+  const respondToAlert = async (alertId: string, response: "panne" | "controle" | "pause") => {
+    setAlertActing(alertId);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/route/alerts/${alertId}/respond`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ response }),
+      });
+      if (res.ok) {
+        Alert.alert("✅ Réponse envoyée", "L'Agent Suivi a été notifié.");
+        await loadMyDeparture();
+      }
+    } catch { Alert.alert("Erreur", "Problème réseau."); }
+    setAlertActing(null);
+  };
+
+  useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
   useEffect(() => {
     if (activeTrip) {
@@ -339,13 +376,32 @@ export default function RouteScreen() {
             </View>
           )}
 
+          {/* Departure badge */}
+          {myDeparture && (
+            <View style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: "#F0F9FF", borderRadius: 12, padding: 12, borderLeftWidth: 4, borderLeftColor: "#0369A1" }}>
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#0369A1" }}>🗓️ Mon départ : {myDeparture.villeDepart} → {myDeparture.villeArrivee}</Text>
+              <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>⏰ {myDeparture.heureDepart} · {myDeparture.busName ?? "Bus"} {myDeparture.plateNumber ? `(${myDeparture.plateNumber})` : ""}</Text>
+              {myDeparture.chauffeurNom && <Text style={{ fontSize: 11, color: "#64748B" }}>👤 {myDeparture.chauffeurNom}</Text>}
+            </View>
+          )}
+
+          {/* Alert badge if any active alerts */}
+          {busAlerts.length > 0 && (
+            <TouchableOpacity onPress={() => setTab("alertes")}
+              style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: "#FEE2E2", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 8, borderLeftWidth: 4, borderLeftColor: "#DC2626" }}>
+              <Ionicons name="warning" size={18} color="#DC2626" />
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626", flex: 1 }}>🚨 {busAlerts.length} alerte(s) — Réponse requise</Text>
+              <Ionicons name="chevron-forward" size={16} color="#DC2626" />
+            </TouchableOpacity>
+          )}
+
           {/* Tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
-              {(["trajet", "passagers", "arrets", "contacts"] as const).map(t => (
+              {(["alertes", "trajet", "passagers", "arrets", "contacts"] as const).map(t => (
                 <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
                   <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                    {t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : t === "arrets" ? "🗺 Arrêts" : "📞 Contacts"}
+                    {t === "alertes" ? `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}` : t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : t === "arrets" ? "🗺 Arrêts" : "📞 Contacts"}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -353,6 +409,81 @@ export default function RouteScreen() {
           </ScrollView>
 
           <ScrollView contentContainerStyle={S.body} showsVerticalScrollIndicator={false}>
+
+            {/* ── TAB: ALERTES ── */}
+            {tab === "alertes" && (
+              <View style={{ gap: 14 }}>
+                <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
+                {busAlerts.length === 0 && (
+                  <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 28, alignItems: "center", gap: 8 }}>
+                    <Ionicons name="checkmark-circle" size={36} color="#4ADE80" />
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#166534" }}>Tout va bien !</Text>
+                    <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>Aucune alerte active pour votre bus.</Text>
+                  </View>
+                )}
+                {busAlerts.map(alert => {
+                  const hasResponse = !!alert.response;
+                  const isActing    = alertActing === alert.id;
+                  const RESP = [
+                    { id: "panne"   as const, label: "🔧 Panne mécanique", color: "#DC2626", bg: "#FEE2E2" },
+                    { id: "controle"as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
+                    { id: "pause"   as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
+                  ];
+                  const responseOpt = RESP.find(r => r.id === alert.response);
+                  return (
+                    <View key={alert.id} style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12, borderLeftWidth: 4, borderLeftColor: "#DC2626", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Ionicons name="warning" size={20} color="#DC2626" />
+                        <Text style={{ flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" }}>{alert.message}</Text>
+                        <Text style={{ fontSize: 10, color: "#94A3B8" }}>
+                          {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                      </View>
+
+                      {/* Request indicator */}
+                      {alert.responseRequested && !hasResponse && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10 }}>
+                          <Ionicons name="mail-open-outline" size={16} color="#D97706" />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#D97706", flex: 1 }}>
+                            📨 L'agent suivi demande votre réponse !
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Response sent */}
+                      {hasResponse && responseOpt && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: responseOpt.bg, borderRadius: 10, padding: 10 }}>
+                          <Ionicons name="checkmark-circle" size={16} color={responseOpt.color} />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: responseOpt.color }}>
+                            ✅ Réponse envoyée : {responseOpt.label}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Response buttons */}
+                      {!hasResponse && (
+                        <>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>Quelle est la situation ?</Text>
+                          <View style={{ gap: 8 }}>
+                            {RESP.map(opt => (
+                              <TouchableOpacity key={opt.id}
+                                style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: opt.bg, borderRadius: 10, padding: 14, borderWidth: 1.5, borderColor: opt.color + "50" }}
+                                onPress={() => respondToAlert(alert.id, opt.id)}
+                                disabled={isActing}
+                              >
+                                {isActing ? <ActivityIndicator size="small" color={opt.color} /> : <Ionicons name="radio-button-on" size={18} color={opt.color} />}
+                                <Text style={{ fontSize: 14, fontWeight: "700", color: opt.color }}>{opt.label}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
             {tab === "trajet" && activeTrip && (
               <>
                 {/* GPS status */}

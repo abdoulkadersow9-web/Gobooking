@@ -53,7 +53,8 @@ interface AlertItem {
   id: string; type: string; busId?: string; busName?: string;
   agentId: string; agentName?: string;
   message: string; status: string;
-  response?: string | null; respondedAt?: string | null; createdAt: string;
+  response?: string | null; respondedAt?: string | null;
+  responseRequested?: boolean; createdAt: string;
 }
 interface Overview { buses: BusItem[]; trips: TripItem[]; alerts: AlertItem[] }
 
@@ -66,8 +67,6 @@ export default function SuiviScreen() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [triggerBus,  setTriggerBus]  = useState<BusItem | null>(null);
-  const [respondAlert,setRespondAlert]= useState<AlertItem | null>(null);
-  const [respondSel,  setRespondSel]  = useState<string>("");
   const [acting,      setActing]      = useState(false);
 
   /* Alarm pulse animation */
@@ -127,23 +126,17 @@ export default function SuiviScreen() {
     setActing(false);
   };
 
-  /* ── Respond to alert ── */
-  const doRespond = async () => {
-    if (!respondAlert || !respondSel) return;
+  /* ── Demander réponse à l'agent en route ── */
+  const demanderReponse = async (alertId: string) => {
     setActing(true);
     try {
-      const res = await fetch(`${BASE_URL}/agent/suivi/alerts/${respondAlert.id}/respond`, {
+      await fetch(`${BASE_URL}/agent/suivi/alerts/${alertId}/demander-reponse`, {
         method: "POST",
         headers: { ...authHeader(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ response: respondSel }),
       });
-      if (res.ok) {
-        Alert.alert("✅ Réponse envoyée", "L'Agent Suivi peut maintenant confirmer.");
-        setRespondAlert(null);
-        setRespondSel("");
-        await load(true);
-      }
-    } catch {}
+      Alert.alert("📨 Demande envoyée", "L'agent en route va être notifié et devra répondre.");
+      await load(true);
+    } catch { Alert.alert("Erreur", "Problème réseau."); }
     setActing(false);
   };
 
@@ -233,8 +226,9 @@ export default function SuiviScreen() {
               </View>
             )}
             {data?.alerts?.map(alert => {
-              const hasResponse = !!alert.response;
-              const responseOpt = RESPONSE_OPTIONS.find(r => r.id === alert.response);
+              const hasResponse   = !!alert.response;
+              const reqRequested  = !!alert.responseRequested;
+              const responseOpt   = RESPONSE_OPTIONS.find(r => r.id === alert.response);
               return (
                 <View key={alert.id} style={S.alertCard}>
                   {/* Top row */}
@@ -254,30 +248,37 @@ export default function SuiviScreen() {
                   <Text style={S.alertMsg}>{alert.message}</Text>
                   <Text style={S.alertAgent}>Par {alert.agentName ?? alert.agentId}</Text>
 
-                  {/* Response */}
+                  {/* State indicators */}
                   {hasResponse && responseOpt && (
                     <View style={[S.responsePill, { backgroundColor: responseOpt.bg }]}>
                       <Text style={[S.responseTxt, { color: responseOpt.color }]}>
-                        Réponse : {responseOpt.label}
+                        ✅ Réponse agent route : {responseOpt.label}
                       </Text>
                     </View>
                   )}
-                  {!hasResponse && (
+                  {!hasResponse && reqRequested && (
                     <View style={S.waitPill}>
                       <ActivityIndicator size="small" color="#D97706" />
-                      <Text style={S.waitTxt}>En attente de réponse du bus...</Text>
+                      <Text style={S.waitTxt}>⏳ En attente de réponse — agent en route notifié</Text>
+                    </View>
+                  )}
+                  {!hasResponse && !reqRequested && (
+                    <View style={[S.waitPill, { backgroundColor: "#FFF1F2", borderColor: "#FECDD3" }]}>
+                      <Ionicons name="alert-circle-outline" size={14} color={RED} />
+                      <Text style={[S.waitTxt, { color: RED }]}>🚨 Aucune réponse — action requise</Text>
                     </View>
                   )}
 
                   {/* Actions */}
                   <View style={S.alertActions}>
-                    {!hasResponse && (
+                    {!hasResponse && !reqRequested && (
                       <TouchableOpacity
                         style={[S.alertBtn, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}
-                        onPress={() => { setRespondAlert(alert); setRespondSel(""); }}
+                        onPress={() => demanderReponse(alert.id)}
+                        disabled={acting}
                       >
-                        <Ionicons name="chatbubble-outline" size={14} color="#D97706" />
-                        <Text style={[S.alertBtnTxt, { color: "#D97706" }]}>Répondre</Text>
+                        <Ionicons name="send-outline" size={14} color="#D97706" />
+                        <Text style={[S.alertBtnTxt, { color: "#D97706" }]}>Demander réponse</Text>
                       </TouchableOpacity>
                     )}
                     {hasResponse && (
@@ -379,42 +380,6 @@ export default function SuiviScreen() {
         </View>
       </Modal>
 
-      {/* ── Respond Modal ── */}
-      <Modal visible={!!respondAlert} transparent animationType="slide">
-        <View style={S.modalBg}>
-          <View style={S.modalBox}>
-            <Text style={S.modalTitle}>💬 Répondre à l'alerte</Text>
-            <Text style={S.modalSub}>{respondAlert?.message}</Text>
-            <Text style={S.modalLabel}>Situation à bord :</Text>
-            {RESPONSE_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.id}
-                style={[S.responseOption, respondSel === opt.id && { borderColor: opt.color, backgroundColor: opt.bg }]}
-                onPress={() => setRespondSel(opt.id)}
-              >
-                <Text style={[S.responseOptionTxt, respondSel === opt.id && { color: opt.color, fontWeight: "800" }]}>
-                  {opt.label}
-                </Text>
-                {respondSel === opt.id && <Ionicons name="checkmark-circle" size={18} color={opt.color} />}
-              </TouchableOpacity>
-            ))}
-            <View style={S.modalActions}>
-              <TouchableOpacity style={[S.modalBtn, { backgroundColor: "#F1F5F9" }]}
-                onPress={() => { setRespondAlert(null); setRespondSel(""); }}>
-                <Text style={{ fontWeight: "700", color: "#475569" }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[S.modalBtn, { backgroundColor: respondSel ? "#166534" : "#E2E8F0" }]}
-                onPress={doRespond}
-                disabled={!respondSel || acting}
-              >
-                {acting ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ fontWeight: "700", color: respondSel ? "#fff" : "#94A3B8" }}>Envoyer réponse</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

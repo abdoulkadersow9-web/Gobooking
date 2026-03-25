@@ -30,3 +30,4 @@ export * from "./colis_logs";
 export * from "./reviews";
 export * from "./fuel_logs";
 export * from "./trip_expenses";
+export * from "./departures";

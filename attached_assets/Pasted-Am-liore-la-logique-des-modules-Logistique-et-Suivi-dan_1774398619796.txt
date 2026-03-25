@@ -1,0 +1,171 @@
+Améliore la logique des modules Logistique et Suivi dans mon application GoBooking pour gérer correctement les bus, les agents en route et les alertes.
+
+-----------------------------------
+1. RÔLE AGENT LOGISTIQUE (RESPONSABLE BUS)
+-----------------------------------
+
+Objectif :
+- L’agent logistique doit gérer l’état des bus et les programmations
+
+À FAIRE :
+
+Créer dans module Logistique :
+
+1. Gestion des bus :
+- Ajouter / modifier :
+  - statut bus :
+    - En attente
+    - Programmé
+    - En route
+    - Arrivé
+    - En panne
+
+2. Programmation des départs :
+Quand un départ est créé :
+- associer :
+  - busId
+  - chauffeurNom
+  - agentRouteNom (IMPORTANT)
+
+3. L’agent logistique peut :
+- modifier état bus
+- programmer départ
+- voir anomalies
+
+-----------------------------------
+2. STRUCTURE DÉPART (TRÈS IMPORTANT)
+-----------------------------------
+
+Créer / corriger structure :
+
+departure = {
+  id,
+  busId,
+  villeDepart,
+  villeArrivee,
+  heureDepart,
+  chauffeurNom,
+  agentRouteNom,
+  statut: "programmé" | "en route" | "terminé"
+}
+
+-----------------------------------
+3. RÔLE AGENT EN ROUTE (NOUVEAU)
+-----------------------------------
+
+Créer rôle :
+"agent_route"
+
+Objectif :
+- C’est l’agent dans le car
+- Il répond aux alertes
+
+Fonctions :
+- voir son trajet
+- répondre aux alertes
+
+-----------------------------------
+4. SYSTÈME ALERTE AUTOMATIQUE
+-----------------------------------
+
+Créer logique :
+
+Si :
+- bus en route
+- ET aucune activité pendant X minutes
+OU
+- bus change statut anormal
+
+ALORS :
+👉 créer alerte automatique
+
+alert = {
+  id,
+  busId,
+  departureId,
+  status: "active",
+  createdAt,
+  response: null
+}
+
+-----------------------------------
+5. FLUX COMPLET ALERTE (IMPORTANT)
+
+Étape 1 :
+- alerte déclenchée automatiquement
+
+Étape 2 :
+- Agent Suivi voit :
+  "Bus BUS-001 en arrêt anormal"
+
+Étape 3 :
+- Agent Suivi demande réponse
+
+Étape 4 :
+- Agent en route reçoit demande
+
+Il doit répondre :
+- "panne"
+- "contrôle"
+- "pause"
+
+-----------------------------------
+6. RÉPONSE AGENT EN ROUTE
+
+Quand il répond :
+
+alert.response = "panne" (ou autre)
+alert.respondedAt = now
+
+-----------------------------------
+7. CONFIRMATION AGENT SUIVI
+
+Agent Suivi voit réponse
+
+Bouton :
+👉 "Confirmer alerte"
+
+Résultat :
+- alert.status = "resolue"
+- alarme s’arrête
+
+-----------------------------------
+8. INTERFACE À AJOUTER
+
+MODULE LOGISTIQUE :
+- bouton "Programmer départ"
+- bouton "Changer état bus"
+
+MODULE SUIVI :
+- liste alertes actives
+- bouton "Demander réponse"
+- bouton "Confirmer"
+
+MODULE AGENT ROUTE :
+- voir trajet assigné
+- voir alerte
+- boutons réponse :
+  - panne
+  - contrôle
+  - pause
+
+-----------------------------------
+9. CONTRAINTES
+
+- Ne pas casser les modules existants
+- Relier correctement :
+  bus → departure → agent_route
+- Chaque alerte doit être liée à un bus ET un départ
+
+-----------------------------------
+À LA FIN
+
+- expliquer le flux complet :
+  logistique → départ → agent_route → alerte → suivi → confirmation
+- expliquer comment tester :
+  1. créer départ
+  2. assigner agent route
+  3. simuler arrêt
+  4. voir alerte
+  5. répondre
+  6. confirmer
