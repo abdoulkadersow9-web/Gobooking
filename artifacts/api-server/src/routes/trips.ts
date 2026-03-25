@@ -4,6 +4,7 @@ import { eq, and, ilike, inArray, desc, sql } from "drizzle-orm";
 import { locationStore, pruneStale } from "../locationStore";
 import { requestStore, newRequestId } from "../requestStore";
 import { tokenStore } from "./auth";
+import { PRICE_GRID, ALL_CITIES, getTicketPrice } from "../lib/priceGrid";
 
 /* Convert mapX%/mapY% back to approximate real-world lat/lon for demo buses.
    Bounding box: lat 4.3–10.7N, lon 8.4W–3.2W */
@@ -31,6 +32,20 @@ function getLiveCache(key: string): unknown[] | null {
 function setLiveCache(key: string, data: unknown[], ttlMs = 30_000) {
   liveCache.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
+
+/* ── GET /trips/price-grid — grille tarifaire publique ────────────────────────
+   ?from=Abidjan&to=Bouaké  →  { price: 3500 }
+   (sans paramètres)         →  { grid: PRICE_GRID, cities: ALL_CITIES }
+──────────────────────────────────────────────────────────────────────────── */
+router.get("/price-grid", (req, res) => {
+  const { from, to } = req.query as { from?: string; to?: string };
+  if (from && to) {
+    const price = getTicketPrice(from, to);
+    res.json({ from, to, price });
+    return;
+  }
+  res.json({ grid: PRICE_GRID, cities: ALL_CITIES });
+});
 
 router.get("/search", async (req, res) => {
   try {
@@ -308,10 +323,10 @@ router.get("/live", async (req, res) => {
     const hhmm = (h: number, m: number) => `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
     /* Build demo entries — compute real lat/lon from mapX/mapY */
     const demoRaw = [
-      { id:"live-1", companyName:"SOTRAL",   busName:"SOTRAL Express 04", busType:"Premium",  fromCity:"Abidjan",  toCity:"Bouaké",      currentCity:"Yamoussoukro", mapX:72, mapY:70, availableSeats:12, totalSeats:59, departureTime:hhmm(now.getHours()-3,15), estimatedArrival:hhmm(now.getHours()+2,30), agentPhone:"+22507123456", agentName:"Kouassi Rémi",    price:3500, color:"#1A56DB", boardingPoints:["Abidjan (Gare Adjamé)","Divo","Yamoussoukro","Bouaké"],                          speed:87 },
-      { id:"live-2", companyName:"UTB",      busName:"UTB Comfort 12",    busType:"Standard", fromCity:"Abidjan",  toCity:"Yamoussoukro",currentCity:"Agboville",     mapX:78, mapY:76, availableSeats:5,  totalSeats:49, departureTime:hhmm(now.getHours()-1,45), estimatedArrival:hhmm(now.getHours()+1, 0), agentPhone:"+22505987654", agentName:"Diomandé Salif", price:2000, color:"#059669", boardingPoints:["Abidjan (Gare Bassam)","Agboville","Tiébissou","Yamoussoukro"],          speed:72 },
-      { id:"live-3", companyName:"TSR",      busName:"TSR Rapide 07",     busType:"VIP",      fromCity:"Bouaké",   toCity:"Korhogo",     currentCity:"Katiola",      mapX:59, mapY:33, availableSeats:18, totalSeats:63, departureTime:hhmm(now.getHours()-2, 0), estimatedArrival:hhmm(now.getHours()+3,45), agentPhone:"+22501567890", agentName:"Traoré Moussa",  price:2500, color:"#7C3AED", boardingPoints:["Bouaké (Gare Nord)","Katiola","Niakaramandougou","Korhogo"],          speed:95 },
-      { id:"live-4", companyName:"SOTRA CI", busName:"SOTRA 501",         busType:"Standard", fromCity:"Abidjan",  toCity:"San-Pédro",   currentCity:"Lakota",       mapX:48, mapY:83, availableSeats:23, totalSeats:59, departureTime:hhmm(now.getHours()-4, 0), estimatedArrival:hhmm(now.getHours()+1,20), agentPhone:"+22507456789", agentName:"Aka Jean-Marie", price:3000, color:"#D97706", boardingPoints:["Abidjan (Gare Yopougon)","Gagnoa","Lakota","Soubré","San-Pédro"],       speed:68 },
+      { id:"live-1", companyName:"SOTRAL",   busName:"SOTRAL Express 04", busType:"Premium",  fromCity:"Abidjan",  toCity:"Bouaké",      currentCity:"Yamoussoukro", mapX:72, mapY:70, availableSeats:12, totalSeats:59, departureTime:hhmm(now.getHours()-3,15), estimatedArrival:hhmm(now.getHours()+2,30), agentPhone:"+22507123456", agentName:"Kouassi Rémi",    price:4500, color:"#1A56DB", boardingPoints:["Abidjan (Gare Adjamé)","Divo","Yamoussoukro","Bouaké"],                          speed:87 },
+      { id:"live-2", companyName:"UTB",      busName:"UTB Comfort 12",    busType:"Standard", fromCity:"Abidjan",  toCity:"Yamoussoukro",currentCity:"Agboville",     mapX:78, mapY:76, availableSeats:5,  totalSeats:49, departureTime:hhmm(now.getHours()-1,45), estimatedArrival:hhmm(now.getHours()+1, 0), agentPhone:"+22505987654", agentName:"Diomandé Salif", price:2500, color:"#059669", boardingPoints:["Abidjan (Gare Bassam)","Agboville","Tiébissou","Yamoussoukro"],          speed:72 },
+      { id:"live-3", companyName:"TSR",      busName:"TSR Rapide 07",     busType:"VIP",      fromCity:"Bouaké",   toCity:"Korhogo",     currentCity:"Katiola",      mapX:59, mapY:33, availableSeats:18, totalSeats:63, departureTime:hhmm(now.getHours()-2, 0), estimatedArrival:hhmm(now.getHours()+3,45), agentPhone:"+22501567890", agentName:"Traoré Moussa",  price:4500, color:"#7C3AED", boardingPoints:["Bouaké (Gare Nord)","Katiola","Niakaramandougou","Korhogo"],          speed:95 },
+      { id:"live-4", companyName:"SOTRA CI", busName:"SOTRA 501",         busType:"Standard", fromCity:"Abidjan",  toCity:"San-Pédro",   currentCity:"Lakota",       mapX:48, mapY:83, availableSeats:23, totalSeats:59, departureTime:hhmm(now.getHours()-4, 0), estimatedArrival:hhmm(now.getHours()+1,20), agentPhone:"+22507456789", agentName:"Aka Jean-Marie", price:3500, color:"#D97706", boardingPoints:["Abidjan (Gare Yopougon)","Gagnoa","Lakota","Soubré","San-Pédro"],       speed:68 },
       { id:"live-5", companyName:"CTM",      busName:"CTM Man 03",        busType:"Premium",  fromCity:"Man",      toCity:"Abidjan",     currentCity:"Daloa",        mapX:38, mapY:60, availableSeats:8,  totalSeats:49, departureTime:hhmm(now.getHours()-5,30), estimatedArrival:hhmm(now.getHours()+4, 0), agentPhone:"+22505234567", agentName:"Bamba Sékou",    price:5500, color:"#DC2626", boardingPoints:["Man (Gare centrale)","Danané","Daloa","Divo","Abidjan (Adjamé)"],        speed:80 },
     ];
 

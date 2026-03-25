@@ -1,0 +1,119 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Ne pas modifier la logique existante.
+
+Adapter uniquement le système de tarification pour qu’il corresponde au fonctionnement réel basé sur les grilles tarifaires.
+
+---
+
+1. PROBLÈME ACTUEL
+
+Actuellement :
+
+- le prix semble dépendre des places ou d’une logique incorrecte
+- ce n’est pas conforme au fonctionnement réel du transport
+
+---
+
+2. LOGIQUE RÉELLE À RESPECTER
+
+Le prix doit être basé uniquement sur :
+
+👉 les villes (ville de départ → ville d’arrivée)
+
+Et non sur :
+- le nombre de places
+- ni une logique dynamique incorrecte
+
+---
+
+3. GRILLE TARIFAIRE (TRÈS IMPORTANT)
+
+Mettre en place une grille tarifaire :
+
+Exemple :
+
+- Abidjan → Yamoussoukro = 2000 F
+- Abidjan → Bouaké = 2500 F
+- Bouaké → Korhogo = 3000 F
+
+Chaque trajet a un prix fixe.
+
+---
+
+4. APPLICATION DE LA LOGIQUE
+
+Quand un client réserve :
+
+- sélectionner ville de départ
+- sélectionner ville d’arrivée
+
+👉 le système doit automatiquement récupérer le prix correspondant dans la grille
+
+---
+
+5. NOMBRE DE PLACES
+
+Le nombre de places :
+
+- ne doit pas changer le prix unitaire
+- seulement calculer le total
+
+Exemple :
+
+prix trajet = 2500 F  
+places = 2  
+
+👉 total = 2500 x 2 = 5000 F
+
+---
+
+6. INTÉGRATION SANS CASSER
+
+- ne pas supprimer les champs existants
+- ne pas modifier la structure actuelle
+- adapter seulement la source du prix
+
+Si un champ "prix" existe déjà :
+
+👉 le remplacer par le prix venant de la grille tarifaire
+
+---
+
+7. DONNÉES EXISTANTES
+
+- garder les anciens trajets
+- adapter leur prix selon la grille si nécessaire
+- ne pas perdre les données
+
+---
+
+8. INTERFACE
+
+Dans :
+
+- réservation client
+- agent guichet
+- agent route
+
+👉 afficher le prix basé sur la ville sélectionnée
+
+---
+
+9. OBJECTIF FINAL
+
+Avoir un système conforme au terrain :
+
+- prix basé sur ville → ville
+- grille tarifaire respectée
+- calcul automatique du total selon les places
+- aucune incohérence
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien modifier dans la logique existante.
+Adapter uniquement le calcul du prix pour utiliser une grille tarifaire basée sur les villes.

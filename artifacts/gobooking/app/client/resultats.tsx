@@ -43,10 +43,12 @@ interface Trip {
 
 const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man", "Divo"];
 
+/* Prix de référence grille tarifaire GoBooking — Abidjan→Bouaké = 3 500 FCFA
+   (bus Standard) / 4 500 FCFA (Premium = +28 %) */
 const FALLBACK_TRIPS: Trip[] = [
   { id: "fb-1", from: "Abidjan", to: "Bouaké", departureTime: "06:00", arrivalTime: "11:30", date: "", price: 3500, busType: "Standard", busName: "UTB Express", totalSeats: 44, availableSeats: 32, duration: "5h 30m", amenities: ["AC", "WiFi"], isFallback: true },
-  { id: "fb-2", from: "Abidjan", to: "Bouaké", departureTime: "07:30", arrivalTime: "13:00", date: "", price: 5000, busType: "Premium", busName: "STC Premium", totalSeats: 40, availableSeats: 27, duration: "5h 30m", amenities: ["AC", "WiFi", "Snacks"], isFallback: true },
-  { id: "fb-3", from: "Abidjan", to: "Bouaké", departureTime: "12:00", arrivalTime: "17:30", date: "", price: 4000, busType: "Standard", busName: "Sotra Voyages", totalSeats: 44, availableSeats: 18, duration: "5h 30m", amenities: ["AC"], isFallback: true },
+  { id: "fb-2", from: "Abidjan", to: "Bouaké", departureTime: "07:30", arrivalTime: "13:00", date: "", price: 4500, busType: "Premium", busName: "STC Premium", totalSeats: 40, availableSeats: 27, duration: "5h 30m", amenities: ["AC", "WiFi", "Snacks"], isFallback: true },
+  { id: "fb-3", from: "Abidjan", to: "Bouaké", departureTime: "12:00", arrivalTime: "17:30", date: "", price: 3500, busType: "Standard", busName: "Sotra Voyages", totalSeats: 44, availableSeats: 18, duration: "5h 30m", amenities: ["AC"], isFallback: true },
 ];
 
 export default function ResultatsScreen() {

@@ -66,6 +66,20 @@ export function useTrips() {
   });
 }
 
+export function useBuses() {
+  return useQuery({
+    queryKey: ["buses"],
+    queryFn: () => apiFetch<any[]>("/company/buses"),
+  });
+}
+
+export function usePriceGrid() {
+  return useQuery({
+    queryKey: ["price-grid"],
+    queryFn: () => apiFetch<{ grid: Record<string, Record<string, number>>; cities: string[] }>("/trips/price-grid"),
+  });
+}
+
 export function useCreateTrip() {
   const queryClient = useQueryClient();
   return useMutation({
