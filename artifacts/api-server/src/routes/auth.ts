@@ -8,10 +8,10 @@ import { recordReferral } from "./growth";
 
 const router: IRouter = Router();
 
-/* ── Rate limiter: max 10 login attempts / 15 min per IP ──────── */
+/* ── Rate limiter: max 100 login attempts / 15 min per IP ──────── */
 const loginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Trop de tentatives de connexion. Réessayez dans 15 minutes." },
