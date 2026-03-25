@@ -589,65 +589,88 @@ export default function RouteScreen() {
 
           {/* ── Carte trajet actif ── */}
           {activeTrip && (
-            <View style={S.tripCard}>
-              {/* Route */}
-              <View style={S.tripRouteRow}>
-                <View style={{ alignItems: "center" }}>
-                  <Text style={S.tripCityLabel}>Départ</Text>
-                  <Text style={S.tripCity}>{activeTrip.from}</Text>
-                  <Text style={S.tripTime}>{activeTrip.departureTime}</Text>
-                </View>
-                <View style={S.tripArrow}>
-                  <View style={S.arrowLine} />
-                  <View style={S.busBadge}>
-                    <Ionicons name="bus" size={18} color="#fff" />
-                  </View>
-                  <View style={S.arrowLine} />
-                </View>
-                <View style={{ alignItems: "center" }}>
-                  <Text style={S.tripCityLabel}>Arrivée</Text>
-                  <Text style={S.tripCity}>{activeTrip.to}</Text>
-                  <Text style={S.tripTime}>{activeTrip.arrivalTime ?? "?"}</Text>
-                </View>
-              </View>
+            <>
+              <View style={S.tripCard}>
 
-              {/* Bus info + passagers */}
-              <View style={S.tripInfoRow}>
-                <View style={S.tripInfoPill}>
-                  <Feather name="truck" size={12} color="#475569" />
-                  <Text style={S.tripInfoTxt}>{activeTrip.busName}</Text>
+                {/* ─ Route principale ─ */}
+                <View style={S.tripRouteRow}>
+                  <View style={{ flex: 1, alignItems: "flex-start" }}>
+                    <Text style={S.tripCityLabel}>DÉPART</Text>
+                    <Text style={S.tripCity} numberOfLines={1}>{activeTrip.from}</Text>
+                    <View style={S.tripTimePill}>
+                      <Ionicons name="time-outline" size={12} color={G} />
+                      <Text style={S.tripTime}>{activeTrip.departureTime}</Text>
+                    </View>
+                  </View>
+
+                  <View style={S.tripArrowBlock}>
+                    <View style={S.arrowLine} />
+                    <View style={S.busBadge}>
+                      <Ionicons name="bus" size={20} color="#fff" />
+                    </View>
+                    <View style={S.arrowLine} />
+                  </View>
+
+                  <View style={{ flex: 1, alignItems: "flex-end" }}>
+                    <Text style={S.tripCityLabel}>ARRIVÉE</Text>
+                    <Text style={S.tripCity} numberOfLines={1}>{activeTrip.to}</Text>
+                    <View style={[S.tripTimePill, { alignSelf: "flex-end" }]}>
+                      <Ionicons name="flag-outline" size={12} color="#7C3AED" />
+                      <Text style={[S.tripTime, { color: "#7C3AED" }]}>{activeTrip.arrivalTime ?? "?"}</Text>
+                    </View>
+                  </View>
                 </View>
+
+                {/* ─ Séparateur ─ */}
+                <View style={S.cardDivider} />
+
+                {/* ─ Info bus + places + vitesse ─ */}
+                <View style={S.tripInfoRow}>
+                  <View style={S.tripInfoPill}>
+                    <Feather name="truck" size={13} color="#475569" />
+                    <Text style={S.tripInfoTxt}>{activeTrip.busName}</Text>
+                  </View>
+                  {activeTrip.passengers != null && activeTrip.totalSeats != null && (
+                    <View style={[S.tripInfoPill, { backgroundColor: "#DCFCE7" }]}>
+                      <Ionicons name="people-outline" size={14} color={G} />
+                      <Text style={[S.tripInfoTxt, { color: G_DARK, fontWeight: "700" }]}>
+                        {activeTrip.passengers} / {activeTrip.totalSeats} places
+                      </Text>
+                    </View>
+                  )}
+                  {activeTrip.speed != null && activeTrip.speed > 0 && (
+                    <View style={[S.tripInfoPill, { backgroundColor: "#FEF3C7" }]}>
+                      <Feather name="zap" size={13} color={AMBER} />
+                      <Text style={[S.tripInfoTxt, { color: AMBER, fontWeight: "700" }]}>{Math.round(activeTrip.speed)} km/h</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* ─ Barre d'occupation avec taux ─ */}
                 {activeTrip.passengers != null && activeTrip.totalSeats != null && (
-                  <View style={[S.tripInfoPill, { backgroundColor: "#DCFCE7" }]}>
-                    <Ionicons name="people-outline" size={13} color={G} />
-                    <Text style={[S.tripInfoTxt, { color: G_DARK, fontWeight: "700" }]}>
-                      {activeTrip.passengers} / {activeTrip.totalSeats} places
-                    </Text>
-                  </View>
-                )}
-                {activeTrip.speed != null && activeTrip.speed > 0 && (
-                  <View style={[S.tripInfoPill, { backgroundColor: "#FEF3C7" }]}>
-                    <Feather name="zap" size={12} color={AMBER} />
-                    <Text style={[S.tripInfoTxt, { color: AMBER, fontWeight: "700" }]}>{Math.round(activeTrip.speed)} km/h</Text>
+                  <View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 5 }}>
+                      <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600" }}>Taux d'occupation</Text>
+                      <Text style={{ fontSize: 11, color: G_DARK, fontWeight: "800" }}>
+                        {Math.min(100, Math.round((activeTrip.passengers / activeTrip.totalSeats) * 100))}%
+                      </Text>
+                    </View>
+                    <View style={S.occBar}>
+                      <View style={[S.occFill, {
+                        width: `${Math.min(100, Math.round((activeTrip.passengers / activeTrip.totalSeats) * 100))}%` as any,
+                      }]} />
+                    </View>
                   </View>
                 )}
               </View>
 
-              {/* Barre d'occupation */}
-              {activeTrip.passengers != null && activeTrip.totalSeats != null && (
-                <View style={{ marginTop: 10 }}>
-                  <View style={S.occBar}>
-                    <View style={[S.occFill, {
-                      width: `${Math.min(100, Math.round((activeTrip.passengers / activeTrip.totalSeats) * 100))}%` as any,
-                    }]} />
-                  </View>
-                </View>
-              )}
-
-              {/* Bande GPS — toujours visible */}
-              <View style={[S.gpsStrip, { borderColor: gps.active ? "#A7F3D0" : "#E2E8F0", backgroundColor: gps.active ? "#F0FDF4" : "#F8FAFC" }]}>
+              {/* ─ Bande GPS — hors carte pour aérer ─ */}
+              <View style={[S.gpsStrip, {
+                borderColor: gps.active ? "#A7F3D0" : "#E2E8F0",
+                backgroundColor: gps.active ? "#F0FDF4" : "#F8FAFC",
+              }]}>
                 <View style={[S.gpsPulse, { backgroundColor: gpsColor }]} />
-                <Ionicons name="navigate" size={15} color={gps.active ? G : "#94A3B8"} />
+                <Ionicons name="navigate" size={14} color={gps.active ? G : "#94A3B8"} />
                 <Text style={[S.gpsStripTxt, { color: gps.active ? G_DARK : "#64748B" }]}>
                   {gps.active
                     ? (gps.lat && gps.lon
@@ -661,16 +684,17 @@ export default function RouteScreen() {
                   </View>
                 )}
               </View>
-            </View>
+            </>
           )}
 
           {/* ── Alertes actives (bannière rapide) ── */}
           {allAlerts.length > 0 && (
-            <TouchableOpacity onPress={() => setTab("alertes")}
-              style={S.alertBanner}>
-              <Ionicons name="warning" size={16} color="#DC2626" />
-              <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626", flex: 1 }}>
-                🚨 {allAlerts.length} alerte(s) active(s) — Appuyez pour répondre
+            <TouchableOpacity onPress={() => setTab("alertes")} style={S.alertBanner}>
+              <View style={S.alertBannerIcon}>
+                <Ionicons name="warning" size={16} color="#DC2626" />
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#7F1D1D", flex: 1, lineHeight: 18 }}>
+                {allAlerts.length} alerte{allAlerts.length > 1 ? "s" : ""} active{allAlerts.length > 1 ? "s" : ""} — Appuyez pour répondre
               </Text>
               <Ionicons name="chevron-forward" size={15} color="#DC2626" />
             </TouchableOpacity>
@@ -1454,62 +1478,72 @@ const S = StyleSheet.create({
   chipTextActive: { color: "#fff" },
 
   /* Trip card */
-  tripCard:     { marginHorizontal: 16, marginTop: 12, marginBottom: 8, backgroundColor: "#fff",
-                  borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.07,
-                  shadowRadius: 10, elevation: 4, gap: 12 },
+  tripCard:     { marginHorizontal: 16, marginTop: 12, marginBottom: 0, backgroundColor: "#fff",
+                  borderRadius: 18, padding: 18, shadowColor: "#000", shadowOpacity: 0.08,
+                  shadowRadius: 14, elevation: 5, gap: 14 },
   tripRouteRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  tripCityLabel:{ fontSize: 10, color: "#94A3B8", fontWeight: "600", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 },
-  tripCity:     { fontSize: 20, fontWeight: "800", color: "#0F172A" },
-  tripTime:     { fontSize: 13, color: "#059669", fontWeight: "700", marginTop: 3 },
-  tripArrow:    { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
+  tripCityLabel:{ fontSize: 10, color: "#94A3B8", fontWeight: "700", marginBottom: 4,
+                  textTransform: "uppercase", letterSpacing: 0.8 },
+  tripCity:     { fontSize: 22, fontWeight: "800", color: "#0F172A", letterSpacing: -0.3 },
+  tripTimePill: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5,
+                  backgroundColor: "#F0FDF4", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+                  alignSelf: "flex-start" },
+  tripTime:     { fontSize: 13, color: G, fontWeight: "700" },
+  tripArrowBlock:{ width: 64, flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
   arrowLine:    { flex: 1, height: 2, backgroundColor: "#D1FAE5" },
-  busBadge:     { backgroundColor: G, borderRadius: 18, width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  busBadge:     { backgroundColor: G, borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center",
+                  shadowColor: G, shadowOpacity: 0.35, shadowRadius: 6, elevation: 4 },
+  cardDivider:  { height: 1, backgroundColor: "#F1F5F9" },
   tripInfoRow:  { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  tripInfoPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F1F5F9",
-                  borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  tripInfoPill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9",
+                  borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
   tripInfoTxt:  { fontSize: 12, color: "#475569", fontWeight: "600" },
 
   /* Occupancy bar */
-  occBar:       { height: 6, backgroundColor: "#D1FAE5", borderRadius: 3, overflow: "hidden" },
-  occFill:      { height: 6, backgroundColor: G, borderRadius: 3 },
+  occBar:       { height: 7, backgroundColor: "#D1FAE5", borderRadius: 4, overflow: "hidden" },
+  occFill:      { height: 7, backgroundColor: G, borderRadius: 4 },
 
-  /* GPS strip (inside trip card) */
-  gpsStrip:     { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10,
-                  paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  /* GPS strip — maintenant HORS de la carte pour aérer */
+  gpsStrip:     { flexDirection: "row", alignItems: "center", gap: 7, borderRadius: 12,
+                  marginHorizontal: 16, marginTop: 8, marginBottom: 6,
+                  paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1 },
   gpsPulse:     { width: 8, height: 8, borderRadius: 4 },
   gpsStripTxt:  { fontSize: 12, fontWeight: "600", flex: 1 },
-  gpsLiveBadge: { backgroundColor: "#DCFCE7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  gpsLiveBadge: { backgroundColor: "#DCFCE7", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4 },
   gpsLiveTxt:   { fontSize: 10, fontWeight: "800", color: "#166534" },
 
   /* Alert banner */
-  alertBanner:  { marginHorizontal: 16, marginBottom: 8, backgroundColor: "#FEE2E2", borderRadius: 12,
-                  padding: 12, flexDirection: "row", alignItems: "center", gap: 8,
-                  borderLeftWidth: 4, borderLeftColor: "#DC2626" },
+  alertBanner:  { marginHorizontal: 16, marginBottom: 6, backgroundColor: "#FEF2F2", borderRadius: 12,
+                  paddingVertical: 10, paddingHorizontal: 12,
+                  flexDirection: "row", alignItems: "center", gap: 10,
+                  borderWidth: 1, borderColor: "#FECACA" },
+  alertBannerIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#FEE2E2",
+                     justifyContent: "center", alignItems: "center" },
 
   /* Tabs */
   tabsScroll:   { flexGrow: 0, borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },
   tabs:         { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  tabBtn:       { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22,
-                  backgroundColor: "#EEF2F7", borderWidth: 1.5, borderColor: "#D1D9E0" },
+  tabBtn:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 22,
+                  backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "#E2E8F0" },
   tabBtnActive: { backgroundColor: G_LIGHT, borderColor: G },
-  tabText:      { fontSize: 13, fontWeight: "700", color: "#1E293B" },
+  tabText:      { fontSize: 12, fontWeight: "700", color: "#475569" },
   tabTextActive:{ color: G_DARK, fontWeight: "800" },
 
   /* Body */
-  body:         { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 0 },
+  body:         { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 0 },
 
   /* Section title */
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 14 },
 
   /* Passenger list header */
   passengerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  countBadge:   { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
-                  flexDirection: "row", alignItems: "center", gap: 4 },
+  countBadge:   { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6,
+                  flexDirection: "row", alignItems: "center", gap: 5 },
   countBadgeTxt:{ fontSize: 12, fontWeight: "800", color: "#fff" },
 
   /* Passenger card */
-  passengerCard:{ backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 12,
-                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  passengerCard:{ backgroundColor: "#fff", borderRadius: 16, padding: 16, marginBottom: 14,
+                  shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   passengerAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
   passengerAvatarTxt: { fontSize: 19, fontWeight: "800", color: "#fff" },
   passengerName:{ fontSize: 15, fontWeight: "800", color: "#0F172A" },

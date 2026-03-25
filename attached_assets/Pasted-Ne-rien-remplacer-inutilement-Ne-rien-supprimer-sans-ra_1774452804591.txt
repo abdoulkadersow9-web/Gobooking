@@ -1,0 +1,152 @@
+Ne rien remplacer inutilement.
+Ne rien supprimer sans raison.
+Ne rien casser.
+Ne pas modifier la logique métier existante.
+
+Mais il faut corriger immédiatement un problème majeur d’interface : l’écran Agent en route est encombré et manque de lisibilité.
+
+---
+
+PROBLÈME CONSTATÉ (CAPTURE À L’APPUI) :
+
+En regardant l’écran Agent en route :
+
+- les informations sont mélangées
+- l’interface est chargée et encombrée
+- les éléments ne sont pas bien espacés
+- certaines informations importantes ne sont pas immédiatement visibles
+- les icônes ne sont pas bien mises en valeur
+- la lecture est difficile
+
+👉 On ne comprend pas rapidement l’information
+👉 L’expérience utilisateur n’est pas fluide
+
+---
+
+OBJECTIF :
+
+Réorganiser l’interface pour qu’elle soit :
+
+- claire
+- fluide
+- lisible
+- logique
+- professionnelle
+
+Sans casser le système existant.
+
+---
+
+1. ORGANISATION VISUELLE
+
+Structurer l’écran en blocs bien séparés :
+
+- Bloc 1 : Trajet (départ → arrivée, heure, bus, places)
+- Bloc 2 : GPS / statut en direct
+- Bloc 3 : Alertes (zone visible mais non envahissante)
+- Bloc 4 : Actions principales
+- Bloc 5 : Liste des passagers
+
+Chaque bloc doit être bien espacé.
+
+---
+
+2. ESPACEMENT (TRÈS IMPORTANT)
+
+- ajouter des marges entre les sections
+- éviter que les éléments se collent
+- aérer l’interface
+
+---
+
+3. HIÉRARCHIE VISUELLE
+
+Mettre en priorité :
+
+- trajet
+- statut en direct
+- alertes importantes
+
+Mettre en secondaire :
+
+- détails passagers
+- actions secondaires
+
+---
+
+4. ICÔNES
+
+- afficher correctement toutes les icônes
+- aligner les icônes avec les textes
+- éviter les icônes invisibles ou mal positionnées
+- utiliser les icônes pour améliorer la compréhension
+
+---
+
+5. LISTE DES PASSAGERS
+
+- rendre chaque passager lisible
+- bien séparer chaque carte
+- éviter l’effet bloc compact
+- rendre les boutons (appeler, statut) visibles
+
+---
+
+6. ALERTES
+
+- les alertes doivent être visibles mais bien intégrées
+- éviter qu’elles écrasent le reste de l’interface
+- garder un bon équilibre visuel
+
+---
+
+7. FLUIDITÉ
+
+L’utilisateur doit pouvoir :
+
+- comprendre l’écran en 2 secondes
+- voir les infos importantes immédiatement
+- naviguer sans confusion
+
+---
+
+8. ADAPTATION AU PROGRAMME
+
+Respecter la logique du programme :
+
+- agent en route doit voir clairement :
+  - son trajet
+  - ses passagers
+  - ses actions
+  - ses alertes
+
+---
+
+9. IMPORTANT
+
+- ne pas modifier la logique backend
+- ne pas casser les fonctionnalités existantes
+- ne pas supprimer des éléments utiles
+- améliorer uniquement l’organisation visuelle
+
+---
+
+10. OBJECTIF FINAL
+
+Un écran Agent en route :
+
+- propre
+- bien structuré
+- fluide
+- lisible
+- compréhensible immédiatement
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne pas modifier la logique.
+Réorganiser correctement l’interface.
+Rendre toutes les informations visibles, claires et fluides.
+Supprimer l’effet encombré et désorganisé.
