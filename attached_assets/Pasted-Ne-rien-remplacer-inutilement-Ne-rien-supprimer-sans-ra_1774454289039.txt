@@ -1,0 +1,149 @@
+Ne rien remplacer inutilement.
+Ne rien supprimer sans raison.
+Ne rien casser.
+Ne pas modifier la logique métier existante.
+
+Améliorer uniquement la navigation et l’ouverture des actions depuis les icônes dans l’écran Agent en route.
+
+---
+
+PROBLÈME CONSTATÉ (CAPTURE À L’APPUI) :
+
+- les icônes sont maintenant visibles (OK)
+- mais quand on clique sur une icône :
+  - le contenu s’affiche mal (en bas ou mal positionné)
+  - ce n’est pas une vraie page claire
+  - l’expérience n’est pas fluide
+
+👉 l’utilisateur ne comprend pas bien la navigation
+
+---
+
+OBJECTIF :
+
+Créer une navigation claire, fluide et professionnelle :
+
+👉 clic sur icône = ouverture d’un écran clair  
+👉 possibilité de revenir facilement au dashboard Agent en route  
+
+---
+
+1. COMPORTEMENT ATTENDU (TRÈS IMPORTANT)
+
+Quand on clique sur une icône :
+
+Exemples :
+
+- Scanner ticket → ouvre écran scan
+- Ajouter passager → ouvre formulaire complet
+- Passagers → ouvre liste complète des passagers
+- Alertes → ouvre page des alertes
+
+👉 chaque icône doit ouvrir un écran dédié (pas un bloc en bas)
+
+---
+
+2. AFFICHAGE EN MODE PAGE
+
+Ne pas afficher le contenu en bas ou en overlay mal positionné.
+
+👉 ouvrir une vraie page ou écran complet :
+
+- clair
+- centré
+- bien structuré
+
+---
+
+3. BOUTON RETOUR (TRÈS IMPORTANT)
+
+Dans chaque écran ouvert :
+
+👉 ajouter un bouton retour :
+
+- ← Retour
+OU
+- bouton fermer
+
+Permet de revenir à :
+
+👉 l’écran principal "Agent en route"
+
+---
+
+4. NAVIGATION FLUIDE
+
+Le flux doit être :
+
+- Dashboard Agent en route
+→ clic icône
+→ ouverture page claire
+→ retour
+→ retour au dashboard
+
+👉 sans bug
+👉 sans confusion
+👉 sans éléments cachés
+
+---
+
+5. STRUCTURE CONSEILLÉE
+
+Option recommandée :
+
+- navigation par pages (stack navigation)
+OU
+- écran plein avec retour
+
+---
+
+6. LISTE PASSAGERS
+
+Quand on clique "Passagers" :
+
+- afficher une liste complète
+- bien organisée
+- pas en bas de l’écran
+
+---
+
+7. FORMULAIRE AJOUT
+
+Quand on clique "Ajouter passager" :
+
+- afficher un vrai formulaire complet
+- champs visibles
+- bouton valider clair
+
+---
+
+8. IMPORTANT
+
+- ne pas casser l’interface actuelle
+- ne pas supprimer les icônes
+- ne pas modifier la logique métier
+
+👉 améliorer uniquement :
+- navigation
+- affichage
+- fluidité
+
+---
+
+9. OBJECTIF FINAL
+
+Un système où :
+
+- les icônes sont visibles ✅
+- chaque clic ouvre une vraie page ✅
+- navigation fluide ✅
+- bouton retour fonctionnel ✅
+- aucune confusion ✅
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Garder ce qui est bon.
+Améliorer la navigation pour qu’elle soit fluide, claire et professionnelle.

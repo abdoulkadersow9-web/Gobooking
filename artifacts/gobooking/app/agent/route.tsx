@@ -110,6 +110,17 @@ export default function RouteScreen() {
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
   const [tab, setTab]                   = useState<"passagers" | "scan" | "montee" | "trajet" | "arrets" | "contacts" | "alertes">("passagers");
+  const [fullscreen, setFullscreen]     = useState(false);
+
+  const PAGE_TITLE: Record<string, string> = {
+    passagers: "Liste des passagers",
+    scan:      "Scanner un ticket",
+    montee:    "Ajouter un passager",
+    trajet:    "Mon trajet",
+    arrets:    "Arrêts programmés",
+    contacts:  "Contacts d'urgence",
+    alertes:   "Alertes à bord",
+  };
 
   /* ── Manual booking state ── */
   const [manualName,    setManualName]    = useState("");
@@ -572,6 +583,9 @@ export default function RouteScreen() {
       {!loading && trips.length > 0 && (
         <View style={{ flex: 1 }}>
 
+          {/* ══ ZONE COLLAPSABLE (masquée en mode page pleine) ══ */}
+          {!fullscreen && (<>
+
           {/* ── Sélecteur de trajet (si plusieurs) ── */}
           {trips.length > 1 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.tripChips}>
@@ -705,7 +719,7 @@ export default function RouteScreen() {
             {/* Scanner ticket */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "scan" && S.quickBtnActive]}
-              onPress={() => setTab("scan")}
+              onPress={() => { setTab("scan"); setFullscreen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#EFF6FF" }]}>
@@ -717,7 +731,7 @@ export default function RouteScreen() {
             {/* Ajouter passager */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "montee" && S.quickBtnActive]}
-              onPress={() => setTab("montee")}
+              onPress={() => { setTab("montee"); setFullscreen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
@@ -729,7 +743,7 @@ export default function RouteScreen() {
             {/* Liste passagers */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "passagers" && S.quickBtnActive]}
-              onPress={() => setTab("passagers")}
+              onPress={() => { setTab("passagers"); setFullscreen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#F5F3FF" }]}>
@@ -743,7 +757,7 @@ export default function RouteScreen() {
             {/* Alertes */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "alertes" && S.quickBtnActive]}
-              onPress={() => setTab("alertes")}
+              onPress={() => { setTab("alertes"); setFullscreen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: allAlerts.length > 0 ? "#FEF2F2" : "#F8FAFC" }]}>
@@ -759,6 +773,24 @@ export default function RouteScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          </>)} {/* ══ FIN ZONE COLLAPSABLE ══ */}
+
+          {/* ── Header page pleine (visible uniquement en fullscreen) ── */}
+          {fullscreen && (
+            <View style={S.pageHeader}>
+              <TouchableOpacity
+                style={S.pageBackBtn}
+                onPress={() => setFullscreen(false)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={20} color={G_DARK} />
+                <Text style={S.pageBackTxt}>Retour</Text>
+              </TouchableOpacity>
+              <Text style={S.pageTitle}>{PAGE_TITLE[tab] ?? tab}</Text>
+              <View style={{ width: 70 }} />
+            </View>
+          )}
 
           {/* ── Onglets secondaires (navigation fine) ── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
@@ -786,6 +818,7 @@ export default function RouteScreen() {
             contentContainerStyle={S.body}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            style={fullscreen ? { flex: 1 } : undefined}
           >
 
             {/* ══ PASSAGERS ══ */}
@@ -1496,14 +1529,16 @@ export default function RouteScreen() {
         </View>
       )}
 
-      {/* ── Bouton Rapport (bas de page) ── */}
-      <TouchableOpacity
-        style={S.rapportBtn}
-        onPress={() => router.push("/agent/rapport" as never)}
-      >
-        <Feather name="file-text" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
-      </TouchableOpacity>
+      {/* ── Bouton Rapport (bas de page) — masqué en fullscreen ── */}
+      {!fullscreen && (
+        <TouchableOpacity
+          style={S.rapportBtn}
+          onPress={() => router.push("/agent/rapport" as never)}
+        >
+          <Feather name="file-text" size={16} color="#fff" />
+          <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 }
@@ -1595,6 +1630,16 @@ const S = StyleSheet.create({
                   borderRadius: 10, minWidth: 18, height: 18, alignItems: "center",
                   justifyContent: "center", paddingHorizontal: 4 },
   quickBadgeTxt:{ fontSize: 10, fontWeight: "800", color: "#fff" },
+
+  /* Page header (fullscreen mode) */
+  pageHeader:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                  backgroundColor: "#fff", paddingHorizontal: 16, paddingVertical: 12,
+                  borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0" },
+  pageBackBtn:  { flexDirection: "row", alignItems: "center", gap: 6,
+                  backgroundColor: G_LIGHT, borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 8, width: 90 },
+  pageBackTxt:  { fontSize: 13, fontWeight: "700", color: G_DARK },
+  pageTitle:    { fontSize: 16, fontWeight: "800", color: "#0F172A", flex: 1, textAlign: "center" },
 
   /* Tabs */
   tabsScroll:   { flexGrow: 0, borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },
