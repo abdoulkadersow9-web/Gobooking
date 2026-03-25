@@ -1,0 +1,163 @@
+Corrige les problèmes suivants dans mon application GoBooking (modules Agent Guichet et Agent Colis).
+
+-----------------------------------
+1. PROBLÈME IMPRESSION COLIS (QR CODE)
+-----------------------------------
+
+Actuellement :
+- Le colis se crée correctement
+- L’impression fonctionne
+- MAIS le QR code et les informations ne sont pas bien visibles (mauvais format / mauvaise taille)
+
+OBJECTIF :
+- Corriger le format d’impression pour les étiquettes colis
+
+À FAIRE :
+- Créer un format d’impression propre (type ticket ou étiquette)
+- Centrer tous les éléments
+- Augmenter la taille du QR code (minimum 150px à 200px)
+- Ajouter marges propres pour impression
+
+FORMAT À UTILISER :
+
+- largeur : 80mm (ticket thermique) OU 300px écran
+- texte centré
+- QR code bien visible
+- police lisible
+
+EXEMPLE CSS À APPLIQUER :
+
+@media print {
+  body {
+    width: 80mm;
+    margin: 0;
+    padding: 10px;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  .qrcode {
+    width: 180px;
+    height: 180px;
+    margin: 10px auto;
+  }
+}
+
+Structure à afficher :
+
+GOBOOKING COLIS
+-------------------
+Code : GB-C001
+Expéditeur : Nom
+Destinataire : Nom
+Destination : Ville
+
+[ QR CODE BIEN VISIBLE ]
+
+-----------------------------------
+2. PROBLÈME PAIEMENT (AGENT GUICHET)
+-----------------------------------
+
+Actuellement :
+- Quand je clique sur :
+  - Espèces
+  - Orange Money
+  - MTN Money
+  - Wave
+- Rien ne se passe ou le bouton ne fonctionne pas
+
+OBJECTIF :
+- Corriger la sélection du mode de paiement
+- Faire fonctionner le bouton "Valider la vente"
+
+À FAIRE :
+
+1. Corriger les boutons de paiement :
+- Ils doivent être cliquables
+- Quand on clique, ils doivent changer de sélection (state actif)
+
+2. Ajouter une variable "modePaiement" :
+- Valeurs possibles :
+  - "especes"
+  - "orange"
+  - "mtn"
+  - "wave"
+
+3. Lors du clic :
+
+Exemple logique :
+setModePaiement("especes")
+
+4. Bouton "Valider la vente" :
+- Vérifier que :
+  - nom rempli
+  - téléphone rempli
+  - modePaiement sélectionné
+
+Sinon afficher erreur
+
+5. Quand validé :
+- Créer ticket
+- Générer code ticket (GB-0001)
+- Rediriger vers page impression
+
+-----------------------------------
+3. IMPRESSION TICKET (GUICHET)
+-----------------------------------
+
+Créer un format d’impression propre similaire au colis :
+
+@media print {
+  body {
+    width: 80mm;
+    margin: 0;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .ticket {
+    font-size: 12px;
+  }
+
+  .qrcode {
+    width: 150px;
+    height: 150px;
+    margin: auto;
+  }
+}
+
+Contenu ticket :
+
+GOBOOKING
+-------------------
+Client : Nom
+Trajet : Abidjan → Bouaké
+Heure : 07:00
+Siège : 12
+Prix : 5000 FCFA
+Code : GB-0001
+
+[ QR CODE ]
+
+-----------------------------------
+CONTRAINTES
+-----------------------------------
+
+- Ne pas casser les pages existantes
+- Corriger uniquement la logique et le format
+- Vérifier les onClick / handlers
+- Vérifier que les formulaires envoient bien les données
+- Vérifier le state pour le paiement
+- Adapter au code existant (React / JS si nécessaire)
+
+-----------------------------------
+À LA FIN
+-----------------------------------
+
+- expliquer pourquoi le paiement ne marchait pas
+- expliquer pourquoi le QR code était mal affiché
+- montrer les corrections
+- dire comment tester :
+  - impression colis
+  - paiement ticket
+  - impression ticket

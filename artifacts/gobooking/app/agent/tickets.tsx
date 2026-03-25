@@ -45,7 +45,7 @@ const PAYMENT_METHODS = [
 
 function buildTicketHtml(c: Confirmed): string {
   const qrData = encodeURIComponent(c.bookingRef);
-  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${qrData}`;
+  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrData}`;
   const isOffline = c.bookingRef.startsWith("OFFLINE-");
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -55,28 +55,59 @@ function buildTicketHtml(c: Confirmed): string {
 <title>Billet GoBooking</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; background: #fff; padding: 0; }
-  .ticket { width: 80mm; margin: 0 auto; padding: 10px; border: 2px dashed #D97706; border-radius: 8px; }
-  .header { text-align: center; border-bottom: 1px dashed #ccc; padding-bottom: 8px; margin-bottom: 10px; }
-  .logo { font-size: 18px; font-weight: bold; color: #92400E; letter-spacing: 2px; }
-  .sub  { font-size: 10px; color: #6B7280; margin-top: 2px; }
-  .ref  { font-size: 14px; font-weight: bold; color: #D97706; text-align: center; letter-spacing: 1px; margin: 8px 0; padding: 6px; background: #FEF3C7; border-radius: 4px; }
-  .route { text-align: center; font-size: 16px; font-weight: bold; color: #111; margin: 6px 0; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+  .ticket {
+    width: 80mm;
+    margin: 0 auto;
+    padding: 12px;
+    border: 2px dashed #D97706;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .header { border-bottom: 1px dashed #ccc; padding-bottom: 8px; margin-bottom: 10px; }
+  .logo { font-size: 20px; font-weight: bold; color: #92400E; letter-spacing: 2px; }
+  .sub  { font-size: 10px; color: #6B7280; margin-top: 3px; }
+  .route { font-size: 18px; font-weight: bold; color: #111; margin: 10px 0 4px; }
   .arrow { color: #D97706; }
-  table { width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 8px; }
-  td { padding: 4px 2px; vertical-align: top; }
-  td:first-child { color: #6B7280; width: 40%; }
+  .ref  {
+    font-size: 15px; font-weight: bold; color: #D97706;
+    letter-spacing: 1px; margin: 8px 0;
+    padding: 7px 10px; background: #FEF3C7;
+    border-radius: 4px; border: 1px dashed #FCD34D;
+    display: inline-block; width: 100%;
+  }
+  .divider { border-top: 1px dashed #ccc; margin: 10px 0; }
+  table { width: 100%; font-size: 11px; border-collapse: collapse; text-align: left; }
+  td { padding: 5px 2px; vertical-align: top; }
+  td:first-child { color: #6B7280; width: 42%; }
   td:last-child { color: #111; font-weight: 600; text-align: right; }
-  .divider { border-top: 1px dashed #ccc; margin: 8px 0; }
-  .total-row td { font-size: 13px; font-weight: bold; color: #D97706; padding-top: 8px; }
-  .qr-section { text-align: center; margin-top: 10px; }
-  .qr-section img { width: 100px; height: 100px; }
-  .qr-label { font-size: 9px; color: #9CA3AF; margin-top: 4px; }
-  .footer { text-align: center; font-size: 9px; color: #9CA3AF; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ccc; }
-  .offline-badge { background: #FEF3C7; color: #92400E; font-size: 9px; padding: 3px 6px; border-radius: 3px; text-align: center; margin-top: 4px; }
+  .total-row td { font-size: 14px; font-weight: bold; color: #D97706; padding-top: 10px; }
+  .qr-section { margin: 14px 0 6px; }
+  .qr-section img {
+    width: 160px;
+    height: 160px;
+    display: block;
+    margin: 0 auto;
+  }
+  .qr-label { font-size: 9px; color: #9CA3AF; margin-top: 5px; }
+  .offline-badge { background: #FEF3C7; color: #92400E; font-size: 9px; padding: 4px 8px; border-radius: 3px; margin: 6px 0; display: inline-block; }
+  .footer { font-size: 9px; color: #9CA3AF; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #ccc; line-height: 1.6; }
   @media print {
-    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body {
+      width: 80mm;
+      margin: 0;
+      padding: 10px;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
     .ticket { border: 2px dashed #D97706; }
+    .qr-section img { width: 160px; height: 160px; }
   }
 </style>
 </head>
@@ -110,7 +141,7 @@ function buildTicketHtml(c: Confirmed): string {
   ${isOffline ? '<div class="offline-badge">⚡ Billet hors ligne — sera synchronisé</div>' : ""}
 
   <div class="qr-section">
-    <img src="${qrUrl}" alt="QR Code" />
+    <img src="${qrUrl}" alt="QR Code ${c.bookingRef}" />
     <div class="qr-label">Scannez pour valider l'embarquement</div>
   </div>
 
@@ -134,7 +165,7 @@ export default function TicketsScreen() {
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
   const [passengerCount, setPassengerCount] = useState("1");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [printing, setPrinting]     = useState(false);
   const [confirmed, setConfirmed]   = useState<Confirmed | null>(null);
@@ -173,6 +204,7 @@ export default function TicketsScreen() {
     if (!selectedTrip) { Alert.alert("Erreur", "Sélectionnez un trajet."); return; }
     if (!passengerName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
     if (!passengerPhone.trim()) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
+    if (!paymentMethod) { Alert.alert("Erreur", "Sélectionnez un mode de paiement."); return; }
     const count = parseInt(passengerCount) || 1;
     if (count < 1 || count > 10) { Alert.alert("Erreur", "Nombre de passagers invalide (1-10)."); return; }
     const pmLabel = PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label ?? paymentMethod;
@@ -234,7 +266,7 @@ export default function TicketsScreen() {
   const reset = () => {
     setConfirmed(null); setSelectedTrip(null);
     setPassengerName(""); setPassengerPhone("");
-    setPassengerCount("1"); setPaymentMethod("cash");
+    setPassengerCount("1"); setPaymentMethod("");
   };
 
   if (confirmed) {
@@ -393,17 +425,32 @@ export default function TicketsScreen() {
         <View style={S.card}>
           <View style={S.cardHeader}>
             <Ionicons name="wallet-outline" size={18} color={G} />
-            <Text style={S.cardTitle}>Mode de paiement</Text>
+            <Text style={S.cardTitle}>Mode de paiement *</Text>
           </View>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {PAYMENT_METHODS.map(pm => (
-              <TouchableOpacity key={pm.id}
-                style={[S.payItem, paymentMethod === pm.id && S.payItemSel]}
-                onPress={() => setPaymentMethod(pm.id)}>
-                <Ionicons name={pm.icon} size={20} color={paymentMethod === pm.id ? G : "#9CA3AF"} />
-                <Text style={[S.payLabel, paymentMethod === pm.id && { color: G, fontWeight: "700" }]}>{pm.label}</Text>
-              </TouchableOpacity>
-            ))}
+          {!paymentMethod && (
+            <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 6 }}>
+              Veuillez sélectionner un mode de paiement
+            </Text>
+          )}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {PAYMENT_METHODS.map(pm => {
+              const selected = paymentMethod === pm.id;
+              return (
+                <TouchableOpacity key={pm.id}
+                  activeOpacity={0.7}
+                  style={[
+                    S.payItem,
+                    selected && S.payItemSel,
+                  ]}
+                  onPress={() => setPaymentMethod(pm.id)}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name={pm.icon} size={20} color={selected ? "#fff" : "#9CA3AF"} />
+                    <Text style={[S.payLabel, selected && { color: "#fff", fontWeight: "800" }]}>{pm.label}</Text>
+                    {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -471,9 +518,9 @@ const S = StyleSheet.create({
   countBtn:  { width: 40, height: 40, borderRadius: 10, borderWidth: 2, borderColor: G, alignItems: "center", justifyContent: "center" },
   countInput:{ borderWidth: 1.5, borderColor: "#FDE68A", borderRadius: 10, width: 70, paddingVertical: 9, fontSize: 18, fontWeight: "700", color: "#111827", backgroundColor: G_LIGHT },
 
-  payItem:   { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  payItemSel:{ borderColor: G, backgroundColor: G_LIGHT },
-  payLabel:  { fontSize: 12, color: "#9CA3AF" },
+  payItem:   { borderWidth: 2, borderColor: "#E5E7EB", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, backgroundColor: "#F9FAFB" },
+  payItemSel:{ borderColor: G, backgroundColor: G },
+  payLabel:  { fontSize: 13, color: "#6B7280", fontWeight: "500" },
 
   recap:     { backgroundColor: G_LIGHT, borderRadius: 14, padding: 16, borderWidth: 1.5, borderColor: "#FDE68A", gap: 8 },
   recapTitle:{ fontSize: 15, fontWeight: "700", color: G_DARK, marginBottom: 4 },

@@ -530,7 +530,8 @@ router.post("/reservations", async (req, res) => {
       paymentMethod:    paymentMethod || "cash",
       paymentStatus:    "paid",
       status:           "confirmed",
-      contactPhone:     clientPhone || null,
+      contactPhone:     clientPhone || "",
+      contactEmail:     "",
       commissionAmount: Math.round(amount * 0.10),
     }).returning();
 

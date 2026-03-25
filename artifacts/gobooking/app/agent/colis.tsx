@@ -180,51 +180,97 @@ interface CreatedParcel {
 }
 
 function buildLabelHtml(p: CreatedParcel): string {
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(p.trackingRef)}`;
-  const deliveryLabel = p.deliveryType === "livraison_domicile" ? "Livraison à domicile" : "Retrait en gare";
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(p.trackingRef)}`;
+  const deliveryLabel = p.deliveryType === "livraison_domicile" ? "🛵 Livraison à domicile" : "🏢 Retrait en gare";
+  const deliveryColor = p.deliveryType === "livraison_domicile" ? "#EA580C" : "#7C3AED";
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Étiquette Colis GoBooking</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; background: #fff; }
-  .label { width: 100mm; min-height: 80mm; margin: 0 auto; padding: 10px; border: 3px solid #7C3AED; border-radius: 8px; }
-  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed #7C3AED; padding-bottom: 8px; margin-bottom: 10px; }
-  .brand { font-size: 14px; font-weight: bold; color: #4C1D95; }
-  .tag   { font-size: 9px; color: #6B7280; }
-  .ref-box { background: #EDE9FE; border-radius: 6px; padding: 6px 10px; text-align: center; margin-bottom: 10px; }
-  .ref   { font-size: 16px; font-weight: bold; color: #7C3AED; letter-spacing: 1px; }
-  .route { font-size: 18px; font-weight: bold; color: #111; text-align: center; margin: 8px 0; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+  }
+  .label {
+    width: 80mm;
+    margin: 0 auto;
+    padding: 12px;
+    border: 3px solid #7C3AED;
+    border-radius: 8px;
+    text-align: center;
+  }
+  .header {
+    border-bottom: 2px dashed #7C3AED;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+  .brand { font-size: 16px; font-weight: bold; color: #4C1D95; }
+  .sub   { font-size: 9px; color: #6B7280; margin-top: 2px; }
+  .date  { font-size: 9px; color: #9CA3AF; margin-top: 3px; }
+  .ref-box {
+    background: #EDE9FE;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    border: 1px dashed #7C3AED;
+  }
+  .ref   { font-size: 18px; font-weight: bold; color: #7C3AED; letter-spacing: 2px; }
+  .route { font-size: 16px; font-weight: bold; color: #111; margin: 8px 0; }
   .arrow { color: #7C3AED; }
-  .section { margin-bottom: 8px; }
-  .section-title { font-size: 9px; color: #9CA3AF; text-transform: uppercase; margin-bottom: 3px; }
-  .row   { display: flex; justify-content: space-between; font-size: 11px; padding: 2px 0; }
-  .row-key { color: #6B7280; }
-  .row-val { color: #111; font-weight: 600; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .party { background: #F5F3FF; border-radius: 6px; padding: 8px; font-size: 11px; }
-  .party-role { font-size: 9px; color: #7C3AED; text-transform: uppercase; font-weight: bold; margin-bottom: 3px; }
-  .party-name { font-weight: 700; color: #111; }
-  .party-phone { color: #6B7280; margin-top: 2px; }
-  .bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; border-top: 1px dashed #DDD6FE; padding-top: 8px; }
-  .delivery-badge { background: #7C3AED; color: #fff; font-size: 9px; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
-  .footer { font-size: 8px; color: #9CA3AF; text-align: center; margin-top: 8px; }
+  .divider { border-top: 1px dashed #DDD6FE; margin: 8px 0; }
+  .parties { display: flex; justify-content: space-between; gap: 8px; margin: 8px 0; text-align: left; }
+  .party { flex: 1; background: #F5F3FF; border-radius: 6px; padding: 6px 8px; font-size: 10px; }
+  .party-role { font-size: 8px; color: #7C3AED; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; }
+  .party-name { font-weight: 700; color: #111; font-size: 11px; }
+  .party-phone { color: #6B7280; font-size: 10px; margin-top: 1px; }
+  .info-row { display: flex; justify-content: space-between; font-size: 10px; padding: 3px 0; }
+  .info-key { color: #6B7280; }
+  .info-val { color: #111; font-weight: 600; }
+  .qr-section { margin: 12px auto 6px; text-align: center; }
+  .qr-section img {
+    width: 180px;
+    height: 180px;
+    display: block;
+    margin: 0 auto;
+  }
+  .qr-label { font-size: 8px; color: #9CA3AF; margin-top: 4px; }
+  .delivery-badge {
+    display: inline-block;
+    background: ${deliveryColor};
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 5px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+  }
+  .footer { font-size: 8px; color: #9CA3AF; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #DDD6FE; }
   @media print {
-    body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body {
+      width: 80mm;
+      margin: 0;
+      padding: 10px;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
     .label { border: 3px solid #7C3AED; }
+    .qr-section img { width: 180px; height: 180px; }
   }
 </style>
 </head>
 <body>
 <div class="label">
   <div class="header">
-    <div>
-      <div class="brand">📦 GoBooking Colis</div>
-      <div class="tag">Transport Côte d'Ivoire</div>
-    </div>
-    <div class="tag">${new Date().toLocaleDateString("fr-FR")}</div>
+    <div class="brand">📦 GoBooking Colis</div>
+    <div class="sub">Transport · Côte d'Ivoire</div>
+    <div class="date">${new Date().toLocaleDateString("fr-FR")} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
   </div>
 
   <div class="ref-box">
@@ -232,6 +278,8 @@ function buildLabelHtml(p: CreatedParcel): string {
   </div>
 
   <div class="route">${p.fromCity} <span class="arrow">→</span> ${p.toCity}</div>
+
+  <div class="divider"></div>
 
   <div class="parties">
     <div class="party">
@@ -246,18 +294,22 @@ function buildLabelHtml(p: CreatedParcel): string {
     </div>
   </div>
 
-  <div class="section">
-    <div class="row"><span class="row-key">Type</span><span class="row-val">${p.parcelType}</span></div>
-    ${p.weight ? `<div class="row"><span class="row-key">Poids</span><span class="row-val">${p.weight} kg</span></div>` : ""}
-    <div class="row"><span class="row-key">Montant</span><span class="row-val">${Number(p.amount).toLocaleString("fr-FR")} FCFA</span></div>
+  <div class="divider"></div>
+
+  <div class="info-row"><span class="info-key">Type</span><span class="info-val">${p.parcelType}</span></div>
+  ${p.weight ? `<div class="info-row"><span class="info-key">Poids</span><span class="info-val">${p.weight} kg</span></div>` : ""}
+  <div class="info-row"><span class="info-key">Montant</span><span class="info-val">${Number(p.amount).toLocaleString("fr-FR")} FCFA</span></div>
+
+  <div class="delivery-badge">${deliveryLabel}</div>
+
+  <div class="qr-section">
+    <img src="${qrUrl}" alt="QR Code ${p.trackingRef}" />
+    <div class="qr-label">Scannez pour suivre votre colis</div>
   </div>
 
-  <div class="bottom">
-    <div>
-      <div class="delivery-badge">${deliveryLabel}</div>
-      <div class="footer" style="margin-top:6px">Scannez le QR pour suivre</div>
-    </div>
-    <img src="${qrUrl}" width="90" height="90" alt="QR" />
+  <div class="footer">
+    GoBooking · Transport Côte d'Ivoire<br/>
+    Conservez cette étiquette jusqu'à livraison
   </div>
 </div>
 </body>
