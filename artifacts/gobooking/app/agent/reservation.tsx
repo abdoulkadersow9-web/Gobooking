@@ -9,8 +9,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -32,6 +34,11 @@ interface OnlineBooking {
   passengers: { name: string; age?: number; gender?: string }[];
   seatNumbers: string[];
   createdAt: string;
+  baggageCount: number;
+  baggageType: string | null;
+  baggageDescription: string | null;
+  bagageStatus: string | null;
+  bagagePrice: number;
   trip: {
     id: string;
     from: string;
@@ -63,6 +70,13 @@ function paymentLabel(p: string) {
   return p;
 }
 
+function baggageTypeLabel(t: string | null) {
+  if (t === "léger") return { label: "Léger (sac, cartable)", icon: "briefcase" as const };
+  if (t === "lourd") return { label: "Lourd (valise, carton)", icon: "package" as const };
+  if (t === "colis") return { label: "Colis / envoi groupé", icon: "box" as const };
+  return { label: t ?? "Non précisé", icon: "briefcase" as const };
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    MAIN SCREEN
 ───────────────────────────────────────────────────────────────────────── */
@@ -73,6 +87,11 @@ export default function AgentReservation() {
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter]     = useState<"all" | "pending" | "confirmed">("pending");
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+
+  /* Cancel modal state */
+  const [cancelModal, setCancelModal] = useState<OnlineBooking | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -97,13 +116,17 @@ export default function AgentReservation() {
 
   const pendingCount = bookings.filter(b => b.status === "pending").length;
 
+  /* ── Confirm ── */
   const confirmBooking = async (booking: OnlineBooking) => {
+    const bagInfo = booking.baggageCount > 0
+      ? `\n🧳 Bagage : ${baggageTypeLabel(booking.baggageType).label} (×${booking.baggageCount})`
+      : "";
     Alert.alert(
       "Confirmer la réservation",
-      `Confirmer ${booking.bookingRef} pour ${booking.passengers[0]?.name ?? "client"} ?\n\nTrajet : ${booking.trip?.from} → ${booking.trip?.to}\nDate : ${booking.trip?.date} à ${booking.trip?.departureTime}\nMontant : ${booking.totalAmount.toLocaleString()} FCFA`,
+      `Confirmer ${booking.bookingRef} pour ${booking.passengers[0]?.name ?? "client"} ?\n\nTrajet : ${booking.trip?.from} → ${booking.trip?.to}\nDate : ${booking.trip?.date} à ${booking.trip?.departureTime}\nMontant : ${booking.totalAmount.toLocaleString()} FCFA${bagInfo}`,
       [
         { text: "Annuler", style: "cancel" },
-        { text: "Confirmer", onPress: async () => {
+        { text: "Confirmer ✓", onPress: async () => {
           setConfirming(booking.id);
           try {
             await apiFetch(`/agent/online-bookings/${booking.id}/confirm`, {
@@ -111,7 +134,7 @@ export default function AgentReservation() {
               method: "POST",
               body: {},
             });
-            Alert.alert("Succès", `Réservation ${booking.bookingRef} confirmée !`);
+            Alert.alert("✅ Succès", `Réservation ${booking.bookingRef} confirmée${booking.baggageCount > 0 ? " avec le bagage" : ""} !`);
             await load(true);
           } catch (e: any) {
             Alert.alert("Erreur", e?.message ?? "Impossible de confirmer la réservation");
@@ -121,6 +144,27 @@ export default function AgentReservation() {
         }},
       ]
     );
+  };
+
+  /* ── Cancel ── */
+  const cancelBooking = async () => {
+    if (!cancelModal) return;
+    setCancelling(cancelModal.id);
+    try {
+      await apiFetch(`/agent/online-bookings/${cancelModal.id}/cancel`, {
+        token: token ?? undefined,
+        method: "POST",
+        body: { reason: cancelReason || undefined },
+      });
+      setCancelModal(null);
+      setCancelReason("");
+      Alert.alert("❌ Annulée", `Réservation ${cancelModal.bookingRef} annulée. Le siège a été libéré.`);
+      await load(true);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible d'annuler la réservation");
+    } finally {
+      setCancelling(null);
+    }
   };
 
   return (
@@ -206,7 +250,9 @@ export default function AgentReservation() {
             const paxCount = b.passengers?.length ?? 1;
             const seatNums = b.seatNumbers?.length > 0 ? b.seatNumbers.join(", ") : "À assigner";
             const isPending = b.status === "pending";
+            const isCancelled = b.status === "cancelled";
             const isConfirming = confirming === b.id;
+            const hasBaggage = b.baggageCount > 0;
 
             return (
               <View key={b.id} style={[S.card, isPending && { borderColor: "#FCD34D", borderWidth: 2 }]}>
@@ -232,7 +278,7 @@ export default function AgentReservation() {
                   </View>
                 )}
 
-                {/* Seat availability for the trip */}
+                {/* Seat availability */}
                 {b.trip && (b.trip.guichetSeats > 0 || b.trip.onlineSeats > 0) && (
                   <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
                     <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8, alignItems: "center" }}>
@@ -256,6 +302,45 @@ export default function AgentReservation() {
                   <InfoRow icon="card-outline" label="Paiement" val={paymentLabel(b.paymentMethod)} />
                 </View>
 
+                {/* ── Baggage section ── */}
+                <View style={S.baggageBlock}>
+                  <View style={S.baggageHeaderRow}>
+                    <Feather name="briefcase" size={13} color={hasBaggage ? "#7C3AED" : "#9CA3AF"} />
+                    <Text style={[S.baggageHeaderTxt, { color: hasBaggage ? "#7C3AED" : "#9CA3AF" }]}>
+                      Bagage{hasBaggage ? ` (×${b.baggageCount})` : ""}
+                    </Text>
+                    {hasBaggage && b.bagageStatus && (
+                      <View style={[S.bagStatusPill, { backgroundColor: b.bagageStatus === "accepté" ? "#DCFCE7" : "#FEF3C7" }]}>
+                        <Text style={[S.bagStatusTxt, { color: b.bagageStatus === "accepté" ? "#16A34A" : "#D97706" }]}>
+                          {b.bagageStatus === "accepté" ? "Validé" : "En attente"}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {hasBaggage ? (
+                    <View style={S.baggageDetails}>
+                      <View style={S.baggageDetailRow}>
+                        <Feather name={baggageTypeLabel(b.baggageType).icon} size={14} color="#6B7280" />
+                        <Text style={S.baggageDetailTxt}>{baggageTypeLabel(b.baggageType).label}</Text>
+                      </View>
+                      {b.baggageDescription ? (
+                        <View style={S.baggageDetailRow}>
+                          <Feather name="file-text" size={14} color="#6B7280" />
+                          <Text style={S.baggageDetailTxt}>{b.baggageDescription}</Text>
+                        </View>
+                      ) : null}
+                      {isPending && (
+                        <Text style={S.baggageValidationNote}>
+                          ✅ Le bagage sera automatiquement validé à la confirmation de la réservation.
+                        </Text>
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={S.noBaggageTxt}>Aucun bagage déclaré</Text>
+                  )}
+                </View>
+
                 {/* Source badge */}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                   <View style={{ backgroundColor: "#DBEAFE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -268,28 +353,46 @@ export default function AgentReservation() {
                   </Text>
                 </View>
 
-                {/* Confirm button */}
+                {/* Action buttons */}
                 {isPending && (
-                  <TouchableOpacity
-                    style={[S.confirmBtn, isConfirming && { opacity: 0.7 }]}
-                    onPress={() => confirmBooking(b)}
-                    disabled={isConfirming}
-                  >
-                    {isConfirming ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                        <Text style={S.confirmTxt}>Confirmer la réservation</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  <View style={{ gap: 8 }}>
+                    <TouchableOpacity
+                      style={[S.confirmBtn, isConfirming && { opacity: 0.7 }]}
+                      onPress={() => confirmBooking(b)}
+                      disabled={isConfirming || cancelling === b.id}
+                    >
+                      {isConfirming ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                          <Text style={S.confirmTxt}>Confirmer la réservation{hasBaggage ? " + bagage" : ""}</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[S.cancelBtn, cancelling === b.id && { opacity: 0.7 }]}
+                      onPress={() => { setCancelModal(b); setCancelReason(""); }}
+                      disabled={isConfirming || cancelling === b.id}
+                    >
+                      <Ionicons name="close-circle-outline" size={17} color="#DC2626" />
+                      <Text style={S.cancelTxt}>Annuler la réservation</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
 
-                {!isPending && (
+                {!isPending && !isCancelled && (
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 6 }}>
                     <Ionicons name="checkmark-done-circle" size={18} color="#16A34A" />
                     <Text style={{ fontSize: 13, color: "#16A34A", fontWeight: "700" }}>Réservation traitée</Text>
+                  </View>
+                )}
+
+                {isCancelled && (
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 6 }}>
+                    <Ionicons name="close-circle" size={18} color="#DC2626" />
+                    <Text style={{ fontSize: 13, color: "#DC2626", fontWeight: "700" }}>Réservation annulée</Text>
                   </View>
                 )}
               </View>
@@ -306,6 +409,50 @@ export default function AgentReservation() {
         <Feather name="alert-triangle" size={16} color="#fff" />
         <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
       </TouchableOpacity>
+
+      {/* Cancel modal */}
+      <Modal visible={!!cancelModal} transparent animationType="slide" onRequestClose={() => setCancelModal(null)}>
+        <View style={S.modalOverlay}>
+          <View style={S.modalCard}>
+            <View style={S.modalHeader}>
+              <Text style={S.modalTitle}>Annuler la réservation</Text>
+              <TouchableOpacity onPress={() => setCancelModal(null)}>
+                <Feather name="x" size={20} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            <Text style={S.modalRef}>{cancelModal?.bookingRef} — {cancelModal?.passengers?.[0]?.name}</Text>
+            <Text style={S.modalInfo}>
+              Le siège sera libéré et le client sera notifié. Cette action est irréversible.
+            </Text>
+            <Text style={S.modalLabel}>Motif d'annulation <Text style={{ color: "#9CA3AF" }}>(optionnel)</Text></Text>
+            <TextInput
+              style={S.modalInput}
+              placeholder="Ex : Doublon, erreur de trajet, demande client..."
+              placeholderTextColor="#9CA3AF"
+              value={cancelReason}
+              onChangeText={setCancelReason}
+              multiline
+              numberOfLines={2}
+            />
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
+              <TouchableOpacity style={[S.modalBtn, { flex: 1, backgroundColor: "#F3F4F6" }]} onPress={() => setCancelModal(null)}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#6B7280" }}>Retour</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[S.modalBtn, { flex: 1, backgroundColor: "#DC2626" }, cancelling ? { opacity: 0.7 } : {}]}
+                onPress={cancelBooking}
+                disabled={!!cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>Confirmer l'annulation</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -354,6 +501,35 @@ const S = StyleSheet.create({
 
   infoGrid:   { gap: 0, marginBottom: 10 },
 
+  /* Baggage block */
+  baggageBlock: {
+    backgroundColor: "#FAFAFF", borderRadius: 12, borderWidth: 1, borderColor: "#EDE9FE",
+    padding: 12, marginBottom: 10,
+  },
+  baggageHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  baggageHeaderTxt: { fontSize: 13, fontWeight: "700", flex: 1 },
+  bagStatusPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  bagStatusTxt: { fontSize: 10, fontWeight: "700" },
+  baggageDetails: { gap: 4 },
+  baggageDetailRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  baggageDetailTxt: { fontSize: 12, color: "#374151", flex: 1 },
+  baggageValidationNote: { fontSize: 11, color: "#059669", fontStyle: "italic", marginTop: 4 },
+  noBaggageTxt: { fontSize: 12, color: "#9CA3AF", fontStyle: "italic" },
+
   confirmBtn: { backgroundColor: TEAL, borderRadius: 12, paddingVertical: 13, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8, elevation: 2 },
   confirmTxt: { color: "#fff", fontSize: 15, fontWeight: "800" },
+
+  cancelBtn:  { borderRadius: 12, paddingVertical: 11, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 7, borderWidth: 1.5, borderColor: "#FCA5A5", backgroundColor: "#FEF2F2" },
+  cancelTxt:  { color: "#DC2626", fontSize: 14, fontWeight: "700" },
+
+  /* Modal */
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34 },
+  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  modalTitle: { fontSize: 17, fontWeight: "800", color: "#111827" },
+  modalRef:   { fontSize: 13, color: TEAL, fontWeight: "700", marginBottom: 8 },
+  modalInfo:  { fontSize: 12, color: "#6B7280", marginBottom: 14, lineHeight: 18 },
+  modalLabel: { fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 },
+  modalInput: { borderWidth: 1.5, borderColor: "#D1D5DB", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: "#111827", minHeight: 60, textAlignVertical: "top" },
+  modalBtn:   { paddingVertical: 13, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 });

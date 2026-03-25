@@ -1,7 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -22,8 +20,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useBooking } from "@/context/BookingContext";
 import { apiFetch } from "@/utils/api";
 
-const MAX_PHOTOS = 6;
 const MAX_BAGAGES = 4;
+
+const BAGGAGE_TYPES = [
+  { key: "léger",  label: "Léger",  icon: "briefcase" as const, desc: "Sac, cartable" },
+  { key: "lourd",  label: "Lourd",  icon: "package"   as const, desc: "Valise, carton" },
+  { key: "colis",  label: "Colis",  icon: "box"       as const, desc: "Envoi groupé" },
+] as const;
 
 export default function PassengersScreen() {
   const insets = useSafeAreaInsets();
@@ -35,10 +38,11 @@ export default function PassengersScreen() {
   const [contactEmail, setContactEmail] = useState(user?.email || "");
   const [contactPhone, setContactPhone] = useState(user?.phone || "");
 
-  const [baggageCount, setBaggageCount] = useState<number>(booking?.baggageCount || 0);
-  const [baggagePhotos, setBaggagePhotos] = useState<{ uri: string; url?: string }[]>([]);
-  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [hasBaggage, setHasBaggage]             = useState<boolean>((booking?.baggageCount || 0) > 0);
+  const [baggageCount, setBaggageCount]         = useState<number>(booking?.baggageCount || 0);
+  const [baggageType, setBaggageType]           = useState<string>("");
+  const [baggageDescription, setBaggageDescription] = useState<string>("");
+  const [submitting, setSubmitting]             = useState(false);
 
   const updatePassenger = (index: number, field: string, value: string) => {
     setPassengers((prev) => {
@@ -46,63 +50,6 @@ export default function PassengersScreen() {
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
-  };
-
-  const pickPhoto = async () => {
-    if (baggagePhotos.length >= MAX_PHOTOS) {
-      Alert.alert("Maximum atteint", `Vous ne pouvez pas ajouter plus de ${MAX_PHOTOS} photos.`);
-      return;
-    }
-    try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Permission requise", "Autorisez l'accès à la galerie pour ajouter une photo.");
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        quality: 0.5,
-        base64: true,
-        allowsEditing: true,
-        aspect: [4, 3],
-      });
-      if (result.canceled || !result.assets?.[0]) return;
-
-      const asset = result.assets[0];
-      const fileSize = asset.fileSize ?? 0;
-      if (fileSize > 2 * 1024 * 1024) {
-        Alert.alert("Image trop grande", "La photo dépasse 2 Mo. Veuillez en choisir une plus petite.");
-        return;
-      }
-
-      const newIdx = baggagePhotos.length;
-      setBaggagePhotos(prev => [...prev, { uri: asset.uri }]);
-
-      if (asset.base64) {
-        setUploadingIdx(newIdx);
-        try {
-          const resp = await apiFetch<{ url?: string }>("/bookings/upload-image", {
-            token: token ?? undefined,
-            method: "POST",
-            body: JSON.stringify({ base64: asset.base64, mimeType: asset.mimeType || "image/jpeg" }),
-          });
-          if (resp?.url) {
-            setBaggagePhotos(prev => prev.map((p, i) => i === newIdx ? { ...p, url: resp.url } : p));
-          }
-        } catch {
-          /* keep local URI */
-        } finally {
-          setUploadingIdx(null);
-        }
-      }
-    } catch {
-      Alert.alert("Erreur", "Impossible d'accéder à la galerie.");
-    }
-  };
-
-  const removePhoto = (idx: number) => {
-    setBaggagePhotos(prev => prev.filter((_, i) => i !== idx));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const handleContinue = async () => {
@@ -120,17 +67,14 @@ export default function PassengersScreen() {
       Alert.alert("Erreur", "Informations de trajet manquantes. Recommencez la sélection.");
       return;
     }
-    if (baggageCount >= 2 && baggagePhotos.length === 0) {
-      Alert.alert(
-        "Photos obligatoires",
-        `Avec ${baggageCount} bagages, vous devez ajouter au moins 1 photo pour validation.`
-      );
+    if (hasBaggage && !baggageType) {
+      Alert.alert("Type de bagage requis", "Veuillez sélectionner le type de votre bagage.");
       return;
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const photoUrls = baggagePhotos.map(p => p.url).filter(Boolean) as string[];
-    updateBooking({ passengers, contactEmail, contactPhone, bagages: [], bagagePrice: 0, baggageCount, baggagePhotos: photoUrls });
+    const finalCount = hasBaggage ? (baggageCount || 1) : 0;
+    updateBooking({ passengers, contactEmail, contactPhone, bagages: [], bagagePrice: 0, baggageCount: finalCount, baggagePhotos: [] });
 
     setSubmitting(true);
     try {
@@ -140,17 +84,19 @@ export default function PassengersScreen() {
           token: token ?? undefined,
           method: "POST",
           body: {
-            tripId:       booking.tripId,
-            seatIds:      booking.selectedSeats,
+            tripId:            booking.tripId,
+            seatIds:           booking.selectedSeats,
             passengers,
-            paymentMethod: "wave",
+            paymentMethod:     "wave",
             contactEmail,
             contactPhone,
-            bagages: [],
-            baggageCount,
-            baggagePhotos: photoUrls,
-            fromStopId:   booking.fromStopId ?? null,
-            toStopId:     booking.toStopId   ?? null,
+            bagages:           [],
+            baggageCount:      finalCount,
+            baggagePhotos:     [],
+            baggageType:       hasBaggage ? baggageType : null,
+            baggageDescription: hasBaggage ? baggageDescription : null,
+            fromStopId:        booking.fromStopId ?? null,
+            toStopId:          booking.toStopId   ?? null,
           },
         }
       );
@@ -169,8 +115,6 @@ export default function PassengersScreen() {
     }
   };
 
-  const needsPhotos = baggageCount >= 2;
-  const photosOk = !needsPhotos || baggagePhotos.length > 0;
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
@@ -321,101 +265,95 @@ export default function PassengersScreen() {
           </View>
         </View>
 
-        {/* ── NOUVELLE SECTION BAGAGES ─────────────────────────────────── */}
+        {/* ── SECTION BAGAGES ─────────────────────────────────────────── */}
         <View style={styles.bagSection}>
           <View style={styles.bagHeader}>
             <View style={styles.bagTitleRow}>
-              <Feather name="package" size={16} color="#7C3AED" />
-              <Text style={styles.bagTitle}>Bagages</Text>
-              <View style={styles.bagOptional}>
-                <Text style={styles.bagOptionalText}>Optionnel</Text>
-              </View>
+              <Feather name="briefcase" size={16} color="#7C3AED" />
+              <Text style={styles.bagTitle}>Avez-vous un bagage ?</Text>
             </View>
-            <Text style={styles.bagSubtitle}>Sélectionnez le nombre de bagages</Text>
+            <Text style={styles.bagSubtitle}>Le bagage sera validé par l'agent à votre départ</Text>
           </View>
 
-          {/* Sélecteur de nombre */}
-          <View style={styles.countRow}>
+          {/* Oui / Non */}
+          <View style={styles.yesNoRow}>
             <Pressable
-              style={[styles.countBtn, baggageCount === 0 && styles.countBtnActive]}
-              onPress={() => { setBaggageCount(0); setBaggagePhotos([]); Haptics.selectionAsync(); }}
+              style={[styles.yesNoBtn, !hasBaggage && styles.yesNoBtnActive, !hasBaggage && { borderColor: "#059669" }]}
+              onPress={() => { setHasBaggage(false); setBaggageCount(0); setBaggageType(""); setBaggageDescription(""); Haptics.selectionAsync(); }}
             >
-              <Text style={[styles.countBtnText, baggageCount === 0 && styles.countBtnTextActive]}>Aucun</Text>
+              <Feather name="x-circle" size={18} color={!hasBaggage ? "#059669" : "#9CA3AF"} />
+              <Text style={[styles.yesNoText, !hasBaggage && { color: "#059669", fontFamily: "Inter_700Bold" }]}>Non</Text>
             </Pressable>
-            {[1, 2, 3, 4].map((n) => (
-              <Pressable
-                key={n}
-                style={[styles.countBtn, baggageCount === n && styles.countBtnActive]}
-                onPress={() => { setBaggageCount(n); Haptics.selectionAsync(); }}
-              >
-                <Text style={[styles.countBtnText, baggageCount === n && styles.countBtnTextActive]}>{n}</Text>
-              </Pressable>
-            ))}
+            <Pressable
+              style={[styles.yesNoBtn, hasBaggage && styles.yesNoBtnActive, hasBaggage && { borderColor: "#7C3AED" }]}
+              onPress={() => { setHasBaggage(true); if (baggageCount === 0) setBaggageCount(1); Haptics.selectionAsync(); }}
+            >
+              <Feather name="check-circle" size={18} color={hasBaggage ? "#7C3AED" : "#9CA3AF"} />
+              <Text style={[styles.yesNoText, hasBaggage && { color: "#7C3AED", fontFamily: "Inter_700Bold" }]}>Oui</Text>
+            </Pressable>
           </View>
 
-          {/* Bannière info dynamique */}
-          {baggageCount === 1 && (
-            <View style={[styles.infoBanner, styles.infoBannerGreen]}>
-              <Feather name="check-circle" size={15} color="#059669" />
-              <Text style={[styles.infoBannerText, { color: "#065F46" }]}>
-                1 bagage — Validation automatique, pas de photo requise
-              </Text>
-            </View>
-          )}
-          {baggageCount >= 2 && (
-            <View style={[styles.infoBanner, styles.infoBannerAmber]}>
-              <Feather name="camera" size={15} color="#B45309" />
-              <Text style={[styles.infoBannerText, { color: "#92400E" }]}>
-                {baggageCount} bagages — Photos obligatoires (1 à {MAX_PHOTOS}). Un agent validera avant le départ.
-              </Text>
-            </View>
-          )}
-
-          {/* Zone photos (si ≥ 2 bagages) */}
-          {baggageCount >= 2 && (
-            <View style={styles.photosSection}>
-              <View style={styles.photosSectionHeader}>
-                <Text style={styles.photosTitle}>Photos des bagages</Text>
-                <Text style={styles.photosCount}>{baggagePhotos.length}/{MAX_PHOTOS}</Text>
-              </View>
-
-              <View style={styles.photosGrid}>
-                {baggagePhotos.map((photo, idx) => (
-                  <View key={idx} style={styles.photoThumb}>
-                    <Image source={{ uri: photo.uri }} style={styles.photoImg} contentFit="cover" />
-                    {uploadingIdx === idx && (
-                      <View style={styles.photoOverlay}>
-                        <ActivityIndicator size="small" color="#fff" />
-                      </View>
-                    )}
-                    {uploadingIdx !== idx && photo.url && (
-                      <View style={[styles.photoOverlay, styles.photoSuccess]}>
-                        <Feather name="check" size={14} color="#fff" />
-                      </View>
-                    )}
-                    {uploadingIdx !== idx && (
-                      <Pressable style={styles.photoRemoveBtn} onPress={() => removePhoto(idx)}>
-                        <Feather name="x" size={12} color="#fff" />
-                      </Pressable>
-                    )}
-                  </View>
-                ))}
-
-                {baggagePhotos.length < MAX_PHOTOS && (
-                  <Pressable style={styles.photoAddBtn} onPress={pickPhoto}>
-                    <Feather name="plus" size={22} color="#7C3AED" />
-                    <Text style={styles.photoAddText}>Ajouter</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {baggagePhotos.length === 0 && (
-                <View style={styles.photoEmptyHint}>
-                  <Feather name="alert-circle" size={14} color="#DC2626" />
-                  <Text style={styles.photoEmptyHintText}>Au moins 1 photo est obligatoire</Text>
+          {hasBaggage && (
+            <>
+              {/* Nombre de bagages */}
+              <View style={styles.bagFieldBlock}>
+                <Text style={styles.bagFieldLabel}>Nombre de bagages</Text>
+                <View style={styles.countRow}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <Pressable
+                      key={n}
+                      style={[styles.countBtn, baggageCount === n && styles.countBtnActive]}
+                      onPress={() => { setBaggageCount(n); Haptics.selectionAsync(); }}
+                    >
+                      <Text style={[styles.countBtnText, baggageCount === n && styles.countBtnTextActive]}>{n}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-              )}
-            </View>
+              </View>
+
+              {/* Type de bagage */}
+              <View style={styles.bagFieldBlock}>
+                <Text style={styles.bagFieldLabel}>Type de bagage <Text style={{ color: "#DC2626" }}>*</Text></Text>
+                <View style={styles.typeGrid}>
+                  {BAGGAGE_TYPES.map((t) => {
+                    const active = baggageType === t.key;
+                    return (
+                      <Pressable
+                        key={t.key}
+                        style={[styles.typeCard, active && styles.typeCardActive]}
+                        onPress={() => { setBaggageType(t.key); Haptics.selectionAsync(); }}
+                      >
+                        <Feather name={t.icon} size={20} color={active ? "#7C3AED" : "#9CA3AF"} />
+                        <Text style={[styles.typeLabel, active && { color: "#7C3AED", fontFamily: "Inter_700Bold" }]}>{t.label}</Text>
+                        <Text style={styles.typeDesc}>{t.desc}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Description optionnelle */}
+              <View style={styles.bagFieldBlock}>
+                <Text style={styles.bagFieldLabel}>Description <Text style={{ color: "#9CA3AF" }}>(optionnel)</Text></Text>
+                <TextInput
+                  style={styles.bagDescInput}
+                  placeholder="Ex : Valise bleue 23kg, carton fragile..."
+                  placeholderTextColor={Colors.light.textMuted}
+                  value={baggageDescription}
+                  onChangeText={setBaggageDescription}
+                  multiline
+                  numberOfLines={2}
+                />
+              </View>
+
+              {/* Info banner */}
+              <View style={[styles.infoBanner, styles.infoBannerAmber]}>
+                <Feather name="info" size={14} color="#B45309" />
+                <Text style={[styles.infoBannerText, { color: "#92400E" }]}>
+                  L'agent validera votre bagage à l'embarquement.
+                </Text>
+              </View>
+            </>
           )}
         </View>
       </ScrollView>
@@ -424,15 +362,11 @@ export default function PassengersScreen() {
         <View>
           <Text style={styles.totalLabel}>Total à payer</Text>
           <Text style={styles.totalAmount}>{(booking?.totalAmount ?? 0).toLocaleString()} FCFA</Text>
-          {baggageCount >= 2 && !photosOk && (
-            <Text style={styles.totalWarning}>⚠️ Photos requises</Text>
-          )}
         </View>
         <Pressable
           style={({ pressed }) => [
             styles.continueBtn,
-            (pressed || submitting || (needsPhotos && !photosOk)) && styles.continueBtnPressed,
-            needsPhotos && !photosOk && styles.continueBtnDisabled,
+            (pressed || submitting) && styles.continueBtnPressed,
           ]}
           onPress={handleContinue}
           disabled={submitting}
@@ -521,12 +455,23 @@ const styles = StyleSheet.create({
   bagHeader: { marginBottom: 14 },
   bagTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   bagTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text },
-  bagOptional: { backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  bagOptionalText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: VIOLET },
   bagSubtitle: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
 
+  /* Oui / Non toggle */
+  yesNoRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
+  yesNoBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+    paddingVertical: 13, borderRadius: 12, borderWidth: 2, borderColor: "#E5E7EB", backgroundColor: "#fff",
+  },
+  yesNoBtnActive: { backgroundColor: "#FAFAFF" },
+  yesNoText: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#9CA3AF" },
+
+  /* Bag field blocks */
+  bagFieldBlock: { marginBottom: 12 },
+  bagFieldLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#374151", marginBottom: 8 },
+
   /* Count selector */
-  countRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  countRow: { flexDirection: "row", gap: 8, marginBottom: 0 },
   countBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 12,
     alignItems: "center", justifyContent: "center",
@@ -546,40 +491,24 @@ const styles = StyleSheet.create({
   infoBannerAmber: { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: "#FDE68A" },
   infoBannerText: { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
 
-  /* Photos */
-  photosSection: { marginTop: 4 },
-  photosSectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  photosTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.text },
-  photosCount: { fontSize: 12, fontFamily: "Inter_500Medium", color: VIOLET },
+  /* Type cards */
+  typeGrid: { flexDirection: "row", gap: 8 },
+  typeCard: {
+    flex: 1, alignItems: "center", paddingVertical: 12, paddingHorizontal: 4,
+    borderRadius: 12, borderWidth: 2, borderColor: "#E5E7EB", backgroundColor: "#fff",
+    gap: 4,
+  },
+  typeCardActive: { borderColor: VIOLET, backgroundColor: "#FAFAFF" },
+  typeLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#6B7280" },
+  typeDesc: { fontSize: 10, fontFamily: "Inter_400Regular", color: "#9CA3AF", textAlign: "center" },
 
-  photosGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  photoThumb: { width: 88, height: 88, borderRadius: 12, overflow: "hidden", position: "relative" },
-  photoImg: { width: "100%", height: "100%" },
-  photoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center", alignItems: "center",
+  /* Description input */
+  bagDescInput: {
+    borderWidth: 1.5, borderColor: "#D8B4FE", borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 13,
+    fontFamily: "Inter_400Regular", color: Colors.light.text,
+    backgroundColor: "#fff", minHeight: 60, textAlignVertical: "top",
   },
-  photoSuccess: { backgroundColor: "rgba(5,150,105,0.6)" },
-  photoRemoveBtn: {
-    position: "absolute", top: 4, right: 4,
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: "rgba(220,38,38,0.85)",
-    justifyContent: "center", alignItems: "center",
-  },
-  photoAddBtn: {
-    width: 88, height: 88, borderRadius: 12,
-    borderWidth: 2, borderColor: "#D8B4FE", borderStyle: "dashed",
-    justifyContent: "center", alignItems: "center",
-    backgroundColor: "#F5F3FF", gap: 4,
-  },
-  photoAddText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: VIOLET },
-
-  photoEmptyHint: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    marginTop: 8, paddingHorizontal: 4,
-  },
-  photoEmptyHintText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#DC2626" },
 
   /* 45-min rule banner */
   rule45Card: {

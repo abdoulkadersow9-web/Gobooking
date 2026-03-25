@@ -258,7 +258,7 @@ router.post("/", async (req, res) => {
       return;
     }
 
-    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages, fromStopId, toStopId, baggageCount, baggagePhotos } = req.body;
+    const { tripId, seatIds, passengers, paymentMethod, contactEmail, contactPhone, promoId, bagages, fromStopId, toStopId, baggageCount, baggagePhotos, baggageType, baggageDescription } = req.body;
 
     if (!tripId || !seatIds?.length || !passengers?.length || !paymentMethod || !contactEmail || !contactPhone) {
       res.status(400).json({ error: "Champs requis manquants" });
@@ -371,15 +371,16 @@ router.post("/", async (req, res) => {
         bagages: bagageList as any,
         bagageStatus: (() => {
           const cnt = Number(baggageCount) || bagageList.length;
-          if (cnt === 1) return "accepté";
-          if (cnt >= 2) return "en_attente";
-          return bagageList.length > 0 ? "en_attente" : null;
+          if (cnt > 0) return "en_attente";
+          return null;
         })(),
         bagagePrice,
         fromStopId: fromStopId ?? null,
         toStopId:   toStopId   ?? null,
         baggageCount: Number(baggageCount) || bagageList.length || null,
         baggagePhotos: Array.isArray(baggagePhotos) ? baggagePhotos : [],
+        baggageType: baggageType ?? null,
+        baggageDescription: baggageDescription ?? null,
         qrCode,
       } as any);
 

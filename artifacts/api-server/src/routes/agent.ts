@@ -607,6 +607,11 @@ router.get("/online-bookings", async (req, res) => {
         passengers: b.passengers,
         seatNumbers: b.seatNumbers,
         createdAt: b.createdAt?.toISOString(),
+        baggageCount: (b as any).baggageCount ?? 0,
+        baggageType: (b as any).baggageType ?? null,
+        baggageDescription: (b as any).baggageDescription ?? null,
+        bagageStatus: (b as any).bagageStatus ?? null,
+        bagagePrice: (b as any).bagagePrice ?? 0,
         trip: trip ? {
           id: trip.id,
           from: trip.from,
@@ -662,14 +667,28 @@ router.post("/online-bookings/:id/confirm", async (req, res) => {
       }
     }
 
+    const hasBaggage = ((booking as any).baggageCount ?? 0) > 0;
+
     const [updated] = await db.update(bookingsTable)
-      .set({ status: "confirmed", paymentStatus: "paid" })
+      .set({
+        status: "confirmed",
+        paymentStatus: "paid",
+        ...(hasBaggage ? { bagageStatus: "accepté" } as any : {}),
+      })
       .where(eq(bookingsTable.id, bookingId))
       .returning();
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.BOOKING_CREATE, bookingId, "booking",
       { action: "confirm_online", bookingRef: booking.bookingRef }).catch(() => {});
+
+    if (booking.userId) {
+      sendExpoPush(booking.userId, {
+        title: "✅ Réservation confirmée",
+        body: `Votre réservation ${booking.bookingRef} a été confirmée${hasBaggage ? " avec votre bagage" : ""} !`,
+        data: { type: "booking_confirmed", bookingId: booking.id },
+      }).catch(() => {});
+    }
 
     res.json({
       id: updated.id, bookingRef: updated.bookingRef, status: updated.status,
@@ -678,6 +697,53 @@ router.post("/online-bookings/:id/confirm", async (req, res) => {
   } catch (err) {
     console.error("confirm online-booking error:", err);
     res.status(500).json({ error: "Erreur confirmation réservation" });
+  }
+});
+
+/* ─── POST /agent/online-bookings/:id/cancel — cancel an online booking ─── */
+router.post("/online-bookings/:id/cancel", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bookingId = req.params.id;
+    const { reason } = req.body;
+
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+
+    if (["boarded", "cancelled"].includes(booking.status)) {
+      res.status(400).json({ error: "Cette réservation ne peut pas être annulée" });
+      return;
+    }
+
+    const seatIds: string[] = Array.isArray(booking.seatIds) ? (booking.seatIds as string[]) : [];
+    for (const seatId of seatIds) {
+      await db.update(seatsTable).set({ status: "available" }).where(eq(seatsTable.id, seatId));
+    }
+
+    const [updated] = await db.update(bookingsTable)
+      .set({ status: "cancelled", paymentStatus: "failed" } as any)
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    if (booking.userId) {
+      sendExpoPush(booking.userId, {
+        title: "❌ Réservation annulée",
+        body: `Votre réservation ${booking.bookingRef} a été annulée${reason ? ` : ${reason}` : ""}.`,
+        data: { type: "booking_cancelled", bookingId: booking.id },
+      }).catch(() => {});
+    }
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CREATE, bookingId, "booking",
+      { action: "cancel_online", bookingRef: booking.bookingRef, reason }).catch(() => {});
+
+    res.json({ id: updated.id, bookingRef: updated.bookingRef, status: updated.status, message: "Réservation annulée" });
+  } catch (err) {
+    console.error("cancel online-booking error:", err);
+    res.status(500).json({ error: "Erreur annulation réservation" });
   }
 });
 
