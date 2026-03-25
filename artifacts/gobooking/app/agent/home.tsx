@@ -98,6 +98,19 @@ const ALL_MODULES = [
     border: "#FDA4AF",
     roles: ["suivi"],
   },
+  {
+    id: "reservation",
+    label: "Agent Réservation",
+    sub: "Réservations en ligne",
+    desc: "Confirmer les réservations en ligne, assigner les sièges, générer les tickets",
+    icon: "monitor" as const,
+    emoji: "🖥️",
+    path: "/agent/reservation",
+    color: "#0E7490",
+    gradient: ["#ECFEFF", "#CFFAFE"] as [string, string],
+    border: "#67E8F9",
+    roles: ["agent_reservation"],
+  },
 ];
 
 export default function AgentHome() {
@@ -110,6 +123,7 @@ export default function AgentHome() {
     if (r === "agent_embarquement" || r === "embarquement") return "Agent Embarquement";
     if (r === "agent_colis" || r === "reception_colis") return "Agent Colis";
     if (r === "logistique") return "Agent Logistique";
+    if (r === "agent_reservation") return "Agent Réservation";
     return r;
   };
 

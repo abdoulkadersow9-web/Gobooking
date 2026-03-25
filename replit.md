@@ -25,6 +25,27 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - **GoBooking Admin Web** (`artifacts/gobooking-admin`) — React + Vite web dashboard at `/admin/` for company management (bookings, parcels, agents, trips, analytics, invoices). Uses JWT auth.
 - **API Server** (`artifacts/api-server`) — All routes at `/api`, started from `index.ts`.
 
+## Agent Roles
+- `agent_ticket` / `vente` / `agent_guichet` → /agent/tickets (guichet vente)
+- `agent_embarquement` / `embarquement` → /agent/embarquement
+- `agent_colis` / `reception_colis` → /agent/colis
+- `logistique` → /agent/logistique
+- `route` → /agent/route
+- `suivi` → /agent/suivi
+- `agent_reservation` → /agent/reservation (réservations en ligne) — NEW
+
+## Demo Accounts (password: test123)
+- compagnie@test.com, agent@test.com, admin@test.com
+- logistique@test.com, suivi@test.com, reservation@test.com (NEW)
+
+## Seat Separation System (trips table)
+- `guichet_seats` — seats reserved for guichet sales
+- `online_seats` — seats reserved for online bookings
+- `bookings.booking_source` — "guichet" | "online" | "mobile"
+- Guichet endpoint enforces guichetSeats limit
+- Online confirmation endpoint enforces onlineSeats limit
+- API: GET /agent/online-bookings, POST /agent/online-bookings/:id/confirm, GET /agent/trips/capacity/:tripId
+
 ## Features Implemented
 1. Login / Registration (token-based auth with SHA256 password hashing, role-based registration, inline error messages)
 2. Home screen with bus search (from/to/date/passengers) + recent activity section

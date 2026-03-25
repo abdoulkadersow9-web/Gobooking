@@ -1,0 +1,144 @@
+Améliore la gestion des sièges et ajoute un nouveau rôle "Agent Réservation en ligne" dans mon application GoBooking pour éviter les doublons entre guichet et réservation en ligne.
+
+-----------------------------------
+1. PROBLÈME ACTUEL
+-----------------------------------
+
+- Les sièges ne sont pas séparés entre :
+  - guichet (vente physique)
+  - réservation en ligne
+- Risque de doublon de sièges
+- Pas de contrôle clair par rôle
+
+-----------------------------------
+2. OBJECTIF
+-----------------------------------
+
+- Séparer les sièges en 2 catégories :
+  1. sièges guichet
+  2. sièges réservation en ligne
+- Ajouter un agent dédié :
+  👉 "agent_reservation"
+
+-----------------------------------
+3. STRUCTURE À METTRE EN PLACE
+
+bus = {
+  id,
+  numero: "BUS-001",
+  totalPlaces: 63,
+  placesGuichet: 30,
+  placesEnLigne: 33
+}
+
+-----------------------------------
+4. LOGIQUE DE PROGRAMMATION
+
+Quand la compagnie crée un départ :
+
+Elle doit définir :
+- nombre de places pour guichet
+- nombre de places pour réservation en ligne
+
+EXEMPLE :
+BUS-001
+→ 30 places guichet
+→ 33 places en ligne
+
+-----------------------------------
+5. GESTION DES SIÈGES
+
+Créer deux compteurs séparés :
+
+- placesDisponiblesGuichet
+- placesDisponiblesEnLigne
+
+-----------------------------------
+6. LOGIQUE VENTE GUICHET
+
+Quand agent guichet vend :
+- vérifier placesDisponiblesGuichet > 0
+- décrémenter placesDisponiblesGuichet
+
+-----------------------------------
+7. LOGIQUE RÉSERVATION EN LIGNE
+
+Créer rôle :
+👉 "agent_reservation"
+
+Fonction :
+- voir réservations en ligne
+- confirmer réservations
+
+Quand réservation en ligne :
+- vérifier placesDisponiblesEnLigne > 0
+- décrémenter placesDisponiblesEnLigne
+
+-----------------------------------
+8. ÉVITER DOUBLONS
+
+IMPORTANT :
+
+- Guichet ne doit jamais toucher aux places en ligne
+- Réservation en ligne ne doit jamais toucher aux places guichet
+
+-----------------------------------
+9. MODULE AGENT RÉSERVATION
+
+Créer page :
+👉 "Agent Réservation"
+
+Afficher :
+- liste réservations en attente
+- bouton "Confirmer réservation"
+
+Quand confirmé :
+- générer ticket
+- assigner siège
+- mettre statut = "confirmé"
+
+-----------------------------------
+10. STATUT RÉSERVATION
+
+reservation = {
+  id,
+  clientNom,
+  trajet,
+  statut: "en_attente" | "confirmé"
+}
+
+-----------------------------------
+11. VISIBILITÉ COMPAGNIE
+
+La compagnie doit voir :
+- total places
+- places guichet restantes
+- places en ligne restantes
+- tickets vendus
+- réservations confirmées
+
+-----------------------------------
+12. INTERFACE
+
+Dans création départ ajouter :
+- champ : "Places guichet"
+- champ : "Places en ligne"
+
+-----------------------------------
+CONTRAINTES
+
+- Ne pas casser modules existants
+- Vérifier logique des ventes
+- Vérifier décrémentation correcte
+- Empêcher dépassement de capacité
+
+-----------------------------------
+À LA FIN
+
+- expliquer comment tester :
+  1. créer départ
+  2. définir places guichet / en ligne
+  3. vendre guichet
+  4. réserver en ligne
+  5. confirmer réservation
+- montrer comment éviter les doublons

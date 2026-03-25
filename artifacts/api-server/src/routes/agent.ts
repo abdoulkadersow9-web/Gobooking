@@ -510,7 +510,27 @@ router.post("/reservations", async (req, res) => {
     if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
     const trip = trips[0];
 
-    const count  = Math.max(1, Math.min(10, Number(seatCount) || 1));
+    const count = Math.max(1, Math.min(10, Number(seatCount) || 1));
+
+    /* ── Guichet seat capacity check ─────────────────────────────────────── */
+    if (trip.guichetSeats > 0) {
+      const guichetBookings = await db.select().from(bookingsTable).where(and(
+        eq(bookingsTable.tripId, tripId),
+        eq(bookingsTable.bookingSource, "guichet"),
+        inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+      ));
+      const usedGuichet = guichetBookings.reduce(
+        (acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0
+      );
+      if (usedGuichet + count > trip.guichetSeats) {
+        res.status(400).json({
+          error: `Plus de places guichet disponibles. Places guichet restantes : ${Math.max(0, trip.guichetSeats - usedGuichet)}`,
+          placesRestantes: Math.max(0, trip.guichetSeats - usedGuichet),
+        });
+        return;
+      }
+    }
+
     const amount = trip.price * count;
     const ref    = "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
     const id     = Date.now().toString() + Math.random().toString(36).substr(2, 9);
@@ -533,21 +553,170 @@ router.post("/reservations", async (req, res) => {
       contactPhone:     clientPhone || "",
       contactEmail:     "",
       commissionAmount: Math.round(amount * 0.10),
+      bookingSource:    "guichet",
     }).returning();
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.BOOKING_CREATE, booking.id, "booking",
-      { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod }).catch(() => {});
+      { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod, source: "guichet" }).catch(() => {});
 
     res.status(201).json({
       id: booking.id, bookingRef: booking.bookingRef, tripId: booking.tripId,
       totalAmount: booking.totalAmount, status: booking.status,
       paymentMethod: booking.paymentMethod, passengers: booking.passengers,
-      seatNumbers: booking.seatNumbers, createdAt: booking.createdAt?.toISOString(),
+      seatNumbers: booking.seatNumbers, bookingSource: "guichet",
+      createdAt: booking.createdAt?.toISOString(),
     });
   } catch (err) {
     console.error("Agent create reservation error:", err);
     res.status(500).json({ error: "Échec de la création de la réservation" });
+  }
+});
+
+/* ─── GET /agent/online-bookings — list pending online reservations ─── */
+router.get("/online-bookings", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId = agentRows[0]?.companyId ?? null;
+
+    const conditions = [
+      inArray(bookingsTable.bookingSource, ["online", "mobile"]),
+    ];
+    if (companyId) conditions.push(eq(bookingsTable.companyId, companyId));
+
+    const bookings = await db.select().from(bookingsTable)
+      .where(and(...conditions))
+      .orderBy(desc(bookingsTable.createdAt))
+      .limit(50);
+
+    const enriched = await Promise.all(bookings.map(async (b) => {
+      const trip = b.tripId
+        ? (await db.select().from(tripsTable).where(eq(tripsTable.id, b.tripId)).limit(1))[0]
+        : null;
+      return {
+        id: b.id,
+        bookingRef: b.bookingRef,
+        status: b.status,
+        bookingSource: b.bookingSource,
+        totalAmount: b.totalAmount,
+        paymentMethod: b.paymentMethod,
+        contactPhone: b.contactPhone,
+        passengers: b.passengers,
+        seatNumbers: b.seatNumbers,
+        createdAt: b.createdAt?.toISOString(),
+        trip: trip ? {
+          id: trip.id,
+          from: trip.from,
+          to: trip.to,
+          date: trip.date,
+          departureTime: trip.departureTime,
+          busName: trip.busName,
+          guichetSeats: trip.guichetSeats,
+          onlineSeats: trip.onlineSeats,
+          totalSeats: trip.totalSeats,
+        } : null,
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("online-bookings error:", err);
+    res.status(500).json({ error: "Erreur chargement réservations en ligne" });
+  }
+});
+
+/* ─── POST /agent/online-bookings/:id/confirm — confirm an online booking ─── */
+router.post("/online-bookings/:id/confirm", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bookingId = req.params.id;
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+
+    /* Check online seat capacity */
+    if (booking.tripId) {
+      const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1);
+      const trip = tripRows[0];
+      if (trip && trip.onlineSeats > 0) {
+        const onlineConfirmed = await db.select().from(bookingsTable).where(and(
+          eq(bookingsTable.tripId, booking.tripId),
+          inArray(bookingsTable.bookingSource, ["online", "mobile"]),
+          inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+        ));
+        const usedOnline = onlineConfirmed.reduce(
+          (acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0
+        );
+        const paxCount = Array.isArray(booking.passengers) ? booking.passengers.length : 1;
+        if (usedOnline + paxCount > trip.onlineSeats) {
+          res.status(400).json({
+            error: `Plus de places en ligne disponibles. Places restantes : ${Math.max(0, trip.onlineSeats - usedOnline)}`,
+          });
+          return;
+        }
+      }
+    }
+
+    const [updated] = await db.update(bookingsTable)
+      .set({ status: "confirmed", paymentStatus: "paid" })
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CREATE, bookingId, "booking",
+      { action: "confirm_online", bookingRef: booking.bookingRef }).catch(() => {});
+
+    res.json({
+      id: updated.id, bookingRef: updated.bookingRef, status: updated.status,
+      message: "Réservation confirmée avec succès",
+    });
+  } catch (err) {
+    console.error("confirm online-booking error:", err);
+    res.status(500).json({ error: "Erreur confirmation réservation" });
+  }
+});
+
+/* ─── GET /agent/trips/capacity/:tripId — seats summary per trip ─── */
+router.get("/trips/capacity/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    const allBookings = await db.select().from(bookingsTable).where(and(
+      eq(bookingsTable.tripId, tripId),
+      inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+    ));
+
+    const guichetUsed = allBookings
+      .filter(b => b.bookingSource === "guichet" || !b.bookingSource)
+      .reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+
+    const onlineUsed = allBookings
+      .filter(b => b.bookingSource === "online" || b.bookingSource === "mobile")
+      .reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+
+    res.json({
+      tripId,
+      totalSeats: trip.totalSeats,
+      guichetSeats: trip.guichetSeats,
+      onlineSeats: trip.onlineSeats,
+      guichetUsed,
+      onlineUsed,
+      guichetRestant: Math.max(0, trip.guichetSeats - guichetUsed),
+      onlineRestant: Math.max(0, trip.onlineSeats - onlineUsed),
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur capacité trajet" });
   }
 });
 

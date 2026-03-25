@@ -49,6 +49,7 @@ export const bookingsTable = pgTable("bookings", {
   fromStopId: text("from_stop_id"),
   toStopId:   text("to_stop_id"),
   qrCode:     text("qr_code"),
+  bookingSource: varchar("booking_source", { length: 20 }).default("guichet"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

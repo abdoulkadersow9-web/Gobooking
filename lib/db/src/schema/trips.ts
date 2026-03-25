@@ -18,6 +18,8 @@ export const tripsTable = pgTable("trips", {
   busType: varchar("bus_type", { length: 100 }).notNull(),
   busName: varchar("bus_name", { length: 100 }).notNull(),
   totalSeats: integer("total_seats").notNull(),
+  guichetSeats: integer("guichet_seats").notNull().default(0),
+  onlineSeats: integer("online_seats").notNull().default(0),
   duration: varchar("duration", { length: 20 }).notNull(),
   amenities: json("amenities").$type<string[]>().notNull().default([]),
   stops: json("stops").$type<{ name: string; time: string }[]>().notNull().default([]),

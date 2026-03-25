@@ -14,7 +14,8 @@ import { registerForPushNotifications } from "@/utils/notifications";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
-  | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique" | "suivi";
+  | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique" | "suivi"
+  | "agent_reservation";
 
 export interface User {
   id: string;
@@ -48,6 +49,7 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
   if (agentRole === "route")             return "/agent/route";
   if (agentRole === "logistique")        return "/agent/logistique";
   if (agentRole === "suivi")             return "/agent/suivi";
+  if (agentRole === "agent_reservation") return "/agent/reservation";
   return "/agent/home";
 }
 
@@ -63,6 +65,7 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   route:              "Agent En Route",
   logistique:         "Agent Logistique",
   suivi:              "Agent Suivi",
+  agent_reservation:  "Agent Réservation",
 };
 
 export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
@@ -77,6 +80,7 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
   route:              { bg: "#FFE4CC", text: "#9A3412" },
   logistique:         { bg: "#E0F2FE", text: "#0369A1" },
   suivi:              { bg: "#FFF1F2", text: "#BE123C" },
+  agent_reservation:  { bg: "#ECFEFF", text: "#0E7490" },
 };
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
