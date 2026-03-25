@@ -436,13 +436,13 @@ export default function RouteScreen() {
 
               {/* Bande GPS — toujours visible */}
               <View style={[S.gpsStrip, { borderColor: gps.active ? "#A7F3D0" : "#E2E8F0", backgroundColor: gps.active ? "#F0FDF4" : "#F8FAFC" }]}>
-                <View style={[S.gpsDotSmall, { backgroundColor: gpsColor }]} />
-                <Ionicons name="location" size={14} color={gps.active ? G : "#94A3B8"} />
+                <View style={[S.gpsPulse, { backgroundColor: gpsColor }]} />
+                <Ionicons name="navigate" size={15} color={gps.active ? G : "#94A3B8"} />
                 <Text style={[S.gpsStripTxt, { color: gps.active ? G_DARK : "#64748B" }]}>
                   {gps.active
                     ? (gps.lat && gps.lon
-                        ? `GPS · ${gps.lat.toFixed(4)}° N, ${gps.lon.toFixed(4)}° E`
-                        : "GPS actif — position en attente")
+                        ? `${gps.lat.toFixed(4)}° N, ${gps.lon.toFixed(4)}° E`
+                        : "GPS actif — signal en attente")
                     : (gps.error ? "GPS indisponible" : "Démarrage GPS…")}
                 </Text>
                 {gps.active && (
@@ -501,11 +501,13 @@ export default function RouteScreen() {
                   <Text style={S.sectionTitle}>Liste des passagers</Text>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     <View style={[S.countBadge, { backgroundColor: G }]}>
-                      <Text style={S.countBadgeTxt}>✅ {boardedCount} à bord</Text>
+                      <Ionicons name="checkmark-circle" size={13} color="#fff" />
+                      <Text style={S.countBadgeTxt}>{boardedCount} à bord</Text>
                     </View>
                     {pendingCount > 0 && (
                       <View style={[S.countBadge, { backgroundColor: AMBER }]}>
-                        <Text style={S.countBadgeTxt}>⏳ {pendingCount}</Text>
+                        <Ionicons name="time-outline" size={13} color="#fff" />
+                        <Text style={S.countBadgeTxt}>{pendingCount}</Text>
                       </View>
                     )}
                   </View>
@@ -523,25 +525,35 @@ export default function RouteScreen() {
 
                 {!passLoading && passengers.map((p, i) => {
                   const isBoarded   = p.status === "boarded" || p.status === "confirmed";
-                  const statusBg    = isBoarded ? "#DCFCE7" : "#FEF9C3";
-                  const statusColor = isBoarded ? "#166534" : "#92400E";
-                  const statusText  = isBoarded ? "✅ À bord" : "⏳ En attente";
+                  const isAbsent    = p.status === "absent" || p.status === "no_show";
+                  const statusBg    = isBoarded ? "#DCFCE7" : isAbsent ? "#FEE2E2" : "#FEF9C3";
+                  const statusColor = isBoarded ? "#166534" : isAbsent ? "#991B1B" : "#92400E";
+                  const statusIcon  = isBoarded
+                    ? <Ionicons name="checkmark-circle" size={15} color="#166534" />
+                    : isAbsent
+                    ? <Ionicons name="close-circle"     size={15} color="#991B1B" />
+                    : <Ionicons name="time-outline"     size={15} color="#92400E" />;
+                  const statusText  = isBoarded ? "À bord" : isAbsent ? "Non monté" : "En attente";
                   return (
                     <View key={i} style={S.passengerCard}>
                       {/* Ligne 1 : avatar + nom + statut */}
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        <View style={[S.passengerAvatar, { backgroundColor: isBoarded ? G : "#94A3B8" }]}>
+                        <View style={[S.passengerAvatar, { backgroundColor: isBoarded ? G : isAbsent ? "#EF4444" : "#94A3B8" }]}>
                           <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={S.passengerName}>{p.name}</Text>
                           {p.phone
-                            ? <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}>
-                                <Text style={S.passengerPhone}>📞 {p.phone}</Text>
+                            ? <TouchableOpacity
+                                style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
+                                onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}>
+                                <Feather name="phone" size={11} color={G} />
+                                <Text style={S.passengerPhone}>{p.phone}</Text>
                               </TouchableOpacity>
                             : <Text style={S.passengerNoPhone}>Pas de téléphone</Text>}
                         </View>
-                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          {statusIcon}
                           <Text style={{ fontSize: 12, fontWeight: "700", color: statusColor }}>{statusText}</Text>
                         </View>
                       </View>
@@ -734,14 +746,14 @@ export default function RouteScreen() {
                 {/* Statut du trajet */}
                 <Text style={[S.sectionTitle, { marginTop: 8 }]}>Statut du trajet</Text>
                 <View style={S.timeline}>
-                  {[
-                    { icon: "✅", label: "Départ effectué", done: true },
-                    { icon: "🚌", label: "En route vers " + activeTrip.to, done: true, active: true },
-                    { icon: "📍", label: "Arrivée à " + activeTrip.to, done: false },
-                  ].map((step, i) => (
+                  {([
+                    { iconName: "checkmark" as const,  iconColor: "#166534", label: "Départ effectué",          done: true,  active: false },
+                    { iconName: "bus"       as const,  iconColor: "#fff",    label: "En route vers " + activeTrip.to, done: true,  active: true  },
+                    { iconName: "location"  as const,  iconColor: "#94A3B8", label: "Arrivée à " + activeTrip.to,     done: false, active: false },
+                  ]).map((step, i) => (
                     <View key={i} style={S.timelineRow}>
                       <View style={[S.timelineDot, step.active && S.timelineDotActive, step.done && !step.active && S.timelineDotDone]}>
-                        <Text style={{ fontSize: 10 }}>{step.icon}</Text>
+                        <Ionicons name={step.iconName} size={13} color={step.active ? "#fff" : step.done ? "#166534" : "#94A3B8"} />
                       </View>
                       {i < 2 && <View style={[S.timelineLine, step.done && !step.active && S.timelineLineDone]} />}
                       <Text style={[S.timelineLabel, step.active && S.timelineLabelActive]}>{step.label}</Text>
@@ -1010,7 +1022,7 @@ const S = StyleSheet.create({
   /* GPS strip (inside trip card) */
   gpsStrip:     { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10,
                   paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
-  gpsDotSmall:  { width: 7, height: 7, borderRadius: 4 },
+  gpsPulse:     { width: 8, height: 8, borderRadius: 4 },
   gpsStripTxt:  { fontSize: 12, fontWeight: "600", flex: 1 },
   gpsLiveBadge: { backgroundColor: "#DCFCE7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   gpsLiveTxt:   { fontSize: 10, fontWeight: "800", color: "#166534" },
@@ -1037,7 +1049,8 @@ const S = StyleSheet.create({
 
   /* Passenger list header */
   passengerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-  countBadge:   { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  countBadge:   { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5,
+                  flexDirection: "row", alignItems: "center", gap: 4 },
   countBadgeTxt:{ fontSize: 12, fontWeight: "800", color: "#fff" },
 
   /* Passenger card */
@@ -1046,7 +1059,7 @@ const S = StyleSheet.create({
   passengerAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
   passengerAvatarTxt: { fontSize: 19, fontWeight: "800", color: "#fff" },
   passengerName:{ fontSize: 15, fontWeight: "800", color: "#0F172A" },
-  passengerPhone:{ fontSize: 12, color: G, marginTop: 2, textDecorationLine: "underline" },
+  passengerPhone:{ fontSize: 12, color: G, textDecorationLine: "underline" },
   passengerNoPhone: { fontSize: 12, color: "#CBD5E1", marginTop: 2 },
   divider:      { height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 },
   tagGreen:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0FDF4",
