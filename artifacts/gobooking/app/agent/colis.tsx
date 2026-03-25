@@ -38,15 +38,19 @@ const DELIVERY_TYPES = [
 
 const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
   créé:          { label: "Créé",           color: "#6B7280", bg: "#F3F4F6" },
+  cree:          { label: "Créé",           color: "#6B7280", bg: "#F3F4F6" },
   en_attente:    { label: "En attente",     color: "#6B7280", bg: "#F3F4F6" },
   en_gare:       { label: "En gare",        color: "#D97706", bg: "#FEF3C7" },
   "chargé_bus":  { label: "Chargé bus",     color: "#7C3AED", bg: "#EDE9FE" },
   en_transit:    { label: "En transit",     color: "#2563EB", bg: "#DBEAFE" },
-  arrivé:        { label: "Arrivé",         color: G,         bg: "#D1FAE5" },
+  en_route:      { label: "En route",       color: "#2563EB", bg: "#DBEAFE" },
+  arrivé:        { label: "Arrivé ✅",      color: G,         bg: "#D1FAE5" },
+  arrive:        { label: "Arrivé ✅",      color: G,         bg: "#D1FAE5" },
   en_livraison:  { label: "En livraison 🛵",color: "#EA580C", bg: "#FFF7ED" },
   livré:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
   livre:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
   retiré:        { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5" },
+  retire:        { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5" },
   annulé:        { label: "Annulé",         color: "#DC2626", bg: "#FEE2E2" },
   arrive_gare_depart: { label: "Arrivé gare", color: G,       bg: "#D1FAE5" },
 };
@@ -56,21 +60,31 @@ type NextAction = { label: string; route: string; color: string };
 function getNextAction(parcel: Parcel): NextAction | null {
   const s = parcel.status;
   const isHomeDelivery = parcel.deliveryType === "livraison_domicile";
-  if (s === "créé" || s === "en_attente")
-    return { label: "Enregistrer en gare", route: "en-gare",          color: "#D97706" };
+  if (s === "créé" || s === "cree" || s === "en_attente")
+    return { label: "📋 Enregistrer en gare", route: "en-gare",       color: "#D97706" };
   if (s === "en_gare" || s === "arrive_gare_depart")
-    return { label: "Charger dans bus",    route: "charge-bus",        color: P };
+    return { label: "🚌 Charger dans bus",     route: "charge-bus",    color: P };
   if (s === "chargé_bus")
-    return { label: "Déclarer en transit", route: "transit",           color: "#2563EB" };
-  if (s === "en_transit")
-    return { label: "Confirmer arrivée",   route: "arrive",            color: G };
-  if (s === "arrivé") {
+    return { label: "🔄 Déclarer en transit",  route: "transit",       color: "#2563EB" };
+  if (s === "en_transit" || s === "en_route")
+    return { label: "📍 Confirmer arrivée",    route: "arrive",        color: G };
+  if (s === "arrivé" || s === "arrive") {
     if (isHomeDelivery)
-      return { label: "🛵 Lancer livraison", route: "lancer-livraison", color: "#EA580C" };
-    return { label: "✅ Retrait en gare",  route: "retirer",           color: "#065F46" };
+      return { label: "🛵 Lancer la livraison", route: "lancer-livraison", color: "#EA580C" };
+    return { label: "✅ Retirer en gare",       route: "retirer",          color: "#065F46" };
   }
   if (s === "en_livraison")
-    return { label: "✅ Marquer comme livré", route: "deliver",         color: "#065F46" };
+    return { label: "✅ Confirmer livraison",   route: "deliver",      color: "#065F46" };
+  return null;
+}
+
+function getNotifMessage(action: string, parcel: Parcel): string | null {
+  const ref = parcel.trackingRef;
+  const to  = parcel.toCity;
+  if (action === "arrive")          return `Votre colis ${ref} est arrivé à ${to}. Venez le retirer en gare.`;
+  if (action === "retirer")         return `Votre colis ${ref} a été retiré avec succès. Merci !`;
+  if (action === "lancer-livraison")return `Votre colis ${ref} est en cours de livraison à domicile. Restez disponible.`;
+  if (action === "deliver")         return `Votre colis ${ref} a été livré. Bonne réception !`;
   return null;
 }
 
@@ -92,7 +106,7 @@ interface Parcel {
   createdAt: string;
 }
 
-type TabType = "creer" | "liste" | "scanner";
+type TabType = "creer" | "liste" | "retrait";
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUSES[status] ?? { label: status, color: "#6B7280", bg: "#F3F4F6" };
@@ -106,7 +120,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function ColisScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
-  const [tab, setTab]           = useState<TabType>("creer");
+  const [tab, setTab]           = useState<TabType>("retrait");
 
   const isAgent = user?.role === "agent";
 
@@ -146,18 +160,18 @@ export default function ColisScreen() {
 
       {/* Tabs */}
       <View style={S.tabs}>
-        {(["creer", "liste", "scanner"] as TabType[]).map(t => (
+        {(["retrait", "liste", "creer"] as TabType[]).map(t => (
           <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
             <Text style={[S.tabTxt, tab === t && S.tabTxtActive]}>
-              {t === "creer" ? "➕ Créer" : t === "liste" ? "📋 Liste" : "📷 Scanner"}
+              {t === "retrait" ? "📦 Retrait" : t === "liste" ? "📋 Liste" : "➕ Créer"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
+      {tab === "retrait" && <RetraitTab token={token} networkStatus={networkStatus} />}
+      {tab === "liste"   && <ListTab   token={token} setTab={setTab} />}
       {tab === "creer"   && <CreateTab token={token} networkStatus={networkStatus} />}
-      {tab === "liste"   && <ListTab   token={token} />}
-      {tab === "scanner" && <ScannerTab token={token} networkStatus={networkStatus} />}
     </SafeAreaView>
   );
 }
@@ -542,7 +556,7 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
 /* ═══════════════════════════════════════════
    TAB 2 — Liste des colis
    ═══════════════════════════════════════════ */
-function ListTab({ token }: { token: string | null }) {
+function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): void }) {
   const [parcels, setParcels]   = useState<Parcel[]>([]);
   const [loading, setLoading]   = useState(false);
   const [filter, setFilter]     = useState("tous");
@@ -583,16 +597,35 @@ function ListTab({ token }: { token: string | null }) {
     ]);
   };
 
-  const FILTERS = ["tous", "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "en_livraison", "retiré", "livré"];
+  const FILTERS = ["tous", "⚡ Action", "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "en_livraison", "retiré", "livré"];
+
+  const parcelsNeedingAction = parcels.filter(p => getNextAction(p) !== null && (p.status === "arrivé" || p.status === "arrive" || p.status === "en_livraison"));
+  const displayedParcels = filter === "⚡ Action"
+    ? parcels.filter(p => getNextAction(p) !== null)
+    : filter !== "tous"
+      ? parcels.filter(p => p.status === filter)
+      : parcels;
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F5F3FF" }}>
+      {/* Action needed banner */}
+      {filter === "tous" && parcelsNeedingAction.length > 0 && (
+        <TouchableOpacity onPress={() => setFilter("⚡ Action")}
+          style={{ margin: 12, marginBottom: 4, backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#FCD34D" }}>
+          <Ionicons name="flash" size={18} color="#D97706" />
+          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#D97706" }}>
+            {parcelsNeedingAction.length} colis en attente d'action (retrait/livraison)
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#D97706" />
+        </TouchableOpacity>
+      )}
+
       {/* Filter chips */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 52 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
         {FILTERS.map(f => (
-          <TouchableOpacity key={f} style={[SL.chip, filter === f && SL.chipActive]} onPress={() => setFilter(f)}>
-            <Text style={[SL.chipTxt, filter === f && SL.chipTxtActive]}>
-              {f === "tous" ? "Tous" : (STATUSES[f]?.label ?? f)}
+          <TouchableOpacity key={f} style={[SL.chip, filter === f && SL.chipActive, f === "⚡ Action" && { borderColor: "#D97706", backgroundColor: filter === f ? "#D97706" : "#FFFBEB" }]} onPress={() => setFilter(f)}>
+            <Text style={[SL.chipTxt, filter === f && SL.chipTxtActive, f === "⚡ Action" && filter !== f && { color: "#D97706" }]}>
+              {f === "tous" ? "Tous" : f === "⚡ Action" ? "⚡ Action" : (STATUSES[f]?.label ?? f)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -606,8 +639,15 @@ function ListTab({ token }: { token: string | null }) {
           <TouchableOpacity onPress={load}><Text style={{ color: P, fontWeight: "600" }}>Actualiser</Text></TouchableOpacity>
         </View>
       )}
+      {!loading && displayedParcels.length === 0 && parcels.length > 0 && (
+        <View style={{ alignItems: "center", marginTop: 40, gap: 8 }}>
+          <Text style={{ fontSize: 36 }}>📦</Text>
+          <Text style={{ fontSize: 15, color: "#9CA3AF" }}>Aucun colis pour ce filtre</Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={{ padding: 12, gap: 10 }}>
-        {parcels.map(p => {
+        {displayedParcels.map(p => {
           const nextAction = getNextAction(p);
           return (
             <View key={p.id} style={SL.card}>
@@ -668,21 +708,23 @@ function ListTab({ token }: { token: string | null }) {
 }
 
 /* ═══════════════════════════════════════════
-   TAB 3 — Scanner / Tracker
+   TAB 3 — Retrait / Livraison
    ═══════════════════════════════════════════ */
-function ScannerTab({ token, networkStatus }: { token: string | null; networkStatus: any }) {
+function RetraitTab({ token, networkStatus }: { token: string | null; networkStatus: any }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning]   = useState(false);
   const [manualRef, setManualRef] = useState("");
   const [colis, setColis]         = useState<Parcel | null>(null);
   const [loading, setLoading]     = useState(false);
   const [updating, setUpdating]   = useState(false);
+  const [lastAction, setLastAction] = useState<{ label: string; notif: string | null } | null>(null);
   const lastScan = useRef<string>("");
 
-  const search = async (ref: string) => {
+  const search = useCallback(async (ref: string) => {
     if (!ref.trim()) { Alert.alert("Erreur", "Entrez un numéro de suivi."); return; }
     setLoading(true);
     setColis(null);
+    setLastAction(null);
     try {
       const res = await apiFetch<Parcel>(`/parcels/track/${ref.trim()}`, { token: token ?? undefined });
       setColis(res);
@@ -691,7 +733,7 @@ function ScannerTab({ token, networkStatus }: { token: string | null; networkSta
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   const handleQR = (data: string) => {
     if (data === lastScan.current) return;
@@ -703,104 +745,200 @@ function ScannerTab({ token, networkStatus }: { token: string | null; networkSta
     search(ref);
   };
 
-  const handleStatusUpdate = async () => {
+  const handleAction = async (action: { label: string; route: string; color: string }) => {
     if (!colis) return;
-    const next = getNextAction(colis);
-    if (!next) { Alert.alert("Info", "Ce colis ne peut plus être mis à jour."); return; }
-    Alert.alert(next.label, `Confirmer pour : ${colis.trackingRef} ?`, [
-      { text: "Annuler", style: "cancel" },
-      { text: "Confirmer", onPress: async () => {
-        setUpdating(true);
-        try {
-          await apiFetch(`/agent/parcels/${colis.id}/${next.route}`, { token: token ?? undefined, method: "POST", body: {} });
-          await search(colis.trackingRef);
-        } catch (e: any) {
-          Alert.alert("Erreur", e?.message ?? "Mise à jour impossible.");
-        } finally {
-          setUpdating(false);
-        }
-      }},
-    ]);
+    setUpdating(true);
+    try {
+      await apiFetch(`/agent/parcels/${colis.id}/${action.route}`, { token: token ?? undefined, method: "POST", body: {} });
+      const notif = getNotifMessage(action.route, colis);
+      setLastAction({ label: action.label, notif });
+      await search(colis.trackingRef);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Mise à jour impossible.");
+    } finally {
+      setUpdating(false);
+    }
   };
 
+  const na = colis ? getNextAction(colis) : null;
+  const isHomeDelivery = colis?.deliveryType === "livraison_domicile";
+  const isDone = colis && (colis.status === "retiré" || colis.status === "retire" || colis.status === "livré" || colis.status === "livre");
+
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#F5F3FF" }} contentContainerStyle={{ padding: 16, gap: 14 }}>
-      {/* Scanner cam */}
+    <ScrollView style={{ flex: 1, backgroundColor: "#F5F3FF" }} contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+
+      {/* STEP 1: Scan / Search */}
       <View style={SS.card}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <Text style={SS.cardTitle}>Scanner un QR code</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <Text style={SS.cardTitle}>🔍 Identifier le colis</Text>
           <TouchableOpacity style={[SS.scanToggle, scanning && SS.scanToggleActive]}
             onPress={async () => {
               if (!permission?.granted) await requestPermission();
               setScanning(v => !v);
             }}>
-            <Feather name="camera" size={16} color={scanning ? "#fff" : P} />
-            <Text style={[SS.scanToggleTxt, scanning && { color: "#fff" }]}>{scanning ? "Fermer" : "Ouvrir caméra"}</Text>
+            <Feather name="camera" size={15} color={scanning ? "#fff" : P} />
+            <Text style={[SS.scanToggleTxt, scanning && { color: "#fff" }]}>{scanning ? "Fermer" : "Scanner QR"}</Text>
           </TouchableOpacity>
         </View>
+
         {scanning && permission?.granted && (
-          <View style={{ height: 220, borderRadius: 12, overflow: "hidden" }}>
+          <View style={{ height: 200, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
             <CameraView style={{ flex: 1 }} facing="back"
               onBarcodeScanned={({ data }) => handleQR(data)} barcodeScannerSettings={{ barcodeTypes: ["qr"] }} />
             <View style={{ position: "absolute", inset: 0, justifyContent: "center", alignItems: "center" }}>
-              <View style={{ width: 160, height: 160, borderWidth: 2, borderColor: "#fff", borderRadius: 12 }} />
+              <View style={{ width: 150, height: 150, borderWidth: 2.5, borderColor: "#A78BFA", borderRadius: 12 }} />
+              <Text style={{ color: "#fff", fontSize: 11, marginTop: 8, backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
+                Pointez vers le QR du colis
+              </Text>
             </View>
           </View>
         )}
         {scanning && !permission?.granted && (
-          <TouchableOpacity onPress={requestPermission} style={{ padding: 12, alignItems: "center" }}>
-            <Text style={{ color: P }}>Autoriser l'accès à la caméra</Text>
+          <TouchableOpacity onPress={requestPermission} style={{ padding: 14, alignItems: "center", backgroundColor: P_LIGHT, borderRadius: 10 }}>
+            <Text style={{ color: P, fontWeight: "600" }}>Autoriser l'accès à la caméra</Text>
           </TouchableOpacity>
         )}
-      </View>
 
-      {/* Manual search */}
-      <View style={SS.card}>
-        <Text style={SS.cardTitle}>Recherche par référence</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <TextInput style={[SS.input, { flex: 1 }]} placeholder="Ex: PKG-20260324-ABC"
-            value={manualRef} onChangeText={setManualRef} autoCapitalize="characters" />
+        <View style={{ flexDirection: "row", gap: 8, marginTop: scanning ? 8 : 0 }}>
+          <TextInput style={[SS.input, { flex: 1 }]} placeholder="Code colis (ex: PKG-20260324-ABC)"
+            value={manualRef} onChangeText={setManualRef} autoCapitalize="characters"
+            onSubmitEditing={() => search(manualRef)} returnKeyType="search" />
           <TouchableOpacity style={SS.searchBtn} onPress={() => search(manualRef)} disabled={loading}>
             {loading ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="search" size={18} color="#fff" />}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Result */}
+      {/* Notification sent feedback */}
+      {lastAction && (
+        <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: "#86EFAC", gap: 6 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#16A34A" }}>Action effectuée : {lastAction.label}</Text>
+          </View>
+          {lastAction.notif && (
+            <View style={{ backgroundColor: "#DCFCE7", borderRadius: 8, padding: 10, marginTop: 4 }}>
+              <Text style={{ fontSize: 11, color: "#166534", fontWeight: "600", marginBottom: 3 }}>📱 SMS envoyé au client :</Text>
+              <Text style={{ fontSize: 12, color: "#15803D", fontStyle: "italic" }}>"{lastAction.notif}"</Text>
+              <Text style={{ fontSize: 10, color: "#86EFAC", marginTop: 4 }}>→ {colis?.receiverPhone}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* STEP 2: Colis result card */}
       {colis && (
-        <View style={SS.resultCard}>
+        <View style={[SS.resultCard, isDone && { borderColor: "#86EFAC" }]}>
+          {/* Header */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-            <View>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: P }}>{colis.trackingRef}</Text>
-              <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 2 }}>{colis.fromCity} → {colis.toCity}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: P }}>{colis.trackingRef}</Text>
+              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "600", marginTop: 2 }}>{colis.fromCity} → {colis.toCity}</Text>
             </View>
             <StatusBadge status={colis.status} />
           </View>
+
+          {/* Delivery mode badge (prominent) */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: isHomeDelivery ? "#FFF7ED" : "#F0FDF4", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+            <Text style={{ fontSize: 20 }}>{isHomeDelivery ? "🛵" : "🏢"}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "800", color: isHomeDelivery ? "#EA580C" : "#065F46" }}>
+                {isHomeDelivery ? "Livraison à domicile" : "Retrait en gare"}
+              </Text>
+              <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
+                {isHomeDelivery ? "Le client attend une livraison chez lui" : "Le client vient chercher en gare"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Parcel details */}
           {[
-            { label: "Expéditeur",   val: `${colis.senderName} · ${colis.senderPhone}` },
-            { label: "Destinataire", val: `${colis.receiverName} · ${colis.receiverPhone}` },
-            { label: "Type",         val: colis.parcelType },
-            { label: "Montant",      val: `${Number(colis.amount).toLocaleString()} FCFA` },
+            { icon: "person-outline" as const, label: "Expéditeur",   val: `${colis.senderName}` },
+            { icon: "person-add-outline" as const, label: "Destinataire", val: `${colis.receiverName}` },
+            { icon: "call-outline" as const,    label: "Tél. destinataire", val: colis.receiverPhone },
+            { icon: "cube-outline" as const,    label: "Type",         val: colis.parcelType },
+            { icon: "cash-outline" as const,    label: "Montant",      val: `${Number(colis.amount).toLocaleString()} FCFA` },
           ].map(r => (
-            <View key={r.label} style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5, borderBottomWidth: 1, borderColor: "#EDE9FE" }}>
-              <Text style={{ fontSize: 13, color: "#6B7280" }}>{r.label}</Text>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: "#111827", flexShrink: 1, textAlign: "right" }}>{r.val}</Text>
+            <View key={r.label} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderColor: "#EDE9FE" }}>
+              <Ionicons name={r.icon} size={15} color="#9CA3AF" />
+              <Text style={{ fontSize: 12, color: "#6B7280", width: 110 }}>{r.label}</Text>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#111827", flex: 1 }}>{r.val}</Text>
             </View>
           ))}
-          {(() => {
-            const na = getNextAction(colis);
-            return na ? (
+
+          {/* Done state */}
+          {isDone && (
+            <View style={{ alignItems: "center", paddingTop: 14, gap: 4 }}>
+              <Ionicons name="checkmark-circle" size={36} color="#16A34A" />
+              <Text style={{ fontSize: 14, fontWeight: "800", color: "#16A34A" }}>Colis finalisé</Text>
+              <Text style={{ fontSize: 12, color: "#6B7280" }}>Aucune action supplémentaire requise</Text>
+            </View>
+          )}
+
+          {/* Action button(s) */}
+          {!isDone && na && (
+            <View style={{ marginTop: 12, gap: 10 }}>
+              {/* Notification preview */}
+              {(na.route === "retirer" || na.route === "lancer-livraison" || na.route === "deliver" || na.route === "arrive") && (
+                <View style={{ backgroundColor: "#F0F9FF", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: "#BAE6FD" }}>
+                  <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "600" }}>📱 SMS sera envoyé au destinataire ({colis.receiverPhone}) :</Text>
+                  <Text style={{ fontSize: 11, color: "#0284C7", marginTop: 3, fontStyle: "italic" }}>
+                    "{getNotifMessage(na.route, colis)}"
+                  </Text>
+                </View>
+              )}
+
               <TouchableOpacity
-                style={[SS.updateBtn, { borderColor: na.color, backgroundColor: na.color + "15" }]}
-                onPress={handleStatusUpdate} disabled={updating}>
-                {updating ? <ActivityIndicator size="small" color={na.color} /> : (
-                  <Text style={[SS.updateTxt, { color: na.color }]}>{na.label}</Text>
-                )}
+                style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
+                onPress={() => {
+                  Alert.alert(na.label, `Confirmer pour : ${colis.trackingRef} ?`, [
+                    { text: "Annuler", style: "cancel" },
+                    { text: "Confirmer", onPress: () => handleAction(na) },
+                  ]);
+                }}
+                disabled={updating}
+              >
+                {updating
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>{na.label}</Text><Ionicons name="arrow-forward-circle" size={20} color="#fff" /></>
+                }
               </TouchableOpacity>
-            ) : null;
-          })()}
+            </View>
+          )}
+
+          {/* No action but not done */}
+          {!isDone && !na && (
+            <View style={{ alignItems: "center", paddingTop: 10, gap: 4 }}>
+              <Ionicons name="hourglass-outline" size={28} color="#D97706" />
+              <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "600" }}>En attente d'étape précédente</Text>
+              <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center" }}>Ce colis doit d'abord passer par une autre étape (chargement, transit…)</Text>
+            </View>
+          )}
         </View>
       )}
+
+      {/* Workflow guide */}
+      <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 8, borderWidth: 1, borderColor: "#E5E7EB" }}>
+        <Text style={{ fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 4 }}>📋 Flux de suivi colis</Text>
+        {[
+          { icon: "📝", step: "1. Créé",          desc: "Colis enregistré" },
+          { icon: "🏢", step: "2. En gare",        desc: "Déposé à la gare de départ" },
+          { icon: "🚌", step: "3. Chargé bus",     desc: "Mis dans le bus" },
+          { icon: "🔄", step: "4. En transit",     desc: "En route vers destination" },
+          { icon: "📍", step: "5. Arrivé ✅",      desc: "À destination → SMS client" },
+          { icon: "✅", step: "6a. Retiré",        desc: "(Gare) Client vient chercher → SMS" },
+          { icon: "🛵", step: "6b. En livraison",  desc: "(Domicile) Livreur part → SMS" },
+          { icon: "🎁", step: "7b. Livré",         desc: "Livraison confirmée → SMS" },
+        ].map(s => (
+          <View key={s.step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+            <Text style={{ fontSize: 14, width: 22 }}>{s.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151" }}>{s.step}</Text>
+              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{s.desc}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
     </ScrollView>
   );
 }

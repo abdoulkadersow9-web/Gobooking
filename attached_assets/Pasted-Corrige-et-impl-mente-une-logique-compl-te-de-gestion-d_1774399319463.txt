@@ -1,0 +1,175 @@
+Corrige et implémente une logique complète de gestion des colis dans mon application GoBooking.
+
+-----------------------------------
+1. PROBLÈME ACTUEL
+-----------------------------------
+
+- Le module création colis existe
+- Mais il n’y a pas de vraie logique métier
+- Le retrait colis ne fonctionne pas correctement
+- Il n’y a pas de suivi clair ni de notification
+
+-----------------------------------
+2. OBJECTIF GLOBAL
+-----------------------------------
+
+Mettre en place une vraie logique :
+
+👉 Création colis
+👉 Arrivée colis
+👉 Retrait OU livraison
+👉 Notification client
+
+-----------------------------------
+3. STRUCTURE COLIS À CORRIGER
+
+colis = {
+  id,
+  code: "GB-C001",
+  expediteurNom,
+  expediteurTel,
+  destinataireNom,
+  destinataireTel,
+  villeDepart,
+  villeArrivee,
+  modeReception: "gare" | "domicile",
+  statut: 
+    "cree" |
+    "en_route" |
+    "arrive" |
+    "retire" |
+    "en_livraison" |
+    "livre",
+  createdAt,
+  updatedAt
+}
+
+-----------------------------------
+4. LOGIQUE COMPLÈTE
+
+ÉTAPE 1 : CRÉATION
+- statut = "cree"
+
+ÉTAPE 2 : TRANSPORT
+- statut = "en_route"
+
+ÉTAPE 3 : ARRIVÉE
+- statut = "arrive"
+
+👉 Dès que statut = "arrive"
+ENVOYER MESSAGE AU CLIENT :
+
+"Votre colis est arrivé à destination"
+
+-----------------------------------
+5. RETRAIT COLIS (GARE)
+
+Si modeReception = "gare"
+
+Ajouter fonction :
+
+👉 Scanner QR code OU saisir code colis
+
+Si trouvé :
+- bouton "Retirer colis"
+
+Quand cliqué :
+- statut = "retire"
+
+Envoyer message :
+
+"Votre colis a été retiré avec succès"
+
+-----------------------------------
+6. LIVRAISON DOMICILE
+
+Si modeReception = "domicile"
+
+Quand colis arrive :
+- statut = "arrive"
+
+Ajouter bouton :
+👉 "Lancer livraison"
+
+Quand cliqué :
+- statut = "en_livraison"
+
+Envoyer message :
+
+"Votre colis est en cours de livraison"
+
+Quand livré :
+- bouton "Confirmer livraison"
+- statut = "livre"
+
+Envoyer message :
+
+"Votre colis a été livré"
+
+-----------------------------------
+7. MODULE AGENT COLIS À CORRIGER
+
+Ajouter 3 onglets :
+
+1. Créer colis
+2. Liste colis
+3. Retrait / Livraison
+
+-----------------------------------
+8. RECHERCHE COLIS
+
+Ajouter champ :
+
+- scanner QR code
+OU
+- saisir code colis
+
+Afficher :
+- infos colis
+- statut
+
+-----------------------------------
+9. ACTIONS UI
+
+Selon statut afficher boutons :
+
+SI "arrive" ET mode "gare"
+→ bouton "Retirer"
+
+SI "arrive" ET mode "domicile"
+→ bouton "Lancer livraison"
+
+SI "en_livraison"
+→ bouton "Confirmer livraison"
+
+-----------------------------------
+10. NOTIFICATIONS
+
+Simuler fonction :
+
+sendNotification(tel, message)
+
+Appeler cette fonction à chaque étape :
+
+- arrivée
+- retrait
+- livraison
+
+-----------------------------------
+CONTRAINTES
+
+- Ne pas casser l’existant
+- Réutiliser structure actuelle
+- Vérifier les formulaires
+- Vérifier les boutons (onClick)
+- Vérifier la mise à jour statut
+
+-----------------------------------
+À LA FIN
+
+- expliquer le flux complet
+- montrer les fonctions ajoutées
+- expliquer comment tester :
+  1. créer colis
+  2. marquer arrivé
+  3. retirer ou livrer
