@@ -16,6 +16,7 @@ import Analytics from "@/pages/analytics";
 import Invoices from "@/pages/invoices";
 import Financial from "@/pages/financial";
 import Companies from "@/pages/companies";
+import Agences from "@/pages/agences";
 import Reports from "@/pages/reports";
 import AlertsPage from "@/pages/alerts";
 import NotFound from "@/pages/not-found";
@@ -70,6 +71,7 @@ function Router() {
       {/* Core */}
       <Route path="/admin/dashboard"><ProtectedRoute component={Dashboard} /></Route>
       <Route path="/admin/companies"><ProtectedRoute component={Companies} /></Route>
+      <Route path="/admin/agences"><ProtectedRoute component={Agences} /></Route>
 
       {/* EXPLOITATION */}
       <Route path="/admin/trajets"><ProtectedRoute component={Trips} /></Route>

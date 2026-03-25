@@ -6,7 +6,7 @@ import {
   BarChart3, FileText, LogOut, Menu, X, TrendingUp,
   Building2, AlertTriangle, ClipboardList, ShieldCheck,
   Wrench, Fuel, Radio, UserCheck, Settings, History,
-  Star, MessageSquare, ChevronRight,
+  Star, MessageSquare, ChevronRight, Store,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -55,6 +55,7 @@ const ADMIN_NAV_SECTIONS: AdminSection[] = [
     items: [
       { path: "/admin/dashboard",    label: "Vue d'ensemble",  icon: LayoutDashboard },
       { path: "/admin/companies",    label: "Compagnies",      icon: Building2 },
+      { path: "/admin/agences",      label: "Agences",         icon: Store },
       { path: "/admin/agents",       label: "Agents",          icon: Users },
     ],
   },

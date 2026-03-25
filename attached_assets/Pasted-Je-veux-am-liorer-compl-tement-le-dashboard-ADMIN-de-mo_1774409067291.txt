@@ -1,0 +1,138 @@
+Je veux améliorer complètement le dashboard ADMIN de mon application GoBooking (transport + colis), avec une logique professionnelle et une vraie séparation des rôles.
+
+OBJECTIF :
+Créer un dashboard admin moderne, structuré, clair et conforme à la logique métier réelle.
+
+----------------------------
+1. AMÉLIORATION DESIGN (UI/UX)
+----------------------------
+- Améliorer le design global (style moderne type fintech / transport)
+- Utiliser des cartes (cards) propres avec ombres légères
+- Améliorer les espacements (padding, marges)
+- Harmoniser les couleurs (violet principal + couleurs secondaires cohérentes)
+- Améliorer les icônes (icônes modernes, cohérentes, sans répétition)
+- Supprimer tout élément inutile ou redondant
+
+----------------------------
+2. STRUCTURE DASHBOARD ADMIN
+----------------------------
+Organiser le dashboard en sections claires :
+
+- 📊 Vue globale (revenu total plateforme, stats globales)
+- 👥 Utilisateurs (clients, agents, compagnies)
+- 🏢 Compagnies
+- 🏪 Agences
+- 🚍 Trajets
+- 🎫 Réservations
+- 📦 Colis (historique uniquement pour admin)
+- 💰 Commissions
+- 📄 Factures
+- ⚙️ Paramètres
+
+IMPORTANT :
+Chaque module doit être bien séparé, sans mélange d’informations.
+
+----------------------------
+3. LOGIQUE COMPAGNIE + AGENCES (TRÈS IMPORTANT)
+----------------------------
+- Une COMPAGNIE doit contenir plusieurs AGENCES
+- Ajouter un système hiérarchique :
+
+Compagnie
+   → Agences
+       → Agents
+
+- Lors de la création d’une compagnie :
+  → possibilité d’ajouter des agences
+- Lors de la création d’un agent :
+  → il doit être lié à une agence précise
+
+Afficher dans l’admin :
+- Liste des compagnies
+- Chaque compagnie → voir ses agences
+- Chaque agence → voir ses agents
+
+----------------------------
+4. SÉPARATION STRICTE DES RÔLES (CRITIQUE)
+----------------------------
+
+Corriger les permissions :
+
+ADMIN :
+- voit tout
+- ne crée pas de colis
+
+COMPAGNIE :
+- voit ses trajets
+- voit ses agents
+- voit ses revenus
+- NE PEUT PAS créer de colis ❌
+
+AGENT COLIS :
+- peut créer des colis ✅
+- gère les colis
+
+AGENT GUICHET :
+- gère les réservations
+
+AGENT EMBARQUEMENT :
+- valide les passagers
+
+IMPORTANT :
+Supprimer toute possibilité pour une compagnie de créer un colis.
+
+----------------------------
+5. LOGIQUE DES DONNÉES
+----------------------------
+
+- Les réservations doivent apparaître uniquement dans :
+  → module "Réservations"
+
+- Les colis doivent apparaître uniquement dans :
+  → module "Historique Colis"
+
+- Ne pas mélanger les données
+
+----------------------------
+6. AMÉLIORATION DASHBOARD (CONTENU)
+----------------------------
+
+Dans le dashboard admin afficher :
+
+- Revenu total plateforme
+- Nombre total :
+  → utilisateurs
+  → compagnies
+  → agents
+  → trajets
+  → réservations
+  → colis
+
+- Dernières activités :
+  → nouvelles réservations
+  → nouveaux colis
+  → nouvelles inscriptions
+
+----------------------------
+7. CORRECTION ERREUR TECHNIQUE
+----------------------------
+
+Corriger l’erreur :
+"The action 'POP_TO_TOP' was not handled"
+
+→ vérifier navigation stack
+→ corriger navigation Flutter / React
+→ éviter les actions invalides
+
+----------------------------
+RÉSULTAT ATTENDU :
+----------------------------
+
+- Dashboard admin professionnel
+- Structure claire et logique
+- Système compagnie → agences → agents fonctionnel
+- Permissions corrigées (très important)
+- Interface moderne, propre et efficace
+
+Priorité :
+LOGIQUE MÉTIER + CLARTÉ + PERFORMANC

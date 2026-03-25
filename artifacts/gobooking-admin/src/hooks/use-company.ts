@@ -220,3 +220,45 @@ export function useCompanyAlerts() {
     refetchInterval: 30000,
   });
 }
+
+export function useAllAgences() {
+  return useQuery({
+    queryKey: ["admin-agences"],
+    queryFn: () => apiFetch<any[]>("/superadmin/agences"),
+    refetchInterval: 60000,
+  });
+}
+
+export function useCreateAdminAgence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; city: string; address?: string; phone?: string; companyId: string }) =>
+      apiFetch("/superadmin/agences", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-agences"] }),
+  });
+}
+
+export function useRecentActivity() {
+  return useQuery({
+    queryKey: ["admin-recent-activity"],
+    queryFn: () => apiFetch<any>("/superadmin/recent-activity"),
+    refetchInterval: 30000,
+  });
+}
+
+export function useCompanyAgences() {
+  return useQuery({
+    queryKey: ["company-agences"],
+    queryFn: () => apiFetch<any[]>("/company/agences"),
+    refetchInterval: 60000,
+  });
+}
+
+export function useCreateCompanyAgence() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; city: string; address?: string; phone?: string }) =>
+      apiFetch("/company/agences", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["company-agences"] }),
+  });
+}

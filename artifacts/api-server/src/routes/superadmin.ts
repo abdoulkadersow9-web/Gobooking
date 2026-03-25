@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable, agencesTable } from "@workspace/db";
 import { eq, desc, sql, and, count, gte, lte, between } from "drizzle-orm";
 import { getAuditLogs } from "../audit";
 import crypto from "crypto";
@@ -959,6 +959,98 @@ router.get("/financial", async (req, res) => {
     });
   } catch (err) {
     console.error("Financial dashboard error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── Agences (toutes compagnies) ── */
+router.get("/agences", async (req, res) => {
+  try {
+    const adminCtx = await requireSuperAdmin(req.headers.authorization);
+    if (!adminCtx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agences = await db
+      .select({
+        id: agencesTable.id,
+        name: agencesTable.name,
+        city: agencesTable.city,
+        address: agencesTable.address,
+        phone: agencesTable.phone,
+        status: agencesTable.status,
+        createdAt: agencesTable.createdAt,
+        companyId: agencesTable.companyId,
+        companyName: companiesTable.name,
+      })
+      .from(agencesTable)
+      .leftJoin(companiesTable, eq(agencesTable.companyId, companiesTable.id))
+      .orderBy(agencesTable.createdAt);
+
+    const agentCounts = await db
+      .select({ agenceId: agentsTable.agenceId, count: sql<number>`count(*)::int` })
+      .from(agentsTable)
+      .where(sql`${agentsTable.agenceId} IS NOT NULL`)
+      .groupBy(agentsTable.agenceId);
+
+    const countMap: Record<string, number> = {};
+    for (const a of agentCounts) { if (a.agenceId) countMap[a.agenceId] = a.count; }
+
+    res.json(agences.map(a => ({ ...a, agentCount: countMap[a.id] ?? 0 })));
+  } catch (err) {
+    console.error("Superadmin agences error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.post("/agences", async (req, res) => {
+  try {
+    const adminCtx = await requireSuperAdmin(req.headers.authorization);
+    if (!adminCtx) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const { name, city, address, phone, companyId } = req.body as {
+      name: string; city: string; address?: string; phone?: string; companyId: string;
+    };
+    if (!name || !city || !companyId) { res.status(400).json({ error: "name, city, companyId requis" }); return; }
+    const id = `agence_${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+    await db.insert(agencesTable).values({ id, name, city, address: address ?? null, phone: phone ?? null, companyId, status: "active" });
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error("Create agence error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── Recent activity ── */
+router.get("/recent-activity", async (req, res) => {
+  try {
+    const adminCtx = await requireSuperAdmin(req.headers.authorization);
+    if (!adminCtx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [recentBookings, recentParcels, recentUsers] = await Promise.all([
+      db.select({
+        id: bookingsTable.id,
+        createdAt: bookingsTable.createdAt,
+        status: bookingsTable.status,
+        totalAmount: bookingsTable.totalAmount,
+      }).from(bookingsTable).orderBy(sql`${bookingsTable.createdAt} DESC`).limit(5),
+      db.select({
+        id: parcelsTable.id,
+        trackingRef: parcelsTable.trackingRef,
+        createdAt: parcelsTable.createdAt,
+        status: parcelsTable.status,
+        fromCity: parcelsTable.fromCity,
+        toCity: parcelsTable.toCity,
+      }).from(parcelsTable).orderBy(sql`${parcelsTable.createdAt} DESC`).limit(5),
+      db.select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        role: usersTable.role,
+        createdAt: usersTable.createdAt,
+      }).from(usersTable).orderBy(sql`${usersTable.createdAt} DESC`).limit(5),
+    ]);
+
+    res.json({ recentBookings, recentParcels, recentUsers });
+  } catch (err) {
+    console.error("Recent activity error:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

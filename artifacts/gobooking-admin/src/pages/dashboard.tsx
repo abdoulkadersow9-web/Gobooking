@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   useDashboard, useScanStats, useCompanyReports, useUpdateReport, useCompanyAlerts,
   useSuperAdminStats, useSuperAdminBookingStats, useSuperAdminAnalytics, useSuperAdminCompanies,
+  useRecentActivity,
 } from "@/hooks/use-company";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -551,6 +552,65 @@ function AgentReportsPanel() {
   );
 }
 
+function RecentActivityPanel() {
+  const { data } = useRecentActivity();
+  const recent = [
+    ...((data?.recentBookings || []).map((b: any) => ({
+      type: "reservation",
+      label: `Réservation #${b.id?.slice(-6)}`,
+      sub: b.totalAmount ? `${Number(b.totalAmount).toLocaleString()} FCFA` : b.status,
+      date: b.createdAt,
+      color: "#D97706",
+      bg: "#FEF9C3",
+    }))),
+    ...((data?.recentParcels || []).map((p: any) => ({
+      type: "colis",
+      label: `Colis ${p.trackingRef || p.id?.slice(-6)}`,
+      sub: `${p.fromCity || "?"} → ${p.toCity || "?"}`,
+      date: p.createdAt,
+      color: "#7C3AED",
+      bg: "#EDE9FE",
+    }))),
+    ...((data?.recentUsers || []).map((u: any) => ({
+      type: "user",
+      label: u.name || "Nouvel utilisateur",
+      sub: u.role || u.email,
+      date: u.createdAt,
+      color: "#2563EB",
+      bg: "#DBEAFE",
+    }))),
+  ]
+    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+    .slice(0, 8);
+
+  if (recent.length === 0) return (
+    <div className="text-center py-8 text-muted-foreground text-sm">
+      Aucune activité récente
+    </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      {recent.map((item, i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: item.bg, color: item.color }}>
+            {item.type === "reservation" ? "🎫" : item.type === "colis" ? "📦" : "👤"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">{item.label}</p>
+            <p className="text-xs text-muted-foreground truncate">{item.sub}</p>
+          </div>
+          {item.date && (
+            <p className="text-[10px] text-muted-foreground shrink-0">
+              {new Date(item.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SuperAdminDashboard() {
   const { data: stats, isLoading, refetch, isFetching } = useSuperAdminStats();
   const { data: bkStats } = useSuperAdminBookingStats();
@@ -616,10 +676,15 @@ function SuperAdminDashboard() {
         </div>
 
         <div className="bg-card rounded-2xl p-5 shadow-sm border border-border flex flex-col">
-          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <Building2 size={16} className="text-purple-500" />
-            Compagnies ({(companies as any[]).length})
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <Building2 size={16} className="text-purple-500" />
+              Compagnies ({(companies as any[]).length})
+            </h3>
+            <Link href="/admin/companies" className="text-xs text-purple-600 font-semibold hover:underline flex items-center gap-1">
+              Gérer <ChevronRight size={11} />
+            </Link>
+          </div>
           <div className="flex-1 overflow-y-auto space-y-2">
             {(companies as any[]).slice(0, 6).map((c: any) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:border-purple-200 transition-colors">
@@ -634,6 +699,16 @@ function SuperAdminDashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Recent activity */}
+      <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
+        <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+          <Clock size={16} className="text-blue-500" />
+          Dernières activités
+          <span className="text-xs font-normal text-muted-foreground ml-1">(réservations, colis, inscriptions)</span>
+        </h3>
+        <RecentActivityPanel />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
