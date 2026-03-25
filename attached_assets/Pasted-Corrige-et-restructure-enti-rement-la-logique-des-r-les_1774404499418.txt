@@ -1,0 +1,200 @@
+Corrige et restructure entièrement la logique des rôles et des responsabilités dans mon application GoBooking pour respecter une organisation professionnelle claire sans mélange.
+
+-----------------------------------
+1. RÔLE AGENT LOGISTIQUE (CENTRAL BUS)
+-----------------------------------
+
+L’agent logistique est responsable de TOUT ce qui concerne les bus.
+
+Fonctions :
+
+- Créer et gérer les flottes (bus)
+- Mettre à jour l’état des bus :
+  - disponible
+  - en route
+  - en panne
+  - en maintenance
+
+- Suivre les anomalies des bus
+- Recevoir et gérer les alertes de suivi
+- Centraliser les informations techniques
+
+IMPORTANT :
+- Toutes les informations logistiques sont envoyées automatiquement à la compagnie
+- La compagnie ne modifie rien, elle observe et contrôle
+
+-----------------------------------
+2. SYSTÈME ALERTE (FLUX EXACT)
+
+Acteurs :
+- agent_route (dans le bus)
+- agent_suivi (poste de contrôle)
+- agent_logistique (supervision)
+
+Processus :
+
+1. L’agent en route déclenche une alerte
+   OU système détecte arrêt anormal (GPS)
+
+2. Une alarme est déclenchée côté suivi
+
+3. L’agent de suivi demande une réponse à l’agent en route
+
+4. L’agent en route répond :
+   - panne
+   - contrôle
+   - pause
+
+5. Dès que l’agent en route répond :
+👉 l’alarme s’arrête automatiquement
+
+6. L’information est envoyée :
+- à la logistique
+- à la compagnie
+
+-----------------------------------
+3. RÔLE COMPAGNIE (OBSERVATEUR)
+
+La compagnie :
+
+- voit tout :
+  - bus
+  - trajets
+  - alertes
+  - colis
+  - ventes
+  - réservations
+
+- voit les anomalies
+- peut demander des rapports
+
+MAIS :
+- ne crée pas
+- ne modifie pas
+- ne fait que superviser
+
+-----------------------------------
+4. RÔLE AGENT GUICHET (TRÈS IMPORTANT)
+
+L’agent guichet est responsable des départs et des ventes physiques.
+
+Fonctions :
+
+- Créer les départs
+- Associer :
+  - bus
+  - chauffeur
+  - agent en route
+
+- Définir :
+  - nombre de places guichet
+  - nombre de places réservation en ligne
+
+EXEMPLE :
+BUS-001
+→ 30 places guichet
+→ 33 places en ligne
+
+-----------------------------------
+5. GESTION DYNAMIQUE DES PLACES
+
+L’agent guichet peut :
+
+- libérer des places guichet vers en ligne
+- ajuster les quotas si nécessaire
+
+MAIS :
+- jamais dépasser capacité bus
+- jamais créer doublons
+
+-----------------------------------
+6. RÔLE AGENT RÉSERVATION
+
+L’agent réservation :
+
+- voit uniquement :
+  - les départs créés par le guichet
+  - les places en ligne disponibles
+
+Fonctions :
+
+- voir réservations en attente
+- confirmer réservation
+- annuler réservation
+
+NE DOIT PAS :
+- voir places guichet
+- modifier quotas
+
+-----------------------------------
+7. FLUX COMPLET RÉSERVATION
+
+1. Guichet crée départ + quotas
+2. Client réserve en ligne
+3. Réservation = "en attente"
+4. Agent réservation confirme
+5. Ticket généré
+
+-----------------------------------
+8. RÔLE AGENT ROUTE
+
+- assigné dans chaque départ
+- responsable du bus
+- déclenche alerte
+- répond aux alertes
+
+-----------------------------------
+9. RAPPORTS (OBLIGATOIRE)
+
+Chaque agent doit avoir un bouton dans SON MODULE :
+
+👉 "Envoyer rapport"
+
+Modules concernés :
+- guichet
+- logistique
+- suivi
+- route
+- colis
+- réservation
+
+Les rapports sont envoyés à la compagnie
+
+-----------------------------------
+10. STRUCTURE PROPRE (TRÈS IMPORTANT)
+
+Séparer clairement :
+
+- Logistique = bus
+- Suivi = alertes
+- Route = terrain
+- Guichet = départ + vente
+- Réservation = en ligne
+- Compagnie = supervision
+
+AUCUN CHEVAUCHEMENT
+
+-----------------------------------
+11. CONTRAINTES
+
+- Supprimer toute logique contradictoire
+- Supprimer les doublons
+- Vérifier cohérence des rôles
+- Respecter strictement cette organisation
+
+-----------------------------------
+À LA FIN
+
+- expliquer chaque rôle clairement
+- expliquer les flux :
+  - bus
+  - alerte
+  - vente
+  - réservation
+
+- montrer comment tester :
+  1. créer départ (guichet)
+  2. réserver en ligne
+  3. confirmer réservation
+  4. déclencher alerte
+  5. répondre alerte

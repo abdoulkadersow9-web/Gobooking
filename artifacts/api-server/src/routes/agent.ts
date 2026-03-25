@@ -2947,7 +2947,7 @@ router.patch("/logistique/buses/:id/statut", async (req, res) => {
 
     const { id } = req.params;
     const { statut } = req.body as { statut: string };
-    const allowed = ["en_attente", "programmé", "en_route", "arrivé", "en_panne"];
+    const allowed = ["disponible", "en_attente", "programmé", "en_route", "arrivé", "en_panne", "en_maintenance"];
     if (!allowed.includes(statut)) {
       res.status(400).json({ error: "Statut invalide" }); return;
     }
@@ -2957,6 +2957,93 @@ router.patch("/logistique/buses/:id/statut", async (req, res) => {
   } catch (err) {
     console.error("[logistique/buses/statut]", err);
     res.status(500).json({ error: "Erreur changement statut" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   GUICHET — créer des départs (trips) avec quotas de places
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/guichet/buses — fleet buses accessible au guichet ─── */
+router.get("/guichet/buses", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agent = agentRows[0];
+    if (!agent?.companyId) { res.json([]); return; }
+
+    const buses = await db.select().from(busesTable).where(eq(busesTable.companyId, agent.companyId));
+    res.json(buses.map(b => ({
+      id: b.id,
+      busName: b.busName,
+      plateNumber: b.plateNumber,
+      busType: b.busType,
+      capacity: b.capacity,
+      logisticStatus: b.logisticStatus,
+    })));
+  } catch (err) {
+    console.error("[guichet/buses]", err);
+    res.status(500).json({ error: "Erreur chargement bus" });
+  }
+});
+
+/* ─── POST /agent/guichet/departures — guichet crée un départ (trip) ─── */
+router.post("/guichet/departures", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agent = agentRows[0];
+
+    const { busId, from, to, date, departureTime, price, guichetSeats, onlineSeats, chauffeurNom, agentRouteNom } = req.body as {
+      busId?: string; from: string; to: string; date: string;
+      departureTime: string; price: number; guichetSeats?: number;
+      onlineSeats?: number; chauffeurNom?: string; agentRouteNom?: string;
+    };
+
+    if (!from || !to || !date || !departureTime || !price) {
+      res.status(400).json({ error: "Champs requis : from, to, date, departureTime, price" }); return;
+    }
+
+    const busRows = busId ? await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1) : [];
+    const bus = busRows[0];
+
+    const gSeats = parseInt(String(guichetSeats ?? 0)) || 0;
+    const oSeats = parseInt(String(onlineSeats ?? 0)) || 0;
+    const totalSeats = gSeats + oSeats || bus?.capacity || 44;
+
+    if (bus && (gSeats + oSeats) > bus.capacity) {
+      res.status(400).json({ error: `Total places (${gSeats + oSeats}) dépasse la capacité du bus (${bus.capacity})` }); return;
+    }
+
+    const id = `trip_${Date.now()}${Math.random().toString(36).substr(2, 6)}`;
+    await db.insert(tripsTable).values({
+      id,
+      from: from.trim(),
+      to: to.trim(),
+      date: date.trim(),
+      departureTime: departureTime.trim(),
+      arrivalTime: "—",
+      price: parseFloat(String(price)),
+      busType: bus?.busType ?? "Standard",
+      busName: bus?.busName ?? (chauffeurNom ?? "—"),
+      totalSeats,
+      guichetSeats: gSeats,
+      onlineSeats: oSeats,
+      busId: busId ?? null,
+      companyId: agent?.companyId ?? null,
+      agentId: agent?.id ?? null,
+      status: "scheduled",
+      duration: "—",
+    });
+
+    res.status(201).json({ success: true, id, message: "Départ programmé avec succès" });
+  } catch (err) {
+    console.error("[guichet/departures POST]", err);
+    res.status(500).json({ error: "Erreur création départ" });
   }
 });
 

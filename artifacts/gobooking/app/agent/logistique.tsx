@@ -28,11 +28,13 @@ function authHeader(token: string | null) {
 
 /* ── Status maps ─────────────────────────────────────────────────── */
 const STATUS_BUS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  en_attente: { label: "En attente",  color: "#D97706", bg: "#FEF3C7", icon: "time-outline" },
-  programmé:  { label: "Programmé",   color: "#0369A1", bg: "#E0F2FE", icon: "calendar-outline" },
-  en_route:   { label: "En route",    color: "#166534", bg: "#DCFCE7", icon: "navigate-outline" },
-  arrivé:     { label: "Arrivé",      color: "#0369A1", bg: "#DBEAFE", icon: "checkmark-circle-outline" },
-  en_panne:   { label: "En panne",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
+  disponible:     { label: "Disponible",    color: "#166534", bg: "#DCFCE7", icon: "checkmark-circle-outline" },
+  en_attente:     { label: "En attente",    color: "#D97706", bg: "#FEF3C7", icon: "time-outline" },
+  programmé:      { label: "Programmé",     color: "#0369A1", bg: "#E0F2FE", icon: "calendar-outline" },
+  en_route:       { label: "En route",      color: "#0369A1", bg: "#DBEAFE", icon: "navigate-outline" },
+  arrivé:         { label: "Arrivé",        color: "#166534", bg: "#DCFCE7", icon: "flag-outline" },
+  en_panne:       { label: "En panne",      color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
+  en_maintenance: { label: "Maintenance",   color: "#9333EA", bg: "#F3E8FF", icon: "construct-outline" },
 };
 function getBusStatus(s: string) {
   return STATUS_BUS[s] ?? { label: s, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
@@ -49,11 +51,12 @@ function getDepStatus(s: string) {
 }
 
 const BUS_STATUTS = [
-  { value: "en_attente", label: "En attente",  icon: "time-outline",             color: "#D97706" },
-  { value: "programmé",  label: "Programmé",   icon: "calendar-outline",         color: "#0369A1" },
-  { value: "en_route",   label: "En route",    icon: "navigate-outline",         color: "#166534" },
-  { value: "arrivé",     label: "Arrivé",      icon: "checkmark-circle-outline", color: "#0369A1" },
-  { value: "en_panne",   label: "En panne",    icon: "warning-outline",          color: "#DC2626" },
+  { value: "disponible",     label: "Disponible",    icon: "checkmark-circle-outline", color: "#166534" },
+  { value: "en_route",       label: "En route",      icon: "navigate-outline",         color: "#0369A1" },
+  { value: "en_panne",       label: "En panne",      icon: "warning-outline",          color: "#DC2626" },
+  { value: "en_maintenance", label: "Maintenance",   icon: "construct-outline",        color: "#9333EA" },
+  { value: "en_attente",     label: "En attente",    icon: "time-outline",             color: "#D97706" },
+  { value: "arrivé",         label: "Arrivé",        icon: "flag-outline",             color: "#166534" },
 ];
 const DEP_STATUTS = ["programmé", "en route", "terminé", "annulé"];
 
@@ -193,7 +196,7 @@ export default function LogistiqueScreen() {
           <View style={S.headerIcon}><Ionicons name="bus" size={22} color="#fff" /></View>
           <View>
             <Text style={S.headerTitle}>🚛 Logistique</Text>
-            <Text style={S.headerSub}>Gestion des bus & départs</Text>
+            <Text style={S.headerSub}>Gestion du parc bus</Text>
           </View>
         </View>
         <TouchableOpacity onPress={logout} style={S.logoutBtn}>
@@ -303,17 +306,20 @@ export default function LogistiqueScreen() {
                   </View>
 
                   <View style={S.busActions}>
-                    {bus.logisticStatus !== "en_route" && bus.logisticStatus !== "en_panne" && (
-                      <ActionBtn label="Mettre en route" icon="navigate-outline" color="#166534" bg="#DCFCE7" busy={busy} onPress={() => doAction(bus.id, "mettre-en-route")} />
+                    {!["en_route", "en_panne", "en_maintenance"].includes(bus.logisticStatus) && (
+                      <ActionBtn label="Mettre en route" icon="navigate-outline" color="#0369A1" bg="#DBEAFE" busy={busy} onPress={() => doAction(bus.id, "mettre-en-route")} />
                     )}
                     {bus.logisticStatus === "en_route" && (
-                      <ActionBtn label="Marquer arrivé" icon="checkmark-circle-outline" color="#0369A1" bg="#E0F2FE" busy={busy} onPress={() => doAction(bus.id, "marquer-arrive")} />
+                      <ActionBtn label="Marquer disponible" icon="checkmark-circle-outline" color="#166534" bg="#DCFCE7" busy={busy} onPress={() => changeBusStatus(bus.id, "disponible")} />
                     )}
-                    {bus.logisticStatus !== "en_panne" && (
+                    {bus.logisticStatus !== "en_panne" && bus.logisticStatus !== "en_maintenance" && (
                       <ActionBtn label="Signaler panne" icon="warning-outline" color="#DC2626" bg="#FEE2E2" busy={busy} onPress={() => doAction(bus.id, "signaler-panne")} />
                     )}
-                    {bus.logisticStatus === "en_panne" && (
-                      <ActionBtn label="Remettre en attente" icon="refresh-outline" color="#D97706" bg="#FEF3C7" busy={busy} onPress={() => doAction(bus.id, "remettre-en-attente")} />
+                    {(bus.logisticStatus === "en_panne" || bus.logisticStatus === "en_maintenance") && (
+                      <ActionBtn label="Marquer disponible" icon="checkmark-circle-outline" color="#166534" bg="#DCFCE7" busy={busy} onPress={() => changeBusStatus(bus.id, "disponible")} />
+                    )}
+                    {bus.logisticStatus !== "en_maintenance" && (
+                      <ActionBtn label="Maintenance" icon="construct-outline" color="#9333EA" bg="#F3E8FF" busy={busy} onPress={() => changeBusStatus(bus.id, "en_maintenance")} />
                     )}
                     <ActionBtn label="Changer statut" icon="swap-horizontal-outline" color="#475569" bg="#F1F5F9" busy={false} onPress={() => setStatusBus(bus)} />
                   </View>

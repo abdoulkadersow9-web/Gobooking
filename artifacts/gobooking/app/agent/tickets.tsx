@@ -28,6 +28,15 @@ interface Trip {
   date: string;
 }
 
+interface BusFleet {
+  id: string;
+  busName: string;
+  plateNumber: string;
+  busType: string;
+  capacity: number;
+  logisticStatus: string;
+}
+
 interface Confirmed {
   bookingRef: string;
   total: number;
@@ -43,6 +52,11 @@ const PAYMENT_METHODS = [
   { id: "orange", label: "Orange Money", icon: "phone-portrait-outline" as const },
   { id: "mtn",    label: "MTN Money",    icon: "phone-portrait-outline" as const },
   { id: "wave",   label: "Wave",         icon: "phone-portrait-outline" as const },
+];
+
+const CITIES = [
+  "Abidjan", "Bouaké", "Daloa", "Yamoussoukro", "San-Pédro",
+  "Korhogo", "Man", "Divo", "Gagnoa", "Abengourou",
 ];
 
 function buildTicketHtml(c: Confirmed): string {
@@ -157,10 +171,19 @@ function buildTicketHtml(c: Confirmed): string {
 </html>`;
 }
 
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function TicketsScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
 
+  /* ── Tab ── */
+  const [activeTab, setActiveTab] = useState<"vente" | "depart">("vente");
+
+  /* ── Vente state ── */
   const [trips, setTrips]           = useState<Trip[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -171,6 +194,22 @@ export default function TicketsScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [printing, setPrinting]     = useState(false);
   const [confirmed, setConfirmed]   = useState<Confirmed | null>(null);
+
+  /* ── Créer départ state ── */
+  const [fleetBuses, setFleetBuses]       = useState<BusFleet[]>([]);
+  const [loadingBuses, setLoadingBuses]   = useState(false);
+  const [selectedBus, setSelectedBus]     = useState<BusFleet | null>(null);
+  const [dFrom, setDFrom]                 = useState("");
+  const [dTo, setDTo]                     = useState("");
+  const [dDate, setDDate]                 = useState(todayStr());
+  const [dHeure, setDHeure]               = useState("08:00");
+  const [dPrix, setDPrix]                 = useState("");
+  const [dGuichet, setDGuichet]           = useState("20");
+  const [dOnline, setDOnline]             = useState("24");
+  const [dChauffeur, setDChauffeur]       = useState("");
+  const [dAgentRoute, setDAgentRoute]     = useState("");
+  const [creatingDep, setCreatingDep]     = useState(false);
+  const [depSuccess, setDepSuccess]       = useState<string | null>(null);
 
   const isAgent = user?.role === "agent";
 
@@ -186,7 +225,22 @@ export default function TicketsScreen() {
     }
   };
 
+  const fetchFleetBuses = async () => {
+    setLoadingBuses(true);
+    try {
+      const res = await apiFetch<BusFleet[]>("/agent/guichet/buses", { token: token ?? undefined });
+      setFleetBuses(Array.isArray(res) ? res : []);
+    } catch {
+      setFleetBuses([]);
+    } finally {
+      setLoadingBuses(false);
+    }
+  };
+
   useEffect(() => { fetchTrips(); }, []);
+  useEffect(() => {
+    if (activeTab === "depart" && fleetBuses.length === 0) fetchFleetBuses();
+  }, [activeTab]);
 
   if (!isAgent) {
     return (
@@ -202,6 +256,7 @@ export default function TicketsScreen() {
     );
   }
 
+  /* ── Vente submit ── */
   const handleSubmit = async () => {
     if (!selectedTrip) { Alert.alert("Erreur", "Sélectionnez un trajet."); return; }
     if (!passengerName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
@@ -247,6 +302,52 @@ export default function TicketsScreen() {
     }
   };
 
+  /* ── Créer départ submit ── */
+  const handleCreateDeparture = async () => {
+    if (!dFrom.trim()) { Alert.alert("Erreur", "Saisissez la ville de départ."); return; }
+    if (!dTo.trim()) { Alert.alert("Erreur", "Saisissez la ville d'arrivée."); return; }
+    if (!dDate.trim()) { Alert.alert("Erreur", "Saisissez la date."); return; }
+    if (!dHeure.trim()) { Alert.alert("Erreur", "Saisissez l'heure de départ."); return; }
+    if (!dPrix.trim() || isNaN(parseFloat(dPrix))) { Alert.alert("Erreur", "Saisissez un prix valide."); return; }
+    const gSeats = parseInt(dGuichet) || 0;
+    const oSeats = parseInt(dOnline) || 0;
+    if (gSeats + oSeats === 0) { Alert.alert("Erreur", "Saisissez au moins une place guichet ou en ligne."); return; }
+    if (selectedBus && gSeats + oSeats > selectedBus.capacity) {
+      Alert.alert("Erreur", `Total (${gSeats + oSeats}) dépasse la capacité du bus (${selectedBus.capacity}).`);
+      return;
+    }
+
+    setCreatingDep(true);
+    try {
+      const res = await apiFetch<{ success: boolean; id: string; message: string }>("/agent/guichet/departures", {
+        token: token ?? undefined, method: "POST",
+        body: {
+          busId: selectedBus?.id,
+          from: dFrom.trim(), to: dTo.trim(),
+          date: dDate.trim(), departureTime: dHeure.trim(),
+          price: parseFloat(dPrix),
+          guichetSeats: gSeats, onlineSeats: oSeats,
+          chauffeurNom: dChauffeur.trim() || undefined,
+          agentRouteNom: dAgentRoute.trim() || undefined,
+        },
+      });
+      setDepSuccess(res.id);
+      await fetchTrips();
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de créer le départ.");
+    } finally {
+      setCreatingDep(false);
+    }
+  };
+
+  const resetDeparture = () => {
+    setDepSuccess(null);
+    setSelectedBus(null);
+    setDFrom(""); setDTo(""); setDDate(todayStr()); setDHeure("08:00");
+    setDPrix(""); setDGuichet("20"); setDOnline("24");
+    setDChauffeur(""); setDAgentRoute("");
+  };
+
   const handlePrint = async () => {
     if (!confirmed) return;
     setPrinting(true);
@@ -271,6 +372,7 @@ export default function TicketsScreen() {
     setPassengerCount("1"); setPaymentMethod("");
   };
 
+  /* ── Confirmed screen ── */
   if (confirmed) {
     return (
       <SafeAreaView style={S.safe} edges={["top"]}>
@@ -291,7 +393,6 @@ export default function TicketsScreen() {
           <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
           <Text style={S.successTitle}>Billet émis !</Text>
 
-          {/* Ticket recap card */}
           <View style={S.ticketCard}>
             <View style={S.ticketCardHeader}>
               <Text style={S.ticketRef}>{confirmed.bookingRef}</Text>
@@ -323,7 +424,6 @@ export default function TicketsScreen() {
             </View>
           )}
 
-          {/* Action buttons */}
           <TouchableOpacity style={S.printBtn} onPress={handlePrint} disabled={printing}>
             {printing
               ? <ActivityIndicator color="#fff" />
@@ -340,6 +440,7 @@ export default function TicketsScreen() {
     );
   }
 
+  /* ── Main screen ── */
   return (
     <SafeAreaView style={S.safe} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
@@ -358,149 +459,370 @@ export default function TicketsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1, backgroundColor: "#FFFBEB" }} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
-        {/* TRAJET */}
-        <View style={S.card}>
-          <View style={S.cardHeader}>
-            <Ionicons name="bus-outline" size={18} color={G} />
-            <Text style={S.cardTitle}>Sélectionner un trajet</Text>
+      {/* ── Tab bar ── */}
+      <View style={S.tabBar}>
+        <TouchableOpacity style={[S.tab, activeTab === "vente" && S.tabActive]} onPress={() => setActiveTab("vente")}>
+          <Ionicons name="ticket-outline" size={16} color={activeTab === "vente" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "vente" && S.tabTxtActive]}>Vente</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[S.tab, activeTab === "depart" && S.tabActive]} onPress={() => setActiveTab("depart")}>
+          <Ionicons name="bus-outline" size={16} color={activeTab === "depart" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "depart" && S.tabTxtActive]}>Créer départ</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ══════════════ TAB: VENTE ══════════════ */}
+      {activeTab === "vente" && (
+        <ScrollView style={{ flex: 1, backgroundColor: "#FFFBEB" }} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+          {/* TRAJET */}
+          <View style={S.card}>
+            <View style={S.cardHeader}>
+              <Ionicons name="bus-outline" size={18} color={G} />
+              <Text style={S.cardTitle}>Sélectionner un trajet</Text>
+            </View>
+            {loadingTrips ? (
+              <ActivityIndicator color={G} style={{ marginVertical: 12 }} />
+            ) : trips.length === 0 ? (
+              <View style={{ alignItems: "center", padding: 12, gap: 8 }}>
+                <Text style={{ color: "#9CA3AF", fontSize: 14 }}>Aucun trajet disponible</Text>
+                <TouchableOpacity onPress={fetchTrips}>
+                  <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {trips.map(trip => (
+                  <TouchableOpacity key={trip.id}
+                    style={[S.tripItem, selectedTrip?.id === trip.id && S.tripItemSel]}
+                    onPress={() => setSelectedTrip(trip)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
+                      <Text style={S.tripMeta}>{trip.departureTime} · {trip.date}</Text>
+                      {trip.guichetSeats !== undefined && trip.guichetSeats > 0 ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                          <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: G_DARK }}>🏪 {trip.guichetSeats} guichet</Text>
+                          </View>
+                          {(trip.onlineSeats ?? 0) > 0 && (
+                            <View style={{ backgroundColor: "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "600", color: "#1D4ED8" }}>🌐 {trip.onlineSeats} en ligne</Text>
+                            </View>
+                          )}
+                        </View>
+                      ) : trip.availableSeats !== undefined ? (
+                        <Text style={{ fontSize: 12, color: G, marginTop: 1 }}>{trip.availableSeats} places dispo.</Text>
+                      ) : null}
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={S.tripPrice}>{trip.price?.toLocaleString()}</Text>
+                      <Text style={{ fontSize: 11, color: "#9CA3AF" }}>FCFA</Text>
+                    </View>
+                    {selectedTrip?.id === trip.id && <Ionicons name="checkmark-circle" size={20} color={G} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
-          {loadingTrips ? (
-            <ActivityIndicator color={G} style={{ marginVertical: 12 }} />
-          ) : trips.length === 0 ? (
-            <View style={{ alignItems: "center", padding: 12, gap: 8 }}>
-              <Text style={{ color: "#9CA3AF", fontSize: 14 }}>Aucun trajet disponible</Text>
-              <TouchableOpacity onPress={fetchTrips}>
-                <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+
+          {/* PASSAGER */}
+          <View style={S.card}>
+            <View style={S.cardHeader}>
+              <Ionicons name="person-outline" size={18} color={G} />
+              <Text style={S.cardTitle}>Informations passager</Text>
+            </View>
+            <Text style={S.label}>Nom complet *</Text>
+            <TextInput style={S.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
+            <Text style={S.label}>Téléphone *</Text>
+            <TextInput style={S.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone}
+              onChangeText={setPassengerPhone} keyboardType="phone-pad" />
+            <Text style={S.label}>Nombre de passagers</Text>
+            <View style={S.countRow}>
+              <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
+                <Ionicons name="remove" size={20} color={G} />
+              </TouchableOpacity>
+              <TextInput style={S.countInput} value={passengerCount} onChangeText={setPassengerCount}
+                keyboardType="number-pad" textAlign="center" />
+              <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
+                <Ionicons name="add" size={20} color={G} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* PAIEMENT */}
+          <View style={S.card}>
+            <View style={S.cardHeader}>
+              <Ionicons name="wallet-outline" size={18} color={G} />
+              <Text style={S.cardTitle}>Mode de paiement *</Text>
+            </View>
+            {!paymentMethod && (
+              <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 6 }}>
+                Veuillez sélectionner un mode de paiement
+              </Text>
+            )}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {PAYMENT_METHODS.map(pm => {
+                const selected = paymentMethod === pm.id;
+                return (
+                  <TouchableOpacity key={pm.id}
+                    activeOpacity={0.7}
+                    style={[S.payItem, selected && S.payItemSel]}
+                    onPress={() => setPaymentMethod(pm.id)}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name={pm.icon} size={20} color={selected ? "#fff" : "#9CA3AF"} />
+                      <Text style={[S.payLabel, selected && { color: "#fff", fontWeight: "800" }]}>{pm.label}</Text>
+                      {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* RECAP */}
+          {selectedTrip && (
+            <View style={S.recap}>
+              <Text style={S.recapTitle}>Récapitulatif</Text>
+              <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
+              <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
+              <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
+              <View style={[S.recapRow, { borderTopWidth: 1, borderColor: "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
+                <Text style={[S.recapKey, { fontWeight: "700", color: G_DARK }]}>TOTAL</Text>
+                <Text style={[S.recapVal, { fontWeight: "800", color: G, fontSize: 18 }]}>
+                  {(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity style={[S.submitBtn, submitting && { opacity: 0.6 }]}
+            onPress={handleSubmit} disabled={submitting}>
+            {submitting ? <ActivityIndicator color="#fff" /> : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
+                <Text style={S.submitTxt}>Valider la vente</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, marginTop: 8, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+            onPress={() => router.push("/agent/rapport" as never)}
+          >
+            <Feather name="alert-triangle" size={16} color="#fff" />
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* ══════════════ TAB: CRÉER DÉPART ══════════════ */}
+      {activeTab === "depart" && (
+        <ScrollView style={{ flex: 1, backgroundColor: "#FFFBEB" }} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+
+          {depSuccess ? (
+            /* ── Succès création départ ── */
+            <View style={{ alignItems: "center", paddingTop: 24, gap: 16 }}>
+              <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
+              <Text style={S.successTitle}>Départ programmé !</Text>
+              <View style={[S.card, { width: "100%", alignItems: "center", gap: 6 }]}>
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>Référence départ</Text>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: G, letterSpacing: 1 }}>{depSuccess}</Text>
+                <Text style={{ fontSize: 13, color: "#374151", marginTop: 4 }}>
+                  {dFrom} → {dTo}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                  {dDate} à {dHeure} · {parseInt(dGuichet) + parseInt(dOnline)} places
+                </Text>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: G_DARK }}>🏪 {dGuichet} guichet</Text>
+                  </View>
+                  <View style={{ backgroundColor: "#EFF6FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#1D4ED8" }}>🌐 {dOnline} en ligne</Text>
+                  </View>
+                </View>
+              </View>
+              <TouchableOpacity style={S.submitBtn} onPress={resetDeparture}>
+                <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                <Text style={S.submitTxt}>Programmer un autre départ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 }}
+                onPress={() => setActiveTab("vente")}>
+                <Ionicons name="ticket-outline" size={16} color={G} />
+                <Text style={{ color: G, fontWeight: "700", fontSize: 14 }}>Aller à la vente</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={{ gap: 8 }}>
-              {trips.map(trip => (
-                <TouchableOpacity key={trip.id}
-                  style={[S.tripItem, selectedTrip?.id === trip.id && S.tripItemSel]}
-                  onPress={() => setSelectedTrip(trip)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
-                    <Text style={S.tripMeta}>{trip.departureTime} · {trip.date}</Text>
-                    {trip.guichetSeats !== undefined && trip.guichetSeats > 0 ? (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
-                        <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: G_DARK }}>🏪 {trip.guichetSeats} places guichet</Text>
-                        </View>
-                        {(trip.onlineSeats ?? 0) > 0 && (
-                          <View style={{ backgroundColor: "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "600", color: "#1D4ED8" }}>🌐 {trip.onlineSeats} en ligne</Text>
-                          </View>
-                        )}
-                      </View>
-                    ) : trip.availableSeats !== undefined ? (
-                      <Text style={{ fontSize: 12, color: G, marginTop: 1 }}>{trip.availableSeats} places dispo.</Text>
-                    ) : null}
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={S.tripPrice}>{trip.price?.toLocaleString()}</Text>
-                    <Text style={{ fontSize: 11, color: "#9CA3AF" }}>FCFA</Text>
-                  </View>
-                  {selectedTrip?.id === trip.id && <Ionicons name="checkmark-circle" size={20} color={G} />}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* PASSAGER */}
-        <View style={S.card}>
-          <View style={S.cardHeader}>
-            <Ionicons name="person-outline" size={18} color={G} />
-            <Text style={S.cardTitle}>Informations passager</Text>
-          </View>
-          <Text style={S.label}>Nom complet *</Text>
-          <TextInput style={S.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
-          <Text style={S.label}>Téléphone *</Text>
-          <TextInput style={S.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone}
-            onChangeText={setPassengerPhone} keyboardType="phone-pad" />
-          <Text style={S.label}>Nombre de passagers</Text>
-          <View style={S.countRow}>
-            <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
-              <Ionicons name="remove" size={20} color={G} />
-            </TouchableOpacity>
-            <TextInput style={S.countInput} value={passengerCount} onChangeText={setPassengerCount}
-              keyboardType="number-pad" textAlign="center" />
-            <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
-              <Ionicons name="add" size={20} color={G} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* PAIEMENT */}
-        <View style={S.card}>
-          <View style={S.cardHeader}>
-            <Ionicons name="wallet-outline" size={18} color={G} />
-            <Text style={S.cardTitle}>Mode de paiement *</Text>
-          </View>
-          {!paymentMethod && (
-            <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 6 }}>
-              Veuillez sélectionner un mode de paiement
-            </Text>
-          )}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-            {PAYMENT_METHODS.map(pm => {
-              const selected = paymentMethod === pm.id;
-              return (
-                <TouchableOpacity key={pm.id}
-                  activeOpacity={0.7}
-                  style={[
-                    S.payItem,
-                    selected && S.payItemSel,
-                  ]}
-                  onPress={() => setPaymentMethod(pm.id)}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Ionicons name={pm.icon} size={20} color={selected ? "#fff" : "#9CA3AF"} />
-                    <Text style={[S.payLabel, selected && { color: "#fff", fontWeight: "800" }]}>{pm.label}</Text>
-                    {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* RECAP */}
-        {selectedTrip && (
-          <View style={S.recap}>
-            <Text style={S.recapTitle}>Récapitulatif</Text>
-            <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
-            <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
-            <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
-            <View style={[S.recapRow, { borderTopWidth: 1, borderColor: "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
-              <Text style={[S.recapKey, { fontWeight: "700", color: G_DARK }]}>TOTAL</Text>
-              <Text style={[S.recapVal, { fontWeight: "800", color: G, fontSize: 18 }]}>
-                {(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <TouchableOpacity style={[S.submitBtn, submitting && { opacity: 0.6 }]}
-          onPress={handleSubmit} disabled={submitting}>
-          {submitting ? <ActivityIndicator color="#fff" /> : (
             <>
-              <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
-              <Text style={S.submitTxt}>Valider la vente</Text>
+              {/* ── Bus selector ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="bus-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Sélectionner un bus</Text>
+                  {loadingBuses && <ActivityIndicator size="small" color={G} style={{ marginLeft: "auto" }} />}
+                </View>
+                {!loadingBuses && fleetBuses.length === 0 ? (
+                  <View style={{ alignItems: "center", gap: 8, paddingVertical: 8 }}>
+                    <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Aucun bus dans la flotte</Text>
+                    <TouchableOpacity onPress={fetchFleetBuses}>
+                      <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {fleetBuses.map(bus => {
+                      const sel = selectedBus?.id === bus.id;
+                      return (
+                        <TouchableOpacity key={bus.id}
+                          style={[S.busItem, sel && S.busItemSel]}
+                          onPress={() => setSelectedBus(sel ? null : bus)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 14, fontWeight: "700", color: sel ? G_DARK : "#111827" }}>
+                              {bus.busName}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: sel ? G : "#6B7280", marginTop: 2 }}>
+                              {bus.plateNumber} · {bus.busType} · {bus.capacity} places
+                            </Text>
+                          </View>
+                          {sel && <Ionicons name="checkmark-circle" size={22} color={G} />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+                {selectedBus && (
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 10, padding: 10, marginTop: 4 }}>
+                    <Text style={{ fontSize: 12, color: G_DARK, fontWeight: "600" }}>
+                      🚌 {selectedBus.busName} · capacité : {selectedBus.capacity} places
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#92400E", marginTop: 2 }}>
+                      Guichet ({dGuichet || "0"}) + En ligne ({dOnline || "0"}) = {(parseInt(dGuichet) || 0) + (parseInt(dOnline) || 0)} / {selectedBus.capacity}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* ── Route ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="navigate-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Itinéraire</Text>
+                </View>
+                <Text style={S.label}>Ville de départ *</Text>
+                <TextInput style={S.input} placeholder="Ex: Abidjan" value={dFrom} onChangeText={setDFrom} />
+                <Text style={S.label}>Ville d'arrivée *</Text>
+                <TextInput style={S.input} placeholder="Ex: Bouaké" value={dTo} onChangeText={setDTo} />
+
+                <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>Villes fréquentes :</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                  {CITIES.map(city => (
+                    <TouchableOpacity key={city}
+                      style={{ backgroundColor: "#F3F4F6", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                      onPress={() => {
+                        if (!dFrom) setDFrom(city);
+                        else if (!dTo) setDTo(city);
+                      }}>
+                      <Text style={{ fontSize: 11, color: "#374151", fontWeight: "600" }}>{city}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* ── Horaires ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="time-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Date & heure</Text>
+                </View>
+                <Text style={S.label}>Date du départ *</Text>
+                <TextInput style={S.input} placeholder="YYYY-MM-DD" value={dDate} onChangeText={setDDate} />
+                <Text style={S.label}>Heure de départ *</Text>
+                <TextInput style={S.input} placeholder="HH:MM" value={dHeure} onChangeText={setDHeure} />
+              </View>
+
+              {/* ── Prix & quotas ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="wallet-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Prix & places</Text>
+                </View>
+                <Text style={S.label}>Prix du billet (FCFA) *</Text>
+                <TextInput style={S.input} placeholder="Ex: 3500" value={dPrix} onChangeText={setDPrix}
+                  keyboardType="number-pad" />
+
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[S.label, { color: G_DARK }]}>🏪 Places guichet</Text>
+                    <View style={S.countRow}>
+                      <TouchableOpacity style={S.countBtn} onPress={() => setDGuichet(v => String(Math.max(0, parseInt(v || "0") - 1)))}>
+                        <Ionicons name="remove" size={18} color={G} />
+                      </TouchableOpacity>
+                      <TextInput style={[S.countInput, { flex: 1, width: undefined }]} value={dGuichet}
+                        onChangeText={setDGuichet} keyboardType="number-pad" textAlign="center" />
+                      <TouchableOpacity style={S.countBtn} onPress={() => setDGuichet(v => String(parseInt(v || "0") + 1))}>
+                        <Ionicons name="add" size={18} color={G} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[S.label, { color: "#1D4ED8" }]}>🌐 Places en ligne</Text>
+                    <View style={S.countRow}>
+                      <TouchableOpacity style={[S.countBtn, { borderColor: "#1D4ED8" }]} onPress={() => setDOnline(v => String(Math.max(0, parseInt(v || "0") - 1)))}>
+                        <Ionicons name="remove" size={18} color="#1D4ED8" />
+                      </TouchableOpacity>
+                      <TextInput style={[S.countInput, { flex: 1, width: undefined, borderColor: "#BFDBFE" }]} value={dOnline}
+                        onChangeText={setDOnline} keyboardType="number-pad" textAlign="center" />
+                      <TouchableOpacity style={[S.countBtn, { borderColor: "#1D4ED8" }]} onPress={() => setDOnline(v => String(parseInt(v || "0") + 1))}>
+                        <Ionicons name="add" size={18} color="#1D4ED8" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* ── Personnel (optionnel) ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="people-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Personnel (optionnel)</Text>
+                </View>
+                <Text style={S.label}>Nom du chauffeur</Text>
+                <TextInput style={S.input} placeholder="Ex: Diallo Bakary" value={dChauffeur} onChangeText={setDChauffeur} />
+                <Text style={S.label}>Nom de l'agent en route</Text>
+                <TextInput style={S.input} placeholder="Ex: Koné Ibrahim" value={dAgentRoute} onChangeText={setDAgentRoute} />
+              </View>
+
+              {/* ── Récap ── */}
+              <View style={S.recap}>
+                <Text style={S.recapTitle}>Récapitulatif du départ</Text>
+                <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{dFrom || "—"} → {dTo || "—"}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Date</Text><Text style={S.recapVal}>{dDate || "—"}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Heure</Text><Text style={S.recapVal}>{dHeure || "—"}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Bus</Text><Text style={S.recapVal}>{selectedBus?.busName ?? "Non sélectionné"}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>🏪 Guichet</Text><Text style={S.recapVal}>{dGuichet} places</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>🌐 En ligne</Text><Text style={S.recapVal}>{dOnline} places</Text></View>
+                <View style={[S.recapRow, { borderTopWidth: 1, borderColor: "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
+                  <Text style={[S.recapKey, { fontWeight: "700", color: G_DARK }]}>TOTAL PLACES</Text>
+                  <Text style={[S.recapVal, { fontWeight: "800", color: G, fontSize: 18 }]}>
+                    {(parseInt(dGuichet) || 0) + (parseInt(dOnline) || 0)}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={[S.submitBtn, creatingDep && { opacity: 0.6 }]}
+                onPress={handleCreateDeparture} disabled={creatingDep}>
+                {creatingDep ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={22} color="#fff" />
+                    <Text style={S.submitTxt}>Programmer ce départ</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </>
           )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, marginTop: 8, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-          onPress={() => router.push("/agent/rapport" as never)}
-        >
-          <Feather name="alert-triangle" size={16} color="#fff" />
-          <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -521,6 +843,12 @@ const S = StyleSheet.create({
   logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   logoutTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
+  tabBar:     { flexDirection: "row", backgroundColor: G_DARK, paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  tab:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)" },
+  tabActive:  { backgroundColor: "#fff" },
+  tabTxt:     { fontSize: 13, fontWeight: "700", color: "#9CA3AF" },
+  tabTxtActive: { color: G_DARK },
+
   content:   { padding: 16, gap: 14, paddingBottom: 32 },
   card:      { backgroundColor: "#fff", borderRadius: 14, padding: 16, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, gap: 10 },
   cardHeader:{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
@@ -531,6 +859,9 @@ const S = StyleSheet.create({
   tripRoute: { fontSize: 14, fontWeight: "700", color: "#111827" },
   tripMeta:  { fontSize: 12, color: "#6B7280", marginTop: 2 },
   tripPrice: { fontSize: 15, fontWeight: "800", color: G },
+
+  busItem:    { borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  busItemSel: { borderColor: G, backgroundColor: G_LIGHT },
 
   label:     { fontSize: 13, fontWeight: "500", color: "#374151" },
   input:     { borderWidth: 1.5, borderColor: "#FDE68A", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: G_LIGHT, color: "#111827" },
