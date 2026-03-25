@@ -321,7 +321,7 @@ function BookingCard({
                : isPaid ? Colors.light.primary
                : "#D97706"
         }]}>
-          {item.totalAmount.toLocaleString()} FCFA
+          {(item.totalAmount ?? 0).toLocaleString()} FCFA
         </Text>
       </View>
 

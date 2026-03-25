@@ -759,7 +759,7 @@ export default function RouteScreen() {
                       <Text style={{ fontSize: 14, fontWeight: "800", color: "#166534" }}>Passager enregistré !</Text>
                     </View>
                     <Text style={{ fontSize: 13, color: "#166534" }}>Réf : <Text style={{ fontWeight: "800" }}>{manualSuccess.bookingRef}</Text></Text>
-                    <Text style={{ fontSize: 12, color: "#4B5563" }}>Montant : {manualSuccess.total.toLocaleString()} FCFA · SMS envoyé au passager</Text>
+                    <Text style={{ fontSize: 12, color: "#4B5563" }}>Montant : {(manualSuccess.total ?? 0).toLocaleString()} FCFA · SMS envoyé au passager</Text>
                     <TouchableOpacity onPress={() => setManualSuccess(null)} style={{ alignSelf: "flex-end" }}>
                       <Text style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}>Fermer ✕</Text>
                     </TouchableOpacity>

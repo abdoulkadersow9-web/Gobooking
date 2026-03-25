@@ -92,7 +92,7 @@ export default function EntrepriseColis() {
                   <Text style={S.names}>
                     {item.sender_name} → {item.recipient_name}
                   </Text>
-                  <Text style={S.price}>{item.price.toLocaleString()} FCFA</Text>
+                  <Text style={S.price}>{(item.price ?? 0).toLocaleString()} FCFA</Text>
                 </View>
                 <Text style={S.date}>
                   {new Date(item.created_at).toLocaleDateString("fr-FR", {

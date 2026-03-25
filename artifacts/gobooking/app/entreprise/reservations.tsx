@@ -78,11 +78,13 @@ export default function EntrepriseReservations() {
               <Text style={S.passenger}>{item.passenger_name}</Text>
               <View style={S.cardRow}>
                 <Text style={S.date}>
-                  {new Date(item.departure_time).toLocaleDateString("fr-FR", {
-                    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
-                  })}
+                  {item.departure_time
+                    ? new Date(item.departure_time).toLocaleDateString("fr-FR", {
+                        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                      })
+                    : "—"}
                 </Text>
-                <Text style={S.price}>{item.total_price.toLocaleString()} FCFA</Text>
+                <Text style={S.price}>{(item.total_price ?? 0).toLocaleString()} FCFA</Text>
               </View>
             </View>
           )}

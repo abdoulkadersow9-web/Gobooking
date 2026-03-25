@@ -148,7 +148,7 @@ export default function AgentReservation() {
       : "";
     Alert.alert(
       "Confirmer la réservation",
-      `Confirmer ${booking.bookingRef} pour ${booking.passengers[0]?.name ?? "client"} ?\n\nTrajet : ${booking.trip?.from} → ${booking.trip?.to}\nDate : ${booking.trip?.date} à ${booking.trip?.departureTime}\nMontant : ${booking.totalAmount.toLocaleString()} FCFA${bagInfo}`,
+      `Confirmer ${booking.bookingRef} pour ${booking.passengers[0]?.name ?? "client"} ?\n\nTrajet : ${booking.trip?.from} → ${booking.trip?.to}\nDate : ${booking.trip?.date} à ${booking.trip?.departureTime}\nMontant : ${(booking.totalAmount ?? 0).toLocaleString()} FCFA${bagInfo}`,
       [
         { text: "Annuler", style: "cancel" },
         { text: "Confirmer ✓", onPress: async () => {
@@ -398,7 +398,7 @@ export default function AgentReservation() {
                 <View style={S.detailsBlock}>
                   <InfoRow icon="people-outline" label="Passagers"  val={`${paxCount} personne${paxCount > 1 ? "s" : ""}`} />
                   <InfoRow icon="apps-outline"   label="Sièges"     val={seatNums} />
-                  <InfoRow icon="cash-outline"   label="Montant"    val={`${b.totalAmount.toLocaleString()} FCFA`} />
+                  <InfoRow icon="cash-outline"   label="Montant"    val={`${(b.totalAmount ?? 0).toLocaleString()} FCFA`} />
                   <InfoRow icon="card-outline"   label="Paiement"   val={paymentLabel(b.paymentMethod)} />
                 </View>
 

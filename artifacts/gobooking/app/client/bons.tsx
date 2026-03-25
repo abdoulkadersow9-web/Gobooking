@@ -104,7 +104,7 @@ export default function MesBonsScreen() {
             </View>
             <View>
               <Text style={styles.balanceLabel}>Crédit disponible</Text>
-              <Text style={styles.balanceAmount}>{balance.toLocaleString()} FCFA</Text>
+              <Text style={styles.balanceAmount}>{(balance ?? 0).toLocaleString()} FCFA</Text>
             </View>
           </View>
           {wallet && (
@@ -177,7 +177,7 @@ export default function MesBonsScreen() {
 
                 <View style={styles.bonFooter}>
                   <Text style={styles.bonEmittedAt}>Émis le {formatDate(bon.createdAt)}</Text>
-                  <Text style={styles.bonAmount}>{bon.totalAmount.toLocaleString()} FCFA</Text>
+                  <Text style={styles.bonAmount}>{(bon.totalAmount ?? 0).toLocaleString()} FCFA</Text>
                 </View>
               </View>
             ))

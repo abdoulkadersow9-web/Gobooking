@@ -129,7 +129,7 @@ export default function PaymentHistoryScreen() {
           </View>
         </View>
         <View style={ss.cardRight}>
-          <Text style={ss.amount}>{item.amount.toLocaleString()} F</Text>
+          <Text style={ss.amount}>{(item.amount ?? 0).toLocaleString()} F</Text>
           <View style={[ss.statusBadge, { backgroundColor: badge.bg }]}>
             <Feather name={badge.icon as never} size={10} color={badge.color} />
             <Text style={[ss.statusText, { color: badge.color }]}>{badge.label}</Text>

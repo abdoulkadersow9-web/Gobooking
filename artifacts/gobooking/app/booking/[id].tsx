@@ -339,7 +339,7 @@ export default function BookingDetailScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#1E1B4B", textTransform: "capitalize" }}>{b.type}</Text>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280" }}>{b.poids} kg · {b.prix.toLocaleString()} FCFA</Text>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280" }}>{b.poids} kg · {(b.prix ?? 0).toLocaleString()} FCFA</Text>
                 </View>
                 {b.imageUrl && (
                   <View style={{ width: 44, height: 44, borderRadius: 8, overflow: "hidden" }}>
@@ -391,7 +391,7 @@ export default function BookingDetailScreen() {
             </View>
             <View style={[styles.payRow, { borderBottomWidth: 0 }]}>
               <Text style={styles.payTotalLabel}>Montant total</Text>
-              <Text style={styles.payTotalValue}>{booking.totalAmount.toLocaleString()} FCFA</Text>
+              <Text style={styles.payTotalValue}>{(booking.totalAmount ?? 0).toLocaleString()} FCFA</Text>
             </View>
           </View>
         </View>
@@ -413,7 +413,7 @@ export default function BookingDetailScreen() {
             }}
           >
             <Feather name="credit-card" size={16} color="white" />
-            <Text style={styles.payNowBtnText}>Payer {booking.totalAmount.toLocaleString()} FCFA</Text>
+            <Text style={styles.payNowBtnText}>Payer {(booking.totalAmount ?? 0).toLocaleString()} FCFA</Text>
           </Pressable>
         )}
 

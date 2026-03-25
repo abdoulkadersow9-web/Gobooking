@@ -210,7 +210,7 @@ export default function ConfirmationScreen() {
           `Arrivée   : ${booking.trip.arrivalTime}`,
           `Siège(s)  : ${booking.seatNumbers.join(", ")}`,
           `Passager  : ${booking.passengers.map((p) => p.name).join(", ")}`,
-          `Montant   : ${booking.totalAmount.toLocaleString()} FCFA`,
+          `Montant   : ${(booking.totalAmount ?? 0).toLocaleString()} FCFA`,
           `Paiement  : ${METHOD_LABELS[booking.paymentMethod] || booking.paymentMethod}`,
         ].join("\n"),
       });
@@ -330,7 +330,7 @@ export default function ConfirmationScreen() {
                 Montant payé
               </Text>
               <Text style={rowStyles.accentValue}>
-                {booking.totalAmount.toLocaleString()} FCFA
+                {(booking.totalAmount ?? 0).toLocaleString()} FCFA
               </Text>
             </View>
 
@@ -349,7 +349,7 @@ export default function ConfirmationScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 12, color: "#64748B", fontFamily: "Inter_400Regular" }}>Montant total</Text>
                   <Text style={{ fontSize: 12, color: "#0F172A", fontFamily: "Inter_600SemiBold" }}>
-                    {booking.totalAmount.toLocaleString()} FCFA
+                    {(booking.totalAmount ?? 0).toLocaleString()} FCFA
                   </Text>
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -362,14 +362,14 @@ export default function ConfirmationScreen() {
                     </View>
                   </View>
                   <Text style={{ fontSize: 12, color: "#DC2626", fontFamily: "Inter_600SemiBold" }}>
-                    -{booking.commissionAmount.toLocaleString()} FCFA
+                    -{(booking.commissionAmount ?? 0).toLocaleString()} FCFA
                   </Text>
                 </View>
                 <View style={{ height: 1, backgroundColor: "#E2E8F0" }} />
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                   <Text style={{ fontSize: 12, color: "#059669", fontFamily: "Inter_600SemiBold" }}>Revenu compagnie</Text>
                   <Text style={{ fontSize: 12, color: "#059669", fontFamily: "Inter_700Bold" }}>
-                    {(booking.totalAmount - booking.commissionAmount).toLocaleString()} FCFA
+                    {((booking.totalAmount ?? 0) - (booking.commissionAmount ?? 0)).toLocaleString()} FCFA
                   </Text>
                 </View>
               </View>

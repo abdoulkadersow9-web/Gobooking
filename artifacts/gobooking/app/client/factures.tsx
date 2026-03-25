@@ -124,7 +124,7 @@ function ReceiptCard({ item, onDownload, downloading }: { item: Receipt; onDownl
       <View style={styles.cardFooter}>
         <View>
           <Text style={styles.amountLabel}>Total payé</Text>
-          <Text style={styles.amount}>{item.totalAmount.toLocaleString()} FCFA</Text>
+          <Text style={styles.amount}>{(item.totalAmount ?? 0).toLocaleString()} FCFA</Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.downloadBtn, pressed && { opacity: 0.75 }, downloading && { opacity: 0.6 }]}
@@ -213,7 +213,7 @@ export default function FacturesClientScreen() {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{totalSpent.toLocaleString()}</Text>
+            <Text style={styles.summaryValue}>{(totalSpent ?? 0).toLocaleString()}</Text>
             <Text style={styles.summaryLabel}>FCFA dépensés</Text>
           </View>
         </View>
