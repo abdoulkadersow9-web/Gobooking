@@ -374,7 +374,7 @@ export default function CompanyDashboard() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-gray-800">{t.from} → {t.to}</p>
                   <p className="text-xs text-gray-400 mt-0.5">{t.date} · {t.dep}</p>
-                  <p className="text-xs text-gray-400">{t.seats} places · {Number(t.price).toLocaleString("fr")} FCFA/place</p>
+                  <p className="text-xs text-gray-400">{t.seats} places · {Number(t.price).toLocaleString("fr")} FCFA/passager</p>
                 </div>
               </div>
             ))}

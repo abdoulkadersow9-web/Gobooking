@@ -2328,7 +2328,7 @@ export default function CompanyDashboard() {
             {newReservation.tripId !== "" && (
               <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: "#F8FAFC" }}>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>
-                  {(() => { const t = trips.find(x => x.id === newReservation.tripId); return t ? `${t.from} → ${t.to} · ${(t.price ?? 0).toLocaleString()} FCFA/place × ${newReservation.seatCount} = ${(t.price * Number(newReservation.seatCount)).toLocaleString()} FCFA` : ""; })()}
+                  {(() => { const t = trips.find(x => x.id === newReservation.tripId); return t ? `${t.from} → ${t.to} · ${(t.price ?? 0).toLocaleString()} FCFA/passager × ${newReservation.seatCount} = ${(t.price * Number(newReservation.seatCount)).toLocaleString()} FCFA` : ""; })()}
                 </Text>
               </View>
             )}

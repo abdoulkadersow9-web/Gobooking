@@ -226,7 +226,7 @@ export default function CompanyPreview() {
               <View style={{flex:1}}>
                 <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
                 <Text style={S.cardSub}>{trip.date} · {trip.dep} · {trip.bus}</Text>
-                <Text style={S.cardSub}>{trip.seats} places · {(trip.price ?? 0).toLocaleString()} FCFA/place</Text>
+                <Text style={S.cardSub}>{trip.seats} places · {(trip.price ?? 0).toLocaleString()} FCFA/passager</Text>
               </View>
             </View>
           ))}

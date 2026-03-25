@@ -182,7 +182,7 @@ export default function TripDetailScreen() {
 
         <View style={styles.priceRow}>
           <View>
-            <Text style={styles.priceLabel}>Price per seat</Text>
+            <Text style={styles.priceLabel}>Tarif / passager</Text>
             <Text style={styles.price}>{(trip.price ?? 0).toLocaleString()} FCFA</Text>
           </View>
           <View style={[
@@ -271,7 +271,7 @@ export default function TripDetailScreen() {
 
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
-          <Text style={styles.totalLabel}>Prix par siège</Text>
+          <Text style={styles.totalLabel}>Tarif / passager</Text>
           <Text style={styles.totalPrice}>{(trip.price ?? 0).toLocaleString()} <Text style={styles.totalSub}>FCFA</Text></Text>
         </View>
         <View style={styles.btnGroup}>

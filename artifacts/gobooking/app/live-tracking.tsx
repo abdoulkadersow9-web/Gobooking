@@ -1463,7 +1463,7 @@ export default function LiveTrackingScreen() {
             <View style={[S.sheetFooter, { flexDirection: "column", gap: 10 }]}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <View style={S.priceWrap}>
-                  <Text style={S.priceLabel}>Prix / place</Text>
+                  <Text style={S.priceLabel}>Tarif / passager</Text>
                   <Text style={[S.priceVal, { color: selected.color }]}>{(selected.price ?? 0).toLocaleString()} F</Text>
                 </View>
                 {/* "Demander en direct" toggle — hidden when pending/accepted, shown when idle or rejected */}
