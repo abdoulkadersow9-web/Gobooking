@@ -1,0 +1,131 @@
+Ajoute un nouveau rôle et un système d’alerte temps réel pour le suivi des bus dans mon application GoBooking.
+
+-----------------------------------
+1. NOUVEAU RÔLE : AGENT SUIVI / ALERTE
+-----------------------------------
+
+Créer un nouveau rôle :
+"suivi"
+
+Objectif :
+- Surveiller les bus
+- Gérer les alertes
+- Communiquer avec les agents à bord
+
+Chaque utilisateur peut avoir plusieurs rôles :
+roles = ["logistique", "suivi"]
+
+-----------------------------------
+2. NOUVEAU MODULE : SUIVI & ALERTES
+-----------------------------------
+
+Créer un écran :
+👉 "Agent Suivi"
+
+Contenu :
+
+SECTION 1 : LISTE DES BUS EN TEMPS RÉEL
+
+Afficher :
+- Numéro bus
+- Trajet
+- Statut :
+  - En route
+  - Arrêt anormal
+  - Panne
+  - Contrôle
+- Dernière activité (timestamp)
+
+-----------------------------------
+SECTION 2 : SYSTÈME D’ALERTE
+
+Ajouter bouton dans chaque bus :
+👉 "Déclencher alerte"
+
+Quand cliqué :
+- statut = "ALERTE"
+- enregistrer heure
+- alerte visible côté agent suivi
+
+-----------------------------------
+3. COMPORTEMENT ALERTE (TRÈS IMPORTANT)
+
+Quand une alerte est déclenchée :
+
+1. Une alarme visuelle doit apparaître côté Agent Suivi
+2. Une alarme sonore peut être simulée (optionnel)
+
+3. L’agent dans le bus doit répondre
+
+Créer un système de réponse :
+
+Options :
+- "Panne"
+- "Contrôle"
+- "Pause normale"
+
+-----------------------------------
+4. LOGIQUE DE VALIDATION
+
+Flux :
+
+1. Bus déclenche alerte
+2. Agent Suivi reçoit alerte
+3. Agent bus choisit une réponse :
+   - panne
+   - contrôle
+   - pause
+
+4. Agent Suivi voit la réponse
+5. Agent Suivi clique :
+👉 "Confirmer"
+
+Résultat :
+- statut alerte = "résolue"
+- alarme s’arrête
+
+-----------------------------------
+5. STRUCTURE DONNÉES
+
+Créer structure :
+
+alert = {
+  id,
+  busId,
+  status: "active" | "resolue",
+  type: "panne" | "controle" | "pause",
+  createdAt,
+  respondedAt
+}
+
+-----------------------------------
+6. INTERFACE UTILISATEUR
+
+Ajouter dans espace agent :
+
+Carte :
+"Agent Suivi & Alertes"
+
+Description :
+Surveiller les bus et gérer les situations en temps réel
+
+-----------------------------------
+7. SÉCURITÉ
+
+- Seuls agents avec rôle "suivi" peuvent voir les alertes
+- Seuls agents bus/logistique peuvent répondre
+
+-----------------------------------
+CONTRAINTES
+
+- Ne pas casser les modules existants
+- Réutiliser logique bus déjà créée
+- Code propre et modulaire
+
+-----------------------------------
+À LA FIN
+
+- expliquer comment déclencher une alerte
+- expliquer comment répondre
+- expliquer comment confirmer
+- montrer le flux complet

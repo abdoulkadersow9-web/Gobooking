@@ -72,6 +72,19 @@ const ALL_MODULES = [
     border: "#38BDF8",
     roles: ["logistique"],
   },
+  {
+    id: "suivi",
+    label: "Agent Suivi & Alertes",
+    sub: "Surveillance en temps réel",
+    desc: "Surveiller les bus, gérer les alertes et situations critiques",
+    icon: "radio-outline" as const,
+    emoji: "📡",
+    path: "/agent/suivi",
+    color: "#BE123C",
+    gradient: ["#FFF1F2", "#FFE4E6"] as [string, string],
+    border: "#FDA4AF",
+    roles: ["suivi"],
+  },
 ];
 
 export default function AgentHome() {

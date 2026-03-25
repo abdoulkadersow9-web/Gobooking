@@ -2314,6 +2314,161 @@ router.post("/logistique/buses/:busId/remettre-en-attente", async (req, res) => 
   }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   SUIVI MODULE — Real-time bus monitoring & alert system
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /suivi/overview ─── */
+router.get("/suivi/overview", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const busesList = user.companyId
+      ? await db.select().from(busesTable).where(eq(busesTable.companyId, user.companyId))
+      : await db.select().from(busesTable).limit(100);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const tripsRaw = user.companyId
+      ? await db.select().from(tripsTable).where(and(eq(tripsTable.companyId, user.companyId), eq(tripsTable.date, today)))
+      : await db.select().from(tripsTable).where(eq(tripsTable.date, today)).limit(50);
+
+    const alertsRaw = await db.select().from(agentAlertsTable)
+      .where(and(
+        eq(agentAlertsTable.status, "active"),
+        user.companyId ? eq(agentAlertsTable.companyId, user.companyId) : sql`1=1`
+      ))
+      .orderBy(desc(agentAlertsTable.createdAt))
+      .limit(20);
+
+    res.json({
+      buses: busesList.map((b: any) => ({
+        id:              b.id,
+        busName:         b.bus_name ?? b.busName,
+        plateNumber:     b.plate_number ?? b.plateNumber,
+        logisticStatus:  b.logistic_status ?? b.logisticStatus,
+        currentLocation: b.current_location ?? b.currentLocation,
+        currentTripId:   b.current_trip_id ?? b.currentTripId,
+        condition:       b.condition,
+        issue:           b.issue,
+      })),
+      trips: tripsRaw.map((t: any) => ({
+        id:            t.id,
+        from:          t.from,
+        to:            t.to,
+        departureTime: t.departure_time ?? t.departureTime,
+        status:        t.status,
+        busId:         t.bus_id ?? t.busId,
+        busName:       t.bus_name ?? t.busName,
+      })),
+      alerts: alertsRaw.map((a: any) => ({
+        id:          a.id,
+        type:        a.type,
+        busId:       a.busId,
+        busName:     a.busName,
+        agentId:     a.agentId,
+        agentName:   a.agentName,
+        message:     a.message,
+        status:      a.status,
+        response:    (a as any).response ?? null,
+        respondedAt: (a as any).respondedAt?.toISOString?.() ?? null,
+        createdAt:   a.createdAt?.toISOString?.() ?? a.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("[suivi/overview]", err);
+    res.status(500).json({ error: "Erreur suivi overview" });
+  }
+});
+
+/* ─── POST /suivi/alerts/trigger — any agent triggers an alert for a bus ─── */
+router.post("/suivi/alerts/trigger", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { busId, message } = req.body as { busId: string; message?: string };
+    if (!busId) { res.status(400).json({ error: "busId requis" }); return; }
+
+    const buses = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+    const busName = (buses[0] as any)?.busName ?? (buses[0] as any)?.bus_name ?? busId;
+
+    const alertId = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(agentAlertsTable).values({
+      id: alertId,
+      type: "alerte",
+      agentId: user.id,
+      agentName: user.name,
+      companyId: user.companyId ?? undefined,
+      busId,
+      busName,
+      message: message ?? `⚠️ Alerte déclenchée par ${user.name} pour ${busName}`,
+      status: "active",
+    });
+
+    res.status(201).json({ success: true, alertId, busId, busName });
+  } catch (err) {
+    console.error("[suivi/alerts/trigger]", err);
+    res.status(500).json({ error: "Erreur déclenchement alerte" });
+  }
+});
+
+/* ─── POST /suivi/alerts/:id/respond — bus agent responds to alert ─── */
+router.post("/suivi/alerts/:id/respond", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    const { response } = req.body as { response: "panne" | "controle" | "pause" };
+    if (!["panne", "controle", "pause"].includes(response)) {
+      res.status(400).json({ error: "Réponse invalide (panne | controle | pause)" }); return;
+    }
+
+    await db.execute(sql`
+      UPDATE agent_alerts
+      SET response = ${response}, responded_at = NOW()
+      WHERE id = ${id}
+    `);
+
+    // If panne, update bus status
+    if (response === "panne") {
+      const alertRow = await db.select().from(agentAlertsTable).where(eq(agentAlertsTable.id, id)).limit(1);
+      if (alertRow[0]?.busId) {
+        await db.execute(sql`
+          UPDATE buses SET logistic_status = 'en_panne', condition = 'panne'
+          WHERE id = ${alertRow[0].busId}
+        `);
+      }
+    }
+
+    res.json({ success: true, alertId: id, response });
+  } catch (err) {
+    console.error("[suivi/alerts/respond]", err);
+    res.status(500).json({ error: "Erreur réponse alerte" });
+  }
+});
+
+/* ─── POST /suivi/alerts/:id/confirm — suivi agent confirms/resolves alert ─── */
+router.post("/suivi/alerts/:id/confirm", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.params;
+    await db.execute(sql`
+      UPDATE agent_alerts
+      SET status = 'resolue', resolved_at = NOW(), resolved_by = ${user.name}
+      WHERE id = ${id}
+    `);
+
+    res.json({ success: true, alertId: id, status: "resolue" });
+  } catch (err) {
+    console.error("[suivi/alerts/confirm]", err);
+    res.status(500).json({ error: "Erreur confirmation alerte" });
+  }
+});
+
 /* ─── PATCH /agent/buses/:busId/update — agent updates bus logistic status & location ─── */
 router.patch("/buses/:busId/update", async (req, res) => {
   try {
