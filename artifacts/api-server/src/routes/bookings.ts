@@ -988,6 +988,53 @@ router.get("/pending-baggage", async (req, res) => {
    Body: { base64: string, mimeType?: string }
    Returns: { url: string }
 ─────────────────────────────────────────────────────────────────────────── */
+// ── POST /bookings/:bookingId/voucher — demander un bon de voyage ─────────────
+router.post("/:bookingId/voucher", async (req, res) => {
+  try {
+    const userId = getUserIdFromToken(req.headers.authorization);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const { bookingId } = req.params;
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+
+    const booking = rows[0];
+    if (booking.userId !== userId) { res.status(403).json({ error: "Accès refusé" }); return; }
+    if (booking.paymentStatus !== "paid") { res.status(400).json({ error: "Réservation non payée" }); return; }
+    if ((booking.status as string) === "bon_emis") { res.status(400).json({ error: "Bon déjà émis" }); return; }
+
+    // Émettre le bon
+    await db.update(bookingsTable).set({ status: "bon_emis" } as any).where(eq(bookingsTable.id, bookingId));
+
+    // Créditer le portefeuille fidélité
+    creditUserWallet(userId, booking.totalAmount, false).catch(() => {});
+
+    // Notification
+    const [userRow] = await db.select({ pushToken: usersTable.pushToken, name: usersTable.name })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+
+    if (userRow) {
+      try {
+        await db.insert(notificationsTable).values({
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          userId,
+          type: "voucher_issued",
+          title: "🎟️ Bon de voyage émis",
+          message: `Votre bon de ${booking.totalAmount.toLocaleString()} FCFA a été ajouté à votre compte fidélité.`,
+          refId: bookingId,
+          refType: "booking",
+        });
+      } catch { /* skip dup */ }
+    }
+
+    const full = await getFullBooking(bookingId);
+    res.json({ success: true, booking: full });
+  } catch (err) {
+    console.error("Voucher error:", err);
+    res.status(500).json({ error: "Échec de l'émission du bon" });
+  }
+});
+
 router.post("/upload-image", async (req, res) => {
   try {
     const userId = getUserIdFromToken(req.headers.authorization);

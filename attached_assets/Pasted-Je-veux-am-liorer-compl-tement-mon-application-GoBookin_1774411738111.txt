@@ -1,0 +1,174 @@
+Je veux améliorer complètement mon application GoBooking (transport + colis) avec une logique professionnelle, claire et adaptée au terrain (en ligne + en gare).
+
+OBJECTIF :
+Créer un système fiable, structuré, sans confusion, avec séparation des rôles, gestion des réservations, bagages, fidélisation, module colis complet et synchronisation automatique des données.
+
+--------------------------------
+1. STATUTS DE RÉSERVATION
+--------------------------------
+
+- EN ATTENTE
+- VALIDÉ
+- EXPIRÉ
+- REFUSÉ
+- BON ÉMIS
+
+--------------------------------
+2. RÈGLE DES 45 MINUTES
+--------------------------------
+
+- Toute réservation doit être validée (paiement effectué) au plus tard :
+  → 45 minutes avant le départ
+
+- Si NON validée :
+  → statut = EXPIRÉ
+  → siège libéré automatiquement
+  → place disponible
+
+--------------------------------
+3. MESSAGE CLIENT
+--------------------------------
+
+Afficher :
+
+"Votre réservation doit être validée (paiement effectué) au moins 45 minutes avant le départ. Passé ce délai, elle sera automatiquement annulée."
+
+--------------------------------
+4. APRÈS PAIEMENT
+--------------------------------
+
+- Réservation VALIDÉE :
+  → non annulable
+  → non modifiable
+
+--------------------------------
+5. SYSTÈME DE FIDÉLISATION
+--------------------------------
+
+- Possibilité de demander un bon de voyage
+- Générer crédit
+- Module : "Mes bons"
+
+--------------------------------
+6. SÉPARATION DES RÔLES
+--------------------------------
+
+AGENT RÉSERVATION :
+- Gère réservations en ligne
+- Gère bagages en ligne
+- Valide ou refuse
+
+AGENT GUICHET :
+- Crée trajets / départs
+- Vend billets en gare
+
+AGENT COLIS :
+- Gère uniquement les colis
+
+--------------------------------
+7. GESTION DES BAGAGES (EN LIGNE UNIQUEMENT)
+--------------------------------
+
+- 1 bagage :
+  → pas de photo
+
+- 2 à 4 bagages :
+  → photos obligatoires
+  → validation agent
+
+--------------------------------
+8. AUTOMATISATION
+--------------------------------
+
+Si :
+heure actuelle ≥ (heure départ - 45 min)
+ET statut = EN ATTENTE
+
+→ statut = EXPIRÉ
+→ libérer siège
+
+--------------------------------
+9. MODULE COLIS COMPLET
+--------------------------------
+
+- Création colis (agent colis)
+- QR code + code généré
+- Notifications envoyées
+- Suivi en temps réel
+
+Statuts :
+- ENREGISTRÉ
+- EN TRANSIT
+- ARRIVÉ EN AGENCE
+- EN COURS DE LIVRAISON
+- LIVRÉ
+
+--------------------------------
+10. RETRAIT COLIS
+--------------------------------
+
+- Vérification QR code ou code
+- Interdire retrait sans validation
+
+--------------------------------
+11. SYNCHRONISATION DES DONNÉES (TRÈS IMPORTANT)
+--------------------------------
+
+Mettre en place une logique globale :
+
+- Toute action doit être reflétée automatiquement dans toutes les pages concernées
+
+Exemples :
+
+- Après création d’un trajet :
+  → doit apparaître dans :
+     • liste des trajets
+     • réservation client
+     • dashboard
+
+- Après réservation :
+  → doit apparaître dans :
+     • historique des réservations
+     • espace agent
+     • espace admin
+
+- Après création billet :
+  → doit apparaître dans :
+     • historique des tickets
+     • espace client
+     • espace agent
+
+- Après création colis :
+  → doit apparaître dans :
+     • historique colis
+     • suivi colis
+     • espace agent colis
+     • espace admin
+
+IMPORTANT :
+- Aucune donnée ne doit rester isolée
+- Toutes les données doivent être synchronisées automatiquement
+
+--------------------------------
+12. UX
+--------------------------------
+
+- Afficher :
+  → alertes
+  → temps restant
+
+- Boutons :
+  → bon
+  → scan QR
+
+--------------------------------
+RÉSULTAT ATTENDU
+--------------------------------
+
+- Application complète et cohérente
+- Données synchronisées partout
+- Aucune confusion
+- Système professionnel
+
+Priorité :
+LOGIQUE MÉTIER + SYNCHRONISATION + PERFORMANCE

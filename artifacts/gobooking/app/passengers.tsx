@@ -186,6 +186,19 @@ export default function PassengersScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Règle des 45 minutes ── */}
+        <View style={styles.rule45Card}>
+          <View style={styles.rule45Icon}>
+            <Feather name="clock" size={16} color="#1D4ED8" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rule45Title}>Règle de paiement</Text>
+            <Text style={styles.rule45Text}>
+              Votre réservation doit être validée (paiement effectué) au moins <Text style={{ fontFamily: "Inter_700Bold" }}>45 minutes avant le départ</Text>. Passé ce délai, elle sera automatiquement annulée et le siège libéré.
+            </Text>
+          </View>
+        </View>
+
         {passengers.map((p, i) => (
           <View key={i} style={styles.card}>
             <View style={styles.cardHeader}>
@@ -567,6 +580,20 @@ const styles = StyleSheet.create({
     marginTop: 8, paddingHorizontal: 4,
   },
   photoEmptyHintText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#DC2626" },
+
+  /* 45-min rule banner */
+  rule45Card: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    backgroundColor: "#EFF6FF", borderRadius: 12,
+    borderWidth: 1, borderColor: "#BFDBFE",
+    padding: 12, marginBottom: 12,
+  },
+  rule45Icon: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center",
+  },
+  rule45Title: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#1E40AF", marginBottom: 3 },
+  rule45Text:  { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", lineHeight: 16 },
 
   /* Bottom */
   bottomBar: {

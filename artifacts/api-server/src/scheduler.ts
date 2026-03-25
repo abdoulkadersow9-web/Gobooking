@@ -334,6 +334,76 @@ async function autoConfirmBookings() {
   }
 }
 
+// ─── 7. Expiration 45 min : pending non payées → expiré + siège libéré ───────
+
+const sentExpiry = new Set<string>(); // bookingId déjà traité
+
+async function checkPendingExpiry() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Trajets schedulés d'aujourd'hui
+  const trips = await db
+    .select()
+    .from(tripsTable)
+    .where(and(eq(tripsTable.date, today), eq(tripsTable.status, "scheduled")));
+
+  for (const trip of trips) {
+    const minsLeft = minutesUntil(tripDepartureDate(trip));
+    // Seuil: ≤ 45 min avant départ
+    if (minsLeft > 45) continue;
+
+    // Réservations en attente de paiement pour ce trajet
+    const expiredBookings = await db
+      .select()
+      .from(bookingsTable)
+      .where(
+        and(
+          eq(bookingsTable.tripId, trip.id),
+          eq(bookingsTable.status, "pending"),
+          eq(bookingsTable.paymentStatus, "pending")
+        )
+      );
+
+    for (const booking of expiredBookings) {
+      if (sentExpiry.has(booking.id)) continue;
+      sentExpiry.add(booking.id);
+
+      // Libérer les sièges
+      if (booking.seatIds && booking.seatIds.length > 0) {
+        await db
+          .update(seatsTable)
+          .set({ status: "available" })
+          .where(inArray(seatsTable.id, booking.seatIds));
+      }
+
+      // Marquer la réservation comme expirée
+      await db
+        .update(bookingsTable)
+        .set({ status: "expiré" } as any)
+        .where(eq(bookingsTable.id, booking.id));
+
+      console.log(`[Scheduler] ⏱️  Réservation ${booking.bookingRef} expirée (départ dans ${Math.round(minsLeft)} min)`);
+
+      // Notifier le client
+      const [userRow] = await db
+        .select({ pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(eq(usersTable.id, booking.userId))
+        .limit(1);
+
+      await pushAndStore(
+        booking.userId,
+        userRow?.pushToken,
+        "booking_expired",
+        "⏱️ Réservation expirée",
+        `Votre réservation ${booking.bookingRef} (${trip.from} → ${trip.to}) a expiré faute de paiement dans les 45 min. Le siège a été libéré.`,
+        booking.id,
+        "booking"
+      );
+    }
+  }
+}
+
 // ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 export function startScheduler(intervalMs = 30_000) {
@@ -348,6 +418,7 @@ export function startScheduler(intervalMs = 30_000) {
         checkUnloadedParcels(),
         autoUpdateTripStatuses(),
         autoConfirmBookings(),
+        checkPendingExpiry(),
         checkBusAnomalies(),
       ]);
     } catch (err) {
