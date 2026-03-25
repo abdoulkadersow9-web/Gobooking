@@ -484,6 +484,7 @@ interface CreatedParcel {
   weight: string;
   amount: number;
   deliveryType: string;
+  pickupCode?: string;
 }
 
 function buildLabelHtml(p: CreatedParcel): string {
@@ -645,6 +646,7 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
   const [receiverName, setReceiverName]   = useState("");
   const [receiverPhone, setReceiverPhone] = useState("");
   const [parcelType, setParcelType]   = useState("Colis standard");
+  const [description, setDescription] = useState("");
   const [weight, setWeight]           = useState("");
   const [amount, setAmount]           = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -657,6 +659,13 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
   const [showToPicker, setShowToPicker]     = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
 
+  const reset = () => {
+    setSenderName(""); setSenderPhone(""); setReceiverName(""); setReceiverPhone("");
+    setDescription(""); setWeight(""); setAmount(""); setCreated(null);
+    setFromCity("Abidjan"); setToCity("Bouaké"); setParcelType("Colis standard");
+    setPaymentMethod("cash"); setDeliveryType("livraison_gare");
+  };
+
   const handleCreate = async () => {
     if (!senderName.trim())   { Alert.alert("Erreur", "Entrez le nom de l'expéditeur."); return; }
     if (!senderPhone.trim())  { Alert.alert("Erreur", "Entrez le téléphone de l'expéditeur."); return; }
@@ -667,11 +676,12 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
 
     setSubmitting(true);
     try {
-      const res = await apiFetch<{ trackingRef?: string; id?: string }>("/agent/parcels", {
+      const res = await apiFetch<{ trackingRef?: string; id?: string; pickupCode?: string }>("/agent/parcels", {
         token: token ?? undefined, method: "POST",
         body: { fromCity, toCity, senderName: senderName.trim(), senderPhone: senderPhone.trim(),
           receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(),
-          parcelType, weight: weight.trim(), amount: Number(amount), paymentMethod, deliveryType },
+          parcelType, description: description.trim() || undefined,
+          weight: weight.trim(), amount: Number(amount), paymentMethod, deliveryType },
       });
       setCreated({
         trackingRef: res.trackingRef ?? res.id ?? "—",
@@ -679,6 +689,7 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
         receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(),
         fromCity, toCity, parcelType, weight: weight.trim(),
         amount: Number(amount), deliveryType,
+        pickupCode: res.pickupCode,
       });
     } catch (e: any) {
       if (e?.status === 404 || e?.status === 405) {
@@ -689,11 +700,6 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const reset = () => {
-    setCreated(null); setSenderName(""); setSenderPhone("");
-    setReceiverName(""); setReceiverPhone(""); setWeight(""); setAmount("");
   };
 
   const handlePrint = async () => {
@@ -729,7 +735,20 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
           ))}
         </View>
 
-        <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 10 }}>Transmettez ce numéro à l'expéditeur.</Text>
+        {created.pickupCode && (
+          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 14, padding: 16, marginTop: 10, width: "100%", borderWidth: 2, borderColor: "#FCD34D", alignItems: "center" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <Ionicons name="shield-checkmark" size={20} color="#D97706" />
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#92400E" }}>Code de retrait sécurisé</Text>
+            </View>
+            <Text style={{ fontSize: 36, fontWeight: "900", color: "#D97706", letterSpacing: 10, marginBottom: 4 }}>{created.pickupCode}</Text>
+            <Text style={{ fontSize: 11, color: "#92400E", textAlign: "center", lineHeight: 16 }}>
+              📱 SMS envoyé au destinataire ({created.receiverPhone}){"\n"}
+              Ce code est requis pour récupérer le colis en gare.
+            </Text>
+          </View>
+        )}
+        <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 10 }}>Transmettez le code de suivi à l'expéditeur et rappellez au destinataire de conserver son SMS.</Text>
 
         <TouchableOpacity
           style={{ marginTop: 20, backgroundColor: "#4C1D95", flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 14, width: "100%", justifyContent: "center" }}
@@ -795,6 +814,8 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
             <Text style={SC.pickerTxt}>{parcelType}</Text>
             <Ionicons name="chevron-down" size={16} color={P} />
           </TouchableOpacity>
+          <Text style={SC.label}>Description <Text style={{ color: "#9CA3AF" }}>(optionnel)</Text></Text>
+          <TextInput style={[SC.input, { minHeight: 50, textAlignVertical: "top" }]} placeholder="Ex: Chaussures rouges taille 42, fragile..." value={description} onChangeText={setDescription} multiline numberOfLines={2} />
           <Text style={SC.label}>Poids (kg)</Text>
           <TextInput style={SC.input} placeholder="Ex: 2.5" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
           <Text style={SC.label}>Montant (FCFA) *</Text>
@@ -1015,8 +1036,10 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
 
   /* Retrait confirmation */
   const [showRetraitConfirm, setShowRetraitConfirm] = useState(false);
-  const [retraitInputCode, setRetraitInputCode]     = useState("");
-  const [retraitScanMode, setRetraitScanMode]       = useState(false);
+  const [pickupCode, setPickupCode]   = useState("");
+  const [codeError, setCodeError]     = useState("");
+  const [resending, setResending]     = useState(false);
+  const [retraitScanMode, setRetraitScanMode] = useState(false);
   const lastRetraitScan = useRef<string>("");
 
   const search = useCallback(async (ref: string) => {
@@ -1056,6 +1079,50 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
       Alert.alert("Erreur", e?.message ?? "Mise à jour impossible.");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleRetrait = async () => {
+    if (!colis) return;
+    const code = pickupCode.trim();
+    if (!code || code.length < 4) {
+      setCodeError("Veuillez saisir le code de retrait à 4 chiffres");
+      return;
+    }
+    setCodeError("");
+    setUpdating(true);
+    try {
+      await apiFetch(`/agent/parcels/${colis.id}/retirer`, {
+        token: token ?? undefined, method: "POST", body: { pickupCode: code },
+      });
+      setShowRetraitConfirm(false);
+      setPickupCode("");
+      const notif = `Votre colis ${colis.trackingRef} a été retiré avec succès. Merci !`;
+      setLastAction({ label: "✅ Retrait validé", notif });
+      await search(colis.trackingRef);
+    } catch (e: any) {
+      if (e?.message?.includes("incorrect")) {
+        setCodeError("❌ Code incorrect — Demandez au destinataire de vérifier son SMS");
+      } else {
+        Alert.alert("Erreur", e?.message ?? "Retrait impossible");
+      }
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!colis) return;
+    setResending(true);
+    try {
+      await apiFetch(`/agent/parcels/${colis.id}/resend-pickup-code`, {
+        token: token ?? undefined, method: "POST", body: {},
+      });
+      Alert.alert("📱 SMS envoyé", `Le code de retrait a été renvoyé au ${colis.receiverPhone}`);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de renvoyer le SMS");
+    } finally {
+      setResending(false);
     }
   };
 
@@ -1259,97 +1326,103 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
         <Feather name="alert-triangle" size={16} color="#fff" />
         <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
       </TouchableOpacity>
-    {/* ── Modal confirmation retrait QR/code ── */}
-    <Modal visible={showRetraitConfirm} transparent animationType="slide" onRequestClose={() => setShowRetraitConfirm(false)}>
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" }}>
+    {/* ── Modal validation retrait : code sécurisé ── */}
+    <Modal visible={showRetraitConfirm} transparent animationType="slide" onRequestClose={() => { setShowRetraitConfirm(false); setPickupCode(""); setCodeError(""); }}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" }}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 14 }}>
+
+            {/* Header */}
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontSize: 17, fontWeight: "900", color: "#065F46" }}>✅ Confirmer le retrait</Text>
-              <TouchableOpacity onPress={() => setShowRetraitConfirm(false)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center" }}>
+                  <Ionicons name="shield-checkmark" size={20} color="#059669" />
+                </View>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: "#065F46" }}>Validation sécurisée</Text>
+              </View>
+              <TouchableOpacity onPress={() => { setShowRetraitConfirm(false); setPickupCode(""); setCodeError(""); }}>
                 <Feather name="x" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
+            {/* Colis info */}
             {colis && (
-              <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, gap: 4 }}>
-                <Text style={{ fontSize: 12, color: "#6B7280" }}>Colis à retirer :</Text>
-                <Text style={{ fontSize: 16, fontWeight: "800", color: "#065F46" }}>{colis.trackingRef}</Text>
-                <Text style={{ fontSize: 12, color: "#374151" }}>{colis.senderName} → {colis.receiverName}</Text>
+              <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#BBF7D0" }}>
+                <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>COLIS À RETIRER</Text>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: "#065F46", marginTop: 2, letterSpacing: 0.5 }}>{colis.trackingRef}</Text>
+                <Text style={{ fontSize: 13, color: "#374151", marginTop: 4 }}>
+                  {colis.senderName} → <Text style={{ fontWeight: "700" }}>{colis.receiverName}</Text>
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>📱 {colis.receiverPhone}</Text>
               </View>
             )}
 
-            <Text style={{ fontSize: 13, color: "#374151", fontWeight: "600" }}>
-              Scannez le QR du bordereau ou saisissez le code de suivi pour valider le retrait :
-            </Text>
-
-            {/* QR scan button */}
-            <TouchableOpacity
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: retraitScanMode ? P : P_LIGHT, borderRadius: 12, paddingVertical: 12, borderWidth: 1.5, borderColor: P }}
-              onPress={async () => {
-                if (!permission?.granted) await requestPermission();
-                setRetraitScanMode(v => !v);
-              }}
-            >
-              <Feather name="camera" size={16} color={retraitScanMode ? "#fff" : P} />
-              <Text style={{ fontSize: 14, fontWeight: "700", color: retraitScanMode ? "#fff" : P }}>
-                {retraitScanMode ? "Fermer caméra" : "Scanner QR du bordereau"}
+            {/* Instructions */}
+            <View style={{ backgroundColor: "#FFFBEB", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#FDE68A" }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#92400E", marginBottom: 4 }}>📋 Instructions</Text>
+              <Text style={{ fontSize: 12, color: "#78350F", lineHeight: 18 }}>
+                Demandez au destinataire le <Text style={{ fontWeight: "800" }}>code de retrait à 4 chiffres</Text> reçu par SMS lors de la création du colis. Saisissez-le ci-dessous pour valider.
               </Text>
-            </TouchableOpacity>
-
-            {retraitScanMode && permission?.granted && (
-              <View style={{ height: 180, borderRadius: 12, overflow: "hidden" }}>
-                <CameraView style={{ flex: 1 }} facing="back"
-                  onBarcodeScanned={({ data }) => {
-                    if (data === lastRetraitScan.current) return;
-                    lastRetraitScan.current = data;
-                    const qr = validateQR(data);
-                    const ref = qr?.ref ?? data;
-                    setRetraitInputCode(ref);
-                    setRetraitScanMode(false);
-                  }}
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                />
-                <View style={{ position: "absolute", inset: 0, justifyContent: "center", alignItems: "center" }}>
-                  <View style={{ width: 130, height: 130, borderWidth: 2.5, borderColor: "#34D399", borderRadius: 10 }} />
-                </View>
-              </View>
-            )}
-
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput
-                style={{ flex: 1, borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, fontWeight: "700", color: "#065F46", backgroundColor: "#F0FDF4" }}
-                placeholder="Code colis (ex: PKG-20260324-ABC)"
-                value={retraitInputCode}
-                onChangeText={setRetraitInputCode}
-                autoCapitalize="characters"
-                returnKeyType="done"
-              />
             </View>
 
+            {/* Code input */}
+            <View>
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Code de retrait <Text style={{ color: "#DC2626" }}>*</Text></Text>
+              <TextInput
+                style={{
+                  borderWidth: 2, borderColor: codeError ? "#DC2626" : pickupCode.length === 4 ? "#059669" : "#D1D5DB",
+                  borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+                  fontSize: 28, fontWeight: "900", color: "#111827", backgroundColor: "#F9FAFB",
+                  textAlign: "center", letterSpacing: 12,
+                }}
+                placeholder="• • • •"
+                placeholderTextColor="#D1D5DB"
+                value={pickupCode}
+                onChangeText={v => { setPickupCode(v.replace(/\D/g, "").slice(0, 4)); setCodeError(""); }}
+                keyboardType="number-pad"
+                maxLength={4}
+                returnKeyType="done"
+                onSubmitEditing={handleRetrait}
+                autoFocus
+              />
+              {codeError ? (
+                <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "600", marginTop: 6, textAlign: "center" }}>{codeError}</Text>
+              ) : pickupCode.length === 4 ? (
+                <Text style={{ fontSize: 12, color: "#059669", fontWeight: "600", marginTop: 6, textAlign: "center" }}>✓ Code complet — prêt à valider</Text>
+              ) : null}
+            </View>
+
+            {/* Resend code */}
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" }}
+              onPress={handleResendCode}
+              disabled={resending}
+            >
+              {resending
+                ? <ActivityIndicator size="small" color="#6B7280" />
+                : <><Feather name="refresh-cw" size={14} color="#6B7280" /><Text style={{ fontSize: 13, color: "#6B7280", fontWeight: "600" }}>Renvoyer le SMS au destinataire</Text></>
+              }
+            </TouchableOpacity>
+
+            {/* Buttons */}
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
-                onPress={() => setShowRetraitConfirm(false)}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                onPress={() => { setShowRetraitConfirm(false); setPickupCode(""); setCodeError(""); }}
+              >
                 <Text style={{ fontWeight: "700", color: "#475569" }}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ flex: 2, backgroundColor: "#065F46", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
-                disabled={updating}
-                onPress={() => {
-                  if (!colis) return;
-                  const entered = retraitInputCode.trim().toUpperCase();
-                  const expected = colis.trackingRef.trim().toUpperCase();
-                  if (entered !== expected) {
-                    Alert.alert("Code incorrect", `Le code saisi ne correspond pas au colis.\nAttendu : ${colis.trackingRef}`);
-                    return;
-                  }
-                  setShowRetraitConfirm(false);
-                  handleAction({ label: "✅ Retirer en gare", route: "retirer", color: "#065F46" });
-                }}
+                style={[
+                  { flex: 2, borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 },
+                  pickupCode.length === 4 ? { backgroundColor: "#065F46" } : { backgroundColor: "#D1D5DB" }
+                ]}
+                disabled={updating || pickupCode.length < 4}
+                onPress={handleRetrait}
               >
                 {updating
                   ? <ActivityIndicator color="#fff" />
-                  : <><Ionicons name="checkmark-circle" size={20} color="#fff" /><Text style={{ fontWeight: "800", color: "#fff", fontSize: 15 }}>Valider le retrait</Text></>
+                  : <><Ionicons name="shield-checkmark" size={18} color="#fff" /><Text style={{ fontWeight: "900", color: "#fff", fontSize: 15 }}>Valider le retrait</Text></>
                 }
               </TouchableOpacity>
             </View>

@@ -10,6 +10,7 @@ import { sendExpoPush } from "../pushService";
 import { calculateParcelPrice } from "./parcels";
 import { awardPoints, POINTS_PER_TRIP } from "./loyalty";
 import { sendParcelNotification } from "../notificationService";
+import { sendSMS } from "../lib/smsService";
 
 const router: IRouter = Router();
 
@@ -210,7 +211,7 @@ router.post("/parcels", async (req, res) => {
     const {
       senderName, senderPhone, receiverName, receiverPhone,
       fromCity, toCity, parcelType, weight, description,
-      deliveryType, paymentMethod, notes,
+      deliveryType, paymentMethod, notes, amount: customAmount,
     } = req.body;
 
     if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
@@ -220,7 +221,8 @@ router.post("/parcels", async (req, res) => {
     }
 
     const parsedWeight = weight ? parseFloat(weight) : 1;
-    const amount = calculateParcelPrice(fromCity, toCity, isNaN(parsedWeight) ? 1 : parsedWeight, deliveryType);
+    const calculatedAmount = calculateParcelPrice(fromCity, toCity, isNaN(parsedWeight) ? 1 : parsedWeight, deliveryType);
+    const amount = (customAmount && parseFloat(customAmount) > 0) ? parseFloat(customAmount) : calculatedAmount;
     const commissionAmount = Math.round(amount * 0.05);
 
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -228,6 +230,9 @@ router.post("/parcels", async (req, res) => {
     for (let i = 0; i < 4; i++) part1 += chars[Math.floor(Math.random() * chars.length)];
     for (let i = 0; i < 4; i++) part2 += chars[Math.floor(Math.random() * chars.length)];
     const trackingRef = `GBX-${part1}-${part2}`;
+
+    /* Generate a 4-digit secure pickup code for the receiver */
+    const pickupCode = String(Math.floor(1000 + Math.random() * 9000));
 
     const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const parcel = await db.insert(parcelsTable).values({
@@ -242,7 +247,11 @@ router.post("/parcels", async (req, res) => {
       status: "créé",
       companyId: agentRecord?.companyId ?? null,
       notes: notes || null,
+      createdByAgent: true,
     } as any).returning();
+
+    /* Store pickup code */
+    await db.execute(sql`UPDATE parcels SET pickup_code = ${pickupCode}, pickup_code_sent_at = NOW(), created_by_agent = true WHERE id = ${parcel[0].id}`);
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.PARCEL_CREATE, parcel[0].id, "parcel",
@@ -255,13 +264,56 @@ router.post("/parcels", async (req, res) => {
       action: "créé", agentId: user.id, agentName: user.name,
       companyId: agentRecord?.companyId, notes: locCree,
     }).catch(() => {});
-    sendParcelNotification({ userId: user.id, pushToken: user.pushToken, status: "créé",
-      trackingRef, fromCity, toCity }).catch(() => {});
 
-    res.status(201).json(parcel[0]);
+    /* SMS to sender with tracking ref */
+    sendSMS(senderPhone,
+      `📦 GoBooking : Colis ${trackingRef} enregistré de ${fromCity} → ${toCity}. Montant : ${amount.toLocaleString()} FCFA. Suivez votre colis sur l'app GoBooking.`
+    ).catch(() => {});
+
+    /* SMS to receiver with pickup code */
+    sendSMS(receiverPhone,
+      `📦 GoBooking : Un colis vous est envoyé (${trackingRef}) de ${fromCity} vers ${toCity}. Code de retrait sécurisé : ${pickupCode}. Conservez ce code pour retirer votre colis en gare.`
+    ).catch(() => {});
+
+    res.status(201).json({ ...parcel[0], pickupCode });
   } catch (err) {
     console.error("Agent create parcel error:", err);
     res.status(500).json({ error: "Échec de la création du colis" });
+  }
+});
+
+/* POST /agent/parcels/:id/resend-pickup-code — resend pickup code by SMS */
+router.post("/parcels/:parcelId/resend-pickup-code", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const rows = await db.execute(sql`SELECT id, tracking_ref, receiver_name, receiver_phone, pickup_code, from_city, to_city, status FROM parcels WHERE id = ${req.params.parcelId} LIMIT 1`);
+    const parcel = (rows as any).rows?.[0];
+    if (!parcel) { res.status(404).json({ error: "Colis introuvable" }); return; }
+
+    if (parcel.status === "retiré" || parcel.status === "livré") {
+      res.status(400).json({ error: "Ce colis a déjà été retiré ou livré" });
+      return;
+    }
+
+    /* Generate new code if none exists */
+    let code = parcel.pickup_code;
+    if (!code) {
+      code = String(Math.floor(1000 + Math.random() * 9000));
+      await db.execute(sql`UPDATE parcels SET pickup_code = ${code}, pickup_code_sent_at = NOW() WHERE id = ${parcel.id}`);
+    } else {
+      await db.execute(sql`UPDATE parcels SET pickup_code_sent_at = NOW() WHERE id = ${parcel.id}`);
+    }
+
+    await sendSMS(parcel.receiver_phone,
+      `📦 GoBooking : Rappel — Code de retrait pour le colis ${parcel.tracking_ref} de ${parcel.from_city} → ${parcel.to_city} : ${code}. Présentez ce code en gare pour retirer votre colis.`
+    );
+
+    res.json({ success: true, message: `SMS renvoyé au ${parcel.receiver_phone}` });
+  } catch (err) {
+    console.error("Resend pickup code error:", err);
+    res.status(500).json({ error: "Failed" });
   }
 });
 
@@ -439,7 +491,7 @@ router.post("/parcels/:parcelId/deliver", async (req, res) => {
   }
 });
 
-/* POST /agent/parcels/:id/retirer — client picks up parcel at station */
+/* POST /agent/parcels/:id/retirer — client picks up parcel at station (requires pickup code) */
 router.post("/parcels/:parcelId/retirer", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
@@ -448,16 +500,38 @@ router.post("/parcels/:parcelId/retirer", async (req, res) => {
     const { error, parcel } = await getParcelAndCheckAccess(req.params.parcelId, agentRecord?.companyId);
     if (error || !parcel) { res.status(error === "Colis introuvable" ? 404 : 403).json({ error }); return; }
 
+    /* Validate pickup code if one exists */
+    const pickupCodeRow = await db.execute(sql`SELECT pickup_code FROM parcels WHERE id = ${parcel.id} LIMIT 1`);
+    const storedCode = (pickupCodeRow as any).rows?.[0]?.pickup_code;
+    const { pickupCode } = req.body;
+
+    if (storedCode) {
+      if (!pickupCode) {
+        res.status(400).json({ error: "Code de retrait requis", requiresCode: true });
+        return;
+      }
+      if (String(pickupCode).trim() !== String(storedCode).trim()) {
+        res.status(400).json({ error: "Code de retrait incorrect. Vérifiez le SMS envoyé au destinataire.", requiresCode: true, invalidCode: true });
+        return;
+      }
+    }
+
     await db.update(parcelsTable).set({ status: "retiré", statusUpdatedAt: new Date(),
       location: `Retiré à la gare de ${parcel.toCity}` } as any)
       .where(eq(parcelsTable.id, parcel.id));
 
     logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef ?? null, action: "retiré",
       agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId,
-      notes: `Retiré à la gare de ${parcel.toCity}` }).catch(() => {});
+      notes: `Retiré à la gare de ${parcel.toCity} — validé par ${user.name}` }).catch(() => {});
+
+    /* SMS confirmation to receiver */
+    sendSMS(parcel.receiverPhone,
+      `✅ GoBooking : Votre colis ${parcel.trackingRef} a été retiré avec succès à la gare de ${parcel.toCity}. Merci d'avoir utilisé GoBooking !`
+    ).catch(() => {});
+
     if (parcel.userId) {
       const uRows = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, parcel.userId)).limit(1);
-      sendParcelNotification({ userId: parcel.userId, pushToken: uRows[0]?.pushToken, status: "livré",
+      sendParcelNotification({ userId: parcel.userId, pushToken: uRows[0]?.pushToken, status: "retiré",
         trackingRef: parcel.trackingRef ?? "", fromCity: parcel.fromCity, toCity: parcel.toCity,
         receiverName: parcel.receiverName }).catch(() => {});
     }
