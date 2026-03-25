@@ -20,6 +20,18 @@ import Reports from "@/pages/reports";
 import AlertsPage from "@/pages/alerts";
 import NotFound from "@/pages/not-found";
 
+import Embarquement from "@/pages/embarquement";
+import Affectation from "@/pages/affectation";
+import SuiviEngins from "@/pages/suivi-engins";
+import Maintenance from "@/pages/maintenance";
+import Carburant from "@/pages/carburant";
+import SuiviLive from "@/pages/suivi-live";
+import Billets from "@/pages/billets";
+import Avis from "@/pages/avis";
+import ColisHistorique from "@/pages/colis-historique";
+import SmsMarketing from "@/pages/sms-marketing";
+import Parametres from "@/pages/parametres";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -55,17 +67,39 @@ function Router() {
         <Redirect to="/admin/dashboard" />
       </Route>
 
+      {/* Core */}
       <Route path="/admin/dashboard"><ProtectedRoute component={Dashboard} /></Route>
       <Route path="/admin/companies"><ProtectedRoute component={Companies} /></Route>
-      <Route path="/admin/reservations"><ProtectedRoute component={Reservations} /></Route>
-      <Route path="/admin/colis"><ProtectedRoute component={Parcels} /></Route>
-      <Route path="/admin/agents"><ProtectedRoute component={Agents} /></Route>
+
+      {/* EXPLOITATION */}
       <Route path="/admin/trajets"><ProtectedRoute component={Trips} /></Route>
+      <Route path="/admin/embarquement"><ProtectedRoute component={Embarquement} /></Route>
+      <Route path="/admin/affectation"><ProtectedRoute component={Affectation} /></Route>
+
+      {/* LOGISTIQUE */}
+      <Route path="/admin/suivi-engins"><ProtectedRoute component={SuiviEngins} /></Route>
+      <Route path="/admin/maintenance"><ProtectedRoute component={Maintenance} /></Route>
+      <Route path="/admin/carburant"><ProtectedRoute component={Carburant} /></Route>
+      <Route path="/admin/suivi-live"><ProtectedRoute component={SuiviLive} /></Route>
+      <Route path="/admin/alertes"><ProtectedRoute component={AlertsPage} /></Route>
+
+      {/* COMMERCIAL */}
+      <Route path="/admin/reservations"><ProtectedRoute component={Reservations} /></Route>
+      <Route path="/admin/billets"><ProtectedRoute component={Billets} /></Route>
+      <Route path="/admin/avis"><ProtectedRoute component={Avis} /></Route>
+
+      {/* COLIS */}
+      <Route path="/admin/colis"><ProtectedRoute component={Parcels} /></Route>
+      <Route path="/admin/colis-historique"><ProtectedRoute component={ColisHistorique} /></Route>
+
+      {/* ANALYSE & GESTION */}
       <Route path="/admin/analytics"><ProtectedRoute component={Analytics} /></Route>
-      <Route path="/admin/factures"><ProtectedRoute component={Invoices} /></Route>
       <Route path="/admin/financier"><ProtectedRoute component={Financial} /></Route>
       <Route path="/admin/rapports"><ProtectedRoute component={Reports} /></Route>
-      <Route path="/admin/alertes"><ProtectedRoute component={AlertsPage} /></Route>
+      <Route path="/admin/sms-marketing"><ProtectedRoute component={SmsMarketing} /></Route>
+      <Route path="/admin/agents"><ProtectedRoute component={Agents} /></Route>
+      <Route path="/admin/factures"><ProtectedRoute component={Invoices} /></Route>
+      <Route path="/admin/parametres"><ProtectedRoute component={Parametres} /></Route>
 
       <Route component={NotFound} />
     </Switch>

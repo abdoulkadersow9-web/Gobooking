@@ -1,0 +1,136 @@
+Améliore et restructure complètement le dashboard entreprise de mon application GoBooking pour qu’il soit moderne, clair, sans confusion et parfaitement aligné avec la logique métier.
+
+-----------------------------------
+1. OBJECTIF GLOBAL
+-----------------------------------
+
+- Rendre le dashboard entreprise professionnel (niveau transport réel)
+- Supprimer tous les doublons
+- Regrouper intelligemment les modules
+- Améliorer la lisibilité et la hiérarchie visuelle
+- Adapter le dashboard à la logique des rôles déjà définis
+
+-----------------------------------
+2. STRUCTURE DU DASHBOARD (OBLIGATOIRE)
+
+Organiser le dashboard en 5 grandes sections :
+
+1. EXPLOITATION
+2. LOGISTIQUE
+3. COMMERCIAL
+4. COLIS
+5. ANALYSE & RAPPORTS
+
+-----------------------------------
+3. RÉORGANISATION DES MODULES
+
+SECTION 1 : EXPLOITATION
+- Trajets
+- Embarquement
+- Affectation (chauffeur + agent route)
+
+SECTION 2 : LOGISTIQUE
+- Suivi Engins (bus)
+- Maintenance
+- Carburant
+- Suivi Live (GPS)
+- Alertes
+
+SECTION 3 : COMMERCIAL
+- Réservations
+- Billets (ventes guichet)
+- Avis clients
+
+SECTION 4 : COLIS
+- Colis (global)
+- Historique colis
+- Statuts (créé / en gare / chargé / livré)
+
+SECTION 5 : ANALYSE & GESTION
+- Analytics
+- Rentabilité
+- Comparaison
+- SMS Marketing
+- Marketing Auto
+- Paramètres
+
+-----------------------------------
+4. SUPPRESSION DES DOUBLONS
+
+- Supprimer les modules répétitifs (ex : Routes vs Trajets → garder seulement Trajets)
+- Supprimer tout ce qui n’est pas utilisé
+- Fusionner les modules proches
+
+-----------------------------------
+5. CARDS KPI EN HAUT
+
+Ajouter des indicateurs clés visibles :
+
+- Revenus totaux
+- Nombre de trajets actifs
+- Bus actifs
+- Réservations du jour
+- Colis du jour
+- Alertes actives
+
+-----------------------------------
+6. SECTION ALERTES (PRIORITÉ)
+
+- Les alertes doivent être visibles en haut
+- Couleur rouge
+- Avec :
+  - type d’alerte
+  - trajet concerné
+  - heure
+- bouton “voir / traiter”
+
+-----------------------------------
+7. DESIGN UI/UX
+
+- Garder un style moderne (comme sur les captures)
+- Harmoniser les couleurs par catégorie :
+  - Logistique → vert
+  - Alertes → rouge
+  - Colis → violet
+  - Commercial → bleu/orange
+
+- Utiliser des icônes cohérentes
+- Espacement propre
+- Pas de surcharge visuelle
+
+-----------------------------------
+8. ACCÈS RAPIDE INTELLIGENT
+
+Créer une section “Accès rapide” dynamique :
+
+- Trajets
+- Réservations
+- Colis
+- Alertes
+
+(selon les actions les plus utilisées)
+
+-----------------------------------
+9. RÈGLES IMPORTANTES
+
+- Aucun mélange de rôles
+- Dashboard entreprise = vue globale uniquement
+- Pas d’actions complexes ici (juste supervision + navigation)
+
+-----------------------------------
+10. FINALISATION
+
+Après modification :
+
+- expliquer la nouvelle organisation
+- montrer les sections
+- expliquer comment tester :
+  - voir alertes
+  - voir revenus
+  - voir activité
+
+-----------------------------------
+
+Objectif final :
+
+Un dashboard clair, moderne, structuré comme une vraie compagnie de transport, sans confusion et prêt pour utilisation réelle.
