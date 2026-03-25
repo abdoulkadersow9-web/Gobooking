@@ -4,147 +4,240 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard, Ticket, Package, Users, Map,
   BarChart3, FileText, LogOut, Menu, X, TrendingUp,
-  Building2, Bus, AlertTriangle, ClipboardList, ShieldCheck,
-  Wrench, Fuel, Radio, UserCheck, BarChart2,
-  MessageSquare, Settings, History, Star, Zap,
+  Building2, AlertTriangle, ClipboardList, ShieldCheck,
+  Wrench, Fuel, Radio, UserCheck, Settings, History,
+  Star, MessageSquare, ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 
 /* ══════════════════════════════════════════════════════
-   NAVIGATION STRUCTURE — 5 sections métier
+   COMPANY NAVIGATION — 6 sections métier claires
 ══════════════════════════════════════════════════════ */
 
-type NavItem = { path: string; label: string; icon: any };
-type NavSection = { section: string; color: string; items: NavItem[] };
+type NavItem = {
+  path: string;
+  label: string;
+  icon: any;
+  badge?: string;
+};
 
-const COMPANY_NAV_SECTIONS: NavSection[] = [
-  {
-    section: "EXPLOITATION",
-    color: "#2563EB",
-    items: [
-      { path: "/admin/dashboard",    label: "Vue d'ensemble",   icon: LayoutDashboard },
-      { path: "/admin/trajets",      label: "Trajets",          icon: Map },
-      { path: "/admin/embarquement", label: "Embarquement",     icon: UserCheck },
-      { path: "/admin/affectation",  label: "Affectation",      icon: Users },
-    ],
-  },
-  {
-    section: "LOGISTIQUE",
-    color: "#059669",
-    items: [
-      { path: "/admin/suivi-engins", label: "Suivi Engins",     icon: Bus },
-      { path: "/admin/maintenance",  label: "Maintenance",      icon: Wrench },
-      { path: "/admin/carburant",    label: "Carburant",        icon: Fuel },
-      { path: "/admin/suivi-live",   label: "Suivi Live (GPS)", icon: Radio },
-      { path: "/admin/alertes",      label: "Alertes",          icon: AlertTriangle },
-    ],
-  },
-  {
-    section: "COMMERCIAL",
-    color: "#D97706",
-    items: [
-      { path: "/admin/reservations", label: "Réservations",     icon: Ticket },
-      { path: "/admin/billets",      label: "Billets guichet",  icon: FileText },
-      { path: "/admin/avis",         label: "Avis clients",     icon: Star },
-    ],
-  },
-  {
-    section: "COLIS",
-    color: "#7C3AED",
-    items: [
-      { path: "/admin/colis",           label: "Colis",          icon: Package },
-      { path: "/admin/colis-historique",label: "Historique",     icon: History },
-    ],
-  },
-  {
-    section: "ANALYSE & GESTION",
-    color: "#475569",
-    items: [
-      { path: "/admin/analytics",    label: "Analytics",        icon: BarChart3 },
-      { path: "/admin/financier",    label: "Rentabilité",      icon: TrendingUp },
-      { path: "/admin/rapports",     label: "Rapports agents",  icon: ClipboardList },
-      { path: "/admin/sms-marketing",label: "SMS Marketing",    icon: MessageSquare },
-      { path: "/admin/agents",       label: "Agents",           icon: UserCheck },
-      { path: "/admin/factures",     label: "Factures",         icon: FileText },
-      { path: "/admin/parametres",   label: "Paramètres",       icon: Settings },
-    ],
-  },
+const COMPANY_MAIN_NAV: NavItem[] = [
+  { path: "/admin/dashboard",    label: "Statistiques",     icon: LayoutDashboard },
+  { path: "/admin/trajets",      label: "Trajets",          icon: Map },
+  { path: "/admin/colis",        label: "Colis",            icon: Package },
+  { path: "/admin/agents",       label: "Agents",           icon: Users },
+  { path: "/admin/alertes",      label: "Alertes",          icon: AlertTriangle },
+  { path: "/admin/parametres",   label: "Paramètres",       icon: Settings },
 ];
 
-const ADMIN_NAV_SECTIONS: NavSection[] = [
+const COMPANY_SECONDARY_NAV: NavItem[] = [
+  { path: "/admin/reservations",  label: "Réservations",    icon: Ticket },
+  { path: "/admin/suivi-engins",  label: "Suivi engins",   icon: Map },
+  { path: "/admin/embarquement",  label: "Embarquement",   icon: UserCheck },
+  { path: "/admin/affectation",   label: "Affectation",    icon: Users },
+  { path: "/admin/maintenance",   label: "Maintenance",    icon: Wrench },
+  { path: "/admin/financier",     label: "Rentabilité",    icon: TrendingUp },
+  { path: "/admin/sms-marketing", label: "SMS Marketing",  icon: MessageSquare },
+  { path: "/admin/rapports",      label: "Rapports",       icon: ClipboardList },
+  { path: "/admin/factures",      label: "Factures",       icon: FileText },
+];
+
+/* ══════════════════════════════════════════════════════
+   ADMIN NAVIGATION — sections superviseur global
+══════════════════════════════════════════════════════ */
+
+type AdminSection = { label: string; color: string; items: NavItem[] };
+
+const ADMIN_NAV_SECTIONS: AdminSection[] = [
   {
-    section: "SUPERVISION",
+    label: "SUPERVISION",
     color: "#7C3AED",
     items: [
-      { path: "/admin/dashboard",    label: "Vue d'ensemble",   icon: LayoutDashboard },
-      { path: "/admin/companies",    label: "Compagnies",       icon: Building2 },
-      { path: "/admin/agents",       label: "Agents",           icon: Users },
+      { path: "/admin/dashboard",    label: "Vue d'ensemble",  icon: LayoutDashboard },
+      { path: "/admin/companies",    label: "Compagnies",      icon: Building2 },
+      { path: "/admin/agents",       label: "Agents",          icon: Users },
     ],
   },
   {
-    section: "EXPLOITATION",
+    label: "EXPLOITATION",
     color: "#2563EB",
     items: [
-      { path: "/admin/trajets",      label: "Trajets",          icon: Map },
-      { path: "/admin/alertes",      label: "Alertes",          icon: AlertTriangle },
+      { path: "/admin/trajets",      label: "Trajets",         icon: Map },
+      { path: "/admin/alertes",      label: "Alertes",         icon: AlertTriangle },
     ],
   },
   {
-    section: "COMMERCIAL & COLIS",
+    label: "COMMERCIAL & COLIS",
     color: "#D97706",
     items: [
-      { path: "/admin/reservations", label: "Réservations",     icon: Ticket },
-      { path: "/admin/colis",        label: "Colis",            icon: Package },
+      { path: "/admin/reservations", label: "Réservations",    icon: Ticket },
+      { path: "/admin/colis",        label: "Colis",           icon: Package },
     ],
   },
   {
-    section: "ANALYSE & GESTION",
+    label: "ANALYSE",
     color: "#475569",
     items: [
-      { path: "/admin/analytics",    label: "Analytics",        icon: BarChart3 },
-      { path: "/admin/financier",    label: "Financier",        icon: TrendingUp },
-      { path: "/admin/rapports",     label: "Rapports agents",  icon: ClipboardList },
+      { path: "/admin/analytics",    label: "Analytics",       icon: BarChart3 },
+      { path: "/admin/financier",    label: "Financier",       icon: TrendingUp },
+      { path: "/admin/rapports",     label: "Rapports agents", icon: ClipboardList },
     ],
   },
 ];
 
 /* ══════════════════════════════════════════════════════
-   SIDEBAR NAV SECTION COMPONENT
+   COMPANY SIDEBAR
 ══════════════════════════════════════════════════════ */
-function SidebarSection({ section, onClose }: { section: NavSection; onClose?: () => void }) {
+function CompanySidebar({ onClose }: { onClose?: () => void }) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
+  const [showSecondary, setShowSecondary] = React.useState(false);
+
   return (
-    <div className="mb-2">
-      <p className="text-[10px] font-bold tracking-widest px-4 py-1.5 opacity-40 uppercase" style={{ color: section.color }}>
-        {section.section}
-      </p>
-      {section.items.map((item) => {
-        const isActive = location === item.path;
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.path}
-            href={item.path}
-            onClick={onClose}
-            className={`flex items-center gap-3 px-4 py-2.5 mx-1 rounded-xl transition-all duration-150 text-sm
-              ${isActive
-                ? "font-semibold shadow-lg"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-              }`}
-            style={isActive ? {
-              backgroundColor: section.color + "22",
-              color: section.color === "#475569" ? "#CBD5E1" : section.color,
-              boxShadow: `0 4px 12px ${section.color}33`,
-            } : {}}
-          >
-            <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
-            <span>{item.label}</span>
-            {isActive && (
-              <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.color }} />
-            )}
-          </Link>
-        );
-      })}
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="h-18 flex items-center px-5 py-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-white text-base">G</div>
+          <div>
+            <span className="font-bold text-base text-white block leading-tight">GoBooking</span>
+            <span className="text-[11px] text-white/50">Espace Compagnie</span>
+          </div>
+        </div>
+      </div>
+
+      {/* User badge */}
+      <div className="mx-4 mt-3 mb-1 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/20 flex items-center gap-2">
+        <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-xs shrink-0">
+          {(user?.name?.[0] || "C").toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-amber-300 truncate">{user?.name || "Compagnie"}</p>
+          <p className="text-[10px] text-white/40 truncate">{user?.email || ""}</p>
+        </div>
+      </div>
+
+      {/* Main nav */}
+      <nav className="flex-1 overflow-y-auto px-3 pt-3 space-y-0.5">
+        {COMPANY_MAIN_NAV.map((item) => {
+          const isActive = location === item.path;
+          const Icon = item.icon;
+          return (
+            <Link key={item.path} href={item.path} onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium
+                ${isActive
+                  ? "bg-amber-500/20 text-amber-300 font-semibold"
+                  : "text-white/60 hover:bg-white/8 hover:text-white"
+                }`}
+            >
+              <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="flex-1">{item.label}</span>
+              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+              {item.badge && (
+                <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">{item.badge}</span>
+              )}
+            </Link>
+          );
+        })}
+
+        {/* Secondary nav toggle */}
+        <button
+          onClick={() => setShowSecondary(!showSecondary)}
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-white/30 hover:text-white/50 transition-colors mt-2"
+        >
+          <div className="flex-1 h-px bg-white/10" />
+          <span>Plus</span>
+          <ChevronRight size={12} className={`transition-transform ${showSecondary ? "rotate-90" : ""}`} />
+          <div className="flex-1 h-px bg-white/10" />
+        </button>
+
+        {showSecondary && COMPANY_SECONDARY_NAV.map((item) => {
+          const isActive = location === item.path;
+          const Icon = item.icon;
+          return (
+            <Link key={item.path} href={item.path} onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-xs
+                ${isActive ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}
+            >
+              <Icon size={14} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Logout */}
+      <div className="p-4 border-t border-white/10 shrink-0">
+        <button onClick={logout}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-white/40 hover:bg-white/10 hover:text-red-400 transition-colors text-sm">
+          <LogOut size={16} />
+          <span>Déconnexion</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   ADMIN SIDEBAR
+══════════════════════════════════════════════════════ */
+function AdminSidebar({ onClose }: { onClose?: () => void }) {
+  const [location] = useLocation();
+  const { user, logout } = useAuth();
+
+  const allItems = ADMIN_NAV_SECTIONS.flatMap((s) => s.items);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="h-18 flex items-center px-5 py-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center font-bold text-white text-base">G</div>
+          <div>
+            <span className="font-bold text-base text-white block leading-tight">GoBooking</span>
+            <span className="text-[11px] text-white/50">Super Admin</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-4 mt-3 mb-1 px-3 py-2 rounded-xl bg-purple-500/15 border border-purple-500/20 flex items-center gap-2">
+        <ShieldCheck size={14} className="text-purple-400 shrink-0" />
+        <p className="text-xs font-semibold text-purple-300 truncate">{user?.name || "Admin Global"}</p>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto px-3 pt-3 space-y-3">
+        {ADMIN_NAV_SECTIONS.map((section) => (
+          <div key={section.label}>
+            <p className="text-[9px] font-bold tracking-widest px-3 py-1 opacity-40 uppercase" style={{ color: section.color }}>
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const isActive = location === item.path;
+                const Icon = item.icon;
+                return (
+                  <Link key={item.path} href={item.path} onClick={onClose}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium
+                      ${isActive ? "font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white"}`}
+                    style={isActive ? { backgroundColor: section.color + "22", color: section.color } : {}}
+                  >
+                    <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+                    <span>{item.label}</span>
+                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.color }} />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-white/10 shrink-0">
+        <button onClick={logout}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-white/40 hover:bg-white/10 hover:text-red-400 transition-colors text-sm">
+          <LogOut size={16} />
+          <span>Déconnexion</span>
+        </button>
+      </div>
     </div>
   );
 }
@@ -157,108 +250,57 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { logout, isSuperAdmin, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  const navSections = isSuperAdmin ? ADMIN_NAV_SECTIONS : COMPANY_NAV_SECTIONS;
-  const allItems = navSections.flatMap((s) => s.items);
   const roleLabel = isSuperAdmin ? "Super Administrateur" : "Espace Compagnie";
   const roleColor = isSuperAdmin ? "#7C3AED" : "#D97706";
 
-  const currentLabel = allItems.find((n) => n.path === location)?.label || "Administration";
-
-  function SidebarContent({ onClose }: { onClose?: () => void }) {
-    return (
-      <>
-        <div className="h-20 flex items-center px-6 border-b border-white/10 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-lg"
-              style={{ backgroundColor: roleColor }}>
-              G
-            </div>
-            <div>
-              <span className="font-bold tracking-tight text-base block text-white">GoBooking</span>
-              <span className="text-[11px] opacity-50 text-white">{roleLabel}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mx-4 mt-3 mb-2 rounded-xl px-3 py-2 flex items-center gap-2 border border-white/10 bg-white/5">
-          {isSuperAdmin
-            ? <ShieldCheck size={14} className="text-purple-400" />
-            : <Building2 size={14} className="text-amber-400" />
-          }
-          <span className="text-xs font-semibold" style={{ color: isSuperAdmin ? "#C4B5FD" : "#FCD34D" }}>
-            {isSuperAdmin ? "Admin Global" : user?.name || "Admin Compagnie"}
-          </span>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-3 pr-1 space-y-1 scrollbar-thin">
-          {navSections.map((section) => (
-            <SidebarSection key={section.section} section={section} onClose={onClose} />
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-white/10 shrink-0">
-          {user && (
-            <div className="px-3 py-2 mb-2 rounded-xl bg-white/5">
-              <p className="text-sm font-semibold text-white truncate">{user.name}</p>
-              <p className="text-xs text-white/40 truncate">{user.email}</p>
-            </div>
-          )}
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-white/50 hover:bg-white/10 hover:text-red-400 transition-colors text-sm"
-          >
-            <LogOut size={17} />
-            <span>Déconnexion</span>
-          </button>
-        </div>
-      </>
-    );
-  }
+  const allNavItems = isSuperAdmin
+    ? ADMIN_NAV_SECTIONS.flatMap((s) => s.items)
+    : [...COMPANY_MAIN_NAV, ...COMPANY_SECONDARY_NAV];
+  const currentLabel = allNavItems.find((n) => n.path === location)?.label || "GoBooking";
 
   return (
     <div className="min-h-screen bg-background flex overflow-hidden">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-60 flex-col bg-sidebar text-sidebar-foreground shadow-2xl z-20 shrink-0">
-        <SidebarContent />
+      <aside className="hidden md:flex w-56 flex-col bg-sidebar text-sidebar-foreground shadow-2xl z-20 shrink-0">
+        {isSuperAdmin ? <AdminSidebar /> : <CompanySidebar />}
       </aside>
 
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
           <motion.aside
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 25 }}
-            className="w-60 bg-sidebar text-sidebar-foreground shadow-2xl relative z-10 flex flex-col h-full"
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="w-56 bg-sidebar text-sidebar-foreground shadow-2xl relative z-10 h-full flex flex-col"
           >
-            <div className="h-16 flex items-center justify-between px-4 border-b border-white/10 shrink-0">
-              <span className="font-bold text-white">GoBooking</span>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-white/70 hover:text-white">
-                <X size={20} />
+            <div className="absolute top-4 right-4">
+              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10">
+                <X size={18} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              <SidebarContent onClose={() => setIsMobileMenuOpen(false)} />
-            </div>
+            {isSuperAdmin
+              ? <AdminSidebar onClose={() => setIsMobileMenuOpen(false)} />
+              : <CompanySidebar onClose={() => setIsMobileMenuOpen(false)} />
+            }
           </motion.aside>
         </div>
       )}
 
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm z-10">
+        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 md:px-5 shrink-0 shadow-sm z-10">
           <div className="flex items-center gap-3">
-            <button className="md:hidden p-2 -ml-2 text-muted-foreground" onClick={() => setIsMobileMenuOpen(true)}>
-              <Menu size={22} />
+            <button className="md:hidden p-2 -ml-1 rounded-xl text-muted-foreground hover:bg-muted" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu size={21} />
             </button>
             <h1 className="text-base font-bold text-foreground">{currentLabel}</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:flex flex-col items-end">
-              <span className="text-sm font-semibold text-foreground">{user?.name || roleLabel}</span>
-              <span className="text-xs text-muted-foreground">{roleLabel}</span>
+          <div className="flex items-center gap-2.5">
+            <div className="hidden md:block text-right">
+              <p className="text-sm font-semibold text-foreground leading-tight">{user?.name || roleLabel}</p>
+              <p className="text-xs text-muted-foreground">{roleLabel}</p>
             </div>
             <div
               className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm text-white"
@@ -269,13 +311,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-4 md:p-6 bg-background">
+        <div className="flex-1 overflow-auto p-4 md:p-5 bg-background">
           <motion.div
             key={location}
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="max-w-7xl mx-auto"
+            transition={{ duration: 0.18 }}
+            className="max-w-5xl mx-auto"
           >
             {children}
           </motion.div>

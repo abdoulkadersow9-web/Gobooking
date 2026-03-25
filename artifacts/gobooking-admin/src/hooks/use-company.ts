@@ -212,3 +212,11 @@ export function useFinancialDashboard(period: string = "month") {
     refetchInterval: 60000,
   });
 }
+
+export function useCompanyAlerts() {
+  return useQuery({
+    queryKey: ["company-alertes"],
+    queryFn: () => apiFetch<any[]>("/company/alertes").catch(() => []),
+    refetchInterval: 30000,
+  });
+}

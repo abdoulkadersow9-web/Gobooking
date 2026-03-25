@@ -2,23 +2,466 @@ import React from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  useDashboard, useScanStats, useCompanyReports, useUpdateReport,
+  useDashboard, useScanStats, useCompanyReports, useUpdateReport, useCompanyAlerts,
   useSuperAdminStats, useSuperAdminBookingStats, useSuperAdminAnalytics, useSuperAdminCompanies,
 } from "@/hooks/use-company";
 import { formatCurrency } from "@/lib/utils";
 import {
   TrendingUp, Users, Package, MapPin, RefreshCw, Wallet, Bus,
-  Building2, AlertTriangle, ClipboardList, CheckCircle, Clock, XCircle,
-  Ticket, Activity, BarChart3, Map, UserCheck, Radio, Wrench,
-  ChevronRight, Zap, Star, MessageSquare, ArrowUpRight,
+  Building2, AlertTriangle, ClipboardList, CheckCircle, Clock,
+  Ticket, Activity, BarChart3, Map, ArrowUpRight, Zap, ChevronRight,
+  Navigation, Package2, UserCheck, Settings,
 } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
-/* ═══════════════════════════════════════════════
-   KPI CARD
-═══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   COMPANY DASHBOARD — Tableau de bord Compagnie
+══════════════════════════════════════════ */
+
+/* KPI Card compact */
+function StatCard({
+  label, value, icon, color, sub, href,
+}: {
+  label: string; value: string | number; icon: React.ReactNode;
+  color: string; sub?: string; href?: string;
+}) {
+  const inner = (
+    <div className="bg-card rounded-2xl p-4 border border-border shadow-sm relative overflow-hidden group hover:shadow-md transition-all active:scale-95">
+      <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500"
+        style={{ backgroundColor: color }} />
+      <div className="flex items-start justify-between relative z-10">
+        <div>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
+          <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
+          {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+        </div>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-border bg-background shadow-sm" style={{ color }}>
+          {icon}
+        </div>
+      </div>
+      {href && <div className="absolute right-4 bottom-4" style={{ color }}><ArrowUpRight size={13} /></div>}
+    </div>
+  );
+  return href ? <Link href={href}>{inner}</Link> : inner;
+}
+
+/* Section header */
+function SectionTitle({ emoji, title, href, color }: {
+  emoji: string; title: string; href?: string; color: string;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <span className="text-base">{emoji}</span>
+        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+      </div>
+      {href && (
+        <Link href={href} className="flex items-center gap-1 text-xs font-semibold hover:underline transition-colors" style={{ color }}>
+          Voir tout <ChevronRight size={12} />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+/* ── SECTION TRAJETS ── */
+function TrajetsSection({ activeTrips, summary, dailyData }: any) {
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <div className="space-y-3">
+      <SectionTitle emoji="🚍" title="Trajets" href="/admin/trajets" color="#2563EB" />
+
+      {/* Stats rapides trajets */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Actifs maintenant", value: summary?.activeTripsCount ?? 0, color: "#059669", bg: "#DCFCE7" },
+          { label: "Total programmés", value: summary?.totalTrips ?? 0, color: "#2563EB", bg: "#DBEAFE" },
+          { label: "Bus en service",   value: summary?.activeBuses ?? 0,  color: "#D97706", bg: "#FEF9C3" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: s.bg }}>
+            <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[10px] font-semibold text-gray-600 mt-0.5 leading-tight">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Trajets actifs en cours */}
+      {activeTrips?.length > 0 ? (
+        <div className="space-y-2">
+          {activeTrips.slice(0, 4).map((t: any) => (
+            <div key={t.id} className="bg-card rounded-xl border border-emerald-200 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <Bus size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{t.from} → {t.to}</p>
+                  <p className="text-xs text-muted-foreground">{t.busName} · {t.departureTime}</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse inline-block" />
+                En route
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl bg-muted/40 py-6 text-center text-sm text-muted-foreground">
+          Aucun trajet actif en ce moment
+        </div>
+      )}
+
+      {/* Graphe revenus 7j */}
+      {dailyData?.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <p className="text-xs font-semibold text-muted-foreground mb-3">Réservations (7 derniers jours)</p>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyData} margin={{ top: 0, right: 0, left: -28, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false}
+                  tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} dy={6}
+                  tickFormatter={(v) => v.slice(5)} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }} />
+                <Tooltip
+                  contentStyle={{ borderRadius: "10px", border: "none", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", fontSize: 11 }}
+                  formatter={(v: any) => [v, "Réservations"]}
+                />
+                <Bar dataKey="count" fill="#2563EB" radius={[3, 3, 0, 0]} maxBarSize={28} name="Réservations" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── SECTION COLIS ── */
+function ColisSection({ parcelStats }: { parcelStats: any }) {
+  if (!parcelStats) return null;
+
+  const pipeline = [
+    { label: "Créés",    value: parcelStats.créé ?? 0,       color: "#94A3B8", bg: "#F1F5F9" },
+    { label: "En gare",  value: parcelStats.en_gare ?? 0,    color: "#2563EB", bg: "#DBEAFE" },
+    { label: "Chargés",  value: parcelStats.chargé_bus ?? 0, color: "#7C3AED", bg: "#EDE9FE" },
+    { label: "Transit",  value: parcelStats.en_transit ?? 0, color: "#D97706", bg: "#FEF9C3" },
+    { label: "Arrivés",  value: parcelStats.arrivé ?? 0,     color: "#0369A1", bg: "#E0F2FE" },
+    { label: "Livrés",   value: parcelStats.livré ?? 0,      color: "#059669", bg: "#DCFCE7" },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <SectionTitle emoji="📦" title="Colis" href="/admin/colis" color="#7C3AED" />
+
+      {/* Pipeline horizontal */}
+      <div className="grid grid-cols-3 gap-2">
+        {pipeline.map((p) => (
+          <div key={p.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: p.bg }}>
+            <p className="text-lg font-bold" style={{ color: p.color }}>{p.value}</p>
+            <p className="text-[10px] font-semibold text-gray-600 mt-0.5">{p.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Total + annulés */}
+      <div className="flex gap-2">
+        <div className="flex-1 rounded-xl bg-muted/40 p-3 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground font-medium">Total colis</span>
+          <span className="font-bold text-foreground">{parcelStats.total ?? 0}</span>
+        </div>
+        {(parcelStats.annulé ?? 0) > 0 && (
+          <div className="rounded-xl bg-red-50 border border-red-100 p-3 flex items-center gap-2">
+            <span className="text-xs text-red-600 font-semibold">{parcelStats.annulé} annulé(s)</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── SECTION AGENTS ── */
+function AgentsSection({ reports }: { reports: any[] }) {
+  const pending = reports.filter((r) => r.statut === "soumis" || r.statut === "lu");
+  const updateReport = useUpdateReport();
+
+  return (
+    <div className="space-y-3">
+      <SectionTitle emoji="👥" title="Agents & Rapports" href="/admin/agents" color="#059669" />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/admin/agents">
+          <div className="bg-card rounded-xl border border-border p-4 hover:border-emerald-300 transition-colors cursor-pointer group">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center mb-2 group-hover:bg-emerald-200 transition-colors">
+              <Users size={18} className="text-emerald-600" />
+            </div>
+            <p className="text-sm font-semibold text-foreground">Gérer agents</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Guichet, embarquement, colis</p>
+          </div>
+        </Link>
+        <Link href="/admin/affectation">
+          <div className="bg-card rounded-xl border border-border p-4 hover:border-blue-300 transition-colors cursor-pointer group">
+            <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center mb-2 group-hover:bg-blue-200 transition-colors">
+              <UserCheck size={18} className="text-blue-600" />
+            </div>
+            <p className="text-sm font-semibold text-foreground">Affectation</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Chauffeurs & routes</p>
+          </div>
+        </Link>
+      </div>
+
+      {/* Rapports en attente inline */}
+      {pending.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-bold text-red-700 flex items-center gap-1.5">
+            <ClipboardList size={13} />
+            {pending.length} rapport(s) en attente de traitement
+          </p>
+          {pending.slice(0, 2).map((r: any) => (
+            <div key={r.id} className="bg-white rounded-lg px-3 py-2 border border-red-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{r.reportType?.replace(/_/g, " ") || "Rapport"}</p>
+                <p className="text-[10px] text-muted-foreground">{r.agentName || "Agent"}</p>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <button className="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-semibold"
+                  onClick={() => updateReport.mutate({ id: r.id, statut: "traite" })}>
+                  ✓
+                </button>
+                <button className="text-[10px] px-2 py-1 bg-red-100 text-red-700 rounded font-semibold"
+                  onClick={() => updateReport.mutate({ id: r.id, statut: "rejete" })}>
+                  ✗
+                </button>
+              </div>
+            </div>
+          ))}
+          {pending.length > 2 && (
+            <Link href="/admin/rapports" className="text-xs text-red-600 font-semibold flex items-center gap-1">
+              Voir {pending.length - 2} autres <ChevronRight size={11} />
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── SECTION ALERTES ── */
+function AlertesSection({ alerts }: { alerts: any[] }) {
+  if (!alerts || alerts.length === 0) {
+    return (
+      <div className="space-y-2">
+        <SectionTitle emoji="⚠️" title="Alertes" href="/admin/alertes" color="#DC2626" />
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex items-center gap-3">
+          <CheckCircle size={18} className="text-emerald-500" />
+          <p className="text-sm text-emerald-700 font-medium">Tout est normal — aucune alerte active</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <SectionTitle emoji="⚠️" title={`Alertes (${alerts.length})`} href="/admin/alertes" color="#DC2626" />
+      <div className="space-y-2">
+        {alerts.slice(0, 4).map((a: any, i: number) => {
+          const isUrgent = a.type === "bus_panne";
+          return (
+            <div key={i} className={`rounded-xl px-4 py-3 border flex items-start gap-3 ${
+              isUrgent ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"
+            }`}>
+              <AlertTriangle size={16} className={isUrgent ? "text-red-500 mt-0.5 shrink-0" : "text-amber-500 mt-0.5 shrink-0"} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold ${isUrgent ? "text-red-800" : "text-amber-800"}`}>
+                  {a.message || a.type?.replace(/_/g, " ") || "Alerte"}
+                </p>
+                {(a.from || a.to) && (
+                  <p className={`text-xs mt-0.5 ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
+                    {[a.from, a.to].filter(Boolean).join(" → ")}
+                    {a.date && ` · ${a.date}`}
+                  </p>
+                )}
+                {a.fill !== undefined && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-amber-200 rounded-full">
+                      <div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.round(a.fill * 100)}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-700">{Math.round(a.fill * 100)}% rempli</span>
+                  </div>
+                )}
+              </div>
+              <Link href="/admin/alertes">
+                <button className={`text-[10px] font-bold px-2 py-1 rounded shrink-0 ${
+                  isUrgent ? "bg-red-600 text-white" : "bg-amber-500 text-white"
+                }`}>
+                  Traiter
+                </button>
+              </Link>
+            </div>
+          );
+        })}
+        {alerts.length > 4 && (
+          <Link href="/admin/alertes" className="flex items-center justify-center gap-1 text-xs font-semibold text-amber-600 py-2">
+            Voir {alerts.length - 4} autres alertes <ChevronRight size={11} />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── QUICK ACTIONS ── */
+function QuickActions() {
+  const actions = [
+    { label: "Trajets",       icon: Map,        href: "/admin/trajets",      color: "#2563EB", bg: "#EFF6FF" },
+    { label: "Réservations",  icon: Ticket,     href: "/admin/reservations", color: "#D97706", bg: "#FEF9C3" },
+    { label: "Colis",         icon: Package2,   href: "/admin/colis",        color: "#7C3AED", bg: "#EDE9FE" },
+    { label: "Alertes",       icon: AlertTriangle,href: "/admin/alertes",    color: "#DC2626", bg: "#FEE2E2" },
+    { label: "Suivi live",    icon: Navigation, href: "/admin/suivi-live",   color: "#059669", bg: "#F0FDF4" },
+    { label: "SMS",           icon: Zap,        href: "/admin/sms-marketing",color: "#0369A1", bg: "#E0F2FE" },
+  ];
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-base">⚡</span>
+        <h3 className="text-sm font-bold text-foreground">Actions rapides</h3>
+      </div>
+      <div className="grid grid-cols-3 gap-2.5">
+        {actions.map((a) => {
+          const Icon = a.icon;
+          return (
+            <Link key={a.href} href={a.href}>
+              <div className="rounded-xl border border-border p-3 flex flex-col items-center gap-2 hover:shadow-md transition-all active:scale-95 cursor-pointer"
+                style={{ backgroundColor: a.bg }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: a.color + "20" }}>
+                  <Icon size={20} style={{ color: a.color }} />
+                </div>
+                <span className="text-[11px] font-semibold text-foreground text-center leading-tight">{a.label}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   COMPANY DASHBOARD MAIN
+══════════════════════════════════════════ */
+function CompanyDashboard() {
+  const { data, isLoading, isError, refetch, isFetching } = useDashboard();
+  const { data: reports = [] } = useCompanyReports();
+  const { data: alerts = [] } = useCompanyAlerts();
+
+  if (isLoading) return (
+    <div className="flex h-64 items-center justify-center gap-3">
+      <RefreshCw className="animate-spin text-amber-500" size={22} />
+      <span className="text-muted-foreground text-sm">Chargement...</span>
+    </div>
+  );
+  if (isError || !data) return (
+    <div className="p-5 bg-red-50 text-red-700 rounded-2xl border border-red-200 text-sm">
+      Impossible de charger le tableau de bord. Vérifiez votre connexion.
+    </div>
+  );
+
+  const { summary, dailyData, bookingStats, activeTrips, parcelStats, revenue } = data;
+
+  return (
+    <div className="space-y-6 pb-6">
+      {/* ── HEADER ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground">Tableau de bord</h2>
+          <p className="text-xs text-muted-foreground">Vue d'ensemble de votre compagnie</p>
+        </div>
+        <button onClick={() => refetch()}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground bg-card px-3 py-2 rounded-xl border border-border shadow-sm transition-colors">
+          <RefreshCw size={13} className={isFetching ? "animate-spin" : ""} />
+          Actualiser
+        </button>
+      </div>
+
+      {/* ── 📊 STATISTIQUES ── */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">📊</span>
+          <h3 className="text-sm font-bold text-foreground">Statistiques</h3>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            label="Revenus totaux"
+            value={formatCurrency(revenue?.totalRevenue ?? summary?.totalRevenue ?? 0)}
+            icon={<Wallet size={17} />}
+            color="#D97706"
+            sub="Billets + Colis"
+          />
+          <StatCard
+            label="Réservations"
+            value={bookingStats?.total ?? summary?.totalBookings ?? 0}
+            icon={<Ticket size={17} />}
+            color="#2563EB"
+            sub={`${bookingStats?.confirmed ?? 0} confirmées`}
+            href="/admin/reservations"
+          />
+          <StatCard
+            label="Colis total"
+            value={parcelStats?.total ?? summary?.totalParcels ?? 0}
+            icon={<Package size={17} />}
+            color="#7C3AED"
+            sub={`${parcelStats?.livré ?? 0} livrés`}
+            href="/admin/colis"
+          />
+          <StatCard
+            label="Billets en ligne"
+            value={bookingStats?.paid ?? 0}
+            icon={<Activity size={17} />}
+            color="#059669"
+            sub={`${bookingStats?.boarded ?? 0} embarqués`}
+          />
+        </div>
+      </div>
+
+      {/* ── ⚠️ ALERTES (priorité) ── */}
+      <AlertesSection alerts={alerts as any[]} />
+
+      {/* ── 🚍 TRAJETS ── */}
+      <TrajetsSection activeTrips={activeTrips} summary={summary} dailyData={dailyData} />
+
+      {/* ── 📦 COLIS ── */}
+      <ColisSection parcelStats={parcelStats} />
+
+      {/* ── 👥 AGENTS ── */}
+      <AgentsSection reports={reports as any[]} />
+
+      {/* ── ⚡ ACTIONS RAPIDES ── */}
+      <QuickActions />
+
+      {/* ── ⚙️ PARAMÈTRES quick link ── */}
+      <Link href="/admin/parametres">
+        <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3 hover:border-muted-foreground/30 transition-colors">
+          <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+            <Settings size={17} className="text-muted-foreground" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">Paramètres</p>
+            <p className="text-xs text-muted-foreground">Profil, agences, configuration</p>
+          </div>
+          <ChevronRight size={16} className="text-muted-foreground" />
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   SUPER ADMIN DASHBOARD (inchangé)
+══════════════════════════════════════════ */
+
 function KpiCard({
   title, value, icon, sub, color = "#3B82F6", trend, href,
 }: {
@@ -26,9 +469,8 @@ function KpiCard({
   sub?: string; color?: string; trend?: string; href?: string;
 }) {
   const inner = (
-    <div className="bg-card rounded-2xl p-5 shadow-sm border border-border relative overflow-hidden group hover:shadow-md transition-all duration-200 hover:scale-[1.01]">
-      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500"
-        style={{ backgroundColor: color }} />
+    <div className="bg-card rounded-2xl p-5 shadow-sm border border-border relative overflow-hidden group hover:shadow-md transition-all duration-200">
+      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500" style={{ backgroundColor: color }} />
       <div className="flex justify-between items-start relative z-10">
         <div>
           <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{title}</p>
@@ -50,109 +492,12 @@ function KpiCard({
   return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
-/* ═══════════════════════════════════════════════
-   ALERTS BANNER
-═══════════════════════════════════════════════ */
-function AlertsBanner({ alerts }: { alerts: any[] }) {
-  if (!alerts || alerts.length === 0) return null;
-  return (
-    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-2">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-sm font-bold text-red-700">{alerts.length} Alerte{alerts.length > 1 ? "s" : ""} active{alerts.length > 1 ? "s" : ""}</span>
-        </div>
-        <Link href="/admin/alertes" className="text-xs font-semibold text-red-600 hover:underline flex items-center gap-1">
-          Voir tout <ChevronRight size={12} />
-        </Link>
-      </div>
-      <div className="space-y-2">
-        {alerts.slice(0, 3).map((a: any, i: number) => (
-          <div key={i} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-red-100">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={16} className="text-red-500 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-red-800">{a.type || a.title || "Alerte"}</p>
-                {a.trajet && <p className="text-xs text-red-500">{a.trajet} · {a.heure || ""}</p>}
-              </div>
-            </div>
-            <Link href="/admin/alertes">
-              <button className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-red-700 transition-colors">
-                Traiter
-              </button>
-            </Link>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════
-   QUICK ACCESS
-═══════════════════════════════════════════════ */
-function QuickAccess({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  const items = isSuperAdmin ? [
-    { label: "Trajets", icon: Map, href: "/admin/trajets", color: "#2563EB" },
-    { label: "Réservations", icon: Ticket, href: "/admin/reservations", color: "#D97706" },
-    { label: "Colis", icon: Package, href: "/admin/colis", color: "#7C3AED" },
-    { label: "Alertes", icon: AlertTriangle, href: "/admin/alertes", color: "#DC2626" },
-    { label: "Compagnies", icon: Building2, href: "/admin/companies", color: "#059669" },
-    { label: "Analytiques", icon: BarChart3, href: "/admin/analytics", color: "#475569" },
-  ] : [
-    { label: "Trajets", icon: Map, href: "/admin/trajets", color: "#2563EB" },
-    { label: "Réservations", icon: Ticket, href: "/admin/reservations", color: "#D97706" },
-    { label: "Colis", icon: Package, href: "/admin/colis", color: "#7C3AED" },
-    { label: "Alertes", icon: AlertTriangle, href: "/admin/alertes", color: "#DC2626" },
-    { label: "Suivi Live", icon: Radio, href: "/admin/suivi-live", color: "#059669" },
-    { label: "SMS Marketing", icon: MessageSquare, href: "/admin/sms-marketing", color: "#0369A1" },
-  ];
-  return (
-    <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
-      <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-        <Zap size={16} className="text-amber-500" />
-        Accès rapide
-      </h3>
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link key={item.href} href={item.href}>
-              <div className="flex flex-col items-center gap-2 p-3 rounded-xl border border-border hover:border-transparent hover:shadow-md transition-all group cursor-pointer"
-                style={{ backgroundColor: item.color + "10" }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform"
-                  style={{ backgroundColor: item.color + "20" }}>
-                  <Icon size={20} style={{ color: item.color }} />
-                </div>
-                <span className="text-[11px] font-semibold text-center text-foreground leading-tight">{item.label}</span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════
-   REPORT STATUS BADGE
-═══════════════════════════════════════════════ */
 const REPORT_STATUT: Record<string, { label: string; color: string; bg: string }> = {
   soumis:   { label: "Soumis",   color: "#D97706", bg: "#FEF9C3" },
   lu:       { label: "Lu",       color: "#2563EB", bg: "#DBEAFE" },
   en_cours: { label: "En cours", color: "#7C3AED", bg: "#EDE9FE" },
   traite:   { label: "Traité ✓", color: "#059669", bg: "#DCFCE7" },
   rejete:   { label: "Rejeté",   color: "#DC2626", bg: "#FEE2E2" },
-};
-const REPORT_TYPES: Record<string, string> = {
-  incident_voyage:   "🚨 Incident voyage",
-  probleme_colis:    "📦 Problème colis",
-  probleme_passager: "👤 Problème passager",
-  probleme_vehicule: "🚌 Panne véhicule",
-  fraude:            "⚠️ Fraude",
-  retard:            "⏰ Retard",
-  suggestion:        "💡 Suggestion",
-  autre:             "📝 Autre",
 };
 
 function StatutBadge({ statut }: { statut: string }) {
@@ -181,7 +526,7 @@ function AgentReportsPanel() {
           <div key={r.id} className="bg-background rounded-xl border border-border p-4 space-y-2">
             <div className="flex justify-between items-start gap-2">
               <div>
-                <p className="text-sm font-semibold text-foreground">{REPORT_TYPES[r.reportType] ?? r.reportType}</p>
+                <p className="text-sm font-semibold text-foreground">{r.reportType?.replace(/_/g, " ") || r.reportType}</p>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{r.description}</p>
               </div>
               <StatutBadge statut={r.statut} />
@@ -206,33 +551,6 @@ function AgentReportsPanel() {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   SECTION CARD WRAPPER
-═══════════════════════════════════════════════ */
-function SectionCard({ title, icon, color, children, href }: {
-  title: string; icon: React.ReactNode; color: string; children: React.ReactNode; href?: string;
-}) {
-  return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <h3 className="text-sm font-bold flex items-center gap-2 text-foreground">
-          <span style={{ color }}>{icon}</span>
-          {title}
-        </h3>
-        {href && (
-          <Link href={href} className="flex items-center gap-1 text-xs font-semibold hover:underline" style={{ color }}>
-            Voir tout <ArrowUpRight size={12} />
-          </Link>
-        )}
-      </div>
-      <div className="p-5">{children}</div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════
-   SUPER ADMIN DASHBOARD
-═══════════════════════════════════════════════ */
 function SuperAdminDashboard() {
   const { data: stats, isLoading, refetch, isFetching } = useSuperAdminStats();
   const { data: bkStats } = useSuperAdminBookingStats();
@@ -250,13 +568,8 @@ function SuperAdminDashboard() {
   const pendingReports = (reports as any[]).filter((r) => r.statut === "soumis").length;
   const dailyChart = analytics?.daily || [];
 
-  const mockAlerts = pendingReports > 0 ? [
-    { type: "Rapports agents en attente", trajet: `${pendingReports} rapport(s)`, heure: "Action requise" }
-  ] : [];
-
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-foreground">Supervision Globale</h2>
@@ -269,32 +582,27 @@ function SuperAdminDashboard() {
         </button>
       </div>
 
-      {/* Alerts banner */}
-      <AlertsBanner alerts={mockAlerts} />
-
-      {/* KPIs Row 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Revenus totaux" value={formatCurrency(stats?.totalRevenue ?? 0)} icon={<Wallet size={19} />} color="#059669" trend="+8%" />
-        <KpiCard title="Trajets actifs" value={stats?.totalTrips ?? 0} icon={<Map size={19} />} color="#2563EB" href="/admin/trajets" />
-        <KpiCard title="Compagnies" value={stats?.totalCompanies ?? 0} icon={<Building2 size={19} />} color="#7C3AED" href="/admin/companies" />
-        <KpiCard title="Bus actifs" value={stats?.totalAgents ?? 0} icon={<Bus size={19} />} color="#D97706" />
+        <KpiCard title="Revenus totaux"   value={formatCurrency(stats?.totalRevenue ?? 0)} icon={<Wallet size={19} />} color="#059669" trend="+8%" />
+        <KpiCard title="Compagnies"       value={stats?.totalCompanies ?? 0}               icon={<Building2 size={19} />} color="#7C3AED" href="/admin/companies" />
+        <KpiCard title="Réservations"     value={bkStats?.today ?? 0}                      icon={<Ticket size={19} />} color="#D97706" sub="Aujourd'hui" href="/admin/reservations" />
+        <KpiCard title="Alertes actives"  value={pendingReports}                            icon={<AlertTriangle size={19} />} color="#DC2626" sub={pendingReports > 0 ? "Action requise" : "Tout est calme"} href="/admin/alertes" />
       </div>
 
-      {/* KPIs Row 2 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Réservations du jour" value={bkStats?.today ?? 0} icon={<Ticket size={19} />} color="#EA580C" href="/admin/reservations" />
-        <KpiCard title="Colis en cours" value={stats?.totalParcels ?? 0} icon={<Package size={19} />} color="#7C3AED" href="/admin/colis" />
-        <KpiCard title="Total agents" value={stats?.totalAgents ?? 0} icon={<Users size={19} />} color="#0369A1" />
-        <KpiCard title="Alertes actives" value={pendingReports} icon={<AlertTriangle size={19} />} color="#DC2626" sub={pendingReports > 0 ? "Action requise" : "Tout est calme"} href="/admin/alertes" />
+        <KpiCard title="Total trajets"  value={stats?.totalTrips ?? 0}    icon={<Map size={19} />} color="#2563EB" href="/admin/trajets" />
+        <KpiCard title="Colis en cours" value={stats?.totalParcels ?? 0}  icon={<Package size={19} />} color="#7C3AED" href="/admin/colis" />
+        <KpiCard title="Total agents"   value={stats?.totalAgents ?? 0}   icon={<Users size={19} />} color="#0369A1" />
+        <KpiCard title="Total billets"  value={stats?.totalBookings ?? 0} icon={<Ticket size={19} />} color="#059669" />
       </div>
 
-      {/* Quick Access */}
-      <QuickAccess isSuperAdmin />
-
-      {/* Charts + Companies */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <SectionCard title="Revenus 7 derniers jours" icon={<BarChart3 size={16} />} color="#7C3AED" href="/admin/analytics">
-          <div className="h-56">
+        <div className="lg:col-span-2 bg-card rounded-2xl p-5 shadow-sm border border-border">
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+            <BarChart3 size={16} className="text-purple-500" />
+            Revenus 7 derniers jours
+          </h3>
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyChart} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -305,11 +613,15 @@ function SuperAdminDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </SectionCard>
+        </div>
 
-        <SectionCard title={`Compagnies (${(companies as any[]).length})`} icon={<Building2 size={16} />} color="#7C3AED" href="/admin/companies">
-          <div className="space-y-2">
-            {(companies as any[]).slice(0, 5).map((c: any) => (
+        <div className="bg-card rounded-2xl p-5 shadow-sm border border-border flex flex-col">
+          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
+            <Building2 size={16} className="text-purple-500" />
+            Compagnies ({(companies as any[]).length})
+          </h3>
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {(companies as any[]).slice(0, 6).map((c: any) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-xl bg-background border border-border hover:border-purple-200 transition-colors">
                 <div>
                   <p className="text-sm font-semibold text-foreground">{c.name}</p>
@@ -321,206 +633,53 @@ function SuperAdminDashboard() {
               </div>
             ))}
           </div>
-        </SectionCard>
+        </div>
+      </div>
 
-        <SectionCard title="Réservations — statuts" icon={<Activity size={16} />} color="#D97706" href="/admin/reservations">
-          <div className="space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+            <Activity size={16} className="text-amber-500" />
+            Activité réservations
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
             {[
               { label: "Confirmées", value: bkStats?.confirmed ?? "—", color: "#059669", bg: "#DCFCE7" },
-              { label: "En attente",  value: bkStats?.pending ?? "—",   color: "#D97706", bg: "#FEF9C3" },
+              { label: "En attente", value: bkStats?.pending ?? "—",   color: "#D97706", bg: "#FEF9C3" },
               { label: "Annulées",   value: bkStats?.cancelled ?? "—", color: "#DC2626", bg: "#FEE2E2" },
             ].map((s) => (
-              <div key={s.label} className="flex items-center justify-between rounded-xl px-4 py-3" style={{ backgroundColor: s.bg }}>
-                <span className="text-sm font-semibold" style={{ color: s.color }}>{s.label}</span>
-                <span className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</span>
-              </div>
-            ))}
-            <div className="rounded-xl p-3 bg-muted/40 flex justify-between items-center mt-1">
-              <span className="text-sm text-muted-foreground">Revenu total</span>
-              <span className="font-bold text-foreground">{formatCurrency(bkStats?.totalRevenue ?? 0)}</span>
-            </div>
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* Reports */}
-      <SectionCard title="Rapports agents en attente" icon={<ClipboardList size={16} />} color="#DC2626" href="/admin/rapports">
-        <AgentReportsPanel />
-      </SectionCard>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════
-   COMPANY DASHBOARD
-═══════════════════════════════════════════════ */
-function CompanyDashboard() {
-  const { data, isLoading, isError, refetch, isFetching } = useDashboard();
-  const { data: scanData } = useScanStats();
-  const { data: reports = [] } = useCompanyReports();
-
-  if (isLoading) return (
-    <div className="flex h-64 items-center justify-center gap-3">
-      <RefreshCw className="animate-spin text-amber-500" size={24} />
-      <span className="text-muted-foreground text-sm">Chargement du tableau de bord...</span>
-    </div>
-  );
-  if (isError || !data) return (
-    <div className="p-6 bg-red-50 text-red-700 rounded-2xl border border-red-200 text-sm">
-      Impossible de charger le tableau de bord. Vérifiez votre connexion.
-    </div>
-  );
-
-  const { summary, dailyData, bookingStats, activeTrips } = data;
-  const scans = scanData?.stats || { passager: 0, colis: 0, bagage: 0 };
-  const pendingValidation = summary?.parcelsAwaitingValidation ?? 0;
-  const pendingReports = (reports as any[]).filter((r) => r.statut === "soumis").length;
-
-  const activeAlerts = [
-    ...(pendingValidation > 0 ? [{ type: `${pendingValidation} colis en attente de validation`, trajet: "Section Colis", heure: "Action requise" }] : []),
-    ...(pendingReports > 0 ? [{ type: `${pendingReports} rapport(s) agent non traité(s)`, trajet: "Section Rapports", heure: "À traiter" }] : []),
-  ];
-
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Tableau de bord</h2>
-          <p className="text-sm text-muted-foreground">Vue d'ensemble de votre compagnie</p>
-        </div>
-        <button onClick={() => refetch()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground bg-card px-4 py-2 rounded-xl border border-border shadow-sm transition-colors">
-          <RefreshCw size={14} className={isFetching ? "animate-spin" : ""} />
-          Actualiser
-        </button>
-      </div>
-
-      {/* === ALERTES — PRIORITÉ === */}
-      <AlertsBanner alerts={activeAlerts} />
-
-      {/* === SECTION EXPLOITATION — KPIs === */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-4 rounded-full bg-blue-500" />
-          <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">Exploitation</span>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard title="Trajets actifs" value={summary?.activeTripsCount || 0} icon={<Map size={19} />} color="#2563EB" href="/admin/trajets" trend="+2%" />
-          <KpiCard title="Bus en route" value={summary?.activeTripsCount || 0} icon={<Bus size={19} />} color="#059669" />
-          <KpiCard title="Réservations du jour" value={summary?.totalBookings || 0} icon={<Ticket size={19} />} color="#D97706" trend="+5%" href="/admin/reservations" />
-          <KpiCard title="Guichet / En ligne" value={`${bookingStats?.guichet ?? 0} / ${bookingStats?.online ?? 0}`} icon={<Users size={19} />} color="#7C3AED" />
-        </div>
-      </div>
-
-      {/* === SECTION COMMERCIAL & COLIS === */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-4 rounded-full bg-violet-500" />
-          <span className="text-xs font-bold text-violet-600 uppercase tracking-widest">Commercial & Colis</span>
-        </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard title="Revenus du jour" value={formatCurrency(summary?.totalRevenue || 0)} icon={<Wallet size={19} />} color="#D97706" trend="+12%" />
-          <KpiCard title="Colis traités" value={summary?.totalParcels || 0} icon={<Package size={19} />} color="#EA580C" href="/admin/colis" />
-          <KpiCard title="Colis à valider" value={pendingValidation} icon={<Clock size={19} />}
-            color={pendingValidation > 0 ? "#D97706" : "#94A3B8"}
-            sub={pendingValidation > 0 ? "Action requise" : "Aucun en attente"} href="/admin/colis" />
-          <KpiCard title="Rapports agents" value={pendingReports} icon={<ClipboardList size={19} />}
-            color={pendingReports > 0 ? "#DC2626" : "#94A3B8"}
-            sub={pendingReports > 0 ? "À traiter" : "Tout traité"} href="/admin/rapports" />
-        </div>
-      </div>
-
-      {/* Quick Access */}
-      <QuickAccess isSuperAdmin={false} />
-
-      {/* Scans en gare */}
-      <SectionCard title="Scans en gare — Aujourd'hui" icon={<Activity size={16} />} color="#2563EB">
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: "Passagers", value: scans.passager, color: "#2563EB", bg: "#EFF6FF" },
-            { label: "Colis",     value: scans.colis,    color: "#EA580C", bg: "#FFF7ED" },
-            { label: "Bagages",   value: scans.bagage,   color: "#059669", bg: "#F0FDF4" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-xl p-5 flex flex-col items-center gap-1" style={{ backgroundColor: s.bg }}>
-              <span className="text-3xl font-bold" style={{ color: s.color }}>{s.value}</span>
-              <span className="text-sm font-medium text-gray-600">{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Chart + Active trips */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <SectionCard title="Évolution des revenus (7 jours)" icon={<TrendingUp size={16} />} color="#D97706" href="/admin/financier">
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData || []} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} dy={8} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)", fontSize: 12 }} />
-                  <Bar dataKey="revenue" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={36} name="Revenus FCFA" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </SectionCard>
-        </div>
-
-        <SectionCard title="Trajets en cours" icon={<Bus size={16} />} color="#059669" href="/admin/trajets">
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {!activeTrips?.length ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Aucun trajet en cours</p>
-            ) : (
-              activeTrips.slice(0, 6).map((trip: any) => (
-                <div key={trip.id} className="p-3 rounded-xl bg-background border border-border hover:border-emerald-200 transition-colors">
-                  <div className="flex justify-between items-start">
-                    <p className="font-semibold text-sm text-foreground">{trip.from} → {trip.to}</p>
-                    <span className="text-xs font-semibold text-emerald-600">{trip.departureTime}</span>
-                  </div>
-                  <div className="flex items-center text-xs text-muted-foreground gap-1 mt-1">
-                    <MapPin size={10} />
-                    <span>{trip.busName}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </SectionCard>
-      </div>
-
-      {/* Colis + Reports */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="État des colis" icon={<Package size={16} />} color="#7C3AED" href="/admin/colis">
-          <div className="space-y-3">
-            {[
-              { label: "En attente validation", value: pendingValidation, color: "#D97706", bg: "#FEF9C3", icon: <Clock size={13} /> },
-              { label: "En transit",           value: summary?.colisEnTransit ?? 0, color: "#2563EB", bg: "#DBEAFE", icon: <MapPin size={13} /> },
-              { label: "Livrés / Retirés",    value: summary?.colisLivres ?? 0, color: "#059669", bg: "#DCFCE7", icon: <CheckCircle size={13} /> },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: item.bg }}>
-                <div className="flex items-center gap-2" style={{ color: item.color }}>
-                  {item.icon}
-                  <span className="text-sm font-semibold" style={{ color: item.color }}>{item.label}</span>
-                </div>
-                <span className="text-xl font-bold" style={{ color: item.color }}>{item.value}</span>
+              <div key={s.label} className="rounded-xl p-3 text-center" style={{ backgroundColor: s.bg }}>
+                <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
+                <p className="text-[10px] font-semibold text-gray-600 mt-1">{s.label}</p>
               </div>
             ))}
           </div>
-        </SectionCard>
+          <div className="mt-4 rounded-xl p-3 bg-muted/40 flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Revenu total</span>
+            <span className="font-bold text-foreground">{formatCurrency(bkStats?.totalRevenue ?? 0)}</span>
+          </div>
+        </div>
 
-        <SectionCard title="Rapports agents" icon={<ClipboardList size={16} />} color="#DC2626" href="/admin/rapports">
+        <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold flex items-center gap-2">
+              <ClipboardList size={16} className="text-red-500" />
+              Rapports agents en attente
+            </h3>
+            <Link href="/admin/rapports" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+              Voir tout <ChevronRight size={11} />
+            </Link>
+          </div>
           <AgentReportsPanel />
-        </SectionCard>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════
-   EXPORT PRINCIPAL — adaptatif selon rôle
-═══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════
+   EXPORT — adaptatif selon rôle
+══════════════════════════════════════════ */
 export default function Dashboard() {
   const { isSuperAdmin } = useAuth();
   return isSuperAdmin ? <SuperAdminDashboard /> : <CompanyDashboard />;
