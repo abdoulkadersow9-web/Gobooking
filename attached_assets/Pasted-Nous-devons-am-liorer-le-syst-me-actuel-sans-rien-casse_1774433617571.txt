@@ -1,0 +1,153 @@
+Nous devons améliorer le système actuel sans rien casser.
+
+IMPORTANT :
+- Ne pas supprimer les fonctionnalités existantes
+- Ne pas casser les flux déjà en place
+- Analyser l’existant et améliorer la logique progressivement
+- Adapter le système actuel à la nouvelle logique
+
+---
+
+1. LOGIQUE DES DÉPARTS (BASE DU SYSTÈME)
+
+Une compagnie peut avoir plusieurs départs pour un même trajet.
+
+Exemple :
+- Départ 1 : 07h00
+- Départ 2 : 08h00
+- Départ 3 : 09h00
+
+Chaque départ est indépendant et contient :
+- trajet
+- heure
+- bus
+- nombre de places
+- prix
+- compagnie
+
+IMPORTANT :
+Quand le client choisit un départ :
+- il doit être lié uniquement à ce départ
+- toutes ses actions concernent uniquement ce départ
+
+Exemple :
+- si le client clique sur départ 07h → il est lié au départ 07h
+- si le client clique sur départ 08h → il est lié au départ 08h
+
+Aucune confusion entre les départs.
+
+---
+
+2. CÔTÉ CLIENT (EXISTANT À AMÉLIORER)
+
+Le client peut :
+- voir les cars en route (carte / live)
+- voir les bus à proximité
+- voir les différents départs disponibles
+- réserver un siège sur un départ précis
+
+AMÉLIORATION :
+Quand le client réserve :
+- la réservation est liée au départ sélectionné
+- envoyer automatiquement à l’agent de réservation :
+  - nom
+  - téléphone
+  - point d’embarquement
+  - nombre de places
+  - paiement
+
+---
+
+3. CÔTÉ AGENT DE RÉSERVATION (À RENFORCER)
+
+L’agent doit voir :
+- tous les départs (par compagnie)
+- les anciennes réservations
+- les nouvelles réservations en temps réel
+
+AMÉLIORATION :
+- chaque réservation est liée à un départ précis
+- afficher les réservations par départ
+- permettre validation ou refus
+
+Si validé :
+- statut = confirmée
+- envoyer automatiquement les infos à l’agent en route du même départ
+
+---
+
+4. CÔTÉ AGENT EN ROUTE (À AMÉLIORER)
+
+Chaque agent en route est lié à un départ précis.
+
+Il doit voir :
+- les passagers de SON départ uniquement
+- les points d’embarquement
+- les numéros de téléphone
+
+Le client reçoit :
+- le numéro de l’agent en route correspondant à son départ
+- les infos du bus
+
+👉 Communication directe client ↔ agent du même départ
+
+---
+
+5. AJOUT IMPORTANT : RÉSERVATION EN COURS DE ROUTE
+
+Sans supprimer l’existant, ajouter :
+
+L’agent en route peut créer une réservation manuelle.
+
+Cas :
+- passager sans application
+- montée en cours de route
+
+Lors de la création :
+- nom
+- téléphone
+- point de montée
+- nombre de places
+
+AMÉLIORATION :
+- la réservation est ajoutée au départ de l’agent
+- synchronisation automatique avec :
+  - agent réservation
+  - entreprise
+  - historique
+
+---
+
+6. SYNCHRONISATION (TRÈS IMPORTANT)
+
+Améliorer sans casser :
+
+Toutes les actions doivent être synchronisées en temps réel entre :
+- client
+- agent réservation
+- agent en route
+- entreprise
+
+Chaque donnée doit être liée à un départ précis.
+
+---
+
+7. OBJECTIF FINAL
+
+Améliorer le système existant pour obtenir :
+
+- plusieurs départs possibles par compagnie
+- chaque départ est indépendant
+- chaque réservation est liée à un départ précis
+- agent réservation valide
+- agent en route gère uniquement son départ
+- client reçoit les infos correctes selon son départ
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien supprimer inutilement.
+Améliorer, structurer et connecter les modules existants.
+Respecter la logique : un client = un départ précis.

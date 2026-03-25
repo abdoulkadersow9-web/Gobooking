@@ -764,6 +764,28 @@ router.post("/online-bookings/:id/confirm", async (req, res) => {
       }).catch(() => {});
     }
 
+    /* ── Notify agent en route of that trip ── */
+    if (booking.tripId) {
+      try {
+        const agentEnRoute = await db.select().from(agentsTable)
+          .where(and(
+            eq(agentsTable.tripId, booking.tripId),
+            eq(agentsTable.agentRole, "agent_route")
+          )).limit(1);
+        if (agentEnRoute[0]) {
+          const agentUser = await db.select().from(usersTable)
+            .where(eq(usersTable.id, agentEnRoute[0].userId)).limit(1);
+          if (agentUser[0]?.phone) {
+            const trip = (await db.select().from(tripsTable).where(eq(tripsTable.id, booking.tripId)).limit(1))[0];
+            const paxNames = Array.isArray(booking.passengers) ? booking.passengers.map((p: any) => p.name).join(", ") : "Passager";
+            sendSMS(agentUser[0].phone,
+              `🚌 GoBooking [En route] : Nouvelle réservation confirmée sur votre trajet ${trip?.from ?? ""} → ${trip?.to ?? ""} (${trip?.departureTime ?? ""}). Passager(s) : ${paxNames}. Tél: ${booking.contactPhone ?? "?"}. Réf: ${booking.bookingRef}.`
+            );
+          }
+        }
+      } catch {} // non-blocking
+    }
+
     res.json({
       id: updated.id, bookingRef: updated.bookingRef, status: updated.status,
       message: "Réservation confirmée avec succès",
@@ -1324,7 +1346,7 @@ router.get("/trip/:tripId/passengers", async (req, res) => {
     const result: { name: string; seatNumber: string; status: string; phone?: string; boardingPoint?: string }[] = [];
 
     for (const b of bookings) {
-      if (!["confirmed", "boarded", "validated"].includes(b.status ?? "")) continue;
+      if (!["confirmed", "boarded", "validated", "payé"].includes(b.status ?? "")) continue;
       const passengers = Array.isArray(b.passengers) ? b.passengers : [];
       const seats = Array.isArray(b.seatNumbers) ? b.seatNumbers : [];
       passengers.forEach((p: any, i: number) => {
@@ -1332,6 +1354,10 @@ router.get("/trip/:tripId/passengers", async (req, res) => {
           name: p.name ?? "Passager",
           seatNumber: seats[i] ?? "?",
           status: b.status === "boarded" ? "boarded" : "confirmed",
+          phone: (p.phone ?? b.contactPhone) || undefined,
+          boardingPoint: (b as any).boardingPoint ?? (b as any).boarding_point ?? undefined,
+          bookingRef: b.bookingRef ?? undefined,
+          bookingSource: b.bookingSource ?? undefined,
         });
       });
     }
@@ -3214,6 +3240,135 @@ router.post("/suivi/alerts/:id/demander-reponse", async (req, res) => {
 /* ══════════════════════════════════════════════════════════════════
    AGENT EN ROUTE — voir son départ + alertes + répondre
    ══════════════════════════════════════════════════════════════════ */
+
+/* ─── POST /agent/route/manual-booking — en-route agent creates a manual reservation ─── */
+router.post("/route/manual-booking", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { passengerName, passengerPhone, boardingPoint, seatCount } = req.body as {
+      passengerName: string;
+      passengerPhone: string;
+      boardingPoint?: string;
+      seatCount?: number;
+    };
+
+    if (!passengerName?.trim()) { res.status(400).json({ error: "Nom du passager requis" }); return; }
+    if (!passengerPhone?.trim()) { res.status(400).json({ error: "Téléphone du passager requis" }); return; }
+
+    const count = Math.max(1, Math.min(seatCount ?? 1, 10));
+
+    /* Find agent's assigned trip */
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agent = agentRows[0];
+    const tripId = agent?.tripId ?? null;
+    if (!tripId) { res.status(400).json({ error: "Aucun trajet assigné à cet agent en route. Contactez votre compagnie." }); return; }
+
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    const trip = tripRows[0];
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    /* Generate booking reference */
+    const bookingRef = `MAN-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+
+    /* Build passengers array */
+    const passengers = Array.from({ length: count }, (_, i) =>
+      i === 0 ? { name: passengerName.trim(), phone: passengerPhone.trim() } : { name: `${passengerName.trim()} +${i}` }
+    );
+
+    /* Create the booking */
+    const [booking] = await db.insert(bookingsTable).values({
+      bookingRef,
+      tripId,
+      companyId: agent.companyId ?? trip.companyId ?? null,
+      userId: null,
+      status: "confirmed",
+      bookingSource: "guichet",
+      paymentStatus: "paid",
+      paymentMethod: "cash",
+      totalAmount: (trip.price ?? 0) * count,
+      contactPhone: passengerPhone.trim(),
+      passengers,
+      seatNumbers: [],
+      boardingPoint: boardingPoint?.trim() ?? null,
+    } as any).returning();
+
+    /* SMS to passenger */
+    sendSMS(passengerPhone.trim(),
+      `🚌 GoBooking : Bienvenue à bord ! Votre réservation ${bookingRef} a été enregistrée sur le trajet ${trip.from} → ${trip.to}. Bon voyage !`
+    );
+
+    /* Notify agent réservation (push or SMS via company) */
+    try {
+      const companyId = agent.companyId ?? trip.companyId;
+      if (companyId) {
+        const resAgents = await db.select().from(agentsTable).where(and(
+          eq(agentsTable.companyId, companyId),
+          eq(agentsTable.agentRole, "agent_reservation")
+        )).limit(3);
+        for (const ra of resAgents) {
+          const raUser = await db.select().from(usersTable).where(eq(usersTable.id, ra.userId)).limit(1);
+          if (raUser[0]?.phone) {
+            sendSMS(raUser[0].phone,
+              `🚌 GoBooking [Réservation] : Montée en cours de route — ${passengerName} (${count} pax). Trajet ${trip.from} → ${trip.to}. Tél: ${passengerPhone}. Réf: ${bookingRef}.`
+            );
+          }
+        }
+      }
+    } catch {} // non-blocking
+
+    res.json({
+      success: true,
+      bookingRef: booking.bookingRef,
+      bookingId: booking.id,
+      trip: { from: trip.from, to: trip.to, departureTime: trip.departureTime },
+      passengerName: passengerName.trim(),
+      passengerPhone: passengerPhone.trim(),
+      boardingPoint: boardingPoint?.trim() ?? null,
+      seatCount: count,
+      totalAmount: (trip.price ?? 0) * count,
+    });
+  } catch (err) {
+    console.error("[route/manual-booking]", err);
+    res.status(500).json({ error: "Erreur création réservation manuelle" });
+  }
+});
+
+/* ─── GET /agent/route/manual-bookings — list manual bookings for agent's trip ─── */
+router.get("/route/manual-bookings", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const tripId = agentRows[0]?.tripId ?? null;
+    if (!tripId) { res.json([]); return; }
+
+    const bookings = await db.select().from(bookingsTable)
+      .where(and(
+        eq(bookingsTable.tripId, tripId),
+        eq(bookingsTable.bookingSource, "guichet")
+      ))
+      .orderBy(desc(bookingsTable.createdAt))
+      .limit(30);
+
+    res.json(bookings.map(b => ({
+      id: b.id,
+      bookingRef: b.bookingRef,
+      passengers: b.passengers,
+      contactPhone: b.contactPhone,
+      seatNumbers: b.seatNumbers,
+      totalAmount: b.totalAmount,
+      status: b.status,
+      boardingPoint: (b as any).boardingPoint ?? null,
+      createdAt: b.createdAt?.toISOString?.() ?? b.createdAt,
+    })));
+  } catch (err) {
+    console.error("[route/manual-bookings]", err);
+    res.status(500).json({ error: "Erreur" });
+  }
+});
 
 /* ─── GET /agent/route/my-departure — route agent sees their departure ─── */
 router.get("/route/my-departure", async (req, res) => {

@@ -116,6 +116,22 @@ export default function AgentReservation() {
 
   const pendingCount = bookings.filter(b => b.status === "pending").length;
 
+  /* ── Group displayed bookings by trip ── */
+  type TripGroup = { tripKey: string; tripInfo: OnlineBooking["trip"]; bookings: OnlineBooking[] };
+  const groupedByTrip = displayed.reduce<TripGroup[]>((acc, b) => {
+    const key = b.trip?.id ?? "no-trip";
+    const existing = acc.find(g => g.tripKey === key);
+    if (existing) { existing.bookings.push(b); }
+    else { acc.push({ tripKey: key, tripInfo: b.trip ?? null, bookings: [b] }); }
+    return acc;
+  }, []);
+  /* Sort: groups with pending bookings first */
+  groupedByTrip.sort((a, b) => {
+    const aHasPending = a.bookings.some(x => x.status === "pending") ? 0 : 1;
+    const bHasPending = b.bookings.some(x => x.status === "pending") ? 0 : 1;
+    return aHasPending - bHasPending;
+  });
+
   /* ── Confirm ── */
   const confirmBooking = async (booking: OnlineBooking) => {
     const bagInfo = booking.baggageCount > 0
@@ -242,10 +258,44 @@ export default function AgentReservation() {
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 14, gap: 8, paddingBottom: 40 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={TEAL} />}
         >
-          {displayed.map(b => {
+          {groupedByTrip.map(group => {
+            const trip = group.tripInfo;
+            const groupPending = group.bookings.filter(b => b.status === "pending").length;
+            return (
+              <View key={group.tripKey} style={{ marginBottom: 8 }}>
+                {/* Departure header */}
+                <View style={{
+                  flexDirection: "row", alignItems: "center", backgroundColor: groupPending > 0 ? "#FEF3C7" : "#F0F9FF",
+                  borderRadius: 12, padding: 12, marginBottom: 8, gap: 10,
+                  borderLeftWidth: 4, borderLeftColor: groupPending > 0 ? "#D97706" : TEAL,
+                }}>
+                  <Ionicons name="bus" size={18} color={groupPending > 0 ? "#D97706" : TEAL} />
+                  <View style={{ flex: 1 }}>
+                    {trip
+                      ? <>
+                          <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{trip.from} → {trip.to}</Text>
+                          <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
+                            {trip.date} · {trip.departureTime} · {trip.busName}
+                          </Text>
+                        </>
+                      : <Text style={{ fontSize: 14, fontWeight: "700", color: "#374151" }}>Trajet non précisé</Text>
+                    }
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 2 }}>
+                    <View style={{ backgroundColor: groupPending > 0 ? "#D97706" : "#0E7490", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{group.bookings.length} rés.</Text>
+                    </View>
+                    {groupPending > 0 && (
+                      <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>{groupPending} en attente</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Bookings in this group */}
+                {group.bookings.map(b => {
             const st = statusLabel(b.status);
             const paxCount = b.passengers?.length ?? 1;
             const seatNums = b.seatNumbers?.length > 0 ? b.seatNumbers.join(", ") : "À assigner";
@@ -255,7 +305,7 @@ export default function AgentReservation() {
             const hasBaggage = b.baggageCount > 0;
 
             return (
-              <View key={b.id} style={[S.card, isPending && { borderColor: "#FCD34D", borderWidth: 2 }]}>
+              <View key={b.id} style={[S.card, isPending && { borderColor: "#FCD34D", borderWidth: 2 }, { marginBottom: 8 }]}>
                 {/* Card header */}
                 <View style={S.cardHeader}>
                   <View style={{ flex: 1 }}>
@@ -395,6 +445,9 @@ export default function AgentReservation() {
                     <Text style={{ fontSize: 13, color: "#DC2626", fontWeight: "700" }}>Réservation annulée</Text>
                   </View>
                 )}
+              </View>
+            );
+          })}
               </View>
             );
           })}

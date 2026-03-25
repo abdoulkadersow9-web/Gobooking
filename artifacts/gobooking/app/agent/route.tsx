@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -60,7 +60,15 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets" | "alertes">("trajet");
+  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets" | "alertes" | "montee">("trajet");
+
+  /* ── Manual booking state ── */
+  const [manualName,    setManualName]    = useState("");
+  const [manualPhone,   setManualPhone]   = useState("");
+  const [manualPoint,   setManualPoint]   = useState("");
+  const [manualSeats,   setManualSeats]   = useState("1");
+  const [manualSaving,  setManualSaving]  = useState(false);
+  const [manualSuccess, setManualSuccess] = useState<{bookingRef: string; total: number} | null>(null);
 
   /* ── Departure & Alerts ── */
   interface MyDeparture { id: string; busId?: string; busName?: string; plateNumber?: string; villeDepart: string; villeArrivee: string; heureDepart: string; chauffeurNom?: string; agentRouteNom?: string; statut: string }
@@ -166,14 +174,44 @@ export default function RouteScreen() {
     setAlertActing(null);
   };
 
+  const handleManualBooking = async () => {
+    if (!manualName.trim()) { Alert.alert("Erreur", "Entrez le nom du passager."); return; }
+    if (!manualPhone.trim()) { Alert.alert("Erreur", "Entrez le numéro de téléphone."); return; }
+    const seats = parseInt(manualSeats, 10);
+    if (isNaN(seats) || seats < 1 || seats > 10) { Alert.alert("Erreur", "Nombre de places invalide (1-10)."); return; }
+
+    setManualSaving(true);
+    try {
+      const res = await apiFetch<{ bookingRef: string; totalAmount: number }>("/agent/route/manual-booking", {
+        token: token ?? undefined, method: "POST",
+        body: {
+          passengerName: manualName.trim(),
+          passengerPhone: manualPhone.trim(),
+          boardingPoint: manualPoint.trim() || undefined,
+          seatCount: seats,
+        },
+      });
+      setManualSuccess({ bookingRef: res.bookingRef, total: res.totalAmount });
+      setManualName(""); setManualPhone(""); setManualPoint(""); setManualSeats("1");
+      /* Refresh passengers */
+      if (activeTrip) loadPassengers(activeTrip.id);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation.");
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
   useEffect(() => {
-    if (activeTrip) {
-      loadPassengers(activeTrip.id);
-      loadStopData(activeTrip.id);
+    /* Prefer agent's own assigned tripId for passenger loading */
+    const tripIdToLoad = assignedTripId ?? activeTrip?.id ?? null;
+    if (tripIdToLoad) {
+      loadPassengers(tripIdToLoad);
+      loadStopData(tripIdToLoad);
     }
-  }, [activeTrip?.id]);
+  }, [activeTrip?.id, assignedTripId]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -398,10 +436,15 @@ export default function RouteScreen() {
           {/* Tabs */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
-              {(["alertes", "trajet", "passagers", "arrets", "contacts"] as const).map(t => (
+              {(["alertes", "trajet", "passagers", "arrets", "contacts", "montee"] as const).map(t => (
                 <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
                   <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                    {t === "alertes" ? `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}` : t === "trajet" ? "📍 Trajet" : t === "passagers" ? "👥 Passagers" : t === "arrets" ? "🗺 Arrêts" : "📞 Contacts"}
+                    {t === "alertes"   ? `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}`
+                     : t === "trajet"  ? "📍 Trajet"
+                     : t === "passagers" ? "👥 Passagers"
+                     : t === "arrets"  ? "🗺 Arrêts"
+                     : t === "contacts" ? "📞 Contacts"
+                     : "➕ Montée"}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -631,6 +674,96 @@ export default function RouteScreen() {
                     </View>
                   </View>
                 ))}
+              </>
+            )}
+
+            {tab === "montee" && (
+              <>
+                <Text style={S.sectionTitle}>➕ Montée en cours de route</Text>
+                <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 12, lineHeight: 18 }}>
+                  Enregistrez un passager qui monte à bord sans application. La réservation est automatiquement liée à votre trajet en cours et synchronisée avec l'agent de réservation.
+                </Text>
+
+                {/* Success banner */}
+                {manualSuccess && (
+                  <View style={{ backgroundColor: "#DCFCE7", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: "#4ADE80", gap: 6 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="checkmark-circle" size={22} color="#166534" />
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#166534" }}>Passager enregistré !</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: "#166534" }}>Réf : <Text style={{ fontWeight: "800" }}>{manualSuccess.bookingRef}</Text></Text>
+                    <Text style={{ fontSize: 12, color: "#4B5563" }}>Montant : {manualSuccess.total.toLocaleString()} FCFA · SMS envoyé au passager</Text>
+                    <TouchableOpacity onPress={() => setManualSuccess(null)} style={{ alignSelf: "flex-end" }}>
+                      <Text style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}>Fermer ✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Form */}
+                {!assignedTripId && (
+                  <View style={{ backgroundColor: "#FEF3C7", borderRadius: 12, padding: 14, marginBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <Ionicons name="warning-outline" size={20} color="#D97706" />
+                    <Text style={{ fontSize: 12, color: "#92400E", flex: 1, lineHeight: 18 }}>
+                      Aucun trajet assigné à votre compte. Demandez à votre compagnie de vous assigner un trajet pour pouvoir créer des réservations.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Nom du passager *</Text>
+                    <TextInput
+                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
+                      placeholder="Ex : Kouassi Marie"
+                      value={manualName} onChangeText={setManualName}
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Téléphone *</Text>
+                    <TextInput
+                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
+                      placeholder="Ex : 07 01 23 45 67"
+                      value={manualPhone} onChangeText={setManualPhone}
+                      keyboardType="phone-pad"
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Point de montée</Text>
+                    <TextInput
+                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
+                      placeholder="Ex : Carrefour Koumassi"
+                      value={manualPoint} onChangeText={setManualPoint}
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Nombre de places</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {["1","2","3","4"].map(n => (
+                        <TouchableOpacity key={n}
+                          style={{ flex: 1, borderWidth: 1.5, borderColor: manualSeats === n ? G : "#D1FAE5", borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: manualSeats === n ? G : "#F0FDF4" }}
+                          onPress={() => setManualSeats(n)} disabled={manualSaving}
+                        >
+                          <Text style={{ fontSize: 15, fontWeight: "800", color: manualSeats === n ? "#fff" : G }}>{n}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={{ backgroundColor: G, borderRadius: 12, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, opacity: (!assignedTripId || manualSaving) ? 0.5 : 1 }}
+                    onPress={handleManualBooking}
+                    disabled={!assignedTripId || manualSaving}
+                  >
+                    {manualSaving
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Ionicons name="person-add" size={18} color="#fff" />}
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
+                      {manualSaving ? "Enregistrement…" : "Enregistrer la montée"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
 
