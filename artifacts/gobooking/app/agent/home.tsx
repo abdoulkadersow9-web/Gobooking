@@ -83,7 +83,7 @@ const ALL_MODULES = [
     color: "#9A3412",
     gradient: ["#FFF7ED", "#FFEDD5"] as [string, string],
     border: "#FB923C",
-    roles: ["route"],
+    roles: ["route", "agent_route"],
   },
   {
     id: "suivi",
@@ -123,6 +123,8 @@ export default function AgentHome() {
     if (r === "agent_embarquement" || r === "embarquement") return "Agent Embarquement";
     if (r === "agent_colis" || r === "reception_colis") return "Agent Colis";
     if (r === "logistique") return "Agent Logistique";
+    if (r === "agent_route" || r === "route") return "Agent En Route";
+    if (r === "suivi") return "Agent Suivi";
     if (r === "agent_reservation") return "Agent Réservation";
     return r;
   };
@@ -137,7 +139,7 @@ export default function AgentHome() {
   };
 
   const visibleModules = ALL_MODULES.filter(mod => {
-    return mod.roles.some(r => hasRole(user, r)) || true;
+    return mod.roles.some(r => hasRole(user, r));
   });
 
   return (
