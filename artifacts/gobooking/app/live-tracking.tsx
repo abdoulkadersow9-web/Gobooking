@@ -974,7 +974,7 @@ export default function LiveTrackingScreen() {
                 </View>
                 <View style={S.infoCell}>
                   <Feather name="tag" size={16} color={selected.color} />
-                  <Text style={S.infoCellLabel}>Prix par place</Text>
+                  <Text style={S.infoCellLabel}>Tarif / passager</Text>
                   <Text style={S.infoCellVal}>{(selected.price ?? 0).toLocaleString()} FCFA</Text>
                 </View>
                 {selected.distanceKm != null && (

@@ -57,6 +57,23 @@ const FILTER_TABS = [
 
 const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pedro", "Man", "Daloa", "Gagnoa", "Abengourou", "Divo", "Soubré", "Odienné"];
 
+/* ─── Grille tarifaire CI (Standard) ────────────────────── */
+const PRICE_GRID_MOBILE: Record<string, Record<string, number>> = {
+  Abidjan:      { Yamoussoukro: 2000, Bouaké: 2500, Daloa: 3500, Korhogo: 7000, "San Pedro": 3500, Man: 5000, Gagnoa: 2000, Divo: 1000, Soubré: 4000 },
+  Yamoussoukro: { Abidjan: 2000, Bouaké: 1500, Korhogo: 5000, Daloa: 1500, Gagnoa: 1200 },
+  Bouaké:       { Abidjan: 2500, Yamoussoukro: 1500, Korhogo: 3000, Daloa: 2000, Man: 3500 },
+  Korhogo:      { Abidjan: 7000, Bouaké: 3000, Yamoussoukro: 5000, Man: 4000 },
+  "San Pedro":  { Abidjan: 3500, Daloa: 3000, Gagnoa: 2500, Soubré: 1200 },
+  Daloa:        { Abidjan: 3500, Bouaké: 2000, Yamoussoukro: 1500, Man: 1500, Gagnoa: 1200 },
+  Man:          { Abidjan: 5000, Bouaké: 3500, Daloa: 1500, Korhogo: 4000 },
+  Gagnoa:       { Abidjan: 2000, Daloa: 1200, Yamoussoukro: 1200, "San Pedro": 2500, Soubré: 1200 },
+  Divo:         { Abidjan: 1000, Gagnoa: 1000, Yamoussoukro: 1500 },
+  Soubré:       { Abidjan: 4000, "San Pedro": 1200, Daloa: 2000, Gagnoa: 1200 },
+};
+function getGridPriceMobile(from: string, to: string): number | null {
+  return PRICE_GRID_MOBILE[from]?.[to] ?? PRICE_GRID_MOBILE[to]?.[from] ?? null;
+}
+
 /* ─── Seat progress bar ──────────────────────────────────── */
 function SeatBar({ booked, total }: { booked: number; total: number }) {
   const pct = total > 0 ? Math.min(1, booked / total) : 0;
@@ -186,12 +203,26 @@ export default function TrajetsScreen() {
   const [loading, setLoading]   = useState(true);
   const [filter, setFilter]     = useState("all");
   const [showModal, setShowModal] = useState(false);
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [priceFromGrid, setPriceFromGrid] = useState(false);
 
   const [form, setForm] = useState({
     from: "", to: "", date: "", departureTime: "08:00",
     arrivalTime: "12:00", price: "", duration: "4h00", busId: "",
   });
+
+  /* Auto-remplir le tarif depuis la grille officielle CI */
+  useEffect(() => {
+    if (form.from && form.to) {
+      const gridPrice = getGridPriceMobile(form.from, form.to);
+      if (gridPrice != null) {
+        setForm(p => ({ ...p, price: String(gridPrice) }));
+        setPriceFromGrid(true);
+      } else {
+        setPriceFromGrid(false);
+      }
+    }
+  }, [form.from, form.to]);
 
   const loadData = useCallback(async () => {
     try {
@@ -239,6 +270,7 @@ export default function TrajetsScreen() {
       setShowModal(false);
       setTrips(prev => [{ ...newTrip, availableSeats: 0, bookedSeats: 0 } as Trip, ...prev]);
       setForm({ from: "", to: "", date: "", departureTime: "08:00", arrivalTime: "12:00", price: "", duration: "4h00", busId: "" });
+      setPriceFromGrid(false);
     } catch (err: any) {
       Alert.alert("Erreur", err?.message ?? "Impossible de créer le trajet.");
     } finally {
@@ -444,9 +476,34 @@ export default function TrajetsScreen() {
             <TextInput style={S.input} value={form.duration} onChangeText={v => setForm(p => ({ ...p, duration: v }))} placeholder="4h00" placeholderTextColor="#9CA3AF" />
 
             {/* Price */}
-            <Text style={[S.sectionLabel, { marginTop: 20 }]}>💵 Tarif</Text>
-            <Text style={S.label}>Prix par place (FCFA) *</Text>
-            <TextInput style={S.input} value={form.price} onChangeText={v => setForm(p => ({ ...p, price: v }))} placeholder="3500" placeholderTextColor="#9CA3AF" keyboardType="numeric" />
+            <Text style={[S.sectionLabel, { marginTop: 20 }]}>💵 Tarif de la ligne</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <Text style={S.label}>Tarif / passager (FCFA) *</Text>
+              {priceFromGrid && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#DCFCE7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                  <Feather name="check-circle" size={10} color="#15803D" />
+                  <Text style={{ fontSize: 10, color: "#15803D", fontWeight: "700" }}>Grille CI</Text>
+                </View>
+              )}
+            </View>
+            <TextInput
+              style={[S.input, priceFromGrid && { borderColor: "#86EFAC", backgroundColor: "#F0FDF4" }]}
+              value={form.price}
+              onChangeText={v => { setForm(p => ({ ...p, price: v })); setPriceFromGrid(false); }}
+              placeholder="ex : 2 500"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="numeric"
+            />
+            {!priceFromGrid && form.from && form.to && (
+              <Text style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>
+                Trajet hors grille — saisir le tarif manuellement.
+              </Text>
+            )}
+            {priceFromGrid && form.price ? (
+              <Text style={{ fontSize: 11, color: "#15803D", marginTop: 4 }}>
+                Tarif suggéré : {Number(form.price).toLocaleString("fr-FR")} FCFA ({form.from} → {form.to})
+              </Text>
+            ) : null}
 
             {/* Bus selector */}
             <Text style={[S.sectionLabel, { marginTop: 20 }]}>🚌 Assignation du bus</Text>

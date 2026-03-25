@@ -50,6 +50,23 @@ interface SubscriptionPlan { id: string; name: string; priceMonthly: number; max
 interface CompanySubscription { id: string; companyId: string; planId: string; status: string; startDate: string; endDate: string | null; autoRenew: boolean; plan: SubscriptionPlan }
 
 /* ─── Agent role metadata ────────────────────────────────── */
+/* ── Grille tarifaire CI (Standard) — auto-remplissage nouveau trajet ── */
+const PRICE_GRID_CO: Record<string, Record<string, number>> = {
+  Abidjan:      { Yamoussoukro: 2000, Bouaké: 2500, Daloa: 3500, Korhogo: 7000, "San Pedro": 3500, Man: 5000, Gagnoa: 2000, Divo: 1000, Soubré: 4000 },
+  Yamoussoukro: { Abidjan: 2000, Bouaké: 1500, Korhogo: 5000, Daloa: 1500, Gagnoa: 1200 },
+  Bouaké:       { Abidjan: 2500, Yamoussoukro: 1500, Korhogo: 3000, Daloa: 2000, Man: 3500 },
+  Korhogo:      { Abidjan: 7000, Bouaké: 3000, Yamoussoukro: 5000, Man: 4000 },
+  "San Pedro":  { Abidjan: 3500, Daloa: 3000, Gagnoa: 2500, Soubré: 1200 },
+  Daloa:        { Abidjan: 3500, Bouaké: 2000, Yamoussoukro: 1500, Man: 1500, Gagnoa: 1200 },
+  Man:          { Abidjan: 5000, Bouaké: 3500, Daloa: 1500, Korhogo: 4000 },
+  Gagnoa:       { Abidjan: 2000, Daloa: 1200, Yamoussoukro: 1200, "San Pedro": 2500, Soubré: 1200 },
+  Divo:         { Abidjan: 1000, Gagnoa: 1000, Yamoussoukro: 1500 },
+  Soubré:       { Abidjan: 4000, "San Pedro": 1200, Daloa: 2000, Gagnoa: 1200 },
+};
+function getGridPriceCo(from: string, to: string): number | null {
+  return PRICE_GRID_CO[from]?.[to] ?? PRICE_GRID_CO[to]?.[from] ?? null;
+}
+
 const AGENT_ROLE_META: Record<string, { label: string; bg: string; text: string }> = {
   embarquement:    { label: "Embarquement",  bg: "#DBEAFE", text: "#1E40AF" },
   reception_colis: { label: "Colis",         bg: "#FEF3C7", text: "#92400E" },
@@ -302,6 +319,21 @@ export default function CompanyDashboard() {
   /* form states */
   const [newBus, setNewBus] = useState({ busName: "", plateNumber: "", busType: "Standard", capacity: 49 });
   const [newTrip, setNewTrip] = useState({ from: "", to: "", date: "", departureTime: "", arrivalTime: "", price: "", busId: "", busName: "", totalSeats: 49 });
+  const [newTripPriceFromGrid, setNewTripPriceFromGrid] = useState(false);
+
+  /* Auto-remplir le tarif quand les villes de départ/arrivée changent */
+  useEffect(() => {
+    if (newTrip.from && newTrip.to) {
+      const gp = getGridPriceCo(newTrip.from, newTrip.to);
+      if (gp != null) {
+        setNewTrip(p => ({ ...p, price: String(gp) }));
+        setNewTripPriceFromGrid(true);
+      } else {
+        setNewTripPriceFromGrid(false);
+      }
+    }
+  }, [newTrip.from, newTrip.to]);
+
   const [newAgent, setNewAgent] = useState({ name: "", phone: "", email: "", password: "", agentCode: "", busId: "", busName: "", agentRole: "" });
   const [agentSubmitting, setAgentSubmitting] = useState(false);
   const [agentError, setAgentError] = useState("");
@@ -2050,7 +2082,28 @@ export default function CompanyDashboard() {
               <TextInput style={[S.modalInput, { flex: 1 }]} placeholder="Départ (08h00)" value={newTrip.departureTime} onChangeText={v => setNewTrip(p => ({ ...p, departureTime: v }))} placeholderTextColor="#94A3B8" />
               <TextInput style={[S.modalInput, { flex: 1 }]} placeholder="Arrivée (12h00)" value={newTrip.arrivalTime} onChangeText={v => setNewTrip(p => ({ ...p, arrivalTime: v }))} placeholderTextColor="#94A3B8" />
             </View>
-            <TextInput style={S.modalInput} placeholder="Prix par place (FCFA)" keyboardType="numeric" value={newTrip.price} onChangeText={v => setNewTrip(p => ({ ...p, price: v }))} placeholderTextColor="#94A3B8" />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B" }}>Tarif / passager (FCFA) *</Text>
+              {newTripPriceFromGrid && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#DCFCE7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                  <Feather name="check-circle" size={10} color="#15803D" />
+                  <Text style={{ fontSize: 10, color: "#15803D", fontWeight: "700" }}>Grille CI</Text>
+                </View>
+              )}
+            </View>
+            <TextInput
+              style={[S.modalInput, newTripPriceFromGrid && { borderColor: "#86EFAC", backgroundColor: "#F0FDF4" }]}
+              placeholder="ex : 2 500"
+              keyboardType="numeric"
+              value={newTrip.price}
+              onChangeText={v => { setNewTrip(p => ({ ...p, price: v })); setNewTripPriceFromGrid(false); }}
+              placeholderTextColor="#94A3B8"
+            />
+            {newTripPriceFromGrid && newTrip.price ? (
+              <Text style={{ fontSize: 11, color: "#15803D", marginBottom: 6 }}>
+                ✓ Tarif suggéré : {Number(newTrip.price).toLocaleString("fr-FR")} FCFA ({newTrip.from} → {newTrip.to})
+              </Text>
+            ) : null}
             <BusSelector buses={buses} selected={newTrip.busId} onSelect={bus => setNewTrip(p => ({ ...p, busId: bus.id, busName: bus.busName, totalSeats: bus.capacity }))} />
             {newTrip.busId && (
               <View style={S.tripBusInfo}>
