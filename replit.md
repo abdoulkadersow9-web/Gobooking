@@ -8,6 +8,19 @@ GoBooking is a full-stack mobile bus ticket booking app built with Expo React Na
 - **Backend**: Express.js API server with Drizzle ORM + PostgreSQL
 - **Monorepo**: pnpm workspace
 
+## Navigation Agent En Route (modal plein écran)
+- Le dashboard agent en route affiche : carte trajet, barre GPS, grille d'actions rapides
+- Chaque bouton d'action ouvre un `Modal` React Native (plein écran) sur le tab correspondant
+- `isModalOpen` (boolean) + `PAGE_TITLES` remplace l'ancien système `fullscreen`
+- Header modal : bouton ← Retour + titre de la page + tab bar horizontale
+
+## Simulation de Données (trip-sim-001)
+- **Départ**: `dep-sim-001` — Abidjan→Bouaké, 07:00, en_route, chauffeur Diarra Moussa
+- **GPS**: `bus_positions` pré-seedé (lat 6.82, lon -5.28, 78.5 km/h) + simulation dynamique dans `scheduler.ts` (tickSimGps toutes les 30s)
+- **Alertes**: 2 alertes actives (arrêt_anormal + retard) dans `agent_alerts`
+- **Passagers**: 11 réservations (~17 passagers) avec statuts boarded/confirmed
+- **Arrêts**: DEMO_STOPS_FALLBACK (5 arrêts: Adjamé → Anyama → Yamoussoukro → Tiébissou → Bouaké)
+
 ## Tech Stack
 - Expo SDK 53 / expo-router v6
 - @tanstack/react-query

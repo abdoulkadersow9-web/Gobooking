@@ -1,0 +1,233 @@
+Ne rien casser.  
+Ne rien supprimer inutilement.  
+Ne pas modifier la logique métier existante.  
+Appliquer directement et complètement les améliorations demandées.
+
+---
+
+OBJECTIF :
+
+L’application doit fonctionner comme une application réelle en production, avec :
+
+- navigation fluide  
+- écrans complets  
+- données visibles immédiatement  
+- simulation réaliste active  
+
+---
+
+1. NAVIGATION À FINALISER (OBLIGATOIRE)
+
+Le système doit être exécuté réellement, pas seulement décrit.
+
+Chaque icône doit ouvrir une vraie page :
+
+- Scanner ticket → écran scan complet  
+- Ajouter passager → formulaire complet  
+- Passagers → liste complète  
+- Alertes → écran alertes  
+
+Structure obligatoire :
+
+Dashboard Agent en route  
+→ clic icône  
+→ écran complet  
+→ bouton retour  
+→ retour dashboard  
+
+Aucun affichage en bas.  
+Aucun overlay incomplet.  
+
+---
+
+2. EXÉCUTION RÉELLE (PAS THÉORIQUE)
+
+Arrêter les implémentations partielles.
+
+- appliquer le code complètement  
+- vérifier dans l’interface  
+- corriger jusqu’à ce que ce soit visible et fonctionnel  
+
+---
+
+3. SIMULATION COMPLÈTE DES DONNÉES (OBLIGATOIRE)
+
+Activer une simulation réelle dans toute l’application.
+
+Je dois voir des données comme si le système fonctionne déjà.
+
+---
+
+A. TRAJETS :
+
+- Abidjan → Bouaké  
+- Abidjan → Yamoussoukro  
+- Bouaké → Korhogo  
+
+Avec :
+
+- horaires  
+- bus (ex : Daloa Express 07)  
+- taux d’occupation  
+- statut (en route, en attente)
+
+---
+
+B. AGENT EN ROUTE :
+
+Afficher :
+
+- trajet actif  
+- nombre de passagers (ex : 14 / 63)  
+- liste des passagers  
+- statuts (à bord / non monté)  
+- GPS actif (coordonnées + EN DIRECT)  
+- vitesse (km/h)  
+- alertes actives  
+- arrêts simulés  
+
+---
+
+C. PASSAGERS :
+
+- noms  
+- numéros  
+- sièges  
+- statut  
+
+Le scan doit :
+
+- valider le passager  
+- l’ajouter à la liste à bord  
+
+Ajouter aussi :
+
+- ajout manuel (montée en cours de route)  
+- mise à jour immédiate  
+
+---
+
+D. ALERTES :
+
+- au moins 1 alerte active  
+- système automatique  
+
+Logique :
+
+- anomalie détectée automatiquement  
+- alerte envoyée au suivi  
+- réponse déclenche alarme chez agent route  
+- agent répond → résolution  
+
+---
+
+E. ARRÊTS :
+
+Ajouter des arrêts simulés :
+
+- arrêts normaux  
+- arrêts anormaux  
+
+Visible dans le suivi.
+
+---
+
+F. COLIS :
+
+Unifier agent colis :
+
+- création colis  
+- réception colis  
+- retrait colis  
+
+Avec :
+
+- code sécurisé  
+- validation du retrait  
+
+---
+
+G. ENTREPRISE :
+
+Afficher :
+
+- tous les agents  
+- classés par rôle :
+
+  - agents en route  
+  - agents guichet  
+  - agents colis  
+  - agents embarquement  
+  - agents logistique  
+
+Chaque agent avec :
+
+- nom  
+- téléphone  
+- agence  
+- rôle  
+- statut  
+
+---
+
+4. TARIFICATION (IMPORTANT)
+
+Corriger définitivement :
+
+Les prix doivent être basés sur :
+
+- les villes  
+- les grilles tarifaires réelles en Côte d’Ivoire  
+
+Pas sur les places.
+
+---
+
+5. DONNÉES IMMÉDIATES
+
+Quand on ouvre l’app :
+
+- aucune page vide  
+- tout doit afficher des données  
+- aucun “vide”  
+
+---
+
+6. SIMULATION DYNAMIQUE
+
+Simuler :
+
+- mise à jour automatique  
+- passagers qui évoluent  
+- alertes qui apparaissent  
+- GPS qui bouge  
+
+---
+
+7. ÉVITER LES DOUBLONS
+
+- supprimer les doublons  
+- éviter incohérences  
+- garder une logique propre  
+
+---
+
+OBJECTIF FINAL :
+
+Une application :
+
+- fluide  
+- claire  
+- logique  
+- avec données visibles  
+- navigation propre  
+- comportement réel  
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.  
+Ne pas modifier la logique métier.  
+Appliquer réellement les changements (pas seulement les décrire).  
+Tester et corriger jusqu’à obtenir un résultat visible et fonctionnel.

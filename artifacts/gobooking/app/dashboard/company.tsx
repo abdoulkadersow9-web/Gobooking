@@ -119,12 +119,22 @@ const DEMO_PARCELS: Parcel[] = [
 ];
 
 const DEMO_AGENTS: AgentItem[] = [
-  { id: "a1", name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", tripId: "t1", tripName: "Abidjan → Bouaké",    status: "active",   agentRole: "embarquement" },
-  { id: "a2", name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",  busId: "b2", tripId: "t1", tripName: "Abidjan → Bouaké",    status: "active",   agentRole: "vente" },
-  { id: "a3", name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04",busId: "b4", tripId: "t3", tripName: "Korhogo → Abidjan",   status: "active",   agentRole: "reception_colis" },
-  { id: "a4", name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",       busId: "",   tripId: "",   tripName: "",                    status: "inactive", agentRole: "vente" },
-  { id: "a5", name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",   busId: "b3", tripId: "t2", tripName: "Abidjan → Yamoussoukro", status: "active", agentRole: "route" },
-  { id: "a6", name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",      busId: "b5", tripId: "t4", tripName: "Abidjan → San Pedro", status: "active",   agentRole: "validation" },
+  /* 🚌 Agents en route */
+  { id: "a5",  name: "Coulibaly Koffi",  agentCode: "AGT-005", phone: "0505 55 66 77", bus: "Yamoussoukro 03",    busId: "b3", tripId: "t2",  tripName: "Abidjan → Yamoussoukro", status: "active",   agentRole: "route" },
+  { id: "a7",  name: "Koné Abdoulaye",   agentCode: "AGT-007", phone: "0707 88 99 01", bus: "Daloa Express 07",   busId: "b7", tripId: "t5",  tripName: "Abidjan → Bouaké",       status: "active",   agentRole: "route" },
+  { id: "a8",  name: "Sangaré Ibrahim",  agentCode: "AGT-008", phone: "0101 22 33 44", bus: "Korhogo Nord 09",    busId: "b9", tripId: "t6",  tripName: "Bouaké → Korhogo",       status: "active",   agentRole: "route" },
+  /* 🎫 Agents embarquement */
+  { id: "a1",  name: "Kouassi Jean",     agentCode: "AGT-001", phone: "0707 11 22 33", bus: "Express Abidjan 01", busId: "b1", tripId: "t1",  tripName: "Abidjan → Bouaké",       status: "active",   agentRole: "embarquement" },
+  { id: "a9",  name: "Cissé Aminata",    agentCode: "AGT-009", phone: "0505 33 44 55", bus: "Express Abidjan 01", busId: "b1", tripId: "t1",  tripName: "Abidjan → Bouaké",       status: "active",   agentRole: "embarquement" },
+  /* 🏪 Agents vente / guichet */
+  { id: "a2",  name: "Traoré Mamadou",   agentCode: "AGT-002", phone: "0505 44 55 66", bus: "Bouaké Direct 02",   busId: "b2", tripId: "t1",  tripName: "Abidjan → Bouaké",       status: "active",   agentRole: "vente" },
+  { id: "a4",  name: "Diallo Seydou",    agentCode: "AGT-004", phone: "0707 22 33 44", bus: "Non assigné",        busId: "",   tripId: "",    tripName: "",                       status: "inactive", agentRole: "vente" },
+  { id: "a10", name: "Ouédraogo Awa",    agentCode: "AGT-010", phone: "0101 55 66 77", bus: "San Pedro 05",       busId: "b5", tripId: "",    tripName: "",                       status: "active",   agentRole: "vente" },
+  /* 📦 Agents colis */
+  { id: "a3",  name: "Bamba Fatima",     agentCode: "AGT-003", phone: "0101 77 88 99", bus: "Korhogo Express 04", busId: "b4", tripId: "t3",  tripName: "Korhogo → Abidjan",      status: "active",   agentRole: "reception_colis" },
+  { id: "a11", name: "Fofana Moussa",    agentCode: "AGT-011", phone: "0707 66 77 88", bus: "Non assigné",        busId: "",   tripId: "",    tripName: "",                       status: "active",   agentRole: "reception_colis" },
+  /* ✅ Agents validation */
+  { id: "a6",  name: "Assiéta Koné",     agentCode: "AGT-006", phone: "0101 88 99 00", bus: "San Pedro 05",       busId: "b5", tripId: "t4",  tripName: "Abidjan → San Pedro",    status: "active",   agentRole: "validation" },
 ];
 
 /* ─── Seat grid generator ────────────────────────────────── */
@@ -1372,44 +1382,89 @@ export default function CompanyDashboard() {
               <Feather name="user-plus" size={14} color="white" /><Text style={S.addBtnText}>Ajouter</Text>
             </TouchableOpacity>
           </View>
-          {agents.map(agent => {
-            const roleMeta = AGENT_ROLE_META[agent.agentRole ?? ""] ?? { label: "Agent", bg: "#F1F5F9", text: "#475569" };
+
+          {/* Groupement par rôle */}
+          {(["route","embarquement","vente","reception_colis","validation"] as const).map(roleKey => {
+            const group = agents.filter(a => a.agentRole === roleKey);
+            if (group.length === 0) return null;
+            const roleMeta = AGENT_ROLE_META[roleKey];
+            const ROLE_ICON: Record<string, string> = {
+              route:           "🚌",
+              embarquement:    "🎫",
+              vente:           "🏪",
+              reception_colis: "📦",
+              validation:      "✅",
+            };
             return (
-            <View key={agent.id} style={S.listCard}>
-              <View style={S.agentAvatar}><Text style={S.agentAvatarText}>{agent.name.charAt(0)}</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={S.listTitle}>{agent.name}</Text>
-                <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
-                {agent.tripName ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                    <Feather name="navigation" size={10} color="#7C3AED" />
-                    <Text style={[S.listSub, { color: "#7C3AED", fontSize: 11 }]}>{agent.tripName}</Text>
-                  </View>
-                ) : null}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                  {agent.agentRole && (
-                    <View style={[S.badge, { backgroundColor: roleMeta.bg }]}>
-                      <Text style={[S.badgeText, { color: roleMeta.text }]}>{roleMeta.label}</Text>
-                    </View>
-                  )}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                    <Feather name="truck" size={10} color={agent.busId ? PRIMARY : "#94A3B8"} />
-                    <Text style={[S.listSub, { color: agent.busId ? PRIMARY : "#94A3B8" }]}>{agent.bus}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={{ alignItems: "flex-end", gap: 6 }}>
-                <View style={[S.badge, { backgroundColor: agent.status === "active" ? "#ECFDF5" : "#F1F5F9" }]}>
-                  <Text style={[S.badgeText, { color: agent.status === "active" ? "#065F46" : "#64748B" }]}>
-                    {agent.status === "active" ? "Actif" : "Inactif"}
+              <View key={roleKey} style={{ marginBottom: 12 }}>
+                {/* Entête de groupe */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#E2E8F0", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 16 }}>{ROLE_ICON[roleKey]}</Text>
+                  <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: roleMeta.text }}>
+                    {roleMeta.label}s
                   </Text>
+                  <View style={[S.badge, { backgroundColor: roleMeta.bg, marginLeft: "auto" }]}>
+                    <Text style={[S.badgeText, { color: roleMeta.text }]}>{group.length} agent{group.length > 1 ? "s" : ""}</Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => openAssignModal(agent)} style={S.assignBtn}>
-                  <Feather name="link" size={10} color="#7C3AED" />
-                  <Text style={S.assignBtnText}>Assigner</Text>
-                </TouchableOpacity>
+
+                {/* Agents de ce rôle */}
+                {group.map(agent => (
+                  <View key={agent.id} style={[S.listCard, { marginBottom: 6 }]}>
+                    <View style={[S.agentAvatar, { backgroundColor: roleMeta.bg }]}>
+                      <Text style={[S.agentAvatarText, { color: roleMeta.text }]}>{agent.name.charAt(0)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={S.listTitle}>{agent.name}</Text>
+                      <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
+                      {agent.tripName ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                          <Feather name="navigation" size={10} color="#7C3AED" />
+                          <Text style={[S.listSub, { color: "#7C3AED", fontSize: 11 }]}>{agent.tripName}</Text>
+                        </View>
+                      ) : null}
+                      {agent.bus && agent.busId ? (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
+                          <Feather name="truck" size={10} color={PRIMARY} />
+                          <Text style={[S.listSub, { color: PRIMARY, fontSize: 11 }]}>{agent.bus}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 6 }}>
+                      <View style={[S.badge, { backgroundColor: agent.status === "active" ? "#ECFDF5" : "#F1F5F9" }]}>
+                        <Text style={[S.badgeText, { color: agent.status === "active" ? "#065F46" : "#64748B" }]}>
+                          {agent.status === "active" ? "Actif" : "Inactif"}
+                        </Text>
+                      </View>
+                      <TouchableOpacity onPress={() => openAssignModal(agent)} style={S.assignBtn}>
+                        <Feather name="link" size={10} color="#7C3AED" />
+                        <Text style={S.assignBtnText}>Assigner</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
               </View>
-            </View>
+            );
+          })}
+
+          {/* Agents sans rôle défini */}
+          {agents.filter(a => !a.agentRole || !["route","embarquement","vente","reception_colis","validation"].includes(a.agentRole)).map(agent => {
+            const roleMeta = { label: "Agent", bg: "#F1F5F9", text: "#475569" };
+            return (
+              <View key={agent.id} style={S.listCard}>
+                <View style={S.agentAvatar}><Text style={S.agentAvatarText}>{agent.name.charAt(0)}</Text></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={S.listTitle}>{agent.name}</Text>
+                  <Text style={S.listSub}>{agent.agentCode} · {agent.phone}</Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 6 }}>
+                  <View style={[S.badge, { backgroundColor: agent.status === "active" ? "#ECFDF5" : "#F1F5F9" }]}>
+                    <Text style={[S.badgeText, { color: agent.status === "active" ? "#065F46" : "#64748B" }]}>
+                      {agent.status === "active" ? "Actif" : "Inactif"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             );
           })}
         </>)}

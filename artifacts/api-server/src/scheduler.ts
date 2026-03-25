@@ -411,6 +411,7 @@ export function startScheduler(intervalMs = 30_000) {
 
   const run = async () => {
     try {
+      tickSimGps();
       await Promise.all([
         checkLowSeats(),
         checkDepartureImminent(),
@@ -538,4 +539,59 @@ async function checkBusAnomalies() {
       sentStopAlert.delete(trip.id);
     }
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SIMULATION GPS — maintient trip-sim-001 actif dans le locationStore
+   Simule le mouvement du bus Abidjan → Bouaké avec coordonnées réalistes
+──────────────────────────────────────────────────────────────────────────── */
+const SIM_TRIP_ID  = "trip-sim-001";
+const SIM_AGENT_ID = "1773709474755uplf5hky7";
+
+/* Points clés de la route Abidjan → Bouaké (approximation) */
+const SIM_ROUTE = [
+  { lat: 5.3480, lon: -4.0138, label: "Adjamé" },
+  { lat: 5.5642, lon: -4.3251, label: "Anyama" },
+  { lat: 6.0823, lon: -4.8102, label: "Tiassalé" },
+  { lat: 6.4120, lon: -5.0340, label: "Yamoussoukro" },
+  { lat: 6.8276, lon: -5.2893, label: "Toumodi" },
+  { lat: 7.2351, lon: -5.5021, label: "Dimbokro" },
+  { lat: 7.6919, lon: -5.0338, label: "Bouaké" },
+];
+
+let simRouteIdx = 2; /* démarrer au milieu du trajet pour paraître "en route" */
+let simLat = SIM_ROUTE[simRouteIdx].lat;
+let simLon = SIM_ROUTE[simRouteIdx].lon;
+
+function advanceSimGps() {
+  const target = SIM_ROUTE[Math.min(simRouteIdx + 1, SIM_ROUTE.length - 1)];
+  const dLat = (target.lat - simLat) * 0.05;
+  const dLon = (target.lon - simLon) * 0.05;
+  simLat += dLat + (Math.random() - 0.5) * 0.002;
+  simLon += dLon + (Math.random() - 0.5) * 0.002;
+
+  const dist = Math.sqrt(
+    Math.pow(simLat - target.lat, 2) + Math.pow(simLon - target.lon, 2)
+  );
+  if (dist < 0.01 && simRouteIdx < SIM_ROUTE.length - 2) simRouteIdx++;
+
+  const speed = 70 + Math.random() * 20;
+
+  locationStore.set(SIM_TRIP_ID, {
+    tripId:    SIM_TRIP_ID,
+    lat:       parseFloat(simLat.toFixed(5)),
+    lon:       parseFloat(simLon.toFixed(5)),
+    speed:     parseFloat(speed.toFixed(1)),
+    heading:   315,
+    updatedAt: Date.now(),
+    agentId:   SIM_AGENT_ID,
+  });
+}
+
+/* Initialiser immédiatement */
+advanceSimGps();
+
+/* Mettre à jour toutes les 30 secondes (synchronisé avec le scheduler principal) */
+export function tickSimGps() {
+  advanceSimGps();
 }

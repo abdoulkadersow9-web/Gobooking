@@ -196,7 +196,7 @@ export default function RouteScreen() {
       const demo: LiveTrip[] = [
         { id: "trip-sim-001", from: "Abidjan", to: "Bouaké", departureTime: "07:00",
           arrivalTime: "11:00", busName: "Daloa Express 07", status: "en_route",
-          passengers: 7, totalSeats: 49, lat: 5.9, lon: -5.1, speed: 87 },
+          passengers: 14, totalSeats: 63, lat: 6.4120, lon: -5.0340, speed: 82 },
       ];
       setTrips(demo);
       if (!activeTrip) setActiveTrip(demo[0]);
