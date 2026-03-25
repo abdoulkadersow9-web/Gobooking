@@ -1,0 +1,128 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Ne pas modifier la logique existante.
+
+Adapter uniquement les rôles des agents et l’organisation selon le programme réel de l’application.
+
+---
+
+1. PROBLÈME ACTUEL
+
+Dans l’onglet Agents :
+
+- les agents existent et s’affichent
+- mais les rôles ne correspondent pas exactement au programme réel
+- certains rôles ne sont pas bien adaptés à l’utilisation terrain
+
+---
+
+2. OBJECTIF
+
+Adapter les rôles des agents selon le programme réel sans modifier la structure existante.
+
+Afficher uniquement les agents utiles et cohérents avec le fonctionnement de l’application.
+
+---
+
+3. RÔLES À UTILISER (PROGRAMME RÉEL)
+
+Organiser les agents selon ces rôles principaux :
+
+- Agent en route
+- Agent guichet
+- Agent colis (incluant réception)
+- Agent embarquement
+- Agent logistique (si existant)
+
+Supprimer les incohérences d’affichage (sans supprimer les données), et regrouper correctement.
+
+---
+
+4. AGENT EN ROUTE
+
+- lié à un départ
+- 1 départ = 1 agent en route
+- afficher clairement :
+  - nom
+  - téléphone
+  - départ
+  - statut
+
+---
+
+5. AGENT GUICHET
+
+- lié à une agence
+- gestion des ventes physiques
+
+---
+
+6. AGENT COLIS (TRÈS IMPORTANT)
+
+Fusionner la logique :
+
+- Agent réception = Agent colis
+
+Ne plus séparer ces deux rôles.
+
+---
+
+7. MODULE COLIS (À ADAPTER)
+
+Dans l’espace Agent Colis :
+
+Garder le système actuel mais organiser avec deux onglets :
+
+A. Onglet "Créer colis"
+- création colis
+- génération code colis
+
+B. Onglet "Retrait colis"
+- saisie du code colis
+- saisie du mot de passe / code de retrait
+- validation du retrait
+- confirmation colis livré
+
+---
+
+8. LOGIQUE RETRAIT
+
+Quand le client vient retirer :
+
+- l’agent entre le code colis
+- demande le code de retrait (mot de passe)
+- vérifie
+- valide le retrait
+
+Après validation :
+- statut = livré / retiré
+- mise à jour automatique
+
+---
+
+9. IMPORTANT
+
+- ne pas modifier la structure backend
+- ne pas casser les données existantes
+- ne pas supprimer les rôles existants en base
+- adapter seulement l’affichage et l’organisation
+
+---
+
+10. OBJECTIF FINAL
+
+Avoir un système clair :
+
+- agents bien définis selon le programme réel
+- pas de rôles inutiles
+- agent colis = création + réception + retrait
+- interface cohérente avec la logique terrain
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien supprimer.
+Adapter uniquement les rôles et l’organisation pour correspondre au fonctionnement réel de l’application.
