@@ -10,7 +10,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -80,11 +79,6 @@ export default function LogistiqueScreen() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [actionId,    setActionId]    = useState<string | null>(null);
-
-  /* Departure modal */
-  const [showDepModal,  setShowDepModal]  = useState(false);
-  const [depForm, setDepForm] = useState({ busId: "", villeDepart: "", villeArrivee: "", heureDepart: "", chauffeurNom: "", agentRouteNom: "" });
-  const [savingDep, setSavingDep] = useState(false);
 
   /* Bus status modal */
   const [statusBus, setStatusBus] = useState<BusItem | null>(null);
@@ -163,38 +157,6 @@ export default function LogistiqueScreen() {
     setSavingStatus(false);
   };
 
-  /* ── Create departure ── */
-  const createDeparture = async () => {
-    const { villeDepart, villeArrivee, heureDepart } = depForm;
-    if (!villeDepart.trim() || !villeArrivee.trim() || !heureDepart.trim()) {
-      Alert.alert("Champs requis", "Ville départ, ville arrivée et heure sont obligatoires."); return;
-    }
-    setSavingDep(true);
-    try {
-      const res = await fetch(`${BASE_URL}/agent/logistique/departures`, {
-        method: "POST",
-        headers: { ...authHeader(token), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          busId:         depForm.busId.trim()         || undefined,
-          villeDepart:   depForm.villeDepart.trim(),
-          villeArrivee:  depForm.villeArrivee.trim(),
-          heureDepart:   depForm.heureDepart.trim(),
-          chauffeurNom:  depForm.chauffeurNom.trim()  || undefined,
-          agentRouteNom: depForm.agentRouteNom.trim() || undefined,
-        }),
-      });
-      if (res.ok) {
-        setShowDepModal(false);
-        setDepForm({ busId: "", villeDepart: "", villeArrivee: "", heureDepart: "", chauffeurNom: "", agentRouteNom: "" });
-        await load(true);
-      } else {
-        const err = await res.json();
-        Alert.alert("Erreur", err.error ?? "Impossible de créer le départ.");
-      }
-    } catch { Alert.alert("Erreur", "Problème réseau."); }
-    setSavingDep(false);
-  };
-
   /* ── Update departure status ── */
   const updateDepStatus = async (dep: DepartureItem, statut: string) => {
     try {
@@ -234,15 +196,9 @@ export default function LogistiqueScreen() {
             <Text style={S.headerSub}>Gestion des bus & départs</Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          <TouchableOpacity onPress={() => setShowDepModal(true)} style={S.addBtn}>
-            <Feather name="plus" size={16} color="#fff" />
-            <Text style={S.addBtnTxt}>Départ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-            <Text style={S.logoutTxt}>Déco.</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={logout} style={S.logoutBtn}>
+          <Text style={S.logoutTxt}>Déco.</Text>
+        </TouchableOpacity>
       </View>
 
       {loading && !data ? (
@@ -291,20 +247,11 @@ export default function LogistiqueScreen() {
 
           {/* ── DÉPARTS PROGRAMMÉS ── */}
           <View style={S.section}>
-            <View style={S.sectionHeader}>
-              <Text style={S.sectionTitle}>🗓️ Départs ({departures.length})</Text>
-              <TouchableOpacity style={S.sectionBtn} onPress={() => setShowDepModal(true)}>
-                <Feather name="plus" size={13} color={BLUE} />
-                <Text style={{ fontSize: 12, color: BLUE, fontWeight: "700" }}>Programmer</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={S.sectionTitle}>🗓️ Départs ({departures.length})</Text>
             {!departures.length && (
               <View style={S.empty}>
                 <Ionicons name="calendar-outline" size={28} color="#CBD5E1" />
                 <Text style={S.emptyTxt}>Aucun départ programmé</Text>
-                <TouchableOpacity style={[S.sectionBtn, { marginTop: 8 }]} onPress={() => setShowDepModal(true)}>
-                  <Text style={{ fontSize: 12, color: BLUE, fontWeight: "700" }}>+ Programmer un départ</Text>
-                </TouchableOpacity>
               </View>
             )}
             {departures.map(dep => {
@@ -395,74 +342,17 @@ export default function LogistiqueScreen() {
             <Text style={S.suiviBtnTxt}>Ouvrir Suivi & Alertes temps réel</Text>
             <Feather name="arrow-right" size={16} color="#fff" />
           </TouchableOpacity>
+
+          {/* Rapport button */}
+          <TouchableOpacity
+            style={S.rapportBtn}
+            onPress={() => router.push("/agent/rapport" as never)}
+          >
+            <Feather name="alert-triangle" size={16} color="#fff" />
+            <Text style={S.rapportBtnTxt}>📋 Faire un rapport</Text>
+          </TouchableOpacity>
         </ScrollView>
       )}
-
-      {/* ══ MODAL: Programmer départ ══ */}
-      <Modal visible={showDepModal} transparent animationType="slide">
-        <View style={S.modalBg}>
-          <View style={S.modalBox}>
-            <View style={S.modalTitleRow}>
-              <Text style={S.modalTitle}>🗓️ Programmer un départ</Text>
-              <TouchableOpacity onPress={() => setShowDepModal(false)}>
-                <Feather name="x" size={22} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 440 }} keyboardShouldPersistTaps="handled">
-              <Text style={S.fieldLabel}>Ville de départ *</Text>
-              <TextInput style={S.input} placeholder="Ex: Abidjan" value={depForm.villeDepart}
-                onChangeText={v => setDepForm(f => ({ ...f, villeDepart: v }))} />
-
-              <Text style={S.fieldLabel}>Ville d'arrivée *</Text>
-              <TextInput style={S.input} placeholder="Ex: Bouaké" value={depForm.villeArrivee}
-                onChangeText={v => setDepForm(f => ({ ...f, villeArrivee: v }))} />
-
-              <Text style={S.fieldLabel}>Heure de départ *</Text>
-              <TextInput style={S.input} placeholder="Ex: 06:30" value={depForm.heureDepart}
-                onChangeText={v => setDepForm(f => ({ ...f, heureDepart: v }))} keyboardType="numbers-and-punctuation" />
-
-              <Text style={S.fieldLabel}>Nom du chauffeur</Text>
-              <TextInput style={S.input} placeholder="Ex: Koné Mamadou" value={depForm.chauffeurNom}
-                onChangeText={v => setDepForm(f => ({ ...f, chauffeurNom: v }))} />
-
-              <Text style={S.fieldLabel}>Nom de l'agent en route</Text>
-              <TextInput style={S.input} placeholder="Ex: Touré Awa" value={depForm.agentRouteNom}
-                onChangeText={v => setDepForm(f => ({ ...f, agentRouteNom: v }))} />
-
-              <Text style={S.fieldLabel}>Bus assigné (nom ou plaque)</Text>
-              {data?.buses?.length ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}>
-                    {data.buses.map(b => (
-                      <TouchableOpacity key={b.id}
-                        style={[S.busChip, depForm.busId === b.id && { backgroundColor: BLUE_L, borderColor: BLUE }]}
-                        onPress={() => setDepForm(f => ({ ...f, busId: f.busId === b.id ? "" : b.id }))}>
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: depForm.busId === b.id ? BLUE : "#475569" }}>
-                          {b.busName}
-                        </Text>
-                        <Text style={{ fontSize: 9, color: "#94A3B8" }}>{b.plateNumber}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              ) : null}
-            </ScrollView>
-
-            <View style={S.modalActions}>
-              <TouchableOpacity style={[S.modalBtn, { backgroundColor: "#F1F5F9" }]}
-                onPress={() => setShowDepModal(false)}>
-                <Text style={{ fontWeight: "700", color: "#475569" }}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[S.modalBtn, { backgroundColor: BLUE }]}
-                onPress={createDeparture} disabled={savingDep}>
-                {savingDep ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ fontWeight: "700", color: "#fff" }}>Créer départ</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ══ MODAL: Changer statut bus ══ */}
       <Modal visible={!!statusBus} transparent animationType="slide">
@@ -549,8 +439,6 @@ const S = StyleSheet.create({
   headerIcon:  { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   headerTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
   headerSub:   { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 1 },
-  addBtn:      { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.18)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  addBtnTxt:   { color: "#fff", fontSize: 12, fontWeight: "700" },
   logoutBtn:   { backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   logoutTxt:   { color: "#fff", fontSize: 12, fontWeight: "700" },
 
@@ -596,6 +484,9 @@ const S = StyleSheet.create({
 
   suiviBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#7C3AED", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 20 },
   suiviBtnTxt: { color: "#fff", fontSize: 14, fontWeight: "800", flex: 1, textAlign: "center" },
+
+  rapportBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  rapportBtnTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
 
   modalBg:      { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalBox:     { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12, maxHeight: "90%" },

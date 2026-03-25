@@ -4,7 +4,7 @@ import {
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Print from "expo-print";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,8 @@ interface Trip {
   departureTime: string;
   price: number;
   availableSeats?: number;
+  guichetSeats?: number;
+  onlineSeats?: number;
   date: string;
 }
 
@@ -348,7 +350,7 @@ export default function TicketsScreen() {
           <View style={S.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
           <View>
             <Text style={S.headerTitle}>🎫 Espace Ticketing</Text>
-            <Text style={S.headerSub}>{networkStatus.isOnline ? "Vente de billets en gare" : "⚡ Mode hors ligne"}</Text>
+            <Text style={S.headerSub}>🏪 Vente guichet · {networkStatus.isOnline ? "En ligne" : "⚡ Hors ligne"}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={logout} style={S.logoutBtn}>
@@ -382,9 +384,20 @@ export default function TicketsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
                     <Text style={S.tripMeta}>{trip.departureTime} · {trip.date}</Text>
-                    {trip.availableSeats !== undefined && (
+                    {trip.guichetSeats !== undefined && trip.guichetSeats > 0 ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                        <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: G_DARK }}>🏪 {trip.guichetSeats} places guichet</Text>
+                        </View>
+                        {(trip.onlineSeats ?? 0) > 0 && (
+                          <View style={{ backgroundColor: "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 11, fontWeight: "600", color: "#1D4ED8" }}>🌐 {trip.onlineSeats} en ligne</Text>
+                          </View>
+                        )}
+                      </View>
+                    ) : trip.availableSeats !== undefined ? (
                       <Text style={{ fontSize: 12, color: G, marginTop: 1 }}>{trip.availableSeats} places dispo.</Text>
-                    )}
+                    ) : null}
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={S.tripPrice}>{trip.price?.toLocaleString()}</Text>
@@ -478,6 +491,14 @@ export default function TicketsScreen() {
               <Text style={S.submitTxt}>Valider la vente</Text>
             </>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, marginTop: 8, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+          onPress={() => router.push("/agent/rapport" as never)}
+        >
+          <Feather name="alert-triangle" size={16} color="#fff" />
+          <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

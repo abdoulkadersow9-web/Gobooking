@@ -676,6 +676,15 @@ export default function RouteScreen() {
           </ScrollView>
         </>
       )}
+
+      {/* Rapport button */}
+      <TouchableOpacity
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 16, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        onPress={() => router.push("/agent/rapport" as never)}
+      >
+        <Feather name="alert-triangle" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

@@ -132,7 +132,7 @@ export default function AgentReservation() {
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 14 }}>
           <Text style={S.headerTitle}>Réservations en ligne</Text>
-          <Text style={S.headerSub}>Agent Réservation · {user?.name}</Text>
+          <Text style={S.headerSub}>🌐 En ligne uniquement · {user?.name}</Text>
         </View>
         <TouchableOpacity onPress={() => load()} style={S.refreshBtn}>
           <Feather name="refresh-cw" size={17} color="#fff" />
@@ -297,6 +297,15 @@ export default function AgentReservation() {
           })}
         </ScrollView>
       )}
+
+      {/* Rapport button */}
+      <TouchableOpacity
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 14, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        onPress={() => router.push("/agent/rapport" as never)}
+      >
+        <Feather name="alert-triangle" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

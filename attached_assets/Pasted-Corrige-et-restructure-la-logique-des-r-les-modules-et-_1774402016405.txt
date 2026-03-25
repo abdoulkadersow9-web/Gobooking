@@ -1,0 +1,181 @@
+Corrige et restructure la logique des rôles, modules et responsabilités dans mon application GoBooking pour respecter une organisation professionnelle et éviter toute confusion.
+
+-----------------------------------
+1. CORRECTION RÔLE AGENT LOGISTIQUE
+-----------------------------------
+
+Problème actuel :
+- L’agent logistique peut créer les départs (ce qui est incorrect)
+
+Correction :
+
+- L’agent logistique NE DOIT PAS créer les départs
+- Les départs sont créés UNIQUEMENT par la compagnie (entreprise)
+
+Rôle agent logistique :
+
+- Créer et gérer les flottes (bus)
+- Mettre à jour l’état des bus :
+  - disponible
+  - en route
+  - en panne
+  - en maintenance
+
+- Signaler anomalies
+- Envoyer rapports liés aux bus
+
+-----------------------------------
+2. CRÉATION DÉPART (COMPAGNIE UNIQUEMENT)
+
+Les départs doivent être créés par la compagnie avec :
+
+- busId
+- chauffeurNom
+- agentRoute (IMPORTANT)
+- nombre places guichet
+- nombre places réservation en ligne
+
+-----------------------------------
+3. SYSTÈME RAPPORT (IMPORTANT)
+
+Correction :
+
+- Le bouton "Envoyer rapport" ne doit PAS être global
+- Il doit être intégré dans CHAQUE module agent
+
+Modules concernés :
+- agent embarquement
+- agent guichet
+- agent colis
+- agent logistique
+- agent suivi
+- agent route
+- agent réservation
+
+Dans chaque module :
+
+Ajouter en bas :
+👉 bouton "Envoyer rapport"
+
+-----------------------------------
+4. LOGIQUE RETRAIT COLIS (TRÈS IMPORTANT)
+
+Corriger :
+
+Retrait doit se faire UNIQUEMENT par :
+
+- scan QR code
+OU
+- saisie code colis
+
+Processus :
+
+1. Rechercher colis
+2. Vérifier statut = "arrivé"
+3. Bouton "Valider retrait"
+
+Après validation :
+- statut = "retiré"
+
+-----------------------------------
+5. AGENT RÉSERVATION (CORRECTION)
+
+Agent réservation doit :
+
+- voir uniquement les places en ligne
+- voir :
+  - places disponibles en ligne
+  - réservations en attente
+
+Actions :
+- confirmer réservation
+- annuler réservation
+
+NE DOIT PAS voir :
+- places guichet
+
+-----------------------------------
+6. AGENT GUICHET (CORRECTION)
+
+Agent guichet doit :
+
+- voir uniquement places guichet
+- vendre tickets physiques
+- décrémenter uniquement places guichet
+
+-----------------------------------
+7. SYSTÈME ALERTE (CORRECTION IMPORTANTE)
+
+Correction :
+
+- L’alerte doit être déclenchée par :
+👉 l’agent en route (dans le bus)
+
+OU automatiquement via GPS :
+
+Condition :
+- bus arrêté anormalement
+
+Processus :
+
+1. Alerte déclenchée (auto ou agent route)
+2. Agent suivi reçoit alerte
+3. Agent suivi demande réponse
+4. Agent route répond :
+   - panne
+   - contrôle
+   - pause
+
+5. Quand réponse envoyée :
+👉 alarme s’arrête automatiquement
+
+-----------------------------------
+8. VISIBILITÉ COMPAGNIE
+
+La compagnie doit :
+
+- voir tous les statuts :
+  - bus
+  - trajets
+  - colis
+  - alertes
+  - réservations
+
+- voir anomalies
+- demander rapports
+
+NE DOIT PAS :
+- exécuter les actions des agents
+
+-----------------------------------
+9. STRUCTURE PROPRE
+
+- Séparer clairement :
+  compagnie / agent / client
+- éviter chevauchement de responsabilités
+- supprimer logique incohérente
+
+-----------------------------------
+10. CONTRAINTES
+
+- Ne pas casser les fonctionnalités existantes
+- Corriger uniquement la logique
+- Vérifier permissions par rôle
+- Vérifier cohérence données
+
+-----------------------------------
+À LA FIN
+
+- expliquer clairement les rôles :
+  compagnie
+  logistique
+  agent route
+  agent suivi
+  agent guichet
+  agent réservation
+  agent colis
+
+- expliquer les flux :
+  bus / colis / ticket / alerte
+
+- montrer comment tester chaque rôle

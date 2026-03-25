@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import { useAgents, useCreateAgent } from "@/hooks/use-company";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, UserCog, Mail, Phone, Bus } from "lucide-react";
+import { Plus, UserCog, Mail, Phone, Bus, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Agents() {
   const { data: agents, isLoading } = useAgents();
   const [showAdd, setShowAdd] = useState(false);
+  const { isCompany } = useAuth();
 
   return (
     <div className="space-y-6">
@@ -16,9 +18,15 @@ export default function Agents() {
           <h2 className="text-2xl font-display font-bold">Agents de Compagnie</h2>
           <p className="text-muted-foreground mt-1">Gérez le personnel au guichet et dans les bus.</p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="gap-2">
-          <Plus size={18} /> Nouvel Agent
-        </Button>
+        {isCompany ? (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+            <Eye size={14} /> Lecture seule
+          </span>
+        ) : (
+          <Button onClick={() => setShowAdd(true)} className="gap-2">
+            <Plus size={18} /> Nouvel Agent
+          </Button>
+        )}
       </div>
 
       {showAdd && (
@@ -63,9 +71,11 @@ export default function Agents() {
                 )}
               </div>
               
-              <div className="mt-6">
-                <Button variant="outline" size="sm" className="w-full">Modifier / Assigner</Button>
-              </div>
+              {!isCompany && (
+                <div className="mt-6">
+                  <Button variant="outline" size="sm" className="w-full">Modifier / Assigner</Button>
+                </div>
+              )}
             </div>
           ))
         )}

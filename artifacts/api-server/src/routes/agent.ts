@@ -940,6 +940,8 @@ router.get("/trips", async (req, res) => {
         status: trip.status,
         totalSeats: trip.totalSeats,
         availableSeats: availableCount.length,
+        guichetSeats: trip.guichetSeats ?? 0,
+        onlineSeats: trip.onlineSeats ?? 0,
       };
     }));
 

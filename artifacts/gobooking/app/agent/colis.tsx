@@ -1013,6 +1013,12 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
   const [lastAction, setLastAction] = useState<{ label: string; notif: string | null } | null>(null);
   const lastScan = useRef<string>("");
 
+  /* Retrait confirmation */
+  const [showRetraitConfirm, setShowRetraitConfirm] = useState(false);
+  const [retraitInputCode, setRetraitInputCode]     = useState("");
+  const [retraitScanMode, setRetraitScanMode]       = useState(false);
+  const lastRetraitScan = useRef<string>("");
+
   const search = useCallback(async (ref: string) => {
     if (!ref.trim()) { Alert.alert("Erreur", "Entrez un numéro de suivi."); return; }
     setLoading(true);
@@ -1181,21 +1187,33 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
                 </View>
               )}
 
-              <TouchableOpacity
-                style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
-                onPress={() => {
-                  Alert.alert(na.label, `Confirmer pour : ${colis.trackingRef} ?`, [
-                    { text: "Annuler", style: "cancel" },
-                    { text: "Confirmer", onPress: () => handleAction(na) },
-                  ]);
-                }}
-                disabled={updating}
-              >
-                {updating
-                  ? <ActivityIndicator color="#fff" />
-                  : <><Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>{na.label}</Text><Ionicons name="arrow-forward-circle" size={20} color="#fff" /></>
-                }
-              </TouchableOpacity>
+              {na.route === "retirer" ? (
+                /* ── Retrait : requiert confirmation QR ou code ── */
+                <TouchableOpacity
+                  style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
+                  onPress={() => { setRetraitInputCode(""); setRetraitScanMode(false); lastRetraitScan.current = ""; setShowRetraitConfirm(true); }}
+                  disabled={updating}
+                >
+                  <Ionicons name="qr-code-outline" size={20} color="#fff" />
+                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>✅ Retrait — Scanner / Saisir code</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
+                  onPress={() => {
+                    Alert.alert(na.label, `Confirmer pour : ${colis.trackingRef} ?`, [
+                      { text: "Annuler", style: "cancel" },
+                      { text: "Confirmer", onPress: () => handleAction(na) },
+                    ]);
+                  }}
+                  disabled={updating}
+                >
+                  {updating
+                    ? <ActivityIndicator color="#fff" />
+                    : <><Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>{na.label}</Text><Ionicons name="arrow-forward-circle" size={20} color="#fff" /></>
+                  }
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -1232,6 +1250,113 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
           </View>
         ))}
       </View>
+
+      {/* Rapport button */}
+      <TouchableOpacity
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        onPress={() => router.push("/agent/rapport" as never)}
+      >
+        <Feather name="alert-triangle" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+      </TouchableOpacity>
+    {/* ── Modal confirmation retrait QR/code ── */}
+    <Modal visible={showRetraitConfirm} transparent animationType="slide" onRequestClose={() => setShowRetraitConfirm(false)}>
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={{ fontSize: 17, fontWeight: "900", color: "#065F46" }}>✅ Confirmer le retrait</Text>
+              <TouchableOpacity onPress={() => setShowRetraitConfirm(false)}>
+                <Feather name="x" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {colis && (
+              <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, gap: 4 }}>
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>Colis à retirer :</Text>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#065F46" }}>{colis.trackingRef}</Text>
+                <Text style={{ fontSize: 12, color: "#374151" }}>{colis.senderName} → {colis.receiverName}</Text>
+              </View>
+            )}
+
+            <Text style={{ fontSize: 13, color: "#374151", fontWeight: "600" }}>
+              Scannez le QR du bordereau ou saisissez le code de suivi pour valider le retrait :
+            </Text>
+
+            {/* QR scan button */}
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: retraitScanMode ? P : P_LIGHT, borderRadius: 12, paddingVertical: 12, borderWidth: 1.5, borderColor: P }}
+              onPress={async () => {
+                if (!permission?.granted) await requestPermission();
+                setRetraitScanMode(v => !v);
+              }}
+            >
+              <Feather name="camera" size={16} color={retraitScanMode ? "#fff" : P} />
+              <Text style={{ fontSize: 14, fontWeight: "700", color: retraitScanMode ? "#fff" : P }}>
+                {retraitScanMode ? "Fermer caméra" : "Scanner QR du bordereau"}
+              </Text>
+            </TouchableOpacity>
+
+            {retraitScanMode && permission?.granted && (
+              <View style={{ height: 180, borderRadius: 12, overflow: "hidden" }}>
+                <CameraView style={{ flex: 1 }} facing="back"
+                  onBarcodeScanned={({ data }) => {
+                    if (data === lastRetraitScan.current) return;
+                    lastRetraitScan.current = data;
+                    const qr = validateQR(data);
+                    const ref = qr?.ref ?? data;
+                    setRetraitInputCode(ref);
+                    setRetraitScanMode(false);
+                  }}
+                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                />
+                <View style={{ position: "absolute", inset: 0, justifyContent: "center", alignItems: "center" }}>
+                  <View style={{ width: 130, height: 130, borderWidth: 2.5, borderColor: "#34D399", borderRadius: 10 }} />
+                </View>
+              </View>
+            )}
+
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TextInput
+                style={{ flex: 1, borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, fontWeight: "700", color: "#065F46", backgroundColor: "#F0FDF4" }}
+                placeholder="Code colis (ex: PKG-20260324-ABC)"
+                value={retraitInputCode}
+                onChangeText={setRetraitInputCode}
+                autoCapitalize="characters"
+                returnKeyType="done"
+              />
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                onPress={() => setShowRetraitConfirm(false)}>
+                <Text style={{ fontWeight: "700", color: "#475569" }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 2, backgroundColor: "#065F46", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                disabled={updating}
+                onPress={() => {
+                  if (!colis) return;
+                  const entered = retraitInputCode.trim().toUpperCase();
+                  const expected = colis.trackingRef.trim().toUpperCase();
+                  if (entered !== expected) {
+                    Alert.alert("Code incorrect", `Le code saisi ne correspond pas au colis.\nAttendu : ${colis.trackingRef}`);
+                    return;
+                  }
+                  setShowRetraitConfirm(false);
+                  handleAction({ label: "✅ Retirer en gare", route: "retirer", color: "#065F46" });
+                }}
+              >
+                {updating
+                  ? <ActivityIndicator color="#fff" />
+                  : <><Ionicons name="checkmark-circle" size={20} color="#fff" /><Text style={{ fontWeight: "800", color: "#fff", fontSize: 15 }}>Valider le retrait</Text></>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
     </ScrollView>
   );
 }

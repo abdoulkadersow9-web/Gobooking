@@ -3,13 +3,15 @@ import { useTrips, useCreateTrip, useTripAction } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Trips() {
   const { data: trips, isLoading } = useTrips();
   const { mutate: tripAction, isPending: actionPending } = useTripAction();
   const { toast } = useToast();
+  const { isCompany } = useAuth();
 
   const handleAction = (id: string, action: 'start' | 'end') => {
     tripAction({ id, action }, {
@@ -25,9 +27,15 @@ export default function Trips() {
           <h2 className="text-2xl font-display font-bold">Trajets Planifiés</h2>
           <p className="text-muted-foreground mt-1">Gérez vos lignes et départs.</p>
         </div>
-        <Button className="gap-2">
-          <Plus size={18} /> Programmer un trajet
-        </Button>
+        {isCompany ? (
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+            <Eye size={14} /> Lecture seule
+          </span>
+        ) : (
+          <Button className="gap-2">
+            <Plus size={18} /> Programmer un trajet
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4">
@@ -58,22 +66,24 @@ export default function Trips() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-border">
-                {trip.status === 'scheduled' && (
-                  <Button variant="accent" onClick={() => handleAction(trip.id, 'start')} disabled={actionPending} className="w-full md:w-auto">
-                    <PlayCircle size={16} className="mr-2" /> Démarrer
+              {!isCompany && (
+                <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-border">
+                  {trip.status === 'scheduled' && (
+                    <Button variant="accent" onClick={() => handleAction(trip.id, 'start')} disabled={actionPending} className="w-full md:w-auto">
+                      <PlayCircle size={16} className="mr-2" /> Démarrer
+                    </Button>
+                  )}
+                  {trip.status === 'en_route' && (
+                    <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 w-full md:w-auto" onClick={() => handleAction(trip.id, 'end')} disabled={actionPending}>
+                      <CheckSquare size={16} className="mr-2" /> Marquer Arrivé
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon">
+                    <span className="sr-only">Details</span>
+                    &middot;&middot;&middot;
                   </Button>
-                )}
-                {trip.status === 'en_route' && (
-                  <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 w-full md:w-auto" onClick={() => handleAction(trip.id, 'end')} disabled={actionPending}>
-                    <CheckSquare size={16} className="mr-2" /> Marquer Arrivé
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon">
-                  <span className="sr-only">Details</span>
-                  &middot;&middot;&middot;
-                </Button>
-              </div>
+                </div>
+              )}
 
             </div>
           ))
