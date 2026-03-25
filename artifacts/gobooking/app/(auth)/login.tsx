@@ -60,7 +60,6 @@ export default function LoginScreen() {
     });
     await login(res.token, res.user);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.dismissAll();
     router.replace(getDashboardPath(res.user.role, res.user.agentRole) as never);
   };
 

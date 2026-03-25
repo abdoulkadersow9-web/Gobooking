@@ -83,7 +83,6 @@ export default function RegisterScreen() {
       });
       await login(res.token, res.user);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.dismissAll();
       router.replace("/(tabs)");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Inscription échouée. Veuillez réessayer.";
