@@ -1033,13 +1033,13 @@ const S = StyleSheet.create({
                   borderLeftWidth: 4, borderLeftColor: "#DC2626" },
 
   /* Tabs */
-  tabsScroll:   { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },
+  tabsScroll:   { flexGrow: 0, borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },
   tabs:         { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  tabBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-                  backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "transparent" },
+  tabBtn:       { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22,
+                  backgroundColor: "#EEF2F7", borderWidth: 1.5, borderColor: "#D1D9E0" },
   tabBtnActive: { backgroundColor: G_LIGHT, borderColor: G },
-  tabText:      { fontSize: 12, fontWeight: "600", color: "#64748B" },
-  tabTextActive:{ color: G_DARK, fontWeight: "700" },
+  tabText:      { fontSize: 13, fontWeight: "700", color: "#1E293B" },
+  tabTextActive:{ color: G_DARK, fontWeight: "800" },
 
   /* Body */
   body:         { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 0 },
