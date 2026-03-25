@@ -1,0 +1,167 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Respecter toute la logique existante.
+
+Adapter et compléter uniquement pour permettre la simulation des arrêts et un système d’alertes intelligent avec détection automatique.
+
+---
+
+1. PROBLÈME ACTUEL
+
+- la section "Arrêts" est vide
+- impossible de tester le suivi
+- le système d’alerte n’est pas complet
+- pas de détection automatique des anomalies
+
+---
+
+2. OBJECTIF
+
+- simuler les arrêts
+- activer un système d’alerte intelligent
+- permettre la détection automatique des anomalies
+- rendre le module testable et robuste
+
+---
+
+3. SIMULATION DES ARRÊTS
+
+Ajouter des arrêts simulés pour chaque trajet.
+
+Exemple :
+Trajet : Abidjan → Bouaké
+
+Arrêts :
+- Yopougon
+- Yamoussoukro
+- Tiébissou
+- Bouaké
+
+Chaque arrêt :
+- nom
+- ordre
+- statut (prévu / en cours / passé)
+
+---
+
+4. DÉTECTION AUTOMATIQUE DES ANOMALIES (TRÈS IMPORTANT)
+
+Le système doit détecter automatiquement les anomalies sans intervention de l’agent.
+
+Exemples d’anomalies :
+
+- arrêt prolongé anormal (temps trop long)
+- véhicule immobile trop longtemps
+- sortie de trajectoire GPS
+- vitesse anormale (0 km/h trop longtemps ou incohérente)
+- arrêt hors zone prévue
+
+👉 Dès qu’une anomalie est détectée :
+
+- le système déclenche automatiquement une alerte
+- sans action manuelle de l’agent
+
+IMPORTANT :
+Ne pas dépendre uniquement de l’agent en route pour déclencher l’alerte.
+
+---
+
+5. LOGIQUE DES ALERTES
+
+---
+
+A. DÉCLENCHEMENT AUTOMATIQUE
+
+Quand anomalie détectée :
+
+- alerte générée automatiquement
+- envoyée à l’agent suivi / supervision
+
+---
+
+B. RÉCEPTION AGENT SUIVI
+
+L’agent suivi :
+
+- reçoit l’alerte
+- voit le type d’anomalie
+- peut envoyer une demande
+
+---
+
+C. DÉCLENCHEMENT ALARME
+
+Quand l’agent suivi envoie une demande :
+
+👉 une alarme se déclenche côté agent en route
+
+- notification visible
+- signal d’alerte actif
+
+---
+
+D. RÉPONSE AGENT EN ROUTE
+
+L’agent doit répondre :
+
+Exemples :
+- contrôle
+- pause
+- panne
+- arrêt normal
+
+---
+
+E. RÉSOLUTION
+
+Quand l’agent répond :
+
+- alarme s’arrête
+- anomalie résolue
+- suivi continue
+
+---
+
+6. SYNCHRONISATION
+
+Tout doit être synchronisé :
+
+- agent route
+- agent suivi
+- historique
+
+---
+
+7. SIMULATION POUR TEST
+
+Même sans API réelle :
+
+- simuler anomalies
+- simuler alertes automatiques
+- simuler réponses
+
+---
+
+8. OBJECTIF FINAL
+
+Un système intelligent où :
+
+- les arrêts sont visibles
+- les anomalies sont détectées automatiquement
+- les alertes sont déclenchées automatiquement
+- l’agent suivi contrôle
+- l’agent route répond
+- l’alarme s’arrête après réponse
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne pas modifier la logique existante.
+Ajouter uniquement :
+- simulation des arrêts
+- détection automatique des anomalies
+- alertes automatiques
+- interaction agent suivi ↔ agent route

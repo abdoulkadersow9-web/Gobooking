@@ -56,6 +56,28 @@ const DEMO_PASSENGERS: Passenger[] = [
   { name: "Assiéta Koné",    seatNumber: "E1", status: "pending",  phone: "01 01 88 99 00", boardingPoint: "Arrêt Marcory" },
 ];
 
+/* ── Arrêts simulés (fallback quand l'API ne retourne rien) ── */
+const DEMO_STOPS_FALLBACK = [
+  { id: "ds1", name: "Gare d'Adjamé",    city: "Abidjan",      order: 1, stopStatus: "passé"    as const, estimatedTime: "07:00", passengers: [{ bookingRef:"SIM-A01", userName:"Kouassi Ama",     fromStopId: null }, { bookingRef:"SIM-A02", userName:"Traoré Youssouf", fromStopId: null }] },
+  { id: "ds2", name: "Péage Anyama",      city: "Anyama",       order: 2, stopStatus: "passé"    as const, estimatedTime: "07:35", passengers: [] },
+  { id: "ds3", name: "Gare Yamoussoukro", city: "Yamoussoukro", order: 3, stopStatus: "en_cours" as const, estimatedTime: "09:15", passengers: [{ bookingRef:"SIM-Y01", userName:"Bamba Koffi", fromStopId: null }] },
+  { id: "ds4", name: "Arrêt Tiébissou",  city: "Tiébissou",    order: 4, stopStatus: "prévu"    as const, estimatedTime: "10:30", passengers: [] },
+  { id: "ds5", name: "Gare de Bouaké",   city: "Bouaké",       order: 5, stopStatus: "prévu"    as const, estimatedTime: "11:00", passengers: [] },
+];
+
+/* ── Alertes simulées (fallback si API retourne aucune alerte) ── */
+const DEMO_ALERTS_FALLBACK = [
+  {
+    id: "sim-demo-1",
+    type: "arret_prolonge",
+    message: "⚠️ [Simulation] Arrêt anormal à Yamoussoukro — véhicule immobile depuis 12 min",
+    status: "active" as const,
+    response: null as null,
+    responseRequested: true,
+    createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
+  },
+];
+
 export default function RouteScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
@@ -84,6 +106,7 @@ export default function RouteScreen() {
   const [myDeparture,  setMyDeparture]  = useState<MyDeparture | null>(null);
   const [busAlerts,    setBusAlerts]    = useState<BusAlert[]>([]);
   const [alertActing,  setAlertActing]  = useState<string | null>(null);
+  const [autoAlerts,   setAutoAlerts]   = useState<BusAlert[]>([]);
 
   interface StopWithPassengers {
     id: string;
@@ -95,7 +118,9 @@ export default function RouteScreen() {
   const [stopData, setStopData]         = useState<StopWithPassengers[]>([]);
   const [stopLoading, setStopLoading]   = useState(false);
   const [lastSync, setLastSync]         = useState<Date | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef          = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speedZeroRef     = useRef<number | null>(null);
+  const anomalyInjected  = useRef<Set<string>>(new Set());
 
   const assignedTripId = user?.tripId ?? null;
   const assignedBusId  = user?.busId  ?? null;
@@ -160,9 +185,10 @@ export default function RouteScreen() {
     setStopLoading(true);
     try {
       const data = await apiFetch<{ stops: StopWithPassengers[] }>(`/company/trips/${tripId}/stop-passengers`, { token });
-      setStopData(data.stops ?? []);
+      const stops = data.stops ?? [];
+      setStopData(stops.length > 0 ? stops : (DEMO_STOPS_FALLBACK as any));
     } catch {
-      setStopData([]);
+      setStopData(DEMO_STOPS_FALLBACK as any);
     } finally {
       setStopLoading(false);
     }
@@ -177,12 +203,27 @@ export default function RouteScreen() {
       if (res.ok) {
         const json = await res.json();
         setMyDeparture(json.departure ?? null);
-        setBusAlerts(json.alerts ?? []);
+        const apiAlerts: BusAlert[] = json.alerts ?? [];
+        setBusAlerts(apiAlerts.length > 0 ? apiAlerts : DEMO_ALERTS_FALLBACK);
       }
     } catch {}
   }, [token]);
 
   const respondToAlert = async (alertId: string, response: "panne" | "controle" | "pause") => {
+    /* ── Alertes auto-détectées ou simulées : résolution locale ── */
+    if (alertId.startsWith("auto-") || alertId.startsWith("sim-")) {
+      setAlertActing(alertId);
+      await new Promise(r => setTimeout(r, 700)); // feedback visuel
+      setAutoAlerts(prev  => prev.filter(a  => a.id !== alertId));
+      setBusAlerts(prev   => prev.filter(a  => a.id !== alertId));
+      anomalyInjected.current.delete("arret_prolonge");
+      anomalyInjected.current.delete("vitesse_anormale");
+      speedZeroRef.current = null;
+      Alert.alert("✅ Anomalie résolue", "L'alerte a été clôturée. Le suivi continue.");
+      setAlertActing(null);
+      return;
+    }
+    /* ── Alertes réelles : appel API ── */
     setAlertActing(alertId);
     try {
       const res = await fetch(`${BASE_URL}/agent/route/alerts/${alertId}/respond`, {
@@ -246,6 +287,74 @@ export default function RouteScreen() {
     }, 15000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeTrip?.id, assignedTripId, loadPassengers, loadMyDeparture]);
+
+  /* ── Détection automatique des anomalies GPS ── */
+  useEffect(() => {
+    if (!gps.active || !activeTrip) return;
+    const speed = gps.speed ?? 0;
+    const now   = Date.now();
+
+    /* Vitesse nulle prolongée → arrêt anormal */
+    if (speed < 2) {
+      if (!speedZeroRef.current) speedZeroRef.current = now;
+      const stoppedMin = Math.floor((now - speedZeroRef.current) / 60_000);
+      if (stoppedMin >= 5 && !anomalyInjected.current.has("arret_prolonge")) {
+        anomalyInjected.current.add("arret_prolonge");
+        setAutoAlerts(prev => [...prev.filter(a => a.type !== "arret_prolonge"), {
+          id: `auto-${now}`,
+          type: "arret_prolonge",
+          message: `🚨 Arrêt prolongé détecté — véhicule immobile depuis ${stoppedMin} min (détection automatique)`,
+          status: "active",
+          response: null,
+          responseRequested: true,
+          createdAt: new Date().toISOString(),
+        }]);
+      }
+    } else {
+      if (speedZeroRef.current) {
+        speedZeroRef.current = null;
+        anomalyInjected.current.delete("arret_prolonge");
+        setAutoAlerts(prev => prev.filter(a => a.type !== "arret_prolonge"));
+      }
+    }
+
+    /* Vitesse anormalement élevée */
+    if (speed > 100 && !anomalyInjected.current.has("vitesse_anormale")) {
+      anomalyInjected.current.add("vitesse_anormale");
+      setAutoAlerts(prev => [...prev.filter(a => a.type !== "vitesse_anormale"), {
+        id: `auto-speed-${now}`,
+        type: "vitesse_anormale",
+        message: `⚡ Vitesse anormale détectée : ${Math.round(speed)} km/h — vérification requise`,
+        status: "active",
+        response: null,
+        responseRequested: false,
+        createdAt: new Date().toISOString(),
+      }]);
+    } else if (speed <= 100) {
+      anomalyInjected.current.delete("vitesse_anormale");
+      setAutoAlerts(prev => prev.filter(a => a.type !== "vitesse_anormale"));
+    }
+  }, [gps.speed, gps.active, activeTrip]);
+
+  /* ── Signal GPS perdu ── */
+  useEffect(() => {
+    if (!activeTrip) return;
+    if (gps.error && !anomalyInjected.current.has("gps_perdu")) {
+      anomalyInjected.current.add("gps_perdu");
+      setAutoAlerts(prev => [...prev.filter(a => a.type !== "gps_perdu"), {
+        id: `auto-gps-${Date.now()}`,
+        type: "gps_perdu",
+        message: "📡 Signal GPS perdu — position non disponible",
+        status: "active",
+        response: null,
+        responseRequested: false,
+        createdAt: new Date().toISOString(),
+      }]);
+    } else if (!gps.error) {
+      anomalyInjected.current.delete("gps_perdu");
+      setAutoAlerts(prev => prev.filter(a => a.type !== "gps_perdu"));
+    }
+  }, [gps.error, activeTrip]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -321,6 +430,9 @@ export default function RouteScreen() {
 
   const boardedCount  = passengers.filter(p => p.status === "boarded" || p.status === "confirmed").length;
   const pendingCount  = passengers.filter(p => p.status !== "boarded" && p.status !== "confirmed").length;
+
+  /* Toutes les alertes : API + auto-détectées */
+  const allAlerts: BusAlert[] = [...busAlerts, ...autoAlerts];
 
   return (
     <SafeAreaView style={S.safe}>
@@ -468,12 +580,12 @@ export default function RouteScreen() {
           )}
 
           {/* ── Alertes actives (bannière rapide) ── */}
-          {busAlerts.length > 0 && (
+          {allAlerts.length > 0 && (
             <TouchableOpacity onPress={() => setTab("alertes")}
               style={S.alertBanner}>
               <Ionicons name="warning" size={16} color="#DC2626" />
               <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626", flex: 1 }}>
-                🚨 {busAlerts.length} alerte(s) active(s) — Appuyez pour répondre
+                🚨 {allAlerts.length} alerte(s) active(s) — Appuyez pour répondre
               </Text>
               <Ionicons name="chevron-forward" size={15} color="#DC2626" />
             </TouchableOpacity>
@@ -486,9 +598,9 @@ export default function RouteScreen() {
                 { key: "passagers", label: `👥 Passagers${passengers.length > 0 ? ` (${passengers.length})` : ""}` },
                 { key: "montee",    label: "➕ Montée" },
                 { key: "trajet",    label: "📍 Trajet" },
-                { key: "arrets",    label: "🗺 Arrêts" },
+                { key: "arrets",    label: `🗺 Arrêts${stopData.length > 0 ? ` (${stopData.length})` : ""}` },
                 { key: "contacts",  label: "📞 Contacts" },
-                { key: "alertes",   label: `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}` },
+                { key: "alertes",   label: `🚨 Alertes${allAlerts.length > 0 ? ` (${allAlerts.length})` : ""}` },
               ] as const).map(t => (
                 <TouchableOpacity key={t.key}
                   style={[S.tabBtn, tab === t.key && S.tabBtnActive]}
@@ -790,48 +902,72 @@ export default function RouteScreen() {
             {/* ══ ARRÊTS ══ */}
             {tab === "arrets" && (
               <>
-                <Text style={S.sectionTitle}>Ordre des arrêts</Text>
-                {stopLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
-                {!stopLoading && stopData.length === 0 && (
-                  <View style={S.emptyCard}>
-                    <Text style={{ fontSize: 28 }}>🗺️</Text>
-                    <Text style={S.emptySub}>Aucun arrêt configuré pour ce trajet.</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <Text style={S.sectionTitle}>Ordre des arrêts</Text>
+                  <View style={{ backgroundColor: "#1E40AF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{stopData.length} arrêts</Text>
                   </View>
-                )}
-                {!stopLoading && stopData.map((stop, idx) => (
-                  <View key={stop.id} style={S.stopWrapper}>
-                    <View style={S.stopRowOuter}>
-                      <View style={S.stopDotCol}>
-                        <View style={S.stopDotCircle}>
-                          <Text style={S.stopDotText}>{idx + 1}</Text>
-                        </View>
-                        {idx < stopData.length - 1 && <View style={S.stopConnector} />}
-                      </View>
-                      <View style={S.stopCard}>
-                        <View style={S.stopCardHeader}>
-                          <Text style={S.stopCardTitle}>{stop.name}</Text>
-                          <View style={S.stopBadge}>
-                            <Text style={S.stopBadgeText}>{stop.passengers.length} passager{stop.passengers.length !== 1 ? "s" : ""}</Text>
+                </View>
+                {stopLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
+                {!stopLoading && stopData.map((stop, idx) => {
+                  const st = (stop as any).stopStatus as "passé" | "en_cours" | "prévu" | undefined;
+                  const et = (stop as any).estimatedTime as string | undefined;
+                  const dotStyle = st === "passé"
+                    ? S.stopDotPasse
+                    : st === "en_cours"
+                    ? S.stopDotEnCours
+                    : S.stopDotCircle;
+                  return (
+                    <View key={stop.id} style={S.stopWrapper}>
+                      <View style={S.stopRowOuter}>
+                        <View style={S.stopDotCol}>
+                          <View style={dotStyle}>
+                            {st === "passé"
+                              ? <Ionicons name="checkmark" size={13} color="#fff" />
+                              : st === "en_cours"
+                              ? <Ionicons name="navigate" size={12} color="#fff" />
+                              : <Text style={S.stopDotText}>{idx + 1}</Text>}
                           </View>
+                          {idx < stopData.length - 1 && (
+                            <View style={[S.stopConnector, st === "passé" && S.stopConnectorDone]} />
+                          )}
                         </View>
-                        <Text style={S.stopCity}>{stop.city}</Text>
-                        {stop.passengers.length > 0 && (
-                          <View style={S.stopPassList}>
-                            {stop.passengers.map((p) => (
-                              <View key={p.bookingRef} style={S.stopPassRow}>
-                                <View style={S.stopPassAvatar}>
-                                  <Text style={S.stopPassAvatarText}>{(p.userName ?? "?").charAt(0)}</Text>
+                        <View style={[S.stopCard, st === "en_cours" && S.stopCardActive]}>
+                          <View style={S.stopCardHeader}>
+                            <Text style={S.stopCardTitle}>{stop.name}</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              {st === "passé"    && <View style={S.stopStatusPasse}><Text style={S.stopStatusTxt}>✓ Passé</Text></View>}
+                              {st === "en_cours" && <View style={S.stopStatusEnCours}><Text style={[S.stopStatusTxt, { color: "#1E40AF" }]}>▶ En cours</Text></View>}
+                              {st === "prévu"    && <View style={S.stopStatusPrevu}><Text style={[S.stopStatusTxt, { color: "#64748B" }]}>○ Prévu</Text></View>}
+                              {stop.passengers.length > 0 && (
+                                <View style={S.stopBadge}>
+                                  <Text style={S.stopBadgeText}>{stop.passengers.length} pax</Text>
                                 </View>
-                                <Text style={S.stopPassName}>{p.userName ?? "Passager"}</Text>
-                                <Text style={S.stopPassRef}>#{p.bookingRef}</Text>
-                              </View>
-                            ))}
+                              )}
+                            </View>
                           </View>
-                        )}
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                            <Text style={S.stopCity}>{stop.city}</Text>
+                            {et && <Text style={S.stopEstTime}>{et}</Text>}
+                          </View>
+                          {stop.passengers.length > 0 && (
+                            <View style={S.stopPassList}>
+                              {stop.passengers.map((p) => (
+                                <View key={p.bookingRef} style={S.stopPassRow}>
+                                  <View style={S.stopPassAvatar}>
+                                    <Text style={S.stopPassAvatarText}>{(p.userName ?? "?").charAt(0)}</Text>
+                                  </View>
+                                  <Text style={S.stopPassName}>{p.userName ?? "Passager"}</Text>
+                                  <Text style={S.stopPassRef}>#{p.bookingRef}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 
@@ -901,27 +1037,41 @@ export default function RouteScreen() {
             {/* ══ ALERTES ══ */}
             {tab === "alertes" && (
               <View style={S.alertsContainer}>
-                <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
-                {busAlerts.length === 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
+                  {allAlerts.length > 0 && (
+                    <View style={{ backgroundColor: "#DC2626", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{allAlerts.length} active(s)</Text>
+                    </View>
+                  )}
+                </View>
+                {allAlerts.length === 0 && (
                   <View style={S.emptyCard}>
                     <Ionicons name="checkmark-circle" size={36} color="#4ADE80" />
                     <Text style={S.alertEmptyTitle}>Tout va bien !</Text>
                     <Text style={S.alertEmptyText}>Aucune alerte active pour votre bus.</Text>
                   </View>
                 )}
-                {busAlerts.map(alert => {
+                {allAlerts.map(alert => {
                   const hasResponse = !!alert.response;
                   const isActing    = alertActing === alert.id;
                   const responseOpt = RESP.find(r => r.id === alert.response);
+                  const isAuto = alert.id.startsWith("auto-") || alert.id.startsWith("sim-");
                   return (
-                    <View key={alert.id} style={S.alertCard}>
+                    <View key={alert.id} style={[S.alertCard, isAuto && { borderLeftColor: "#D97706" }]}>
                       <View style={S.alertRow}>
-                        <Ionicons name="warning" size={20} color="#DC2626" />
+                        <Ionicons name="warning" size={20} color={isAuto ? "#D97706" : "#DC2626"} />
                         <Text style={S.alertMessage}>{alert.message}</Text>
                         <Text style={S.alertTime}>
                           {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </Text>
                       </View>
+                      {isAuto && (
+                        <View style={S.autoDetectedBadge}>
+                          <Ionicons name="flash" size={12} color="#D97706" />
+                          <Text style={S.autoDetectedTxt}>Détectée automatiquement</Text>
+                        </View>
+                      )}
                       {alert.responseRequested && !hasResponse && (
                         <View style={S.alertRequestBanner}>
                           <Ionicons name="mail-open-outline" size={16} color="#D97706" />
@@ -1108,15 +1258,27 @@ const S = StyleSheet.create({
                        alignItems: "center", justifyContent: "center" },
   stopDotText:       { fontSize: 12, fontWeight: "800", color: "#fff" },
   stopConnector:     { width: 2, height: 20, backgroundColor: "#D1FAE5", marginTop: 2 },
+  stopConnectorDone: { backgroundColor: G },
+  stopDotPasse:      { width: 26, height: 26, borderRadius: 13, backgroundColor: G,
+                       alignItems: "center", justifyContent: "center" },
+  stopDotEnCours:    { width: 26, height: 26, borderRadius: 13, backgroundColor: "#1E40AF",
+                       alignItems: "center", justifyContent: "center",
+                       shadowColor: "#1E40AF", shadowOpacity: 0.5, shadowRadius: 6, elevation: 4 },
   stopCard:          { flex: 1, marginLeft: 10, backgroundColor: "#fff", borderRadius: 10,
                        padding: 10, marginBottom: 4, elevation: 1,
                        shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 2,
                        shadowOffset: { width: 0, height: 1 } },
+  stopCardActive:    { borderWidth: 1.5, borderColor: "#1E40AF", backgroundColor: "#EFF6FF" },
   stopCardHeader:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   stopCardTitle:     { fontSize: 14, fontWeight: "700", color: "#111827" },
   stopBadge:         { backgroundColor: G_LIGHT, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
   stopBadgeText:     { fontSize: 11, fontWeight: "700", color: G },
   stopCity:          { fontSize: 12, color: "#6B7280", marginTop: 1 },
+  stopEstTime:       { fontSize: 11, color: "#1E40AF", fontWeight: "700" },
+  stopStatusPasse:   { backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  stopStatusEnCours: { backgroundColor: "#DBEAFE", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  stopStatusPrevu:   { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  stopStatusTxt:     { fontSize: 10, fontWeight: "800", color: G },
   stopPassList:      { marginTop: 8, gap: 4 },
   stopPassRow:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4",
                        borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
@@ -1142,6 +1304,9 @@ const S = StyleSheet.create({
   alertResponseBanner:{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, padding: 10 },
   alertResponseText:  { fontSize: 12, fontWeight: "700", flex: 1 },
   alertStatusLabel:   { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  autoDetectedBadge:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#FEF3C7",
+                        borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start" },
+  autoDetectedTxt:    { fontSize: 11, fontWeight: "700", color: "#D97706" },
   respGap:            { gap: 8 },
   respOptBtn:         { flexDirection: "row", alignItems: "center", gap: 10,
                         borderRadius: 10, padding: 14, borderWidth: 1.5 },
