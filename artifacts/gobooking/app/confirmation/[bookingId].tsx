@@ -209,7 +209,7 @@ export default function ConfirmationScreen() {
           `Départ    : ${booking.trip.departureTime}`,
           `Arrivée   : ${booking.trip.arrivalTime}`,
           `Siège(s)  : ${booking.seatNumbers.join(", ")}`,
-          `Passager  : ${booking.passengers.map((p) => p.name).join(", ")}`,
+          `Passager  : ${(booking.passengers ?? []).map((p) => p.name).join(", ")}`,
           `Montant   : ${(booking.totalAmount ?? 0).toLocaleString()} FCFA`,
           `Paiement  : ${METHOD_LABELS[booking.paymentMethod] || booking.paymentMethod}`,
         ].join("\n"),
@@ -236,7 +236,7 @@ export default function ConfirmationScreen() {
     );
   }
 
-  const passengerNames = booking.passengers.map((p) => p.name || "—").join(", ");
+  const passengerNames = (booking.passengers ?? []).map((p) => p.name || "—").join(", ");
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>

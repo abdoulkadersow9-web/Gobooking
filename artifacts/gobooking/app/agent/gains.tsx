@@ -164,7 +164,7 @@ export default function AgentGains() {
                   <Text style={S.scanRef}>{s.ref}</Text>
                   <Text style={S.scanType}>{TYPE_LABEL[s.type] ?? s.type} · {new Date(s.createdAt).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</Text>
                 </View>
-                <Text style={S.scanComm}>+{s.commission.toLocaleString()} FCFA</Text>
+                <Text style={S.scanComm}>+{(s.commission ?? 0).toLocaleString()} FCFA</Text>
               </View>
             ))
           )}

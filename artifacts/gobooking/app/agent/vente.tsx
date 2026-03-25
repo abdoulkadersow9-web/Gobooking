@@ -145,7 +145,7 @@ export default function VenteScreen() {
           </View>
           <Text style={styles.successTitle}>Réservation créée !</Text>
           <Text style={styles.successRef}>Réf: {confirmed.bookingRef}</Text>
-          <Text style={styles.successTotal}>Total encaissé: {confirmed.total.toLocaleString()} FCFA</Text>
+          <Text style={styles.successTotal}>Total encaissé: {(confirmed.total ?? 0).toLocaleString()} FCFA</Text>
           {confirmed.bookingRef.startsWith("OFFLINE-") ? (
             <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, padding: 12, marginTop: 4, flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="cloud-offline-outline" size={18} color="#D97706" />

@@ -265,7 +265,7 @@ export default function SearchResultsScreen() {
             </View>
           </View>
           <View style={styles.pricePill}>
-            <Text style={styles.priceAmount}>{item.price.toLocaleString()}</Text>
+            <Text style={styles.priceAmount}>{(item.price ?? 0).toLocaleString()}</Text>
             <Text style={styles.priceCurrency}>FCFA</Text>
           </View>
         </View>

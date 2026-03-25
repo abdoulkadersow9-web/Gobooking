@@ -621,7 +621,7 @@ export default function HomeScreen() {
                             <Feather name="tag" size={12} color="#94A3B8" />
                           </View>
                           <Text style={{ fontSize: 12, color: "#94A3B8", fontFamily: "Inter_500Medium" }}>
-                            {best.price.toLocaleString()} FCFA
+                            {(best.price ?? 0).toLocaleString()} FCFA
                           </Text>
                         </View>
                       )}
@@ -673,7 +673,7 @@ export default function HomeScreen() {
                     <View style={{ alignItems: "flex-end", gap: 5 }}>
                       {bus.price > 0 && (
                         <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: Colors.light.primary }}>
-                          {bus.price.toLocaleString()} F
+                          {(bus.price ?? 0).toLocaleString()} F
                         </Text>
                       )}
                       {isClose && (
@@ -828,7 +828,7 @@ export default function HomeScreen() {
                     </View>
                     <View style={{ alignItems: "flex-end" }}>
                       <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: isTop ? "#7C3AED" : Colors.light.primary }}>
-                        {trip.price.toLocaleString()} F
+                        {(trip.price ?? 0).toLocaleString()} F
                       </Text>
                     </View>
                   </View>
@@ -1082,7 +1082,7 @@ export default function HomeScreen() {
               </View>
             </View>
             <View style={styles.routeCardRight}>
-              <Text style={styles.routeCardPrice}>{route.price.toLocaleString()} FCFA</Text>
+              <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()} FCFA</Text>
               <Feather name="chevron-right" size={16} color={Colors.light.textMuted} />
             </View>
           </Pressable>

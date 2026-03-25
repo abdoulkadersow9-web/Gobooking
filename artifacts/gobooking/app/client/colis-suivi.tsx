@@ -324,7 +324,7 @@ export default function ColisSuivi() {
                   <Text style={S.infoDetail}>{parcel.weight} kg</Text>
                   <Text style={S.infoBullet}>·</Text>
                   <Feather name="credit-card" size={13} color="#94a3b8" />
-                  <Text style={S.infoDetail}>{parcel.amount.toLocaleString()} FCFA</Text>
+                  <Text style={S.infoDetail}>{(parcel.amount ?? 0).toLocaleString()} FCFA</Text>
                   <Text style={S.infoBullet}>·</Text>
                   <Feather name="calendar" size={13} color="#94a3b8" />
                   <Text style={S.infoDetail}>{fmtDate(parcel.createdAt)}</Text>

@@ -268,7 +268,7 @@ export default function BookingDetailScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Passagers</Text>
-          {booking.passengers.map((p, i) => (
+          {(booking.passengers ?? []).map((p, i) => (
             <View key={i} style={styles.paxCard}>
               <View style={styles.paxLeft}>
                 <View style={styles.paxAvatar}>
@@ -326,7 +326,7 @@ export default function BookingDetailScreen() {
               </View>
             )}
 
-            {booking.bagages.map((b, i) => (
+            {(booking.bagages ?? []).map((b, i) => (
               <View key={b.id || i} style={{
                 backgroundColor: "#FAFAFF", borderRadius: 12, padding: 12, marginBottom: 8,
                 borderWidth: 1, borderColor: "#EDE9FE", flexDirection: "row", gap: 10, alignItems: "center",

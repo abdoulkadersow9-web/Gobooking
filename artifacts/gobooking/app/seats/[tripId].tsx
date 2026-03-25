@@ -338,7 +338,7 @@ export default function SeatSelectionScreen() {
                 {selected.includes(tappedSeat.id) ? "✓ Siège sélectionné" : "Siège désélectionné"}
               </Text>
               <Text style={styles.tooltipSeat}>{tappedSeat.number}</Text>
-              <Text style={styles.tooltipPrice}>{tappedSeat.price.toLocaleString()} FCFA</Text>
+              <Text style={styles.tooltipPrice}>{(tappedSeat.price ?? 0).toLocaleString()} FCFA</Text>
             </Animated.View>
           )}
         </ScrollView>

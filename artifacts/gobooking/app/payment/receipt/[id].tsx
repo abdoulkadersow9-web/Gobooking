@@ -234,7 +234,7 @@ export default function ReceiptScreen() {
         {/* Amount card */}
         <View style={ss.amountCard}>
           <View style={ss.amountRow}>
-            <Text style={ss.amountValue}>{receipt.amount.toLocaleString()} FCFA</Text>
+            <Text style={ss.amountValue}>{(receipt.amount ?? 0).toLocaleString()} FCFA</Text>
             <View style={ss.paidBadge}>
               <Feather name="check-circle" size={12} color="#065F46" />
               <Text style={ss.paidBadgeText}>Payé</Text>
@@ -282,7 +282,7 @@ export default function ReceiptScreen() {
         {(receipt.booking?.passengers?.length ?? 0) > 0 && (
           <View style={ss.section}>
             <Text style={ss.sectionTitle}>Passagers</Text>
-            {receipt.booking!.passengers.map((p, i) => (
+            {(receipt.booking?.passengers ?? []).map((p, i) => (
               <View key={i} style={ss.paxRow}>
                 <View style={ss.paxAvatar}>
                   <Text style={ss.paxAvatarText}>{p.name.charAt(0).toUpperCase()}</Text>

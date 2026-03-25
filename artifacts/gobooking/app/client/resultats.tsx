@@ -191,7 +191,7 @@ export default function ResultatsScreen() {
             </View>
           </View>
           <View style={s.pricePill}>
-            <Text style={s.priceAmount}>{item.price.toLocaleString()}</Text>
+            <Text style={s.priceAmount}>{(item.price ?? 0).toLocaleString()}</Text>
             <Text style={s.priceCurrency}> FCFA</Text>
           </View>
         </View>

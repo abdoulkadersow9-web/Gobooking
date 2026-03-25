@@ -421,7 +421,7 @@ export default function ParcelTrackScreen() {
                     <View>
                       <Text style={styles.infoGridLabel}>Montant</Text>
                       <Text style={styles.infoGridValue}>
-                        {result.amount.toLocaleString()} FCFA
+                        {(result.amount ?? 0).toLocaleString()} FCFA
                       </Text>
                     </View>
                   </View>

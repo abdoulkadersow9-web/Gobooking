@@ -226,7 +226,7 @@ export default function CompanyPreview() {
               <View style={{flex:1}}>
                 <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
                 <Text style={S.cardSub}>{trip.date} · {trip.dep} · {trip.bus}</Text>
-                <Text style={S.cardSub}>{trip.seats} places · {trip.price.toLocaleString()} FCFA/place</Text>
+                <Text style={S.cardSub}>{trip.seats} places · {(trip.price ?? 0).toLocaleString()} FCFA/place</Text>
               </View>
             </View>
           ))}
@@ -282,7 +282,7 @@ export default function CompanyPreview() {
                   <View style={[S.chip, {backgroundColor:st.bg}]}><Text style={[S.chipTxt,{color:st.color}]}>{st.label}</Text></View>
                 </View>
                 <Text style={[S.cardSub, {marginBottom:4}]}>{b.route}</Text>
-                {b.passengers.map((p,j) => (
+                {(b.passengers ?? []).map((p,j) => (
                   <View key={j} style={S.paxRow}>
                     <View style={S.seatTag}><Text style={S.seatTagTxt}>{p.split(" · ")[1]}</Text></View>
                     <Text style={S.paxName}>{p.split(" · ")[0]}</Text>
@@ -290,7 +290,7 @@ export default function CompanyPreview() {
                 ))}
                 <View style={S.reservBottom}>
                   <Text style={S.cardSub}>{b.pay}</Text>
-                  <Text style={S.reservAmt}>{b.amount.toLocaleString()} FCFA</Text>
+                  <Text style={S.reservAmt}>{(b.amount ?? 0).toLocaleString()} FCFA</Text>
                 </View>
               </View>
             );
@@ -312,7 +312,7 @@ export default function CompanyPreview() {
                 </View>
                 <View style={{alignItems:"flex-end",gap:4}}>
                   <View style={[S.chip, {backgroundColor:st.bg}]}><Text style={[S.chipTxt,{color:st.color}]}>{st.label}</Text></View>
-                  <Text style={[S.chipTxt, {color:PRIMARY, fontWeight:"700"}]}>{p.amount.toLocaleString()} F</Text>
+                  <Text style={[S.chipTxt, {color:PRIMARY, fontWeight:"700"}]}>{(p.amount ?? 0).toLocaleString()} F</Text>
                 </View>
               </View>
             );

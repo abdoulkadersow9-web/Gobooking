@@ -904,7 +904,7 @@ export default function LiveTrackingScreen() {
                   </View>
                   <View style={S.metaItem}>
                     <Feather name="tag" size={11} color="#94A3B8" />
-                    <Text style={S.metaText}>{bus.price.toLocaleString()} F</Text>
+                    <Text style={S.metaText}>{(bus.price ?? 0).toLocaleString()} F</Text>
                   </View>
                   {bus.speed != null && bus.speed > 0 && (
                     <View style={[S.metaItem, { backgroundColor: "#F59E0B18", borderRadius: 4, paddingHorizontal: 4 }]}>
@@ -975,7 +975,7 @@ export default function LiveTrackingScreen() {
                 <View style={S.infoCell}>
                   <Feather name="tag" size={16} color={selected.color} />
                   <Text style={S.infoCellLabel}>Prix par place</Text>
-                  <Text style={S.infoCellVal}>{selected.price.toLocaleString()} FCFA</Text>
+                  <Text style={S.infoCellVal}>{(selected.price ?? 0).toLocaleString()} FCFA</Text>
                 </View>
                 {selected.distanceKm != null && (
                   <View style={S.infoCell}>
@@ -1464,7 +1464,7 @@ export default function LiveTrackingScreen() {
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <View style={S.priceWrap}>
                   <Text style={S.priceLabel}>Prix / place</Text>
-                  <Text style={[S.priceVal, { color: selected.color }]}>{selected.price.toLocaleString()} F</Text>
+                  <Text style={[S.priceVal, { color: selected.color }]}>{(selected.price ?? 0).toLocaleString()} F</Text>
                 </View>
                 {/* "Demander en direct" toggle — hidden when pending/accepted, shown when idle or rejected */}
                 {(!reqSuccess || reqStatus === "rejected") && (

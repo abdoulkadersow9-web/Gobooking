@@ -383,7 +383,7 @@ export default function EntrepriseDashboard() {
         {/* Scan unifiés du jour */}
         {scanStats !== null && (
           <View style={ss.section}>
-            <SectionTitle icon="scan" title="Scans du jour" color="#7C3AED" />
+            <SectionTitle icon="maximize" title="Scans du jour" color="#7C3AED" />
             <View style={{ flexDirection: "row", gap: 8 }}>
               <View style={{ flex: 1, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 14, alignItems: "center", gap: 4 }}>
                 <Feather name="user-check" size={20} color="#059669" />

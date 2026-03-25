@@ -183,7 +183,7 @@ export default function TripDetailScreen() {
         <View style={styles.priceRow}>
           <View>
             <Text style={styles.priceLabel}>Price per seat</Text>
-            <Text style={styles.price}>{trip.price.toLocaleString()} FCFA</Text>
+            <Text style={styles.price}>{(trip.price ?? 0).toLocaleString()} FCFA</Text>
           </View>
           <View style={[
             styles.seatsBadge,
@@ -206,7 +206,7 @@ export default function TripDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Amenities</Text>
           <View style={styles.amenitiesGrid}>
-            {trip.amenities.map((a) => (
+            {(trip.amenities ?? []).map((a) => (
               <View key={a} style={styles.amenityItem}>
                 <View style={styles.amenityIcon}>
                   <Feather
@@ -221,7 +221,7 @@ export default function TripDetailScreen() {
           </View>
         </View>
 
-        {trip.stops.length > 0 && (
+        {(trip.stops ?? []).length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Stops</Text>
             <View style={styles.stopsCard}>
@@ -232,7 +232,7 @@ export default function TripDetailScreen() {
                   <Text style={styles.stopTime}>{trip.departureTime}</Text>
                 </View>
               </View>
-              {trip.stops.map((stop, i) => (
+              {(trip.stops ?? []).map((stop, i) => (
                 <View key={i} style={styles.stopItem}>
                   <View style={styles.stopLine} />
                   <View style={[styles.stopDot, { backgroundColor: Colors.light.warning }]} />
@@ -254,11 +254,11 @@ export default function TripDetailScreen() {
           </View>
         )}
 
-        {trip.policies.length > 0 && (
+        {(trip.policies ?? []).length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Policies</Text>
             <View style={styles.policiesCard}>
-              {trip.policies.map((p, i) => (
+              {(trip.policies ?? []).map((p, i) => (
                 <View key={i} style={styles.policyItem}>
                   <Feather name="info" size={14} color={Colors.light.textSecondary} />
                   <Text style={styles.policyText}>{p}</Text>
@@ -272,7 +272,7 @@ export default function TripDetailScreen() {
       <View style={[styles.bottomBar, { paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 16 }]}>
         <View>
           <Text style={styles.totalLabel}>Prix par siège</Text>
-          <Text style={styles.totalPrice}>{trip.price.toLocaleString()} <Text style={styles.totalSub}>FCFA</Text></Text>
+          <Text style={styles.totalPrice}>{(trip.price ?? 0).toLocaleString()} <Text style={styles.totalSub}>FCFA</Text></Text>
         </View>
         <View style={styles.btnGroup}>
           {/* Bouton réservation rapide */}

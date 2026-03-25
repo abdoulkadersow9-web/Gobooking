@@ -212,7 +212,7 @@ export default function ParcelTrackingScreen() {
           <View style={styles.infoRow}>
             <Feather name="dollar-sign" size={14} color={Colors.light.textSecondary} />
             <Text style={styles.infoLabel}>Montant :</Text>
-            <Text style={styles.infoValue}>{parcel.amount.toLocaleString()} FCFA</Text>
+            <Text style={styles.infoValue}>{(parcel.amount ?? 0).toLocaleString()} FCFA</Text>
           </View>
         </View>
       </ScrollView>

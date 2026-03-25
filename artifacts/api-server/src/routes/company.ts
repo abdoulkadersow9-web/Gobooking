@@ -973,14 +973,39 @@ router.get("/bookings", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
     if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const companyTrips = await db.select({ id: tripsTable.id }).from(tripsTable)
-      .where(eq(tripsTable.companyId, ctx.companyId));
+    const companyTrips = await db.select({
+      id: tripsTable.id,
+      from: tripsTable.from,
+      to: tripsTable.to,
+      departureTime: tripsTable.departureTime,
+      date: tripsTable.date,
+    }).from(tripsTable).where(eq(tripsTable.companyId, ctx.companyId));
     const tripIds = companyTrips.map(t => t.id);
     if (!tripIds.length) { res.json([]); return; }
+    const tripMap = Object.fromEntries(companyTrips.map(t => [t.id, t]));
     const bookings = await db.select().from(bookingsTable)
       .where(inArray(bookingsTable.tripId, tripIds))
       .orderBy(desc(bookingsTable.createdAt));
-    res.json(bookings.map(b => ({ id: b.id, bookingRef: b.bookingRef, tripId: b.tripId, totalAmount: b.totalAmount, status: b.status, passengers: b.passengers, createdAt: b.createdAt?.toISOString() })));
+    res.json(bookings.map(b => {
+      const trip = tripMap[b.tripId] ?? {};
+      const pax = (b.passengers as any[]) ?? [];
+      return {
+        id: b.id,
+        bookingRef: b.bookingRef,
+        tripId: b.tripId,
+        totalAmount: b.totalAmount ?? 0,
+        total_price: b.totalAmount ?? 0,
+        status: b.status,
+        passengers: pax,
+        passenger_name: pax[0]?.name || "—",
+        departure_city: trip.from || "—",
+        arrival_city: trip.to || "—",
+        departure_time: trip.date && trip.departureTime
+          ? `${trip.date}T${trip.departureTime}:00`
+          : b.createdAt?.toISOString() ?? new Date().toISOString(),
+        createdAt: b.createdAt?.toISOString(),
+      };
+    }));
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

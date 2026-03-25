@@ -634,12 +634,12 @@ export default function SuperAdminDashboard() {
           </View>
           <View style={S.statsGrid}>
             {[
-              { icon: "users",       label: "Utilisateurs",  value: stats.totalUsers.toLocaleString(),    color: PRIMARY,   bg: "#EEF2FF" },
+              { icon: "users",       label: "Utilisateurs",  value: (stats.totalUsers ?? 0).toLocaleString(),    color: PRIMARY,   bg: "#EEF2FF" },
               { icon: "briefcase",   label: "Compagnies",    value: stats.totalCompanies,                 color: "#D97706", bg: "#FFFBEB" },
               { icon: "user",        label: "Agents",        value: stats.totalAgents,                    color: "#059669", bg: "#ECFDF5" },
-              { icon: "navigation",  label: "Trajets",       value: stats.totalTrips.toLocaleString(),    color: "#0891B2", bg: "#ECFEFF" },
-              { icon: "package",     label: "Colis",         value: stats.totalParcels.toLocaleString(),  color: "#6D28D9", bg: "#F5F3FF" },
-              { icon: "bookmark",    label: "Réservations",  value: stats.totalBookings.toLocaleString(), color: "#DC2626", bg: "#FEF2F2" },
+              { icon: "navigation",  label: "Trajets",       value: (stats.totalTrips ?? 0).toLocaleString(),    color: "#0891B2", bg: "#ECFEFF" },
+              { icon: "package",     label: "Colis",         value: (stats.totalParcels ?? 0).toLocaleString(),  color: "#6D28D9", bg: "#F5F3FF" },
+              { icon: "bookmark",    label: "Réservations",  value: (stats.totalBookings ?? 0).toLocaleString(), color: "#DC2626", bg: "#FEF2F2" },
               { icon: "map-pin",     label: "Villes",        value: stats.totalCities,                    color: "#0F766E", bg: "#F0FDFA" },
               { icon: "credit-card", label: "Modes paiement",value: "4 actifs",                           color: "#9333EA", bg: "#FAF5FF" },
             ].map((c, i) => (
@@ -842,7 +842,7 @@ export default function SuperAdminDashboard() {
                     </View>
                     <Text style={S.listSub}>{t.date} · {t.departureTime} – {t.arrivalTime} ({t.duration})</Text>
                     <Text style={S.listSub}>{t.busName} · {t.busType} · {t.totalSeats} places</Text>
-                    <Text style={[S.listTitle, { fontSize: 13, color: "#059669", marginTop: 2 }]}>{t.price.toLocaleString()} FCFA</Text>
+                    <Text style={[S.listTitle, { fontSize: 13, color: "#059669", marginTop: 2 }]}>{(t.price ?? 0).toLocaleString()} FCFA</Text>
                   </View>
                   <View style={[S.badge, { backgroundColor: "#F1F5F9", alignSelf: "flex-start" }]}>
                     <Feather name="eye" size={11} color="#64748B" />
@@ -942,9 +942,9 @@ export default function SuperAdminDashboard() {
 
           <View style={S.statsSummaryRow}>
             {[
-              { label: "Réservations", value: stats.totalBookings.toLocaleString(), icon: "bookmark",  color: PRIMARY   },
+              { label: "Réservations", value: (stats.totalBookings ?? 0).toLocaleString(), icon: "bookmark",  color: PRIMARY   },
               { label: "Revenus",      value: `${(stats.totalRevenue/1_000_000).toFixed(1)}M`,icon:"trending-up",color:"#059669"},
-              { label: "Utilisateurs", value: stats.totalUsers.toLocaleString(),    icon: "users",     color: "#D97706" },
+              { label: "Utilisateurs", value: (stats.totalUsers ?? 0).toLocaleString(),    icon: "users",     color: "#D97706" },
             ].map((c,i) => (
               <View key={i} style={[S.summaryCard, { borderTopColor: c.color }]}>
                 <Feather name={c.icon as never} size={18} color={c.color} />
@@ -998,7 +998,7 @@ export default function SuperAdminDashboard() {
             ].map(item => (
               <View key={item.label} style={[S.pieCard, { borderLeftColor: item.color }]}>
                 <View style={[S.pieCircle, { backgroundColor: item.bg }]}>
-                  <Text style={[S.pieNum, { color: item.color }]}>{item.value.toLocaleString()}</Text>
+                  <Text style={[S.pieNum, { color: item.color }]}>{(item.value ?? 0).toLocaleString()}</Text>
                 </View>
                 <Text style={S.pieLabel}>{item.label}</Text>
                 <Text style={S.piePct}>{Math.round((item.value / (stats.totalBookings + stats.totalParcels)) * 100)}%</Text>
@@ -1045,7 +1045,7 @@ export default function SuperAdminDashboard() {
                   </View>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={[S.badge, { backgroundColor: s.bg }]}>
-                      <Text style={[S.badgeText, { color: s.color }]}>{s.count.toLocaleString()}</Text>
+                      <Text style={[S.badgeText, { color: s.color }]}>{(s.count ?? 0).toLocaleString()}</Text>
                     </View>
                     <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: s.color }}>{pct}%</Text>
                   </View>
@@ -1205,9 +1205,9 @@ export default function SuperAdminDashboard() {
                 const comm = commForm.type === "percentage" ? Math.round((price * v) / 100) : v;
                 return (
                   <View key={price} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#475569" }}>Ticket {price.toLocaleString()} FCFA</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#475569" }}>Ticket {(price ?? 0).toLocaleString()} FCFA</Text>
                     <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#D97706" }}>+{comm.toLocaleString()} FCFA</Text>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#D97706" }}>+{(comm ?? 0).toLocaleString()} FCFA</Text>
                       <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>({v}{commForm.type === "percentage" ? "%" : "F"})</Text>
                     </View>
                   </View>
@@ -1248,7 +1248,7 @@ export default function SuperAdminDashboard() {
                           <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#475569" }}>Réservations (10%)</Text>
                         </View>
                         <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#D97706" }}>
-                          {revenueData.bookingCommission.toLocaleString()} FCFA
+                          {(revenueData.bookingCommission ?? 0).toLocaleString()} FCFA
                         </Text>
                       </View>
                       <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
@@ -1262,7 +1262,7 @@ export default function SuperAdminDashboard() {
                           <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#475569" }}>Colis (5%)</Text>
                         </View>
                         <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>
-                          {revenueData.parcelCommission.toLocaleString()} FCFA
+                          {(revenueData.parcelCommission ?? 0).toLocaleString()} FCFA
                         </Text>
                       </View>
                       <View style={{ height: 7, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
@@ -1273,7 +1273,7 @@ export default function SuperAdminDashboard() {
                     <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                       <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Total plateforme</Text>
                       <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" }}>
-                        {revenueData.totalCommission.toLocaleString()} FCFA
+                        {(revenueData.totalCommission ?? 0).toLocaleString()} FCFA
                       </Text>
                     </View>
                   </>
@@ -1293,7 +1293,7 @@ export default function SuperAdminDashboard() {
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginTop: 4 }}>
                 <Feather name={commSettings.type === "percentage" ? "percent" : "hash"} size={12} color="#D97706" />
                 <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#D97706" }}>
-                  {commSettings.type === "percentage" ? `${commSettings.value}%` : `${commSettings.value.toLocaleString()} FCFA fixe`}
+                  {commSettings.type === "percentage" ? `${commSettings.value}%` : `${(commSettings.value ?? 0).toLocaleString()} FCFA fixe`}
                 </Text>
               </View>
             </View>
@@ -1346,7 +1346,7 @@ export default function SuperAdminDashboard() {
                         <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>{c.bookings} réservation{c.bookings > 1 ? "s" : ""}</Text>
                       </View>
                     </View>
-                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#D97706" }}>{c.commission.toLocaleString()} FCFA</Text>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#D97706" }}>{(c.commission ?? 0).toLocaleString()} FCFA</Text>
                   </View>
                   <View style={{ height: 6, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" }}>
                     <View style={{ height: 6, width: `${pct}%`, backgroundColor: "#D97706", borderRadius: 3 }} />
@@ -1411,20 +1411,20 @@ export default function SuperAdminDashboard() {
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Chiffre brut</Text>
                     <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>
-                      {inv.totalGross.toLocaleString()} FCFA
+                      {(inv.totalGross ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>Commission GoBooking</Text>
                     <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#D97706" }}>
-                      {inv.totalCommission.toLocaleString()} FCFA
+                      {(inv.totalCommission ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                   <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 2 }} />
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Net compagnie</Text>
                     <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#059669" }}>
-                      {inv.totalNet.toLocaleString()} FCFA
+                      {(inv.totalNet ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                 </View>
@@ -1452,7 +1452,7 @@ export default function SuperAdminDashboard() {
                     style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1.5, borderColor: "#E2E8F0", borderRadius: 10 }}
                     onPress={() => Share.share({
                       title: `Facture GoBooking — ${inv.companyName} — ${moLabel}`,
-                      message: `Facture GoBooking\nCompagnie : ${inv.companyName}\nPériode : ${moLabel}\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
+                      message: `Facture GoBooking\nCompagnie : ${inv.companyName}\nPériode : ${moLabel}\nTransactions : ${inv.transactionCount}\nBrut : ${(inv.totalGross ?? 0).toLocaleString()} FCFA\nCommission : ${(inv.totalCommission ?? 0).toLocaleString()} FCFA\nNet : ${(inv.totalNet ?? 0).toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
                     })}
                   >
                     <Feather name="share-2" size={13} color="#64748B" />
@@ -1490,7 +1490,7 @@ export default function SuperAdminDashboard() {
               ].map(kpi => (
                 <View key={kpi.label} style={{ flex: 1, minWidth: 90, backgroundColor: kpi.bg, borderRadius: 12, padding: 14, alignItems: "center", gap: 6 }}>
                   <Feather name={kpi.icon as any} size={18} color={kpi.color} />
-                  <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: kpi.color }}>{kpi.value.toLocaleString()}</Text>
+                  <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: kpi.color }}>{(kpi.value ?? 0).toLocaleString()}</Text>
                   <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center" }}>{kpi.label}</Text>
                 </View>
               ))}

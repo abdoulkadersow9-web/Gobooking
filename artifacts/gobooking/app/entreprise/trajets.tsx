@@ -120,7 +120,7 @@ function TripCard({ trip, onStart, onEnd, onDelete }: {
         )}
         <View style={TC.infoChip}>
           <Feather name="tag" size={11} color="#64748B" />
-          <Text style={TC.infoText}>{trip.price.toLocaleString()} FCFA</Text>
+          <Text style={TC.infoText}>{(trip.price ?? 0).toLocaleString()} FCFA</Text>
         </View>
       </View>
 

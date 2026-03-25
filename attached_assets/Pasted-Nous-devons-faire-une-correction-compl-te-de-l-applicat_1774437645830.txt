@@ -1,0 +1,171 @@
+Nous devons faire une correction complète de l’application pour supprimer toutes les erreurs actuelles sans rien casser.
+
+IMPORTANT :
+- Ne pas casser les fonctionnalités existantes
+- Ne pas supprimer la logique métier déjà en place
+- Corriger proprement tout le projet
+- Stabiliser l’application avant de continuer les améliorations
+
+OBJECTIF :
+Je veux corriger toutes les erreurs de l’application, pas seulement une erreur isolée.
+
+---
+
+1. CORRECTION GLOBALE DES ERREURS
+
+Faire un audit complet du projet et corriger toutes les erreurs :
+- erreurs de navigation
+- erreurs de rendu
+- erreurs de variables undefined / null
+- erreurs de listes
+- erreurs de données non chargées
+- erreurs de champs manquants
+- erreurs de synchronisation temps réel
+- erreurs de typage
+- erreurs liées aux pages agent réservation, agent route, agent colis, entreprise et client
+
+---
+
+2. NAVIGATION
+
+Corriger toute la navigation dans l’application :
+- vérifier tous les router.push, navigation.navigate, liens et redirections
+- corriger tous les endroits où router n’est pas défini
+- uniformiser la navigation dans tout le projet
+- empêcher les crashes au clic sur les boutons
+
+---
+
+3. DONNÉES UNDEFINED / NULL
+
+Sécuriser tout le projet contre les erreurs de type :
+- Cannot read property of undefined
+- Cannot read property of null
+- toLocaleString of undefined
+- map of undefined
+- length of undefined
+
+Faire les vérifications partout :
+- avant affichage
+- avant appel de fonction
+- avant lecture d’un champ
+- avant rendu de liste
+
+Ajouter des valeurs par défaut propres quand les données n’existent pas encore.
+
+---
+
+4. RENDU DES PAGES
+
+Corriger toutes les pages qui peuvent planter au rendu :
+- réservations
+- agent route
+- agent colis
+- cars en route
+- historique
+- dashboard
+- rapports
+
+Aucune page ne doit crasher si une donnée manque.
+
+---
+
+5. LISTES ET AFFICHAGE
+
+Corriger toutes les listes :
+- ne pas limiter à 10 si ce n’est pas volontaire
+- afficher toutes les données disponibles
+- éviter les écrans vides
+- afficher données simulées si nécessaire pour test
+- sécuriser map, filter, sort, reduce
+
+---
+
+6. TEMPS RÉEL
+
+Vérifier et corriger la logique temps réel :
+- quand une réservation est créée, elle doit remonter chez l’agent réservation
+- quand l’agent réservation valide, cela doit remonter chez l’agent route
+- quand l’agent route ajoute un passager, cela doit remonter chez entreprise et historique
+- quand un colis est créé, il doit apparaître dans agent colis
+- quand un retrait est validé, le statut doit se mettre à jour partout
+
+Corriger toute rupture de synchronisation.
+
+---
+
+7. INTERFACE
+
+Corriger aussi les problèmes d’interface :
+- textes coupés
+- informations non visibles
+- blocs mal organisés
+- pages vides
+- manque de fluidité
+- mauvais alignements
+
+Je veux une interface claire, lisible et stable.
+
+---
+
+8. MOCK DATA / TEST DATA
+
+Si certaines pages restent vides faute de données :
+- ajouter des données simulées cohérentes
+- respecter la logique de l’application
+- afficher des départs, réservations, passagers, colis, historiques
+
+Le but est que quand je me connecte, je vois immédiatement ce que je dois tester.
+
+---
+
+9. COMPTES TEST
+
+Me fournir tous les comptes test créés dans l’application, avec :
+- email
+- mot de passe
+- rôle
+
+Je veux tous les comptes test :
+- client
+- agent réservation
+- agent route
+- agent colis
+- entreprise
+- admin
+
+---
+
+10. LOGS ET DÉBOGAGE
+
+Après correction :
+- vérifier les logs
+- supprimer les erreurs rouges bloquantes
+- vérifier qu’aucune page importante ne plante
+- tester les parcours principaux de bout en bout
+
+---
+
+11. PARCOURS À TESTER OBLIGATOIREMENT
+
+Tester ces flux sans erreur :
+- connexion
+- ouverture dashboard selon rôle
+- réservation en ligne
+- validation agent réservation
+- transmission agent route
+- ajout passager en route
+- création colis
+- retrait colis
+- affichage historique
+- navigation entre pages
+
+---
+
+12. IMPORTANT FINAL
+
+Je veux une correction complète et propre de toute l’application.
+Ne corrige pas une seule erreur seulement.
+Analyse tout le projet et stabilise tout le système.
+Corrige toutes les erreurs actuelles et préviens les prochaines erreurs avec des sécurités.
+Ne rien casser, ne rien supprimer inutilement, améliorer proprement l’existant.

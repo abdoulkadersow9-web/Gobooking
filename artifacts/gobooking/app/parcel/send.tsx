@@ -512,7 +512,7 @@ export default function ParcelSendScreen() {
                     </Text>
                     <Text style={styles.deliveryDesc}>{type.desc}</Text>
                     {type.extra > 0 && (
-                      <Text style={styles.deliveryExtra}>+{type.extra.toLocaleString()} FCFA</Text>
+                      <Text style={styles.deliveryExtra}>+{(type.extra ?? 0).toLocaleString()} FCFA</Text>
                     )}
                   </View>
                   {deliveryType === type.id && (
@@ -527,7 +527,7 @@ export default function ParcelSendScreen() {
                 <View style={styles.priceCard}>
                   <View style={styles.priceRow}>
                     <Text style={styles.priceLabel}>Estimation du tarif</Text>
-                    <Text style={styles.priceValue}>{price.toLocaleString()} FCFA</Text>
+                    <Text style={styles.priceValue}>{(price ?? 0).toLocaleString()} FCFA</Text>
                   </View>
                   <Text style={styles.priceSub}>
                     {fromCity} → {toCity} · {weight} kg · {DELIVERY_TYPES.find((d) => d.id === deliveryType)?.label}
@@ -543,7 +543,7 @@ export default function ParcelSendScreen() {
           {step === STEPS.length - 1 && price !== null && (
             <View style={styles.pricePreview}>
               <Text style={styles.pricePreviewLabel}>Montant estimé</Text>
-              <Text style={styles.pricePreviewValue}>{price.toLocaleString()} FCFA</Text>
+              <Text style={styles.pricePreviewValue}>{(price ?? 0).toLocaleString()} FCFA</Text>
             </View>
           )}
           <Pressable

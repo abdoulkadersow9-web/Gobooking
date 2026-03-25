@@ -738,7 +738,7 @@ export default function CompanyDashboard() {
               { icon: "truck",       label: "Bus actifs",    value: `${stats.activeBuses}/${stats.totalBuses}`, color: "#1D4ED8", bg: "#EFF6FF" },
               { icon: "users",       label: "Agents",        value: stats.totalAgents,                         color: "#7C3AED", bg: "#F5F3FF" },
               { icon: "navigation",  label: "Trajets",       value: stats.totalTrips,                          color: PRIMARY,   bg: "#EEF2FF" },
-              { icon: "bookmark",    label: "Réservations",  value: stats.totalReservations.toLocaleString(),  color: "#059669", bg: "#ECFDF5" },
+              { icon: "bookmark",    label: "Réservations",  value: (stats.totalReservations ?? 0).toLocaleString(),  color: "#059669", bg: "#ECFDF5" },
               { icon: "package",     label: "Colis",         value: stats.totalParcels,                        color: "#D97706", bg: "#FFFBEB" },
               { icon: "trending-up", label: "Revenus",       value: `${(stats.totalRevenue / 1_000_000).toFixed(1)} M FCFA`, color: "#0891B2", bg: "#ECFEFF" },
             ].map((c, i) => (
@@ -826,7 +826,7 @@ export default function CompanyDashboard() {
               </View>
               <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.85)" }}>Solde disponible</Text>
             </View>
-            <Text style={{ fontSize: 36, fontFamily: "Inter_700Bold", color: "white" }}>{walletData.balance.toLocaleString()}</Text>
+            <Text style={{ fontSize: 36, fontFamily: "Inter_700Bold", color: "white" }}>{(walletData.balance ?? 0).toLocaleString()}</Text>
             <Text style={{ fontSize: 14, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.75)" }}>FCFA</Text>
           </LinearGradient>
 
@@ -834,17 +834,17 @@ export default function CompanyDashboard() {
           <View style={{ flexDirection: "row", gap: 10 }}>
             <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#059669", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
               <Feather name="trending-up" size={16} color="#059669" />
-              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalGross.toLocaleString()}</Text>
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{(walletData.totalGross ?? 0).toLocaleString()}</Text>
               <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA total brut</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#DC2626", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
               <Feather name="minus-circle" size={16} color="#DC2626" />
-              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalCommission.toLocaleString()}</Text>
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{(walletData.totalCommission ?? 0).toLocaleString()}</Text>
               <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA commissions</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: "white", borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#D97706", gap: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
               <Feather name="dollar-sign" size={16} color="#D97706" />
-              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{walletData.totalNet.toLocaleString()}</Text>
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 6 }}>{(walletData.totalNet ?? 0).toLocaleString()}</Text>
               <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#64748B" }}>FCFA net reçu</Text>
             </View>
           </View>
@@ -881,7 +881,7 @@ export default function CompanyDashboard() {
                     <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 }}>{dateStr} à {timeStr}{tx.bookingRef ? ` · Réf. ${tx.bookingRef}` : ""}</Text>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#059669" }}>+{tx.netAmount.toLocaleString()} F</Text>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#059669" }}>+{(tx.netAmount ?? 0).toLocaleString()} F</Text>
                     <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>net</Text>
                   </View>
                 </View>
@@ -889,12 +889,12 @@ export default function CompanyDashboard() {
                 <View style={{ flexDirection: "row", marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9", gap: 16 }}>
                   <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Prix transport</Text>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{tx.grossAmount.toLocaleString()} FCFA</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0F172A" }}>{(tx.grossAmount ?? 0).toLocaleString()} FCFA</Text>
                   </View>
                   <View style={{ width: 1, backgroundColor: "#F1F5F9" }} />
                   <View style={{ flex: 1, flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" }}>Commission</Text>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>-{tx.commissionAmount.toLocaleString()} FCFA</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#DC2626" }}>-{(tx.commissionAmount ?? 0).toLocaleString()} FCFA</Text>
                   </View>
                 </View>
               </View>
@@ -953,7 +953,7 @@ export default function CompanyDashboard() {
                   </View>
                 </View>
                 <View style={S.tripRight}>
-                  <Text style={S.tripPrice}>{trip.price.toLocaleString()} F</Text>
+                  <Text style={S.tripPrice}>{(trip.price ?? 0).toLocaleString()} F</Text>
                   <TouchableOpacity style={S.seatBtn} onPress={() => loadSeats(trip)} activeOpacity={0.8}>
                     <Feather name="grid" size={12} color={PRIMARY} />
                     <Text style={S.seatBtnText}>Sièges</Text>
@@ -1038,7 +1038,7 @@ export default function CompanyDashboard() {
                   </View>
                 </View>
                 <View style={S.reservMid}>
-                  {res.passengers.map((p, i) => (
+                  {(res.passengers ?? []).map((p, i) => (
                     <View key={i} style={S.paxRow}>
                       <View style={S.seatTag}><Text style={S.seatTagText}>{p.seatNumber}</Text></View>
                       <Text style={S.paxName}>{p.name}</Text>
@@ -1049,13 +1049,13 @@ export default function CompanyDashboard() {
                 {/* Bagages detail */}
                 {!!res.bagages?.length && (
                   <View style={{ marginTop: 8, backgroundColor: "#FAFAFF", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#EDE9FE" }}>
-                    {res.bagages.map((b, bi) => (
+                    {(res.bagages ?? []).map((b, bi) => (
                       <View key={b.id || bi} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: bi < res.bagages!.length - 1 ? 6 : 0 }}>
                         <Feather name={b.type === "valise" ? "briefcase" : b.type === "sac" ? "shopping-bag" : b.type === "colis" ? "package" : "box"} size={14} color="#7C3AED" />
                         <Text style={{ flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", color: "#4C1D95", textTransform: "capitalize" }}>
                           {b.type} · {b.poids} kg
                         </Text>
-                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>{b.prix.toLocaleString()} F</Text>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" }}>{(b.prix ?? 0).toLocaleString()} F</Text>
                       </View>
                     ))}
                     {(res.bagagePrice ?? 0) > 0 && (
@@ -1069,7 +1069,7 @@ export default function CompanyDashboard() {
 
                 <View style={S.reservBottom}>
                   <Text style={S.reservPay}>{PAYMENT_LABELS[res.paymentMethod] || res.paymentMethod}</Text>
-                  <Text style={S.reservAmount}>{res.totalAmount.toLocaleString()} FCFA</Text>
+                  <Text style={S.reservAmount}>{(res.totalAmount ?? 0).toLocaleString()} FCFA</Text>
                 </View>
 
                 {/* Bagages validation button */}
@@ -1275,7 +1275,7 @@ export default function CompanyDashboard() {
                   </View>
                   <View style={{ alignItems: "flex-end", gap: 5 }}>
                     <View style={[S.badge, { backgroundColor: st.bg }]}><Text style={[S.badgeText, { color: st.color }]}>{st.label}</Text></View>
-                    <Text style={[S.badgeText, { color: PRIMARY }]}>{parcel.amount.toLocaleString()} F</Text>
+                    <Text style={[S.badgeText, { color: PRIMARY }]}>{(parcel.amount ?? 0).toLocaleString()} F</Text>
                   </View>
                 </View>
                 {/* Workflow actions */}
@@ -1442,20 +1442,20 @@ export default function CompanyDashboard() {
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={S.listSub}>Chiffre brut</Text>
                     <Text style={{ fontWeight: "600", color: "#1E293B" }}>
-                      {inv.totalGross.toLocaleString()} FCFA
+                      {(inv.totalGross ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={S.listSub}>Commission GoBooking</Text>
                     <Text style={{ fontWeight: "600", color: "#DC2626" }}>
-                      − {inv.totalCommission.toLocaleString()} FCFA
+                      − {(inv.totalCommission ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                   <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 2 }} />
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontWeight: "700", color: "#1E293B" }}>Net à reverser</Text>
                     <Text style={{ fontWeight: "700", fontSize: 15, color: "#059669" }}>
-                      {inv.totalNet.toLocaleString()} FCFA
+                      {(inv.totalNet ?? 0).toLocaleString()} FCFA
                     </Text>
                   </View>
                 </View>
@@ -1499,7 +1499,7 @@ export default function CompanyDashboard() {
                     style={{ paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10, backgroundColor: "#F1F5F9", flexDirection: "row", alignItems: "center", gap: 6 }}
                     onPress={() => Share.share({
                       title: `Facture GoBooking — ${moLabel}`,
-                      message: `Facture GoBooking — ${moLabel}\n\nTransactions : ${inv.transactionCount}\nBrut : ${inv.totalGross.toLocaleString()} FCFA\nCommission : ${inv.totalCommission.toLocaleString()} FCFA\nNet : ${inv.totalNet.toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
+                      message: `Facture GoBooking — ${moLabel}\n\nTransactions : ${inv.transactionCount}\nBrut : ${(inv.totalGross ?? 0).toLocaleString()} FCFA\nCommission : ${(inv.totalCommission ?? 0).toLocaleString()} FCFA\nNet : ${(inv.totalNet ?? 0).toLocaleString()} FCFA\nStatut : ${isPaid ? "Payée" : "En attente"}`,
                     })}
                   >
                     <Feather name="share-2" size={13} color="#64748B" />
@@ -1537,7 +1537,7 @@ export default function CompanyDashboard() {
                     <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", marginTop: 4 }}>{subscription.plan.name}</Text>
                     {subscription.plan.priceMonthly > 0 ? (
                       <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: PRIMARY, marginTop: 2 }}>
-                        {subscription.plan.priceMonthly.toLocaleString()} FCFA / mois
+                        {(subscription.plan.priceMonthly ?? 0).toLocaleString()} FCFA / mois
                       </Text>
                     ) : (
                       <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#059669", marginTop: 2 }}>Gratuit</Text>
@@ -1581,7 +1581,7 @@ export default function CompanyDashboard() {
                       <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: plan.color }}>{plan.name}</Text>
                       {plan.price > 0 ? (
                         <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0F172A", marginTop: 2 }}>
-                          {plan.price.toLocaleString()} FCFA<Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}> /mois</Text>
+                          {(plan.price ?? 0).toLocaleString()} FCFA<Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}> /mois</Text>
                         </Text>
                       ) : (
                         <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#059669", marginTop: 2 }}>Gratuit</Text>
@@ -1607,7 +1607,7 @@ export default function CompanyDashboard() {
                         Alert.alert(
                           `Passer au plan ${plan.name}`,
                           plan.price > 0
-                            ? `Ce plan coûte ${plan.price.toLocaleString()} FCFA/mois. Confirmer la souscription ?`
+                            ? `Ce plan coûte ${(plan.price ?? 0).toLocaleString()} FCFA/mois. Confirmer la souscription ?`
                             : "Revenir au plan gratuit. Confirmer ?",
                           [
                             { text: "Annuler", style: "cancel" },
@@ -1748,12 +1748,12 @@ export default function CompanyDashboard() {
             <Text style={S.sectionTitle}>Vue business</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
               {[
-                { label: "Total réservations", value: kpis.totalBookings.toLocaleString(), icon: "bookmark",    color: PRIMARY,   bg: "#EEF2FF" },
+                { label: "Total réservations", value: (kpis.totalBookings ?? 0).toLocaleString(), icon: "bookmark",    color: PRIMARY,   bg: "#EEF2FF" },
                 { label: "Revenus totaux",      value: `${(kpis.totalRevenue/1_000_000).toFixed(2)} M FCFA`, icon: "trending-up", color: "#059669", bg: "#ECFDF5" },
                 { label: "Revenus billets",     value: `${(kpis.bookingRevenue/1_000_000).toFixed(2)} M`,    icon: "navigation",  color: "#1D4ED8", bg: "#EFF6FF" },
                 { label: "Revenus colis",       value: `${(kpis.parcelRevenue/1_000_000).toFixed(2)} M`,     icon: "package",     color: "#D97706", bg: "#FFFBEB" },
-                { label: "Total colis",         value: kpis.totalParcels.toLocaleString(),                   icon: "package",     color: "#7C3AED", bg: "#F5F3FF" },
-                { label: "Actives",             value: totalActive.toLocaleString(),                         icon: "check-circle",color: "#0891B2", bg: "#ECFEFF" },
+                { label: "Total colis",         value: (kpis.totalParcels ?? 0).toLocaleString(),                   icon: "package",     color: "#7C3AED", bg: "#F5F3FF" },
+                { label: "Actives",             value: (totalActive ?? 0).toLocaleString(),                         icon: "check-circle",color: "#0891B2", bg: "#ECFEFF" },
               ].map((c, i) => (
                 <View key={i} style={[S.statCard, { width: "47%", borderLeftColor: c.color }]}>
                   <View style={[S.statIcon, { backgroundColor: c.bg }]}><Feather name={c.icon as never} size={16} color={c.color} /></View>
@@ -1781,7 +1781,7 @@ export default function CompanyDashboard() {
                     </View>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                       <View style={[S.badge, { backgroundColor: s.bg }]}>
-                        <Text style={[S.badgeText, { color: s.color }]}>{s.count.toLocaleString()}</Text>
+                        <Text style={[S.badgeText, { color: s.color }]}>{(s.count ?? 0).toLocaleString()}</Text>
                       </View>
                       <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: s.color }}>{pct}%</Text>
                     </View>
@@ -2275,7 +2275,7 @@ export default function CompanyDashboard() {
             {newReservation.tripId !== "" && (
               <View style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: "#F8FAFC" }}>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B" }}>
-                  {(() => { const t = trips.find(x => x.id === newReservation.tripId); return t ? `${t.from} → ${t.to} · ${t.price.toLocaleString()} FCFA/place × ${newReservation.seatCount} = ${(t.price * Number(newReservation.seatCount)).toLocaleString()} FCFA` : ""; })()}
+                  {(() => { const t = trips.find(x => x.id === newReservation.tripId); return t ? `${t.from} → ${t.to} · ${(t.price ?? 0).toLocaleString()} FCFA/place × ${newReservation.seatCount} = ${(t.price * Number(newReservation.seatCount)).toLocaleString()} FCFA` : ""; })()}
                 </Text>
               </View>
             )}

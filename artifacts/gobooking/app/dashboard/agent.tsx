@@ -155,7 +155,7 @@ function ScanResultCard({
 
       {/* passengers */}
       <Text style={SC.paxTitle}>Passagers ({result.passengers.length})</Text>
-      {result.passengers.map((p, i) => (
+      {(result.passengers ?? []).map((p, i) => (
         <View key={i} style={SC.paxRow}>
           <View style={SC.seatTag}><Text style={SC.seatTagText}>{p.seatNumber}</Text></View>
           <View style={{ flex: 1 }}>
@@ -167,7 +167,7 @@ function ScanResultCard({
 
       <View style={SC.amountRow}>
         <Text style={SC.amountLabel}>Montant payé</Text>
-        <Text style={SC.amountVal}>{result.totalAmount.toLocaleString()} FCFA</Text>
+        <Text style={SC.amountVal}>{(result.totalAmount ?? 0).toLocaleString()} FCFA</Text>
       </View>
 
       {canBoard && (
@@ -498,7 +498,7 @@ export default function AgentDashboard() {
   const [parcels,        setParcels]        = useState<ParcelEntry[]>(DEMO_PARCELS);
   const [seats,          setSeats]          = useState<SeatItem[]>(genDemoSeats(DEMO_BUS.capacity, DEMO_TRIP.bookedSeats));
   const [paxValidated,   setPaxValidated]   = useState<Set<string>>(
-    () => new Set(DEMO_BOARDING.filter(b => b.status === "boarded").flatMap(b => b.passengers.map(p => `${b.id}-${p.seatNumber}`)))
+    () => new Set(DEMO_BOARDING.filter(b => b.status === "boarded").flatMap(b => (b.passengers ?? []).map(p => `${b.id}-${p.seatNumber}`)))
   );
   const [passengerSearch, setPassengerSearch] = useState("");
 
@@ -659,7 +659,7 @@ export default function AgentDashboard() {
     setPaxValidated(next);
     const entry = boarding.find(b => b.id === bookingId);
     if (entry) {
-      const allKeys = entry.passengers.map(p => `${entry.id}-${p.seatNumber}`);
+      const allKeys = (entry.passengers ?? []).map(p => `${entry.id}-${p.seatNumber}`);
       if (allKeys.every(k => next.has(k))) {
         setBoarding(prev => prev.map(b => b.id === bookingId ? { ...b, status: "boarded" } : b));
         if (token) { try { apiFetch(`/agent/boarding/${bookingId}/validate`, { token, method: "POST" }); } catch {} }
@@ -670,7 +670,7 @@ export default function AgentDashboard() {
   const flatPassengers = useMemo(() => {
     const q = passengerSearch.trim().toLowerCase();
     const all = boarding.filter(b => b.status === "confirmed").flatMap(b =>
-      b.passengers.map(p => ({
+      (b.passengers ?? []).map(p => ({
         key:        `${b.id}-${p.seatNumber}`,
         bookingId:  b.id,
         bookingRef: b.bookingRef,
@@ -1532,7 +1532,7 @@ export default function AgentDashboard() {
                     ["Expéditeur",   parcel.senderName],
                     ["Destinataire", parcel.receiverName],
                     ["Téléphone",    parcel.receiverPhone],
-                    ["Poids / Prix", `${parcel.weight} kg · ${parcel.amount.toLocaleString()} FCFA`],
+                    ["Poids / Prix", `${parcel.weight} kg · ${(parcel.amount ?? 0).toLocaleString()} FCFA`],
                   ].map(([label, val]) => (
                     <View key={label} style={S.detailRow}>
                       <Text style={S.detailLabel}>{label}</Text>

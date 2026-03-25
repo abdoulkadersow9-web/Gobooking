@@ -149,7 +149,7 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
                 {item.paymentStatus === "paid" ? "Payé" : "Paiement requis"}
               </Text>
             </View>
-            <Text style={styles.amountText}>{item.amount.toLocaleString()} FCFA</Text>
+            <Text style={styles.amountText}>{(item.amount ?? 0).toLocaleString()} FCFA</Text>
           </View>
           <View style={styles.detailBtn}>
             <Text style={styles.detailBtnText}>{t.suivre}</Text>
