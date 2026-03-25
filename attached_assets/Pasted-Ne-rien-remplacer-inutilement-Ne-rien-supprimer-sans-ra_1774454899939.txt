@@ -1,0 +1,126 @@
+Ne rien remplacer inutilement.
+Ne rien supprimer sans raison.
+Ne rien casser.
+Ne pas modifier la logique métier existante.
+
+Mais il faut arrêter les modifications partielles et appliquer une correction complète et fonctionnelle.
+
+---
+
+PROBLÈME ACTUEL :
+
+Même après plusieurs corrections :
+
+- les icônes sont visibles (OK)
+- mais la navigation n’est pas correcte
+- quand on clique :
+  - affichage partiel ou mal positionné
+  - contenu en bas ou incomplet
+  - pas une vraie page claire
+
+👉 ce n’est pas un comportement final acceptable
+
+---
+
+OBJECTIF :
+
+Obtenir un fonctionnement réel et complet, pas une implémentation partielle.
+
+---
+
+1. COMPORTEMENT OBLIGATOIRE
+
+Quand on clique sur une icône :
+
+- Scanner ticket → ouvre un écran complet de scan
+- Ajouter passager → ouvre un écran complet avec formulaire
+- Passagers → ouvre une page complète liste passagers
+- Alertes → ouvre une page complète des alertes
+
+👉 PAS de contenu affiché en bas
+👉 PAS d’overlay incomplet
+👉 PAS de demi-écran
+
+---
+
+2. NAVIGATION RÉELLE (OBLIGATOIRE)
+
+Mettre en place une vraie navigation :
+
+- écran principal (Agent en route)
+→ clic icône
+→ nouvelle page claire
+→ bouton retour
+→ retour écran principal
+
+---
+
+3. BOUTON RETOUR
+
+Chaque écran ouvert doit avoir :
+
+- bouton retour visible
+- retour propre vers Agent en route
+
+---
+
+4. PAS DE FAUX RENDU
+
+Actuellement le problème ressemble à :
+
+- composants affichés dans le même écran
+- mauvaise gestion du layout
+- mauvaise navigation
+
+👉 Corriger ça pour avoir de vraies pages séparées
+
+---
+
+5. VÉRIFICATION TECHNIQUE
+
+Vérifier et corriger :
+
+- routing/navigation (stack)
+- état écran actif
+- composants conditionnels mal utilisés
+- mauvais positionnement (absolute / bottom)
+
+---
+
+6. TEST OBLIGATOIRE
+
+Tester réellement :
+
+- cliquer sur chaque icône
+- vérifier que chaque écran s’ouvre correctement
+- vérifier que le retour fonctionne
+- vérifier qu’il n’y a aucun affichage cassé
+
+---
+
+7. IMPORTANT
+
+- ne pas casser le système existant
+- ne pas supprimer les fonctionnalités
+- corriger uniquement le comportement réel
+
+---
+
+OBJECTIF FINAL :
+
+Une application où :
+
+- les icônes sont visibles ✅
+- chaque clic ouvre une vraie page ✅
+- navigation fluide ✅
+- aucun contenu caché ou mal affiché ✅
+- expérience propre et professionnelle ✅
+
+---
+
+IMPORTANT FINAL :
+
+Arrêter les modifications partielles.
+Appliquer une correction complète.
+Vérifier le résultat réel dans l’interface.
+Corriger jusqu’à ce que le comportement soit parfaitement fonctionnel.

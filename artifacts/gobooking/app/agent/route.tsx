@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, Modal,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -110,9 +110,9 @@ export default function RouteScreen() {
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
   const [tab, setTab]                   = useState<"passagers" | "scan" | "montee" | "trajet" | "arrets" | "contacts" | "alertes">("passagers");
-  const [fullscreen, setFullscreen]     = useState(false);
+  const [isModalOpen, setIsModalOpen]   = useState(false);
 
-  const PAGE_TITLE: Record<string, string> = {
+  const PAGE_TITLES: Record<string, string> = {
     passagers: "Liste des passagers",
     scan:      "Scanner un ticket",
     montee:    "Ajouter un passager",
@@ -583,9 +583,6 @@ export default function RouteScreen() {
       {!loading && trips.length > 0 && (
         <View style={{ flex: 1 }}>
 
-          {/* ══ ZONE COLLAPSABLE (masquée en mode page pleine) ══ */}
-          {!fullscreen && (<>
-
           {/* ── Sélecteur de trajet (si plusieurs) ── */}
           {trips.length > 1 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.tripChips}>
@@ -719,7 +716,7 @@ export default function RouteScreen() {
             {/* Scanner ticket */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "scan" && S.quickBtnActive]}
-              onPress={() => { setTab("scan"); setFullscreen(true); }}
+              onPress={() => { setTab("scan"); setIsModalOpen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#EFF6FF" }]}>
@@ -731,7 +728,7 @@ export default function RouteScreen() {
             {/* Ajouter passager */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "montee" && S.quickBtnActive]}
-              onPress={() => { setTab("montee"); setFullscreen(true); }}
+              onPress={() => { setTab("montee"); setIsModalOpen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
@@ -743,7 +740,7 @@ export default function RouteScreen() {
             {/* Liste passagers */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "passagers" && S.quickBtnActive]}
-              onPress={() => { setTab("passagers"); setFullscreen(true); }}
+              onPress={() => { setTab("passagers"); setIsModalOpen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: "#F5F3FF" }]}>
@@ -757,7 +754,7 @@ export default function RouteScreen() {
             {/* Alertes */}
             <TouchableOpacity
               style={[S.quickBtn, tab === "alertes" && S.quickBtnActive]}
-              onPress={() => { setTab("alertes"); setFullscreen(true); }}
+              onPress={() => { setTab("alertes"); setIsModalOpen(true); }}
               activeOpacity={0.78}
             >
               <View style={[S.quickIcon, { backgroundColor: allAlerts.length > 0 ? "#FEF2F2" : "#F8FAFC" }]}>
@@ -774,25 +771,32 @@ export default function RouteScreen() {
             </TouchableOpacity>
           </View>
 
-          </>)} {/* ══ FIN ZONE COLLAPSABLE ══ */}
+        </View>
+      )}
 
-          {/* ── Header page pleine (visible uniquement en fullscreen) ── */}
-          {fullscreen && (
-            <View style={S.pageHeader}>
-              <TouchableOpacity
-                style={S.pageBackBtn}
-                onPress={() => setFullscreen(false)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={20} color={G_DARK} />
-                <Text style={S.pageBackTxt}>Retour</Text>
-              </TouchableOpacity>
-              <Text style={S.pageTitle}>{PAGE_TITLE[tab] ?? tab}</Text>
-              <View style={{ width: 70 }} />
-            </View>
-          )}
+      {/* ════════════════════════════════════════════════
+          MODAL — Pages de détail plein écran
+          ════════════════════════════════════════════════ */}
+      <Modal
+        visible={isModalOpen}
+        animationType="slide"
+        onRequestClose={() => setIsModalOpen(false)}
+        presentationStyle="fullScreen"
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+          <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-          {/* ── Onglets secondaires (navigation fine) ── */}
+          {/* Header modal */}
+          <View style={S.pageHeader}>
+            <TouchableOpacity style={S.pageBackBtn} onPress={() => setIsModalOpen(false)} activeOpacity={0.7}>
+              <Ionicons name="arrow-back" size={20} color={G_DARK} />
+              <Text style={S.pageBackTxt}>Retour</Text>
+            </TouchableOpacity>
+            <Text style={S.pageTitle} numberOfLines={1}>{PAGE_TITLES[tab] ?? ""}</Text>
+            <View style={{ width: 90 }} />
+          </View>
+
+          {/* Onglets de navigation dans la modal */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
               {([
@@ -813,12 +817,12 @@ export default function RouteScreen() {
             </View>
           </ScrollView>
 
-          {/* ── Contenu des onglets ── */}
+          {/* Contenu de la page */}
           <ScrollView
             contentContainerStyle={S.body}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            style={fullscreen ? { flex: 1 } : undefined}
+            style={{ flex: 1 }}
           >
 
             {/* ══ PASSAGERS ══ */}
@@ -1526,19 +1530,17 @@ export default function RouteScreen() {
             )}
 
           </ScrollView>
-        </View>
-      )}
+        </SafeAreaView>
+      </Modal>
 
-      {/* ── Bouton Rapport (bas de page) — masqué en fullscreen ── */}
-      {!fullscreen && (
-        <TouchableOpacity
-          style={S.rapportBtn}
-          onPress={() => router.push("/agent/rapport" as never)}
-        >
-          <Feather name="file-text" size={16} color="#fff" />
-          <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
-        </TouchableOpacity>
-      )}
+      {/* ── Bouton Rapport (bas de page) ── */}
+      <TouchableOpacity
+        style={S.rapportBtn}
+        onPress={() => router.push("/agent/rapport" as never)}
+      >
+        <Feather name="file-text" size={16} color="#fff" />
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
