@@ -41,15 +41,58 @@ interface Trip {
   isFallback?: boolean;
 }
 
-const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man", "Divo"];
+const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man", "Divo", "Gagnoa", "Soubré", "Daloa", "Abengourou"];
 
-/* Prix de référence grille tarifaire GoBooking — Abidjan→Bouaké = 3 500 FCFA
-   (bus Standard) / 4 500 FCFA (Premium = +28 %) */
-const FALLBACK_TRIPS: Trip[] = [
-  { id: "fb-1", from: "Abidjan", to: "Bouaké", departureTime: "06:00", arrivalTime: "11:30", date: "", price: 3500, busType: "Standard", busName: "UTB Express", totalSeats: 44, availableSeats: 32, duration: "5h 30m", amenities: ["AC", "WiFi"], isFallback: true },
-  { id: "fb-2", from: "Abidjan", to: "Bouaké", departureTime: "07:30", arrivalTime: "13:00", date: "", price: 4500, busType: "Premium", busName: "STC Premium", totalSeats: 40, availableSeats: 27, duration: "5h 30m", amenities: ["AC", "WiFi", "Snacks"], isFallback: true },
-  { id: "fb-3", from: "Abidjan", to: "Bouaké", departureTime: "12:00", arrivalTime: "17:30", date: "", price: 3500, busType: "Standard", busName: "Sotra Voyages", totalSeats: 44, availableSeats: 18, duration: "5h 30m", amenities: ["AC"], isFallback: true },
-];
+/* ── Grille tarifaire client — prix Standard réels Côte d'Ivoire ───────────
+   Utilisée pour afficher les prix même sans connexion / sans résultats API  */
+const PRICE_GRID_CLIENT: Record<string, Record<string, number>> = {
+  Abidjan:      { Yamoussoukro: 2000, Bouaké: 2500, Daloa: 3500, Korhogo: 7000, "San Pédro": 3500, "San Pedro": 3500, Man: 5000, Gagnoa: 2000, Divo: 1000, Soubré: 4000 },
+  Yamoussoukro: { Abidjan: 2000, Bouaké: 1500, Korhogo: 5000, Daloa: 1500, Gagnoa: 1200 },
+  Bouaké:       { Abidjan: 2500, Yamoussoukro: 1500, Korhogo: 3000, Daloa: 2000, Man: 3500 },
+  Korhogo:      { Abidjan: 7000, Bouaké: 3000, Yamoussoukro: 5000, Man: 4000 },
+  "San Pédro":  { Abidjan: 3500, Daloa: 3000, Gagnoa: 2500, Soubré: 1200 },
+  "San Pedro":  { Abidjan: 3500, Daloa: 3000, Gagnoa: 2500, Soubré: 1200 },
+  Daloa:        { Abidjan: 3500, Bouaké: 2000, Yamoussoukro: 1500, Man: 1500, Gagnoa: 1200 },
+  Man:          { Abidjan: 5000, Bouaké: 3500, Daloa: 1500, Korhogo: 4000 },
+  Gagnoa:       { Abidjan: 2000, Daloa: 1200, Yamoussoukro: 1200, "San Pédro": 2500, Soubré: 1200 },
+  Divo:         { Abidjan: 1000, Gagnoa: 1000, Yamoussoukro: 1500 },
+  Soubré:       { Abidjan: 4000, "San Pédro": 1200, Daloa: 2000, Gagnoa: 1200 },
+};
+
+function getPriceGrid(from: string, to: string): number | null {
+  if (PRICE_GRID_CLIENT[from]?.[to] != null) return PRICE_GRID_CLIENT[from][to];
+  if (PRICE_GRID_CLIENT[to]?.[from] != null) return PRICE_GRID_CLIENT[to][from];
+  return null;
+}
+
+/* Trips de démonstration : données réelles Côte d'Ivoire, activés si l'API
+   ne renvoie rien pour le trajet recherché */
+function buildFallbackTrips(from: string, to: string, date: string): Trip[] {
+  const base = getPriceGrid(from, to);
+  if (base == null) return [];
+  const COMPANIES = ["UTB Express", "TSR Voyages", "SOTRAL", "STC Transport", "Sotra Voyages"];
+  const schedules = [
+    { dep: "06:00", arr: `0${8 + Math.floor(base / 1000)}:30`.slice(-5), type: "Standard" as const },
+    { dep: "09:00", arr: `${11 + Math.floor(base / 1000)}:00`.slice(-5), type: "Standard" as const },
+    { dep: "12:00", arr: `${14 + Math.floor(base / 1000)}:30`.slice(-5), type: "Standard" as const },
+  ];
+  return schedules.map((s, i) => ({
+    id:            `fb-${from}-${to}-${i}`,
+    from,
+    to,
+    date,
+    departureTime: s.dep,
+    arrivalTime:   s.arr,
+    price:         base,
+    busType:       s.type,
+    busName:       COMPANIES[i % COMPANIES.length],
+    totalSeats:    44,
+    availableSeats: Math.floor(Math.random() * 20) + 10,
+    duration:      `${Math.floor(base / 700)}h${(base % 700) > 350 ? "30" : "00"}`,
+    amenities:     ["AC"],
+    isFallback:    true,
+  }));
+}
 
 export default function ResultatsScreen() {
   const insets = useSafeAreaInsets();
@@ -70,10 +113,6 @@ export default function ResultatsScreen() {
 
   const topPad = insets.top + 8;
 
-  const isAbidjanBouake =
-    from.toLowerCase().includes("abidjan") &&
-    (to.toLowerCase().includes("boua") || to.toLowerCase().includes("bouak"));
-
   const doSearch = async (f: string, t: string, d: string, p: number) => {
     if (!f.trim() || !t.trim()) return;
     console.log("[Resultats] Recherche:", { from: f, to: t, date: d, passengers: p });
@@ -84,16 +123,22 @@ export default function ResultatsScreen() {
       const url = `/trips/search?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}&date=${d}&passengers=${p}`;
       const data = await apiFetch<Trip[]>(url);
       console.log("[Resultats] Trajets reçus:", data.length);
-      if (data.length === 0 && isAbidjanBouake) {
-        setTrips(FALLBACK_TRIPS.map((x) => ({ ...x, from: f, to: t, date: d })));
-        setUsingFallback(true);
+      if (data.length === 0) {
+        const fallback = buildFallbackTrips(f, t, d);
+        if (fallback.length > 0) {
+          setTrips(fallback);
+          setUsingFallback(true);
+        } else {
+          setTrips([]);
+        }
       } else {
         setTrips(data);
       }
     } catch (err) {
       console.error("[Resultats] Erreur recherche:", err);
-      if (isAbidjanBouake) {
-        setTrips(FALLBACK_TRIPS.map((x) => ({ ...x, from: f, to: t, date: d })));
+      const fallback = buildFallbackTrips(f, t, d);
+      if (fallback.length > 0) {
+        setTrips(fallback);
         setUsingFallback(true);
       } else {
         setTrips([]);

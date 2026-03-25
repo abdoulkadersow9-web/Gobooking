@@ -1,0 +1,123 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Ne pas modifier la logique existante.
+
+Adapter uniquement l’affichage et la simulation des données tarifaires selon les tarifs réels du transport en Côte d’Ivoire.
+
+---
+
+PROBLÈME ACTUEL :
+
+- les prix ne s’affichent pas correctement dans l’interface
+- même après modification, je ne vois pas les prix par ville
+- les données simulées ne remontent pas correctement
+- impossible de vérifier que la logique tarifaire fonctionne
+
+---
+
+OBJECTIF :
+
+Afficher clairement des données simulées basées sur les tarifs réels en Côte d’Ivoire pour tester le système.
+
+---
+
+1. SIMULATION DE TRAJETS (DONNÉES RÉELLES CÔTE D’IVOIRE)
+
+Ajouter des trajets réalistes avec prix basés sur le marché ivoirien :
+
+- Abidjan → Yamoussoukro = 2000 F
+- Abidjan → Bouaké = 2500 F
+- Abidjan → Daloa = 3500 F
+- Bouaké → Korhogo = 3000 F
+- Yamoussoukro → Bouaké = 1500 F
+- Abidjan → Korhogo = 7000 F
+
+Ces données doivent être visibles directement dans l’application.
+
+---
+
+2. LOGIQUE TARIFAIRE
+
+Le prix doit dépendre uniquement :
+
+👉 ville de départ → ville d’arrivée
+
+Et respecter les tarifs réels du transport en Côte d’Ivoire.
+
+---
+
+3. AFFICHAGE DANS L’INTERFACE
+
+Quand je sélectionne :
+
+- ville de départ
+- ville d’arrivée
+
+👉 le prix doit s’afficher immédiatement
+
+Je dois voir clairement :
+
+- le prix du trajet
+- la relation ville → ville
+
+---
+
+4. NOMBRE DE PLACES
+
+Le nombre de places ne change pas le prix unitaire.
+
+Exemple :
+
+- Abidjan → Bouaké = 2500 F
+- 2 places = 5000 F
+
+---
+
+5. REMONTÉE DES DONNÉES
+
+Faire apparaître ces données dans :
+
+- réservation client
+- agent guichet
+- agent route
+- détails trajet
+
+Je dois voir les données à l’écran, pas seulement dans le code.
+
+---
+
+6. CORRECTION DU PROBLÈME
+
+Vérifier que :
+
+- les données simulées sont bien injectées
+- les données sont bien liées à l’interface
+- les prix ne sont pas vides ou undefined
+
+---
+
+7. IMPORTANT
+
+- ne pas changer la logique existante
+- ne pas supprimer les données actuelles
+- adapter seulement pour afficher correctement les données simulées
+
+---
+
+8. OBJECTIF FINAL
+
+Quand j’ouvre l’application, je dois voir :
+
+- des trajets réels simulés (Côte d’Ivoire)
+- des prix visibles
+- une logique claire ville → ville
+- un total correct selon les places
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien modifier inutilement.
+Adapter uniquement l’affichage et simuler des données réelles basées sur les tarifs du transport en Côte d’Ivoire.
