@@ -17,6 +17,13 @@ const G_LIGHT = "#ECFDF5";
 const G_DARK  = "#065F46";
 const AMBER   = "#D97706";
 
+/* ── Constante stable hors composant (ne se recrée jamais) ── */
+const RESP = [
+  { id: "panne"    as const, label: "🔧 Panne mécanique",  color: "#DC2626", bg: "#FEE2E2" },
+  { id: "controle" as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
+  { id: "pause"    as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
+] as const;
+
 interface LiveTrip {
   id: string;
   from: string;
@@ -523,53 +530,51 @@ export default function RouteScreen() {
                   </View>
                 )}
 
-                {!passLoading && passengers.map((p, i) => {
+                {!passLoading && passengers.map((p) => {
                   const isBoarded   = p.status === "boarded" || p.status === "confirmed";
-                  const isAbsent    = p.status === "absent" || p.status === "no_show";
+                  const isAbsent    = p.status === "absent"  || p.status === "no_show";
+                  const avatarBg    = isBoarded ? G : isAbsent ? "#EF4444" : "#94A3B8";
                   const statusBg    = isBoarded ? "#DCFCE7" : isAbsent ? "#FEE2E2" : "#FEF9C3";
                   const statusColor = isBoarded ? "#166534" : isAbsent ? "#991B1B" : "#92400E";
-                  const statusIcon  = isBoarded
-                    ? <Ionicons name="checkmark-circle" size={15} color="#166534" />
-                    : isAbsent
-                    ? <Ionicons name="close-circle"     size={15} color="#991B1B" />
-                    : <Ionicons name="time-outline"     size={15} color="#92400E" />;
+                  const statusIconName = isBoarded ? "checkmark-circle" : isAbsent ? "close-circle" : "time-outline";
                   const statusText  = isBoarded ? "À bord" : isAbsent ? "Non monté" : "En attente";
+                  const phoneClean  = p.phone ? p.phone.replace(/\s/g, "") : "";
                   return (
-                    <View key={i} style={S.passengerCard}>
+                    <View key={p.name + p.seatNumber} style={S.passengerCard}>
                       {/* Ligne 1 : avatar + nom + statut */}
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        <View style={[S.passengerAvatar, { backgroundColor: isBoarded ? G : isAbsent ? "#EF4444" : "#94A3B8" }]}>
+                      <View style={S.paxCardRow}>
+                        <View style={[S.passengerAvatar, { backgroundColor: avatarBg }]}>
                           <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
                         </View>
-                        <View style={{ flex: 1 }}>
+                        <View style={S.paxFlex1}>
                           <Text style={S.passengerName}>{p.name}</Text>
                           {p.phone
                             ? <TouchableOpacity
-                                style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}
-                                onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}>
+                                style={S.paxPhoneRow}
+                                onPress={() => Linking.openURL(`tel:${phoneClean}`)}>
                                 <Feather name="phone" size={11} color={G} />
                                 <Text style={S.passengerPhone}>{p.phone}</Text>
                               </TouchableOpacity>
                             : <Text style={S.passengerNoPhone}>Pas de téléphone</Text>}
                         </View>
-                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5, flexDirection: "row", alignItems: "center", gap: 5 }}>
-                          {statusIcon}
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: statusColor }}>{statusText}</Text>
+                        <View style={[S.statusBadge, { backgroundColor: statusBg }]}>
+                          <Ionicons name={statusIconName} size={15} color={statusColor} />
+                          <Text style={[S.statusBadgeTxt, { color: statusColor }]}>{statusText}</Text>
                         </View>
                       </View>
 
                       <View style={S.divider} />
 
                       {/* Ligne 2 : siège + point d'embarquement */}
-                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                      <View style={S.paxTagsRow}>
                         <View style={S.tagGreen}>
                           <Feather name="hash" size={12} color={G} />
-                          <Text style={{ fontSize: 13, color: G_DARK, fontWeight: "700" }}>Siège {p.seatNumber}</Text>
+                          <Text style={S.paxSeatText}>Siège {p.seatNumber}</Text>
                         </View>
                         {p.boardingPoint && (
-                          <View style={[S.tagGreen, { flex: 1, backgroundColor: "#F5F3FF" }]}>
+                          <View style={S.paxBoardingTag}>
                             <Ionicons name="location-outline" size={12} color="#7C3AED" />
-                            <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600", flex: 1 }} numberOfLines={1}>{p.boardingPoint}</Text>
+                            <Text style={S.paxBoardingText} numberOfLines={1}>{p.boardingPoint}</Text>
                           </View>
                         )}
                       </View>
@@ -578,7 +583,7 @@ export default function RouteScreen() {
                       {p.phone && (
                         <TouchableOpacity
                           style={S.callBtn}
-                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                          onPress={() => Linking.openURL(`tel:${phoneClean}`)}
                           activeOpacity={0.75}
                         >
                           <Feather name="phone" size={15} color={G} />
@@ -788,33 +793,31 @@ export default function RouteScreen() {
                   </View>
                 )}
                 {!stopLoading && stopData.map((stop, idx) => (
-                  <View key={stop.id} style={{ marginBottom: 8 }}>
-                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                      <View style={{ width: 32, alignItems: "center" }}>
-                        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: G, alignItems: "center", justifyContent: "center" }}>
-                          <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{idx + 1}</Text>
+                  <View key={stop.id} style={S.stopWrapper}>
+                    <View style={S.stopRowOuter}>
+                      <View style={S.stopDotCol}>
+                        <View style={S.stopDotCircle}>
+                          <Text style={S.stopDotText}>{idx + 1}</Text>
                         </View>
-                        {idx < stopData.length - 1 && (
-                          <View style={{ width: 2, height: 20, backgroundColor: "#D1FAE5", marginTop: 2 }} />
-                        )}
+                        {idx < stopData.length - 1 && <View style={S.stopConnector} />}
                       </View>
-                      <View style={{ flex: 1, marginLeft: 10, backgroundColor: "#fff", borderRadius: 10, padding: 10, marginBottom: 4, elevation: 1, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                          <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>{stop.name}</Text>
-                          <View style={{ backgroundColor: G_LIGHT, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>{stop.passengers.length} passager{stop.passengers.length !== 1 ? "s" : ""}</Text>
+                      <View style={S.stopCard}>
+                        <View style={S.stopCardHeader}>
+                          <Text style={S.stopCardTitle}>{stop.name}</Text>
+                          <View style={S.stopBadge}>
+                            <Text style={S.stopBadgeText}>{stop.passengers.length} passager{stop.passengers.length !== 1 ? "s" : ""}</Text>
                           </View>
                         </View>
-                        <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>{stop.city}</Text>
+                        <Text style={S.stopCity}>{stop.city}</Text>
                         {stop.passengers.length > 0 && (
-                          <View style={{ marginTop: 8, gap: 4 }}>
-                            {stop.passengers.map((p, pi) => (
-                              <View key={pi} style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: G, alignItems: "center", justifyContent: "center" }}>
-                                  <Text style={{ fontSize: 10, color: "#fff", fontWeight: "700" }}>{(p.userName ?? "?").charAt(0)}</Text>
+                          <View style={S.stopPassList}>
+                            {stop.passengers.map((p) => (
+                              <View key={p.bookingRef} style={S.stopPassRow}>
+                                <View style={S.stopPassAvatar}>
+                                  <Text style={S.stopPassAvatarText}>{(p.userName ?? "?").charAt(0)}</Text>
                                 </View>
-                                <Text style={{ fontSize: 12, fontWeight: "600", color: "#166534", flex: 1 }}>{p.userName ?? "Passager"}</Text>
-                                <Text style={{ fontSize: 10, color: "#6B7280" }}>#{p.bookingRef}</Text>
+                                <Text style={S.stopPassName}>{p.userName ?? "Passager"}</Text>
+                                <Text style={S.stopPassRef}>#{p.bookingRef}</Text>
                               </View>
                             ))}
                           </View>
@@ -842,107 +845,107 @@ export default function RouteScreen() {
                     <Text style={S.emptySub}>Aucun contact disponible</Text>
                   </View>
                 )}
-                {!passLoading && passengers.map((p, i) => (
-                  <View key={i} style={S.passengerCard}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <View style={[S.passengerAvatar, { backgroundColor: "#1E40AF" }]}>
-                        <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
+                {!passLoading && passengers.map((p) => {
+                  const phoneClean = p.phone ? p.phone.replace(/\s/g, "") : "";
+                  return (
+                    <View key={p.name + p.seatNumber} style={S.passengerCard}>
+                      <View style={S.paxCardRow}>
+                        <View style={[S.passengerAvatar, S.contactAvatar]}>
+                          <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <View style={S.paxFlex1}>
+                          <Text style={S.passengerName}>{p.name}</Text>
+                          <Text style={S.contactSeat}>Siège {p.seatNumber}</Text>
+                        </View>
+                        {p.phone ? (
+                          <TouchableOpacity
+                            style={S.contactCallIconBtn}
+                            onPress={() => Linking.openURL(`tel:${phoneClean}`)}
+                          >
+                            <Feather name="phone" size={20} color={G} />
+                          </TouchableOpacity>
+                        ) : (
+                          <View style={S.contactNoPhoneIcon}>
+                            <Feather name="phone-off" size={20} color="#94A3B8" />
+                          </View>
+                        )}
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={S.passengerName}>{p.name}</Text>
-                        <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Siège {p.seatNumber}</Text>
-                      </View>
-                      {p.phone ? (
-                        <TouchableOpacity
-                          style={{ backgroundColor: "#ECFDF5", borderRadius: 14, padding: 11 }}
-                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
-                        >
-                          <Feather name="phone" size={20} color={G} />
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={{ backgroundColor: "#F1F5F9", borderRadius: 14, padding: 11 }}>
-                          <Feather name="phone-off" size={20} color="#94A3B8" />
+                      {p.boardingPoint && (
+                        <View style={S.contactBoarding}>
+                          <Ionicons name="location-outline" size={12} color="#7C3AED" />
+                          <Text style={S.contactBoardingText}>{p.boardingPoint}</Text>
                         </View>
                       )}
+                      {p.phone && (
+                        <TouchableOpacity
+                          style={S.callBtn}
+                          onPress={() => Linking.openURL(`tel:${phoneClean}`)}
+                          activeOpacity={0.75}
+                        >
+                          <Feather name="phone-call" size={15} color={G} />
+                          <Text style={S.callBtnTxt}>{p.phone}</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {p.boardingPoint && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
-                        <Ionicons name="location-outline" size={12} color="#7C3AED" />
-                        <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600" }}>{p.boardingPoint}</Text>
-                      </View>
-                    )}
-                    {p.phone && (
-                      <TouchableOpacity
-                        style={S.callBtn}
-                        onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
-                        activeOpacity={0.75}
-                      >
-                        <Feather name="phone-call" size={15} color={G} />
-                        <Text style={S.callBtnTxt}>{p.phone}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
 
             {/* ══ ALERTES ══ */}
             {tab === "alertes" && (
-              <View style={{ gap: 14 }}>
+              <View style={S.alertsContainer}>
                 <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
                 {busAlerts.length === 0 && (
                   <View style={S.emptyCard}>
                     <Ionicons name="checkmark-circle" size={36} color="#4ADE80" />
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#166534" }}>Tout va bien !</Text>
-                    <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>Aucune alerte active pour votre bus.</Text>
+                    <Text style={S.alertEmptyTitle}>Tout va bien !</Text>
+                    <Text style={S.alertEmptyText}>Aucune alerte active pour votre bus.</Text>
                   </View>
                 )}
                 {busAlerts.map(alert => {
                   const hasResponse = !!alert.response;
                   const isActing    = alertActing === alert.id;
-                  const RESP = [
-                    { id: "panne"    as const, label: "🔧 Panne mécanique",  color: "#DC2626", bg: "#FEE2E2" },
-                    { id: "controle" as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
-                    { id: "pause"    as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
-                  ];
                   const responseOpt = RESP.find(r => r.id === alert.response);
                   return (
-                    <View key={alert.id} style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12, borderLeftWidth: 4, borderLeftColor: "#DC2626", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <View key={alert.id} style={S.alertCard}>
+                      <View style={S.alertRow}>
                         <Ionicons name="warning" size={20} color="#DC2626" />
-                        <Text style={{ flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" }}>{alert.message}</Text>
-                        <Text style={{ fontSize: 10, color: "#94A3B8" }}>
+                        <Text style={S.alertMessage}>{alert.message}</Text>
+                        <Text style={S.alertTime}>
                           {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </Text>
                       </View>
                       {alert.responseRequested && !hasResponse && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10 }}>
+                        <View style={S.alertRequestBanner}>
                           <Ionicons name="mail-open-outline" size={16} color="#D97706" />
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#D97706", flex: 1 }}>
+                          <Text style={S.alertRequestText}>
                             📨 L'agent suivi demande votre réponse !
                           </Text>
                         </View>
                       )}
                       {hasResponse && responseOpt && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: responseOpt.bg, borderRadius: 10, padding: 10 }}>
+                        <View style={[S.alertResponseBanner, { backgroundColor: responseOpt.bg }]}>
                           <Ionicons name="checkmark-circle" size={16} color={responseOpt.color} />
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: responseOpt.color, flex: 1 }}>
+                          <Text style={[S.alertResponseText, { color: responseOpt.color }]}>
                             ✅ Réponse envoyée : {responseOpt.label}
                           </Text>
                         </View>
                       )}
                       {!hasResponse && (
                         <>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>Quelle est la situation ?</Text>
-                          <View style={{ gap: 8 }}>
+                          <Text style={S.alertStatusLabel}>Quelle est la situation ?</Text>
+                          <View style={S.respGap}>
                             {RESP.map(opt => (
                               <TouchableOpacity key={opt.id}
-                                style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: opt.bg, borderRadius: 10, padding: 14, borderWidth: 1.5, borderColor: opt.color + "50" }}
+                                style={[S.respOptBtn, { backgroundColor: opt.bg, borderColor: opt.color + "50" }]}
                                 onPress={() => respondToAlert(alert.id, opt.id)}
                                 disabled={isActing}
                               >
-                                {isActing ? <ActivityIndicator size="small" color={opt.color} /> : <Ionicons name="radio-button-on" size={18} color={opt.color} />}
-                                <Text style={{ fontSize: 14, fontWeight: "700", color: opt.color }}>{opt.label}</Text>
+                                {isActing
+                                  ? <ActivityIndicator size="small" color={opt.color} />
+                                  : <Ionicons name="radio-button-on" size={18} color={opt.color} />}
+                                <Text style={[S.respOptText, { color: opt.color }]}>{opt.label}</Text>
                               </TouchableOpacity>
                             ))}
                           </View>
@@ -1068,6 +1071,75 @@ const S = StyleSheet.create({
                   marginTop: 10, backgroundColor: G_LIGHT, borderRadius: 10, paddingVertical: 10,
                   borderWidth: 1, borderColor: "#A7F3D0" },
   callBtnTxt:   { fontSize: 13, fontWeight: "700", color: G_DARK },
+
+  /* Passenger card layout — stable references, no inline objects */
+  paxCardRow:      { flexDirection: "row", alignItems: "center", gap: 12 },
+  paxFlex1:        { flex: 1 },
+  paxPhoneRow:     { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  paxTagsRow:      { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  paxSeatText:     { fontSize: 13, color: G_DARK, fontWeight: "700" },
+  paxBoardingTag:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F3FF",
+                     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, flex: 1 },
+  paxBoardingText: { fontSize: 12, color: "#6D28D9", fontWeight: "600", flex: 1 },
+  statusBadge:     { borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5,
+                     flexDirection: "row", alignItems: "center", gap: 5 },
+  statusBadgeTxt:  { fontSize: 12, fontWeight: "700" },
+
+  /* Contact tab */
+  contactAvatar:       { backgroundColor: "#1E40AF" },
+  contactSeat:         { fontSize: 12, color: "#64748B", marginTop: 2 },
+  contactCallIconBtn:  { backgroundColor: "#ECFDF5", borderRadius: 14, padding: 11 },
+  contactNoPhoneIcon:  { backgroundColor: "#F1F5F9", borderRadius: 14, padding: 11 },
+  contactBoarding:     { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10,
+                         backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  contactBoardingText: { fontSize: 12, color: "#6D28D9", fontWeight: "600" },
+
+  /* Arrêts tab */
+  stopWrapper:       { marginBottom: 8 },
+  stopRowOuter:      { flexDirection: "row", alignItems: "flex-start" },
+  stopDotCol:        { width: 32, alignItems: "center" },
+  stopDotCircle:     { width: 28, height: 28, borderRadius: 14, backgroundColor: G,
+                       alignItems: "center", justifyContent: "center" },
+  stopDotText:       { fontSize: 12, fontWeight: "800", color: "#fff" },
+  stopConnector:     { width: 2, height: 20, backgroundColor: "#D1FAE5", marginTop: 2 },
+  stopCard:          { flex: 1, marginLeft: 10, backgroundColor: "#fff", borderRadius: 10,
+                       padding: 10, marginBottom: 4, elevation: 1,
+                       shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 2,
+                       shadowOffset: { width: 0, height: 1 } },
+  stopCardHeader:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  stopCardTitle:     { fontSize: 14, fontWeight: "700", color: "#111827" },
+  stopBadge:         { backgroundColor: G_LIGHT, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 },
+  stopBadgeText:     { fontSize: 11, fontWeight: "700", color: G },
+  stopCity:          { fontSize: 12, color: "#6B7280", marginTop: 1 },
+  stopPassList:      { marginTop: 8, gap: 4 },
+  stopPassRow:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4",
+                       borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  stopPassAvatar:    { width: 20, height: 20, borderRadius: 10, backgroundColor: G,
+                       alignItems: "center", justifyContent: "center" },
+  stopPassAvatarText:{ fontSize: 10, color: "#fff", fontWeight: "700" },
+  stopPassName:      { fontSize: 12, fontWeight: "600", color: "#166534", flex: 1 },
+  stopPassRef:       { fontSize: 10, color: "#6B7280" },
+
+  /* Alertes tab */
+  alertsContainer:    { gap: 14 },
+  alertEmptyTitle:    { fontSize: 15, fontWeight: "700", color: "#166534" },
+  alertEmptyText:     { fontSize: 13, color: "#64748B", textAlign: "center" },
+  alertCard:          { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12,
+                        borderLeftWidth: 4, borderLeftColor: "#DC2626",
+                        shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  alertRow:           { flexDirection: "row", alignItems: "center", gap: 8 },
+  alertMessage:       { flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" },
+  alertTime:          { fontSize: 10, color: "#94A3B8" },
+  alertRequestBanner: { flexDirection: "row", alignItems: "center", gap: 8,
+                        backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10 },
+  alertRequestText:   { fontSize: 12, fontWeight: "700", color: "#D97706", flex: 1 },
+  alertResponseBanner:{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 10, padding: 10 },
+  alertResponseText:  { fontSize: 12, fontWeight: "700", flex: 1 },
+  alertStatusLabel:   { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  respGap:            { gap: 8 },
+  respOptBtn:         { flexDirection: "row", alignItems: "center", gap: 10,
+                        borderRadius: 10, padding: 14, borderWidth: 1.5 },
+  respOptText:        { fontSize: 14, fontWeight: "700" },
 
   /* Add passenger button */
   addPassengerBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
