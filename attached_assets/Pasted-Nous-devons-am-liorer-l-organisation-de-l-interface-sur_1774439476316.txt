@@ -1,0 +1,181 @@
+Nous devons améliorer l’organisation de l’interface sur la page "Agent En Route" (Suivi trajet) sans rien casser.
+
+IMPORTANT :
+- Ne pas modifier la logique métier
+- Ne rien supprimer
+- Ne rien casser
+- Améliorer uniquement l’affichage et compléter la logique existante
+
+---
+
+1. PROBLÈME ACTUEL
+
+Sur la page Agent En Route :
+
+- Les informations sont mal organisées
+- Certaines sections ne sont pas claires
+- La lecture n’est pas fluide
+- On ne voit pas bien les informations importantes
+- La liste des passagers n’est pas bien structurée
+
+---
+
+2. OBJECTIF
+
+Rendre la page :
+
+- claire
+- fluide
+- bien organisée
+- lisible immédiatement
+- adaptée au travail réel des agents
+
+---
+
+3. STRUCTURE À RESPECTER
+
+---
+
+A. TRAJET ACTIF (TRÈS IMPORTANT)
+
+L’agent doit voir clairement :
+
+- le trajet en cours (ex: Abidjan → Yamoussoukro)
+- l’heure de départ et d’arrivée
+- le bus / compagnie
+- le nombre total de places et passagers (ex: 7/36)
+
+👉 L’agent doit savoir immédiatement sur quel trajet il travaille
+
+---
+
+B. LISTE DES PASSAGERS (TRÈS IMPORTANT)
+
+Afficher une liste claire et complète :
+
+- passagers du début (réservations validées)
+- + passagers ajoutés en cours de route
+
+Pour chaque passager afficher :
+
+- nom
+- téléphone (cliquable)
+- point d’embarquement
+- nombre de places
+- statut
+
+Chaque passager doit être affiché dans un bloc (card) bien séparé.
+
+---
+
+C. AJOUT MANUEL (LOGIQUE AFRIQUE - OBLIGATOIRE)
+
+Ajouter une fonctionnalité visible :
+
+👉 "Ajouter un passager"
+
+L’agent en route doit pouvoir :
+
+- créer une réservation manuelle
+- vendre un ticket directement en route
+
+Cas réel :
+- client monte en cours de route
+- client n’a pas l’application
+
+Lors de la création :
+
+- nom
+- téléphone
+- point de montée
+- nombre de places
+
+---
+
+D. SYNCHRONISATION AUTOMATIQUE
+
+Quand l’agent ajoute un passager :
+
+- il est ajouté immédiatement dans la liste
+- le nombre de passagers se met à jour
+- les données remontent automatiquement vers :
+  - agent réservation
+  - entreprise
+  - historique
+
+👉 Mise à jour en temps réel obligatoire
+
+---
+
+E. STATUT GPS
+
+Afficher clairement :
+
+- GPS actif
+- position actuelle
+- statut "EN DIRECT"
+
+Dans un bloc visible et bien séparé.
+
+---
+
+F. ACTIONS
+
+Organiser les boutons proprement :
+
+- Actualiser
+- Incident
+- Arrivée
+
+Même taille, bien espacés, alignés.
+
+---
+
+G. STATUT DU TRAJET
+
+Afficher clairement :
+
+- Départ effectué
+- En route (actif)
+- Arrivée
+
+Mettre en évidence l’étape actuelle.
+
+---
+
+4. AMÉLIORATION VISUELLE
+
+- ajouter marges et espacements
+- éviter les éléments collés
+- utiliser des blocs (cards)
+- hiérarchie visuelle claire
+- titres visibles
+
+---
+
+5. VISIBILITÉ
+
+- ne pas cacher les informations importantes
+- ne pas couper les textes
+- tout doit être visible directement
+
+---
+
+6. OBJECTIF FINAL
+
+Une page Agent En Route :
+
+- claire
+- fluide
+- organisée
+- avec liste complète des passagers
+- avec ajout manuel en route
+- avec synchronisation en temps réel
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne rien supprimer.
+Améliorer uniquement l’organisation et compléter la logique avec ajout manuel et visibilité complète.

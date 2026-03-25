@@ -61,7 +61,7 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"trajet" | "passagers" | "contacts" | "arrets" | "alertes" | "montee">("trajet");
+  const [tab, setTab]                   = useState<"passagers" | "montee" | "trajet" | "arrets" | "contacts" | "alertes">("passagers");
 
   /* ── Manual booking state ── */
   const [manualName,    setManualName]    = useState("");
@@ -100,7 +100,6 @@ export default function RouteScreen() {
     setLoading(true);
     try {
       const raw = await apiFetch<any[]>("/trips/live", { token });
-      /* Normalize API response (fromCity/toCity → from/to) */
       const allTrips: LiveTrip[] = raw.map(t => ({
         id:            t.id,
         from:          t.from ?? t.fromCity ?? "—",
@@ -211,7 +210,6 @@ export default function RouteScreen() {
       });
       setManualSuccess({ bookingRef: res.bookingRef, total: res.totalAmount });
       setManualName(""); setManualPhone(""); setManualPoint(""); setManualSeats("1");
-      /* Refresh passengers */
       if (activeTrip) loadPassengers(activeTrip.id);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation.");
@@ -220,10 +218,8 @@ export default function RouteScreen() {
     }
   };
 
-  /* Initial load */
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
-  /* Auto-refresh passengers every 15 seconds */
   useEffect(() => {
     const tripIdToLoad = assignedTripId ?? activeTrip?.id ?? null;
     if (!tripIdToLoad) return;
@@ -303,30 +299,31 @@ export default function RouteScreen() {
 
   const gpsColor = gps.active ? "#10B981" : "#94A3B8";
   const gpsLabel = gps.active
-    ? `GPS actif · ${gps.speed ? Math.round(gps.speed) + " km/h" : "en route"}`
+    ? `EN DIRECT${gps.speed ? " · " + Math.round(gps.speed) + " km/h" : ""}`
     : gps.error ? "GPS indisponible" : "Démarrage GPS…";
+
+  const syncTime = lastSync
+    ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")}`
+    : null;
+
+  const boardedCount  = passengers.filter(p => p.status === "boarded" || p.status === "confirmed").length;
+  const pendingCount  = passengers.filter(p => p.status !== "boarded" && p.status !== "confirmed").length;
 
   return (
     <SafeAreaView style={S.safe}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={S.header}>
         <View>
-          <Text style={S.headerTitle}>Suivi trajet</Text>
+          <Text style={S.headerTitle}>Agent En Route</Text>
           <Text style={S.headerSub}>
-            {lastSync
-              ? `🟢 Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
-              : (user?.name ?? "Agent en route")}
+            {syncTime ? `🟢 ${syncTime} · auto 15s` : (user?.name ?? "En route")}
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={S.gpsPill}>
-            <View style={[S.gpsDot, { backgroundColor: gpsColor }]} />
-            <Text style={S.gpsLabel} numberOfLines={1}>{gpsLabel}</Text>
-          </View>
           <TouchableOpacity
-            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            style={S.logoutBtn}
             onPress={() =>
               Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
                 { text: "Annuler", style: "cancel" },
@@ -341,7 +338,7 @@ export default function RouteScreen() {
 
       <OfflineBanner status={networkStatus} />
 
-      {/* No active trip */}
+      {/* ── État vide / chargement ── */}
       {!loading && trips.length === 0 && (
         <View style={S.emptyState}>
           <Text style={S.emptyIcon}>🚌</Text>
@@ -363,11 +360,11 @@ export default function RouteScreen() {
       )}
 
       {!loading && trips.length > 0 && (
-        <>
-          {/* Trip selector (if multiple) */}
+        <View style={{ flex: 1 }}>
+
+          {/* ── Sélecteur de trajet (si plusieurs) ── */}
           {trips.length > 1 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}
-              contentContainerStyle={S.tripChips}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.tripChips}>
               {trips.map(t => (
                 <TouchableOpacity key={t.id}
                   style={[S.chip, activeTrip?.id === t.id && S.chipActive]}
@@ -380,185 +377,318 @@ export default function RouteScreen() {
             </ScrollView>
           )}
 
-          {/* Active trip card */}
+          {/* ── Carte trajet actif ── */}
           {activeTrip && (
             <View style={S.tripCard}>
-              <View style={S.tripRoute}>
-                <Text style={S.tripCity}>{activeTrip.from}</Text>
+              {/* Route */}
+              <View style={S.tripRouteRow}>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={S.tripCityLabel}>Départ</Text>
+                  <Text style={S.tripCity}>{activeTrip.from}</Text>
+                  <Text style={S.tripTime}>{activeTrip.departureTime}</Text>
+                </View>
                 <View style={S.tripArrow}>
                   <View style={S.arrowLine} />
-                  <Ionicons name="bus" size={20} color={G} />
+                  <View style={S.busBadge}>
+                    <Ionicons name="bus" size={18} color="#fff" />
+                  </View>
                   <View style={S.arrowLine} />
                 </View>
-                <Text style={S.tripCity}>{activeTrip.to}</Text>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={S.tripCityLabel}>Arrivée</Text>
+                  <Text style={S.tripCity}>{activeTrip.to}</Text>
+                  <Text style={S.tripTime}>{activeTrip.arrivalTime ?? "?"}</Text>
+                </View>
               </View>
-              <View style={S.tripMeta}>
-                <View style={S.metaItem}>
-                  <Feather name="clock" size={13} color="#64748B" />
-                  <Text style={S.metaText}>{activeTrip.departureTime} → {activeTrip.arrivalTime ?? "?"}</Text>
+
+              {/* Bus info + passagers */}
+              <View style={S.tripInfoRow}>
+                <View style={S.tripInfoPill}>
+                  <Feather name="truck" size={12} color="#475569" />
+                  <Text style={S.tripInfoTxt}>{activeTrip.busName}</Text>
                 </View>
-                <View style={S.metaItem}>
-                  <Feather name="truck" size={13} color="#64748B" />
-                  <Text style={S.metaText}>{activeTrip.busName}</Text>
-                </View>
+                {activeTrip.passengers != null && activeTrip.totalSeats != null && (
+                  <View style={[S.tripInfoPill, { backgroundColor: "#DCFCE7" }]}>
+                    <Ionicons name="people-outline" size={13} color={G} />
+                    <Text style={[S.tripInfoTxt, { color: G_DARK, fontWeight: "700" }]}>
+                      {activeTrip.passengers} / {activeTrip.totalSeats} places
+                    </Text>
+                  </View>
+                )}
                 {activeTrip.speed != null && activeTrip.speed > 0 && (
-                  <View style={S.metaItem}>
-                    <Feather name="zap" size={13} color={AMBER} />
-                    <Text style={[S.metaText, { color: AMBER }]}>{Math.round(activeTrip.speed)} km/h</Text>
+                  <View style={[S.tripInfoPill, { backgroundColor: "#FEF3C7" }]}>
+                    <Feather name="zap" size={12} color={AMBER} />
+                    <Text style={[S.tripInfoTxt, { color: AMBER, fontWeight: "700" }]}>{Math.round(activeTrip.speed)} km/h</Text>
                   </View>
                 )}
               </View>
-              {/* Occupancy bar */}
+
+              {/* Barre d'occupation */}
               {activeTrip.passengers != null && activeTrip.totalSeats != null && (
-                <View style={S.occupancy}>
-                  <View style={S.occRow}>
-                    <Text style={S.occLabel}>Passagers à bord</Text>
-                    <Text style={S.occCount}>{activeTrip.passengers}/{activeTrip.totalSeats}</Text>
-                  </View>
+                <View style={{ marginTop: 10 }}>
                   <View style={S.occBar}>
                     <View style={[S.occFill, {
-                      width: `${Math.round((activeTrip.passengers / activeTrip.totalSeats) * 100)}%`,
+                      width: `${Math.min(100, Math.round((activeTrip.passengers / activeTrip.totalSeats) * 100))}%` as any,
                     }]} />
                   </View>
                 </View>
               )}
+
+              {/* Bande GPS — toujours visible */}
+              <View style={[S.gpsStrip, { borderColor: gps.active ? "#A7F3D0" : "#E2E8F0", backgroundColor: gps.active ? "#F0FDF4" : "#F8FAFC" }]}>
+                <View style={[S.gpsDotSmall, { backgroundColor: gpsColor }]} />
+                <Ionicons name="location" size={14} color={gps.active ? G : "#94A3B8"} />
+                <Text style={[S.gpsStripTxt, { color: gps.active ? G_DARK : "#64748B" }]}>
+                  {gps.active
+                    ? (gps.lat && gps.lon
+                        ? `GPS · ${gps.lat.toFixed(4)}° N, ${gps.lon.toFixed(4)}° E`
+                        : "GPS actif — position en attente")
+                    : (gps.error ? "GPS indisponible" : "Démarrage GPS…")}
+                </Text>
+                {gps.active && (
+                  <View style={S.gpsLiveBadge}>
+                    <Text style={S.gpsLiveTxt}>{gpsLabel}</Text>
+                  </View>
+                )}
+              </View>
             </View>
           )}
 
-          {/* Assigned trip/bus badge if set */}
-          {(assignedTripId || assignedBusId) && (
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 16, marginBottom: 8, flexWrap: "wrap" }}>
-              {assignedBusId && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Feather name="truck" size={11} color="#059669" />
-                  <Text style={{ fontSize: 11, color: "#047857", fontWeight: "600" }}>Bus assigné</Text>
-                </View>
-              )}
-              {assignedTripId && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F0F9FF", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Feather name="navigation" size={11} color="#0369A1" />
-                  <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "600" }}>Trajet assigné</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Departure badge */}
-          {myDeparture && (
-            <View style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: "#F0F9FF", borderRadius: 12, padding: 12, borderLeftWidth: 4, borderLeftColor: "#0369A1" }}>
-              <Text style={{ fontSize: 13, fontWeight: "800", color: "#0369A1" }}>🗓️ Mon départ : {myDeparture.villeDepart} → {myDeparture.villeArrivee}</Text>
-              <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>⏰ {myDeparture.heureDepart} · {myDeparture.busName ?? "Bus"} {myDeparture.plateNumber ? `(${myDeparture.plateNumber})` : ""}</Text>
-              {myDeparture.chauffeurNom && <Text style={{ fontSize: 11, color: "#64748B" }}>👤 {myDeparture.chauffeurNom}</Text>}
-            </View>
-          )}
-
-          {/* Alert badge if any active alerts */}
+          {/* ── Alertes actives (bannière rapide) ── */}
           {busAlerts.length > 0 && (
             <TouchableOpacity onPress={() => setTab("alertes")}
-              style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: "#FEE2E2", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 8, borderLeftWidth: 4, borderLeftColor: "#DC2626" }}>
-              <Ionicons name="warning" size={18} color="#DC2626" />
-              <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626", flex: 1 }}>🚨 {busAlerts.length} alerte(s) — Réponse requise</Text>
-              <Ionicons name="chevron-forward" size={16} color="#DC2626" />
+              style={S.alertBanner}>
+              <Ionicons name="warning" size={16} color="#DC2626" />
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626", flex: 1 }}>
+                🚨 {busAlerts.length} alerte(s) active(s) — Appuyez pour répondre
+              </Text>
+              <Ionicons name="chevron-forward" size={15} color="#DC2626" />
             </TouchableOpacity>
           )}
 
-          {/* Tabs */}
+          {/* ── Onglets ── */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
-              {(["alertes", "trajet", "passagers", "arrets", "contacts", "montee"] as const).map(t => (
-                <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
-                  <Text style={[S.tabText, tab === t && S.tabTextActive]}>
-                    {t === "alertes"   ? `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}`
-                     : t === "trajet"  ? "📍 Trajet"
-                     : t === "passagers" ? "👥 Passagers"
-                     : t === "arrets"  ? "🗺 Arrêts"
-                     : t === "contacts" ? "📞 Contacts"
-                     : "➕ Montée"}
-                  </Text>
+              {([
+                { key: "passagers", label: `👥 Passagers${passengers.length > 0 ? ` (${passengers.length})` : ""}` },
+                { key: "montee",    label: "➕ Montée" },
+                { key: "trajet",    label: "📍 Trajet" },
+                { key: "arrets",    label: "🗺 Arrêts" },
+                { key: "contacts",  label: "📞 Contacts" },
+                { key: "alertes",   label: `🚨 Alertes${busAlerts.length > 0 ? ` (${busAlerts.length})` : ""}` },
+              ] as const).map(t => (
+                <TouchableOpacity key={t.key}
+                  style={[S.tabBtn, tab === t.key && S.tabBtnActive]}
+                  onPress={() => setTab(t.key)}>
+                  <Text style={[S.tabText, tab === t.key && S.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </ScrollView>
 
-          <ScrollView contentContainerStyle={S.body} showsVerticalScrollIndicator={false}>
+          {/* ── Contenu des onglets ── */}
+          <ScrollView
+            contentContainerStyle={S.body}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
 
-            {/* ── TAB: ALERTES ── */}
-            {tab === "alertes" && (
-              <View style={{ gap: 14 }}>
-                <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
-                {busAlerts.length === 0 && (
-                  <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 28, alignItems: "center", gap: 8 }}>
-                    <Ionicons name="checkmark-circle" size={36} color="#4ADE80" />
-                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#166534" }}>Tout va bien !</Text>
-                    <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>Aucune alerte active pour votre bus.</Text>
+            {/* ══ PASSAGERS ══ */}
+            {tab === "passagers" && (
+              <>
+                {/* En-tête compteurs */}
+                <View style={S.passengerHeader}>
+                  <Text style={S.sectionTitle}>Liste des passagers</Text>
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    <View style={[S.countBadge, { backgroundColor: G }]}>
+                      <Text style={S.countBadgeTxt}>✅ {boardedCount} à bord</Text>
+                    </View>
+                    {pendingCount > 0 && (
+                      <View style={[S.countBadge, { backgroundColor: AMBER }]}>
+                        <Text style={S.countBadgeTxt}>⏳ {pendingCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
+
+                {!passLoading && passengers.length === 0 && (
+                  <View style={S.emptyCard}>
+                    <Text style={{ fontSize: 36 }}>👥</Text>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151" }}>Aucun passager</Text>
+                    <Text style={S.emptySub}>Ajoutez un passager via le bouton vert ci-dessous</Text>
                   </View>
                 )}
-                {busAlerts.map(alert => {
-                  const hasResponse = !!alert.response;
-                  const isActing    = alertActing === alert.id;
-                  const RESP = [
-                    { id: "panne"   as const, label: "🔧 Panne mécanique", color: "#DC2626", bg: "#FEE2E2" },
-                    { id: "controle"as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
-                    { id: "pause"   as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
-                  ];
-                  const responseOpt = RESP.find(r => r.id === alert.response);
+
+                {!passLoading && passengers.map((p, i) => {
+                  const isBoarded   = p.status === "boarded" || p.status === "confirmed";
+                  const statusBg    = isBoarded ? "#DCFCE7" : "#FEF9C3";
+                  const statusColor = isBoarded ? "#166534" : "#92400E";
+                  const statusText  = isBoarded ? "✅ À bord" : "⏳ En attente";
                   return (
-                    <View key={alert.id} style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12, borderLeftWidth: 4, borderLeftColor: "#DC2626", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Ionicons name="warning" size={20} color="#DC2626" />
-                        <Text style={{ flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" }}>{alert.message}</Text>
-                        <Text style={{ fontSize: 10, color: "#94A3B8" }}>
-                          {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        </Text>
+                    <View key={i} style={S.passengerCard}>
+                      {/* Ligne 1 : avatar + nom + statut */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                        <View style={[S.passengerAvatar, { backgroundColor: isBoarded ? G : "#94A3B8" }]}>
+                          <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={S.passengerName}>{p.name}</Text>
+                          {p.phone
+                            ? <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}>
+                                <Text style={S.passengerPhone}>📞 {p.phone}</Text>
+                              </TouchableOpacity>
+                            : <Text style={S.passengerNoPhone}>Pas de téléphone</Text>}
+                        </View>
+                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: statusColor }}>{statusText}</Text>
+                        </View>
                       </View>
 
-                      {/* Request indicator */}
-                      {alert.responseRequested && !hasResponse && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10 }}>
-                          <Ionicons name="mail-open-outline" size={16} color="#D97706" />
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#D97706", flex: 1 }}>
-                            📨 L'agent suivi demande votre réponse !
-                          </Text>
-                        </View>
-                      )}
+                      <View style={S.divider} />
 
-                      {/* Response sent */}
-                      {hasResponse && responseOpt && (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: responseOpt.bg, borderRadius: 10, padding: 10 }}>
-                          <Ionicons name="checkmark-circle" size={16} color={responseOpt.color} />
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: responseOpt.color }}>
-                            ✅ Réponse envoyée : {responseOpt.label}
-                          </Text>
+                      {/* Ligne 2 : siège + point d'embarquement */}
+                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                        <View style={S.tagGreen}>
+                          <Feather name="hash" size={12} color={G} />
+                          <Text style={{ fontSize: 13, color: G_DARK, fontWeight: "700" }}>Siège {p.seatNumber}</Text>
                         </View>
-                      )}
-
-                      {/* Response buttons */}
-                      {!hasResponse && (
-                        <>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>Quelle est la situation ?</Text>
-                          <View style={{ gap: 8 }}>
-                            {RESP.map(opt => (
-                              <TouchableOpacity key={opt.id}
-                                style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: opt.bg, borderRadius: 10, padding: 14, borderWidth: 1.5, borderColor: opt.color + "50" }}
-                                onPress={() => respondToAlert(alert.id, opt.id)}
-                                disabled={isActing}
-                              >
-                                {isActing ? <ActivityIndicator size="small" color={opt.color} /> : <Ionicons name="radio-button-on" size={18} color={opt.color} />}
-                                <Text style={{ fontSize: 14, fontWeight: "700", color: opt.color }}>{opt.label}</Text>
-                              </TouchableOpacity>
-                            ))}
+                        {p.boardingPoint && (
+                          <View style={[S.tagGreen, { flex: 1, backgroundColor: "#F5F3FF" }]}>
+                            <Ionicons name="location-outline" size={12} color="#7C3AED" />
+                            <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600", flex: 1 }} numberOfLines={1}>{p.boardingPoint}</Text>
                           </View>
-                        </>
+                        )}
+                      </View>
+
+                      {/* Bouton appel */}
+                      {p.phone && (
+                        <TouchableOpacity
+                          style={S.callBtn}
+                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
+                          activeOpacity={0.75}
+                        >
+                          <Feather name="phone" size={15} color={G} />
+                          <Text style={S.callBtnTxt}>Appeler — {p.phone}</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                   );
                 })}
-              </View>
+
+                {/* Bouton "Ajouter un passager" en bas de liste */}
+                <TouchableOpacity style={S.addPassengerBtn} onPress={() => setTab("montee")}>
+                  <Ionicons name="person-add" size={18} color="#fff" />
+                  <Text style={S.addPassengerBtnTxt}>Ajouter un passager en route</Text>
+                </TouchableOpacity>
+              </>
             )}
 
+            {/* ══ MONTÉE EN ROUTE ══ */}
+            {tab === "montee" && (
+              <>
+                <View style={S.monteeHeader}>
+                  <Ionicons name="person-add" size={22} color={G} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={S.sectionTitle}>Montée en cours de route</Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2, lineHeight: 17 }}>
+                      Enregistrez un passager qui monte sans application. Synchronisation automatique avec l'agent de réservation et la compagnie.
+                    </Text>
+                  </View>
+                </View>
+
+                {!assignedTripId && (
+                  <View style={S.warningBanner}>
+                    <Ionicons name="warning-outline" size={20} color="#D97706" />
+                    <Text style={{ fontSize: 12, color: "#92400E", flex: 1, lineHeight: 18 }}>
+                      Aucun trajet assigné à votre compte. Demandez à votre compagnie de vous assigner un trajet.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Bannière succès */}
+                {manualSuccess && (
+                  <View style={S.successBanner}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="checkmark-circle" size={22} color="#166534" />
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#166534" }}>Passager enregistré !</Text>
+                    </View>
+                    <Text style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>
+                      Réf : <Text style={{ fontWeight: "800" }}>{manualSuccess.bookingRef}</Text>
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#4B5563", marginTop: 2 }}>
+                      Montant : {(manualSuccess.total ?? 0).toLocaleString()} FCFA · SMS envoyé
+                    </Text>
+                    <TouchableOpacity onPress={() => setManualSuccess(null)} style={{ alignSelf: "flex-end", marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}>Fermer ✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Formulaire */}
+                <View style={S.formCard}>
+                  <View style={S.formField}>
+                    <Text style={S.fieldLabel}>Nom du passager *</Text>
+                    <TextInput
+                      style={S.fieldInput}
+                      placeholder="Ex : Kouassi Marie"
+                      value={manualName} onChangeText={setManualName}
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View style={S.formField}>
+                    <Text style={S.fieldLabel}>Téléphone *</Text>
+                    <TextInput
+                      style={S.fieldInput}
+                      placeholder="Ex : 07 01 23 45 67"
+                      value={manualPhone} onChangeText={setManualPhone}
+                      keyboardType="phone-pad"
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View style={S.formField}>
+                    <Text style={S.fieldLabel}>Point de montée</Text>
+                    <TextInput
+                      style={S.fieldInput}
+                      placeholder="Ex : Carrefour Koumassi"
+                      value={manualPoint} onChangeText={setManualPoint}
+                      editable={!manualSaving}
+                    />
+                  </View>
+                  <View style={S.formField}>
+                    <Text style={S.fieldLabel}>Nombre de places</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      {["1","2","3","4"].map(n => (
+                        <TouchableOpacity key={n}
+                          style={[S.seatBtn, manualSeats === n && S.seatBtnActive]}
+                          onPress={() => setManualSeats(n)} disabled={manualSaving}
+                        >
+                          <Text style={[S.seatBtnTxt, manualSeats === n && S.seatBtnTxtActive]}>{n}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[S.submitBtn, (!assignedTripId || manualSaving) && { opacity: 0.5 }]}
+                    onPress={handleManualBooking}
+                    disabled={!assignedTripId || manualSaving}
+                  >
+                    {manualSaving
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Ionicons name="person-add" size={18} color="#fff" />}
+                    <Text style={S.submitBtnTxt}>
+                      {manualSaving ? "Enregistrement…" : "Enregistrer la montée"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* ══ TRAJET ══ */}
             {tab === "trajet" && activeTrip && (
               <>
-                {/* GPS status */}
+                {/* Carte GPS détaillée */}
                 <View style={[S.gpsCard, { borderColor: gps.active ? "#10B981" : "#E2E8F0" }]}>
                   <View style={S.gpsRow}>
                     <Ionicons name="location" size={20} color={gps.active ? "#10B981" : "#94A3B8"} />
@@ -576,7 +706,7 @@ export default function RouteScreen() {
                   </View>
                 </View>
 
-                {/* Action buttons */}
+                {/* Actions */}
                 <Text style={S.sectionTitle}>Actions</Text>
                 <View style={S.actionsGrid}>
                   <TouchableOpacity style={S.actionBtn} onPress={handleRefresh} disabled={refreshing}>
@@ -601,7 +731,7 @@ export default function RouteScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Status timeline */}
+                {/* Statut du trajet */}
                 <Text style={[S.sectionTitle, { marginTop: 8 }]}>Statut du trajet</Text>
                 <View style={S.timeline}>
                   {[
@@ -618,87 +748,29 @@ export default function RouteScreen() {
                     </View>
                   ))}
                 </View>
-              </>
-            )}
 
-            {tab === "passagers" && (
-              <>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                  <Text style={S.sectionTitle}>Passagers à bord</Text>
-                  <View style={{ backgroundColor: G, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>{passengers.length} pers.</Text>
-                  </View>
-                </View>
-                {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
-                {!passLoading && passengers.length === 0 && (
-                  <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
-                    <Text style={{ fontSize: 32 }}>👥</Text>
-                    <Text style={S.emptySub}>Aucun passager enregistré</Text>
+                {/* Mon départ */}
+                {myDeparture && (
+                  <View style={S.departureBadge}>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: "#0369A1" }}>
+                      🗓️ {myDeparture.villeDepart} → {myDeparture.villeArrivee}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>
+                      ⏰ {myDeparture.heureDepart} · {myDeparture.busName ?? "Bus"}{myDeparture.plateNumber ? ` (${myDeparture.plateNumber})` : ""}
+                    </Text>
+                    {myDeparture.chauffeurNom && <Text style={{ fontSize: 11, color: "#64748B" }}>👤 {myDeparture.chauffeurNom}</Text>}
                   </View>
                 )}
-                {!passLoading && passengers.map((p, i) => {
-                  const isBoarded   = p.status === "boarded" || p.status === "confirmed";
-                  const statusBg    = isBoarded ? "#DCFCE7" : "#FEF9C3";
-                  const statusColor = isBoarded ? "#166534" : "#92400E";
-                  const statusText  = isBoarded ? "✅ À bord" : "⏳ En attente";
-                  return (
-                    <View key={i} style={S.passengerCard}>
-                      {/* Ligne 1 : avatar + nom + statut */}
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                        <View style={[S.passengerAvatar, { width: 46, height: 46, borderRadius: 23, backgroundColor: isBoarded ? G : "#94A3B8" }]}>
-                          <Text style={[S.passengerAvatarTxt, { fontSize: 19 }]}>{p.name.charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>{p.name}</Text>
-                          {p.phone
-                            ? <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>{p.phone}</Text>
-                            : <Text style={{ fontSize: 12, color: "#CBD5E1", marginTop: 2 }}>Pas de téléphone</Text>}
-                        </View>
-                        <View style={{ backgroundColor: statusBg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: statusColor }}>{statusText}</Text>
-                        </View>
-                      </View>
-
-                      {/* Séparateur */}
-                      <View style={{ height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 }} />
-
-                      {/* Ligne 2 : siège + point d'embarquement */}
-                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0FDF4", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
-                          <Feather name="hash" size={12} color={G} />
-                          <Text style={{ fontSize: 13, color: G_DARK, fontWeight: "700" }}>Siège {p.seatNumber}</Text>
-                        </View>
-                        {p.boardingPoint && (
-                          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
-                            <Ionicons name="location-outline" size={12} color="#7C3AED" />
-                            <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600", flex: 1 }} numberOfLines={1}>{p.boardingPoint}</Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Bouton appel */}
-                      {p.phone && (
-                        <TouchableOpacity
-                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10, backgroundColor: G_LIGHT, borderRadius: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#A7F3D0" }}
-                          onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
-                          activeOpacity={0.75}
-                        >
-                          <Feather name="phone" size={15} color={G} />
-                          <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>Appeler — {p.phone}</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                })}
               </>
             )}
 
+            {/* ══ ARRÊTS ══ */}
             {tab === "arrets" && (
               <>
                 <Text style={S.sectionTitle}>Ordre des arrêts</Text>
                 {stopLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
                 {!stopLoading && stopData.length === 0 && (
-                  <View style={{ alignItems: "center", marginTop: 24, gap: 8 }}>
+                  <View style={S.emptyCard}>
                     <Text style={{ fontSize: 28 }}>🗺️</Text>
                     <Text style={S.emptySub}>Aucun arrêt configuré pour ce trajet.</Text>
                   </View>
@@ -706,7 +778,6 @@ export default function RouteScreen() {
                 {!stopLoading && stopData.map((stop, idx) => (
                   <View key={stop.id} style={{ marginBottom: 8 }}>
                     <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                      {/* order dot + connector */}
                       <View style={{ width: 32, alignItems: "center" }}>
                         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: G, alignItems: "center", justifyContent: "center" }}>
                           <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{idx + 1}</Text>
@@ -715,7 +786,6 @@ export default function RouteScreen() {
                           <View style={{ width: 2, height: 20, backgroundColor: "#D1FAE5", marginTop: 2 }} />
                         )}
                       </View>
-                      {/* stop info */}
                       <View style={{ flex: 1, marginLeft: 10, backgroundColor: "#fff", borderRadius: 10, padding: 10, marginBottom: 4, elevation: 1, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
                         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                           <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>{stop.name}</Text>
@@ -744,96 +814,7 @@ export default function RouteScreen() {
               </>
             )}
 
-            {tab === "montee" && (
-              <>
-                <Text style={S.sectionTitle}>➕ Montée en cours de route</Text>
-                <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 12, lineHeight: 18 }}>
-                  Enregistrez un passager qui monte à bord sans application. La réservation est automatiquement liée à votre trajet en cours et synchronisée avec l'agent de réservation.
-                </Text>
-
-                {/* Success banner */}
-                {manualSuccess && (
-                  <View style={{ backgroundColor: "#DCFCE7", borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1.5, borderColor: "#4ADE80", gap: 6 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <Ionicons name="checkmark-circle" size={22} color="#166534" />
-                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#166534" }}>Passager enregistré !</Text>
-                    </View>
-                    <Text style={{ fontSize: 13, color: "#166534" }}>Réf : <Text style={{ fontWeight: "800" }}>{manualSuccess.bookingRef}</Text></Text>
-                    <Text style={{ fontSize: 12, color: "#4B5563" }}>Montant : {(manualSuccess.total ?? 0).toLocaleString()} FCFA · SMS envoyé au passager</Text>
-                    <TouchableOpacity onPress={() => setManualSuccess(null)} style={{ alignSelf: "flex-end" }}>
-                      <Text style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}>Fermer ✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Form */}
-                {!assignedTripId && (
-                  <View style={{ backgroundColor: "#FEF3C7", borderRadius: 12, padding: 14, marginBottom: 14, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                    <Ionicons name="warning-outline" size={20} color="#D97706" />
-                    <Text style={{ fontSize: 12, color: "#92400E", flex: 1, lineHeight: 18 }}>
-                      Aucun trajet assigné à votre compte. Demandez à votre compagnie de vous assigner un trajet pour pouvoir créer des réservations.
-                    </Text>
-                  </View>
-                )}
-
-                <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
-                  <View>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Nom du passager *</Text>
-                    <TextInput
-                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
-                      placeholder="Ex : Kouassi Marie"
-                      value={manualName} onChangeText={setManualName}
-                      editable={!manualSaving}
-                    />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Téléphone *</Text>
-                    <TextInput
-                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
-                      placeholder="Ex : 07 01 23 45 67"
-                      value={manualPhone} onChangeText={setManualPhone}
-                      keyboardType="phone-pad"
-                      editable={!manualSaving}
-                    />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Point de montée</Text>
-                    <TextInput
-                      style={{ borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: "#F0FDF4" }}
-                      placeholder="Ex : Carrefour Koumassi"
-                      value={manualPoint} onChangeText={setManualPoint}
-                      editable={!manualSaving}
-                    />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Nombre de places</Text>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      {["1","2","3","4"].map(n => (
-                        <TouchableOpacity key={n}
-                          style={{ flex: 1, borderWidth: 1.5, borderColor: manualSeats === n ? G : "#D1FAE5", borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: manualSeats === n ? G : "#F0FDF4" }}
-                          onPress={() => setManualSeats(n)} disabled={manualSaving}
-                        >
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: manualSeats === n ? "#fff" : G }}>{n}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={{ backgroundColor: G, borderRadius: 12, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, opacity: (!assignedTripId || manualSaving) ? 0.5 : 1 }}
-                    onPress={handleManualBooking}
-                    disabled={!assignedTripId || manualSaving}
-                  >
-                    {manualSaving
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <Ionicons name="person-add" size={18} color="#fff" />}
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>
-                      {manualSaving ? "Enregistrement…" : "Enregistrer la montée"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-
+            {/* ══ CONTACTS ══ */}
             {tab === "contacts" && (
               <>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -844,27 +825,25 @@ export default function RouteScreen() {
                 </View>
                 {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
                 {!passLoading && passengers.length === 0 && (
-                  <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
+                  <View style={S.emptyCard}>
                     <Text style={{ fontSize: 32 }}>📞</Text>
                     <Text style={S.emptySub}>Aucun contact disponible</Text>
                   </View>
                 )}
                 {!passLoading && passengers.map((p, i) => (
                   <View key={i} style={S.passengerCard}>
-                    {/* En-tête : avatar + infos + bouton appel rapide */}
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                      <View style={[S.passengerAvatar, { width: 46, height: 46, borderRadius: 23, backgroundColor: "#1E40AF" }]}>
-                        <Text style={[S.passengerAvatarTxt, { fontSize: 19 }]}>{p.name.charAt(0).toUpperCase()}</Text>
+                      <View style={[S.passengerAvatar, { backgroundColor: "#1E40AF" }]}>
+                        <Text style={S.passengerAvatarTxt}>{p.name.charAt(0).toUpperCase()}</Text>
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>{p.name}</Text>
+                        <Text style={S.passengerName}>{p.name}</Text>
                         <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>Siège {p.seatNumber}</Text>
                       </View>
                       {p.phone ? (
                         <TouchableOpacity
-                          style={{ backgroundColor: "#ECFDF5", borderRadius: 14, padding: 11, alignItems: "center", justifyContent: "center" }}
+                          style={{ backgroundColor: "#ECFDF5", borderRadius: 14, padding: 11 }}
                           onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
-                          activeOpacity={0.7}
                         >
                           <Feather name="phone" size={20} color={G} />
                         </TouchableOpacity>
@@ -874,37 +853,102 @@ export default function RouteScreen() {
                         </View>
                       )}
                     </View>
-
-                    {/* Point d'embarquement */}
                     {p.boardingPoint && (
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
                         <Ionicons name="location-outline" size={12} color="#7C3AED" />
                         <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600" }}>{p.boardingPoint}</Text>
                       </View>
                     )}
-
-                    {/* Bouton appel large */}
                     {p.phone && (
                       <TouchableOpacity
-                        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10, backgroundColor: "#ECFDF5", borderRadius: 10, paddingVertical: 11, borderWidth: 1.5, borderColor: "#6EE7B7" }}
+                        style={S.callBtn}
                         onPress={() => Linking.openURL(`tel:${p.phone!.replace(/\s/g, "")}`)}
                         activeOpacity={0.75}
                       >
                         <Feather name="phone-call" size={15} color={G} />
-                        <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>{p.phone}</Text>
+                        <Text style={S.callBtnTxt}>{p.phone}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 ))}
               </>
             )}
+
+            {/* ══ ALERTES ══ */}
+            {tab === "alertes" && (
+              <View style={{ gap: 14 }}>
+                <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
+                {busAlerts.length === 0 && (
+                  <View style={S.emptyCard}>
+                    <Ionicons name="checkmark-circle" size={36} color="#4ADE80" />
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#166534" }}>Tout va bien !</Text>
+                    <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center" }}>Aucune alerte active pour votre bus.</Text>
+                  </View>
+                )}
+                {busAlerts.map(alert => {
+                  const hasResponse = !!alert.response;
+                  const isActing    = alertActing === alert.id;
+                  const RESP = [
+                    { id: "panne"    as const, label: "🔧 Panne mécanique",  color: "#DC2626", bg: "#FEE2E2" },
+                    { id: "controle" as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
+                    { id: "pause"    as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
+                  ];
+                  const responseOpt = RESP.find(r => r.id === alert.response);
+                  return (
+                    <View key={alert.id} style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12, borderLeftWidth: 4, borderLeftColor: "#DC2626", shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Ionicons name="warning" size={20} color="#DC2626" />
+                        <Text style={{ flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" }}>{alert.message}</Text>
+                        <Text style={{ fontSize: 10, color: "#94A3B8" }}>
+                          {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                      </View>
+                      {alert.responseRequested && !hasResponse && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 10, padding: 10 }}>
+                          <Ionicons name="mail-open-outline" size={16} color="#D97706" />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#D97706", flex: 1 }}>
+                            📨 L'agent suivi demande votre réponse !
+                          </Text>
+                        </View>
+                      )}
+                      {hasResponse && responseOpt && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: responseOpt.bg, borderRadius: 10, padding: 10 }}>
+                          <Ionicons name="checkmark-circle" size={16} color={responseOpt.color} />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: responseOpt.color, flex: 1 }}>
+                            ✅ Réponse envoyée : {responseOpt.label}
+                          </Text>
+                        </View>
+                      )}
+                      {!hasResponse && (
+                        <>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>Quelle est la situation ?</Text>
+                          <View style={{ gap: 8 }}>
+                            {RESP.map(opt => (
+                              <TouchableOpacity key={opt.id}
+                                style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: opt.bg, borderRadius: 10, padding: 14, borderWidth: 1.5, borderColor: opt.color + "50" }}
+                                onPress={() => respondToAlert(alert.id, opt.id)}
+                                disabled={isActing}
+                              >
+                                {isActing ? <ActivityIndicator size="small" color={opt.color} /> : <Ionicons name="radio-button-on" size={18} color={opt.color} />}
+                                <Text style={{ fontSize: 14, fontWeight: "700", color: opt.color }}>{opt.label}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
           </ScrollView>
-        </>
+        </View>
       )}
 
-      {/* Rapport button */}
+      {/* ── Bouton Rapport (bas de page) ── */}
       <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 16, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        style={S.rapportBtn}
         onPress={() => router.push("/agent/rapport" as never)}
       >
         <Feather name="alert-triangle" size={16} color="#fff" />
@@ -915,99 +959,173 @@ export default function RouteScreen() {
 }
 
 const S = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: G_LIGHT },
-  header:           { backgroundColor: G_DARK, paddingHorizontal: 20, paddingVertical: 14,
-                      flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:      { color: "white", fontSize: 18, fontWeight: "700" },
-  headerSub:        { color: "rgba(255,255,255,0.65)", fontSize: 12, marginTop: 1 },
-  gpsPill:          { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.15)",
-                      borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, gap: 6, maxWidth: 150 },
-  gpsDot:           { width: 8, height: 8, borderRadius: 4 },
-  gpsLabel:         { color: "white", fontSize: 10, fontWeight: "600", flexShrink: 1 },
+  safe:         { flex: 1, backgroundColor: "#F8FAFC" },
 
-  emptyState:       { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
-  emptyIcon:        { fontSize: 48, marginBottom: 12 },
-  emptyTitle:       { fontSize: 18, fontWeight: "700", color: G_DARK, marginBottom: 6 },
-  emptySub:         { fontSize: 13, color: "#64748B", textAlign: "center", marginBottom: 16 },
-  refreshBtn:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: G_LIGHT,
-                      borderWidth: 1.5, borderColor: G, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  refreshTxt:       { color: G, fontSize: 14, fontWeight: "600" },
+  /* Header */
+  header:       { backgroundColor: G_DARK, paddingHorizontal: 20, paddingVertical: 14,
+                  flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:  { color: "white", fontSize: 18, fontWeight: "700" },
+  headerSub:    { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
+  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
 
-  tripChips:        { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
-  chip:             { borderRadius: 20, borderWidth: 1.5, borderColor: "#CBD5E1", paddingHorizontal: 14, paddingVertical: 6 },
-  chipActive:       { borderColor: G, backgroundColor: G },
-  chipText:         { fontSize: 13, color: "#475569" },
-  chipTextActive:   { color: "white", fontWeight: "600" },
+  /* Empty state */
+  emptyState:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
+  emptyCard:    { backgroundColor: "#fff", borderRadius: 14, padding: 28, alignItems: "center", gap: 10,
+                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, marginBottom: 12 },
+  emptyIcon:    { fontSize: 48 },
+  emptyTitle:   { fontSize: 18, fontWeight: "700", color: "#1E293B" },
+  emptySub:     { fontSize: 13, color: "#64748B", textAlign: "center", lineHeight: 19 },
+  refreshBtn:   { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: G_LIGHT,
+                  borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  refreshTxt:   { fontSize: 14, fontWeight: "600", color: G },
 
-  tripCard:         { margin: 16, marginBottom: 0, backgroundColor: "white", borderRadius: 16, padding: 16,
-                      shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
-                      elevation: 3, borderLeftWidth: 4, borderLeftColor: G },
-  tripRoute:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  tripCity:         { fontSize: 20, fontWeight: "800", color: G_DARK },
-  tripArrow:        { flexDirection: "row", alignItems: "center", flex: 1, marginHorizontal: 8, gap: 4 },
-  arrowLine:        { flex: 1, height: 1.5, backgroundColor: "#CBD5E1" },
-  tripMeta:         { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  metaItem:         { flexDirection: "row", alignItems: "center", gap: 5 },
-  metaText:         { fontSize: 13, color: "#475569" },
-  occupancy:        { marginTop: 12 },
-  occRow:           { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  occLabel:         { fontSize: 12, color: "#64748B" },
-  occCount:         { fontSize: 12, fontWeight: "700", color: G_DARK },
-  occBar:           { height: 6, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" },
-  occFill:          { height: "100%", backgroundColor: G, borderRadius: 3 },
+  /* Trip selector chips */
+  tripChips:    { paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  chip:         { backgroundColor: "#fff", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7,
+                  borderWidth: 1.5, borderColor: "#E2E8F0" },
+  chipActive:   { backgroundColor: G, borderColor: G },
+  chipText:     { fontSize: 13, fontWeight: "600", color: "#475569" },
+  chipTextActive: { color: "#fff" },
 
-  tabsScroll:       { marginHorizontal: 16, marginVertical: 12 },
-  tabs:             { flexDirection: "row", backgroundColor: "white",
-                      borderRadius: 10, padding: 4, gap: 4,
-                      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  tabBtn:           { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8, alignItems: "center" },
-  tabBtnActive:     { backgroundColor: G },
-  tabText:          { fontSize: 13, color: "#64748B", fontWeight: "600" },
-  tabTextActive:    { color: "white" },
+  /* Trip card */
+  tripCard:     { marginHorizontal: 16, marginTop: 12, marginBottom: 8, backgroundColor: "#fff",
+                  borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.07,
+                  shadowRadius: 10, elevation: 4, gap: 12 },
+  tripRouteRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  tripCityLabel:{ fontSize: 10, color: "#94A3B8", fontWeight: "600", marginBottom: 3, textTransform: "uppercase", letterSpacing: 0.5 },
+  tripCity:     { fontSize: 20, fontWeight: "800", color: "#0F172A" },
+  tripTime:     { fontSize: 13, color: "#059669", fontWeight: "700", marginTop: 3 },
+  tripArrow:    { flex: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 8 },
+  arrowLine:    { flex: 1, height: 2, backgroundColor: "#D1FAE5" },
+  busBadge:     { backgroundColor: G, borderRadius: 18, width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  tripInfoRow:  { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tripInfoPill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F1F5F9",
+                  borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  tripInfoTxt:  { fontSize: 12, color: "#475569", fontWeight: "600" },
 
-  body:             { paddingHorizontal: 16, paddingBottom: 80 },
-  sectionTitle:     { fontSize: 14, fontWeight: "700", color: G_DARK, marginTop: 4, marginBottom: 10 },
+  /* Occupancy bar */
+  occBar:       { height: 6, backgroundColor: "#D1FAE5", borderRadius: 3, overflow: "hidden" },
+  occFill:      { height: 6, backgroundColor: G, borderRadius: 3 },
 
-  gpsCard:          { backgroundColor: "white", borderRadius: 12, padding: 14, borderWidth: 1.5,
-                      marginBottom: 12,
-                      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  gpsRow:           { flexDirection: "row", alignItems: "center" },
-  gpsTitle:         { fontSize: 14, fontWeight: "700", color: "#1E293B" },
-  gpsSub:           { fontSize: 12, color: "#64748B", marginTop: 2 },
-  gpsActiveBadge:   { backgroundColor: "#DCFCE7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  gpsActiveBadgeTxt:{ fontSize: 10, fontWeight: "800", color: "#166534", letterSpacing: 0.5 },
+  /* GPS strip (inside trip card) */
+  gpsStrip:     { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  gpsDotSmall:  { width: 7, height: 7, borderRadius: 4 },
+  gpsStripTxt:  { fontSize: 12, fontWeight: "600", flex: 1 },
+  gpsLiveBadge: { backgroundColor: "#DCFCE7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  gpsLiveTxt:   { fontSize: 10, fontWeight: "800", color: "#166534" },
 
-  actionsGrid:      { flexDirection: "row", gap: 10, marginBottom: 16 },
-  actionBtn:        { flex: 1, backgroundColor: "white", borderRadius: 12, padding: 14, alignItems: "center", gap: 6,
-                      borderWidth: 1.5, borderColor: "#E2E8F0",
-                      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  actionBtnAmber:   { borderColor: "#FCD34D" },
-  actionBtnRed:     { borderColor: "#FCA5A5" },
-  actionLabel:      { fontSize: 12, fontWeight: "700", color: G },
+  /* Alert banner */
+  alertBanner:  { marginHorizontal: 16, marginBottom: 8, backgroundColor: "#FEE2E2", borderRadius: 12,
+                  padding: 12, flexDirection: "row", alignItems: "center", gap: 8,
+                  borderLeftWidth: 4, borderLeftColor: "#DC2626" },
 
-  timeline:         { backgroundColor: "white", borderRadius: 12, padding: 16, gap: 0,
-                      shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  timelineRow:      { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 0 },
-  timelineDot:      { width: 28, height: 28, borderRadius: 14, backgroundColor: "#E2E8F0",
-                      alignItems: "center", justifyContent: "center", zIndex: 1 },
-  timelineDotActive:{ backgroundColor: "#DCFCE7", borderWidth: 2, borderColor: G },
-  timelineDotDone:  { backgroundColor: "#DCFCE7" },
-  timelineLine:     { position: "absolute", left: 13, top: 28, width: 2, height: 32, backgroundColor: "#E2E8F0" },
-  timelineLineDone: { backgroundColor: G },
-  timelineLabel:    { fontSize: 13, color: "#64748B", paddingTop: 6, flex: 1 },
-  timelineLabelActive: { color: G_DARK, fontWeight: "700" },
+  /* Tabs */
+  tabsScroll:   { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: "#E2E8F0", backgroundColor: "#fff" },
+  tabs:         { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  tabBtn:       { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+                  backgroundColor: "#F1F5F9", borderWidth: 1.5, borderColor: "transparent" },
+  tabBtnActive: { backgroundColor: G_LIGHT, borderColor: G },
+  tabText:      { fontSize: 12, fontWeight: "600", color: "#64748B" },
+  tabTextActive:{ color: G_DARK, fontWeight: "700" },
 
-  passengerCard:    { backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 10,
-                      shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
-                      borderLeftWidth: 3, borderLeftColor: G },
-  passengerRow:     { flexDirection: "row", alignItems: "center", backgroundColor: "white",
-                      borderRadius: 10, padding: 12, marginBottom: 8, gap: 10,
-                      shadowColor: "#000", shadowOpacity: 0.03, shadowRadius: 3, elevation: 1 },
-  passengerAvatar:  { width: 36, height: 36, borderRadius: 18, backgroundColor: G_DARK,
-                      alignItems: "center", justifyContent: "center" },
-  passengerAvatarTxt: { color: "white", fontWeight: "700", fontSize: 15 },
-  passengerName:    { fontSize: 14, fontWeight: "600", color: "#1E293B" },
-  passengerSeat:    { fontSize: 12, color: "#64748B" },
-  badge:            { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeTxt:         { fontSize: 11, fontWeight: "700" },
+  /* Body */
+  body:         { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 0 },
+
+  /* Section title */
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 12 },
+
+  /* Passenger list header */
+  passengerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+  countBadge:   { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  countBadgeTxt:{ fontSize: 12, fontWeight: "800", color: "#fff" },
+
+  /* Passenger card */
+  passengerCard:{ backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 12,
+                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  passengerAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
+  passengerAvatarTxt: { fontSize: 19, fontWeight: "800", color: "#fff" },
+  passengerName:{ fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  passengerPhone:{ fontSize: 12, color: G, marginTop: 2, textDecorationLine: "underline" },
+  passengerNoPhone: { fontSize: 12, color: "#CBD5E1", marginTop: 2 },
+  divider:      { height: 1, backgroundColor: "#F1F5F9", marginVertical: 10 },
+  tagGreen:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0FDF4",
+                  borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  callBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                  marginTop: 10, backgroundColor: G_LIGHT, borderRadius: 10, paddingVertical: 10,
+                  borderWidth: 1, borderColor: "#A7F3D0" },
+  callBtnTxt:   { fontSize: 13, fontWeight: "700", color: G_DARK },
+
+  /* Add passenger button */
+  addPassengerBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                     backgroundColor: G, borderRadius: 14, paddingVertical: 15, marginTop: 8,
+                     shadowColor: G, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4 },
+  addPassengerBtnTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
+
+  /* Montée form */
+  monteeHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16,
+                  backgroundColor: "#fff", borderRadius: 14, padding: 14,
+                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  warningBanner:{ backgroundColor: "#FEF3C7", borderRadius: 12, padding: 14, marginBottom: 14,
+                  flexDirection: "row", alignItems: "center", gap: 10 },
+  successBanner:{ backgroundColor: "#DCFCE7", borderRadius: 14, padding: 16, marginBottom: 16,
+                  borderWidth: 1.5, borderColor: "#4ADE80" },
+  formCard:     { backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 14,
+                  shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  formField:    { gap: 6 },
+  fieldLabel:   { fontSize: 12, fontWeight: "700", color: "#374151" },
+  fieldInput:   { borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, backgroundColor: "#F0FDF4", color: "#111827" },
+  seatBtn:      { flex: 1, borderWidth: 1.5, borderColor: "#D1FAE5", borderRadius: 10,
+                  paddingVertical: 10, alignItems: "center", backgroundColor: "#F0FDF4" },
+  seatBtnActive:{ backgroundColor: G, borderColor: G },
+  seatBtnTxt:   { fontSize: 15, fontWeight: "800", color: G },
+  seatBtnTxtActive: { color: "#fff" },
+  submitBtn:    { backgroundColor: G, borderRadius: 12, paddingVertical: 14,
+                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  submitBtnTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
+
+  /* GPS card (in trajet tab) */
+  gpsCard:      { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 14,
+                  borderWidth: 1.5, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  gpsRow:       { flexDirection: "row", alignItems: "center" },
+  gpsTitle:     { fontSize: 14, fontWeight: "700", color: "#0F172A" },
+  gpsSub:       { fontSize: 12, color: "#64748B", marginTop: 2 },
+  gpsPill:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.12)",
+                  borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  gpsDot:       { width: 7, height: 7, borderRadius: 4 },
+  gpsLabel:     { fontSize: 11, color: "#fff", fontWeight: "600", maxWidth: 130 },
+  gpsActiveBadge:    { backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  gpsActiveBadgeTxt: { fontSize: 10, fontWeight: "800", color: "#065F46" },
+
+  /* Actions */
+  actionsGrid:  { flexDirection: "row", gap: 10, marginBottom: 16 },
+  actionBtn:    { flex: 1, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 14,
+                  alignItems: "center", gap: 6, borderWidth: 1.5, borderColor: "#D1FAE5",
+                  shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  actionBtnAmber: { borderColor: "#FDE68A" },
+  actionBtnRed:   { borderColor: "#FECACA" },
+  actionLabel:    { fontSize: 12, fontWeight: "700", color: G },
+
+  /* Timeline */
+  timeline:     { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 16,
+                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  timelineRow:  { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  timelineDot:  { width: 28, height: 28, borderRadius: 14, backgroundColor: "#E2E8F0",
+                  alignItems: "center", justifyContent: "center", marginRight: 12 },
+  timelineDotActive: { backgroundColor: G, shadowColor: G, shadowOpacity: 0.4, shadowRadius: 6, elevation: 4 },
+  timelineDotDone:   { backgroundColor: "#D1FAE5" },
+  timelineLine:      { width: 2, height: 22, backgroundColor: "#E2E8F0", marginLeft: 13, marginBottom: 4 },
+  timelineLineDone:  { backgroundColor: "#A7F3D0" },
+  timelineLabel:     { fontSize: 14, color: "#64748B", fontWeight: "600" },
+  timelineLabelActive: { color: G_DARK, fontWeight: "800", fontSize: 15 },
+
+  /* Departure badge (in trajet tab) */
+  departureBadge: { marginTop: 8, backgroundColor: "#F0F9FF", borderRadius: 12, padding: 14,
+                    borderLeftWidth: 4, borderLeftColor: "#0369A1" },
+
+  /* Rapport button */
+  rapportBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                  backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14,
+                  margin: 16, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
 });
