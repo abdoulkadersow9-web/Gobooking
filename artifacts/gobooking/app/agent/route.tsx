@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
-import { useNetworkStatus } from "@/utils/offline";
+import { useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import { useAgentGps } from "@/utils/useAgentGps";
 import OfflineBanner from "@/components/OfflineBanner";
 
@@ -16,6 +17,24 @@ const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
 const G_DARK  = "#065F46";
 const AMBER   = "#D97706";
+
+/* ── Types scan ticket ── */
+type ScanStatus = "valid" | "already_used" | "invalid" | "offline";
+interface ScanRouteResult {
+  status: ScanStatus;
+  passenger?: string;
+  route?: string;
+  departure_time?: string;
+  seats?: string;
+  message?: string;
+}
+
+/* ── Tickets de simulation pour tests en route ── */
+const DEMO_TICKETS_ROUTE = [
+  { ref: "GBB-2026-A001", name: "Coulibaly Jean",  seat: "D5", note: "En attente embarquement" },
+  { ref: "GBB-2026-A002", name: "Assiéta Koné",    seat: "E1", note: "En attente embarquement" },
+  { ref: "GBB-2026-B003", name: "Bamba Konan",     seat: "B2", note: "En attente embarquement" },
+];
 
 /* ── Constante stable hors composant (ne se recrée jamais) ── */
 const RESP = [
@@ -90,7 +109,7 @@ export default function RouteScreen() {
   const [reporting, setReporting]       = useState(false);
   const [arriving, setArriving]         = useState(false);
   const [refreshing, setRefreshing]     = useState(false);
-  const [tab, setTab]                   = useState<"passagers" | "montee" | "trajet" | "arrets" | "contacts" | "alertes">("passagers");
+  const [tab, setTab]                   = useState<"passagers" | "scan" | "montee" | "trajet" | "arrets" | "contacts" | "alertes">("passagers");
 
   /* ── Manual booking state ── */
   const [manualName,    setManualName]    = useState("");
@@ -121,6 +140,15 @@ export default function RouteScreen() {
   const pollRef          = useRef<ReturnType<typeof setInterval> | null>(null);
   const speedZeroRef     = useRef<number | null>(null);
   const anomalyInjected  = useRef<Set<string>>(new Set());
+
+  /* ── Scan ticket ── */
+  const [scanPerm, requestScanPerm]   = useCameraPermissions();
+  const [scanMode, setScanMode]       = useState<"camera" | "manual">("camera");
+  const [scanInput, setScanInput]     = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult]   = useState<ScanRouteResult | null>(null);
+  const scannedRouteRef               = useRef(false);
+  const scanPulse                     = useRef(new Animated.Value(1)).current;
 
   const assignedTripId = user?.tripId ?? null;
   const assignedBusId  = user?.busId  ?? null;
@@ -270,6 +298,63 @@ export default function RouteScreen() {
     } finally {
       setManualSaving(false);
     }
+  };
+
+  /* ── Scan ticket handler ── */
+  const triggerScanPulse = () => {
+    Animated.sequence([
+      Animated.timing(scanPulse, { toValue: 1.08, duration: 120, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(scanPulse, { toValue: 0.96, duration: 80,  easing: Easing.in(Easing.ease),  useNativeDriver: true }),
+      Animated.timing(scanPulse, { toValue: 1,    duration: 120, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleScanCode = async (code: string) => {
+    if (!code.trim() || scanLoading) return;
+    setScanLoading(true);
+    try {
+      const already = await isAlreadyScanned(code);
+      if (already) {
+        setScanResult({ status: "already_used", message: "Ce billet a déjà été scanné sur cet appareil." });
+        triggerScanPulse();
+        return;
+      }
+      if (!networkStatus.isOnline) {
+        setScanResult({ status: "offline", message: "Connexion requise pour valider un ticket en temps réel." });
+        triggerScanPulse();
+        return;
+      }
+      const res = await apiFetch<{
+        valid: boolean; message?: string; passenger?: string;
+        route?: string; departure_time?: string; seats?: string;
+      }>("/agent/validate-qr", {
+        method: "POST", token: token ?? undefined,
+        body: JSON.stringify({ qrCode: code }),
+      });
+      if (res.valid) {
+        await markAsScanned(code);
+        setScanResult({ status: "valid", passenger: res.passenger, route: res.route, departure_time: res.departure_time, seats: res.seats });
+        triggerScanPulse();
+        if (activeTrip) loadPassengers(activeTrip.id, true);
+      } else {
+        const msg = res.message ?? "";
+        const status: ScanStatus = msg.includes("déjà utilisé") ? "already_used" : "invalid";
+        setScanResult({ status, message: msg });
+        triggerScanPulse();
+      }
+    } catch {
+      setScanResult({ status: "offline", message: "Erreur réseau — vérifiez votre connexion." });
+      triggerScanPulse();
+    } finally {
+      setScanLoading(false);
+      scannedRouteRef.current = false;
+    }
+  };
+
+  const resetScan = () => {
+    setScanResult(null);
+    setScanInput("");
+    scannedRouteRef.current = false;
   };
 
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
@@ -596,6 +681,7 @@ export default function RouteScreen() {
             <View style={S.tabs}>
               {([
                 { key: "passagers", label: `👥 Passagers${passengers.length > 0 ? ` (${passengers.length})` : ""}` },
+                { key: "scan",      label: "🔍 Scan ticket" },
                 { key: "montee",    label: "➕ Montée" },
                 { key: "trajet",    label: "📍 Trajet" },
                 { key: "arrets",    label: `🗺 Arrêts${stopData.length > 0 ? ` (${stopData.length})` : ""}` },
@@ -717,6 +803,215 @@ export default function RouteScreen() {
                   <Ionicons name="person-add" size={18} color="#fff" />
                   <Text style={S.addPassengerBtnTxt}>Ajouter un passager en route</Text>
                 </TouchableOpacity>
+              </>
+            )}
+
+            {/* ══ SCAN TICKET ══ */}
+            {tab === "scan" && (
+              <>
+                {/* En-tête */}
+                <View style={S.scanHeader}>
+                  <Feather name="maximize" size={22} color={G} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={S.sectionTitle}>Scan ticket passager</Text>
+                    <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2, lineHeight: 17 }}>
+                      Scannez le QR code ou saisissez la référence du billet pour valider la montée à bord.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Résultat du scan */}
+                {scanResult && (
+                  <Animated.View style={[
+                    S.scanResultCard,
+                    { transform: [{ scale: scanPulse }] },
+                    scanResult.status === "valid"        && { borderColor: G,         backgroundColor: "#F0FDF4" },
+                    scanResult.status === "already_used" && { borderColor: "#F59E0B",  backgroundColor: "#FFFBEB" },
+                    scanResult.status === "invalid"      && { borderColor: "#DC2626",  backgroundColor: "#FEF2F2" },
+                    scanResult.status === "offline"      && { borderColor: "#6B7280",  backgroundColor: "#F9FAFB" },
+                  ]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <Feather
+                        name={scanResult.status === "valid" ? "check-circle" : scanResult.status === "already_used" ? "alert-circle" : scanResult.status === "offline" ? "wifi-off" : "x-circle"}
+                        size={24}
+                        color={scanResult.status === "valid" ? G : scanResult.status === "already_used" ? "#F59E0B" : scanResult.status === "offline" ? "#6B7280" : "#DC2626"}
+                      />
+                      <Text style={[
+                        S.scanResultTitle,
+                        { color: scanResult.status === "valid" ? G_DARK : scanResult.status === "already_used" ? "#92400E" : scanResult.status === "offline" ? "#374151" : "#991B1B" },
+                      ]}>
+                        {scanResult.status === "valid"        ? "✅ Passager validé — À bord !" :
+                         scanResult.status === "already_used" ? "⚠️ Billet déjà utilisé" :
+                         scanResult.status === "offline"      ? "📡 Hors ligne" :
+                                                                "❌ Billet invalide"}
+                      </Text>
+                    </View>
+                    {scanResult.passenger && (
+                      <View style={S.scanDetailRow}>
+                        <Feather name="user" size={14} color="#6B7280" />
+                        <Text style={S.scanDetailTxt}>{scanResult.passenger}</Text>
+                      </View>
+                    )}
+                    {scanResult.route && (
+                      <View style={S.scanDetailRow}>
+                        <Feather name="map-pin" size={14} color="#6B7280" />
+                        <Text style={S.scanDetailTxt}>{scanResult.route}</Text>
+                      </View>
+                    )}
+                    {scanResult.departure_time && (
+                      <View style={S.scanDetailRow}>
+                        <Feather name="clock" size={14} color="#6B7280" />
+                        <Text style={S.scanDetailTxt}>Départ : {scanResult.departure_time}</Text>
+                      </View>
+                    )}
+                    {scanResult.seats && (
+                      <View style={S.scanDetailRow}>
+                        <Feather name="grid" size={14} color="#6B7280" />
+                        <Text style={S.scanDetailTxt}>Siège(s) : {scanResult.seats}</Text>
+                      </View>
+                    )}
+                    {scanResult.message && scanResult.status !== "valid" && (
+                      <Text style={[S.scanDetailTxt, { marginTop: 6, fontStyle: "italic", color: "#6B7280" }]}>{scanResult.message}</Text>
+                    )}
+                    <TouchableOpacity style={S.scanResetBtn} onPress={resetScan}>
+                      <Feather name="refresh-cw" size={14} color={G} />
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: G }}>Nouveau scan</Text>
+                    </TouchableOpacity>
+                  </Animated.View>
+                )}
+
+                {/* Sélecteur mode */}
+                {!scanResult && (
+                  <View style={S.scanModeBar}>
+                    {(["camera", "manual"] as const).map(m => (
+                      <TouchableOpacity
+                        key={m}
+                        style={[S.scanModeBtn, scanMode === m && S.scanModeBtnActive]}
+                        onPress={() => { setScanMode(m); resetScan(); }}
+                      >
+                        <Feather name={m === "camera" ? "camera" : "edit-2"} size={14} color={scanMode === m ? G : "#6b7280"} />
+                        <Text style={[S.scanModeTxt, scanMode === m && S.scanModeTxtActive]}>
+                          {m === "camera" ? "Caméra QR" : "Saisie manuelle"}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {/* Mode caméra */}
+                {!scanResult && scanMode === "camera" && (
+                  <>
+                    {!scanPerm?.granted ? (
+                      <View style={S.scanPermBox}>
+                        <Feather name="camera-off" size={36} color="#94A3B8" style={{ marginBottom: 10 }} />
+                        <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", marginBottom: 6 }}>Accès caméra requis</Text>
+                        <Text style={{ fontSize: 13, color: "#6B7280", textAlign: "center", marginBottom: 14, lineHeight: 18 }}>
+                          Autorisez la caméra pour scanner les QR codes des billets.
+                        </Text>
+                        <TouchableOpacity style={S.scanPermBtn} onPress={requestScanPerm}>
+                          <Feather name="camera" size={15} color="#fff" />
+                          <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>Autoriser la caméra</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View style={S.scanCameraWrap}>
+                        <CameraView
+                          style={S.scanCamera}
+                          facing="back"
+                          barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                          onBarcodeScanned={!scannedRouteRef.current && !scanLoading && !scanResult
+                            ? ({ data }: { data: string }) => {
+                                if (scannedRouteRef.current || scanLoading) return;
+                                scannedRouteRef.current = true;
+                                handleScanCode(data);
+                              }
+                            : undefined}
+                        />
+                        <View style={S.scanOverlay}>
+                          <View style={S.scanBox}>
+                            <View style={[S.scanCorner, S.scanCornerTL]} />
+                            <View style={[S.scanCorner, S.scanCornerTR]} />
+                            <View style={[S.scanCorner, S.scanCornerBL]} />
+                            <View style={[S.scanCorner, S.scanCornerBR]} />
+                            {scanLoading
+                              ? <ActivityIndicator size="large" color="#fff" />
+                              : <Feather name="maximize" size={22} color="rgba(255,255,255,0.5)" />}
+                          </View>
+                          <View style={S.scanHintPill}>
+                            <Feather name="zap" size={13} color="rgba(255,255,255,0.9)" />
+                            <Text style={S.scanHintTxt}>Alignez le QR code du billet dans le cadre</Text>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* Mode saisie manuelle */}
+                {!scanResult && scanMode === "manual" && (
+                  <View style={S.scanManualBox}>
+                    <Feather name="hash" size={28} color={G} style={{ marginBottom: 8 }} />
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: "#1F2937", marginBottom: 4 }}>Référence du billet</Text>
+                    <Text style={{ fontSize: 12, color: "#6B7280", marginBottom: 14, textAlign: "center" }}>
+                      Entrez la référence si le QR ne fonctionne pas
+                    </Text>
+                    <TextInput
+                      style={S.scanInput}
+                      placeholder="Ex: GBB-2026-XXXXX"
+                      placeholderTextColor="#9CA3AF"
+                      value={scanInput}
+                      onChangeText={setScanInput}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={() => { if (scanInput.trim()) { handleScanCode(scanInput.trim()); setScanInput(""); } }}
+                    />
+                    <TouchableOpacity
+                      style={[S.scanValidateBtn, (!scanInput.trim() || scanLoading) && { opacity: 0.45 }]}
+                      onPress={() => { if (scanInput.trim() && !scanLoading) { handleScanCode(scanInput.trim()); setScanInput(""); } }}
+                      disabled={!scanInput.trim() || scanLoading}
+                    >
+                      {scanLoading
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <Feather name="check-circle" size={16} color="#fff" />}
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
+                        {scanLoading ? "Validation…" : "Valider le billet"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Tickets de simulation */}
+                {!scanResult && (
+                  <View style={S.demoSection}>
+                    <Text style={S.demoTitle}>🧪 Tickets de test (simulation)</Text>
+                    <Text style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 10 }}>
+                      Appuyez sur une référence pour la tester directement
+                    </Text>
+                    {DEMO_TICKETS_ROUTE.map(t => (
+                      <TouchableOpacity
+                        key={t.ref}
+                        style={S.demoTicketRow}
+                        onPress={() => handleScanCode(t.ref)}
+                        disabled={scanLoading}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={S.demoTicketRef}>{t.ref}</Text>
+                          <Text style={S.demoTicketName}>{t.name} · Siège {t.seat}</Text>
+                          <Text style={S.demoTicketNote}>{t.note}</Text>
+                        </View>
+                        <View style={S.demoScanBtn}>
+                          {scanLoading
+                            ? <ActivityIndicator size="small" color={G} />
+                            : <Feather name="maximize" size={16} color={G} />}
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                    <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 8, textAlign: "center" }}>
+                      En production : utilisez la caméra pour scanner le QR du passager
+                    </Text>
+                  </View>
+                )}
               </>
             )}
 
@@ -1384,4 +1679,57 @@ const S = StyleSheet.create({
   rapportBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
                   backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14,
                   margin: 16, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+
+  /* ── Scan ticket tab ── */
+  scanHeader:       { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  scanResultCard:   { borderRadius: 16, borderWidth: 2, padding: 16, marginBottom: 16,
+                      shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  scanResultTitle:  { fontSize: 16, fontWeight: "800", flex: 1, lineHeight: 22 },
+  scanDetailRow:    { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+  scanDetailTxt:    { fontSize: 13, color: "#374151", flex: 1, lineHeight: 18 },
+  scanResetBtn:     { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14,
+                      backgroundColor: "#F0FDF4", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14,
+                      alignSelf: "flex-start", borderWidth: 1, borderColor: "#D1FAE5" },
+  scanModeBar:      { flexDirection: "row", backgroundColor: "#fff", borderRadius: 12,
+                      borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 14, overflow: "hidden" },
+  scanModeBtn:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                      gap: 6, paddingVertical: 11 },
+  scanModeBtnActive:{ borderBottomWidth: 2.5, borderBottomColor: G, backgroundColor: "#F0FDF4" },
+  scanModeTxt:      { fontSize: 13, fontWeight: "600", color: "#6b7280" },
+  scanModeTxtActive:{ color: G_DARK, fontWeight: "700" },
+  scanPermBox:      { backgroundColor: "#fff", borderRadius: 16, padding: 24, alignItems: "center",
+                      marginBottom: 16, borderWidth: 1.5, borderColor: "#E2E8F0" },
+  scanPermBtn:      { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: G,
+                      borderRadius: 12, paddingVertical: 12, paddingHorizontal: 20 },
+  scanCameraWrap:   { height: 260, borderRadius: 16, overflow: "hidden", marginBottom: 14, position: "relative" },
+  scanCamera:       { flex: 1 },
+  scanOverlay:      { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" },
+  scanBox:          { width: 190, height: 190, justifyContent: "center", alignItems: "center",
+                      borderWidth: 0 },
+  scanCorner:       { position: "absolute", width: 22, height: 22, borderColor: "#fff", borderWidth: 3 },
+  scanCornerTL:     { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 6 },
+  scanCornerTR:     { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 6 },
+  scanCornerBL:     { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 6 },
+  scanCornerBR:     { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 6 },
+  scanHintPill:     { position: "absolute", bottom: 14, flexDirection: "row", alignItems: "center", gap: 5,
+                      backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  scanHintTxt:      { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600" },
+  scanManualBox:    { backgroundColor: "#fff", borderRadius: 16, padding: 20, alignItems: "center",
+                      marginBottom: 14, borderWidth: 1.5, borderColor: "#E2E8F0" },
+  scanInput:        { width: "100%", borderWidth: 1.5, borderColor: "#D1D5DB", borderRadius: 10,
+                      paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#111827",
+                      textAlign: "center", fontWeight: "700", letterSpacing: 1, marginBottom: 12 },
+  scanValidateBtn:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: G,
+                      borderRadius: 12, paddingVertical: 13, paddingHorizontal: 24 },
+  demoSection:      { backgroundColor: "#F8FAFC", borderRadius: 14, padding: 14,
+                      borderWidth: 1.5, borderColor: "#E2E8F0", marginBottom: 8 },
+  demoTitle:        { fontSize: 13, fontWeight: "800", color: "#374151", marginBottom: 4 },
+  demoTicketRow:    { flexDirection: "row", alignItems: "center", backgroundColor: "#fff",
+                      borderRadius: 10, padding: 12, marginBottom: 8,
+                      borderWidth: 1, borderColor: "#E5E7EB" },
+  demoTicketRef:    { fontSize: 13, fontWeight: "800", color: "#1F2937", fontFamily: "monospace" },
+  demoTicketName:   { fontSize: 12, color: "#4B5563", marginTop: 2 },
+  demoTicketNote:   { fontSize: 11, color: "#9CA3AF", marginTop: 1, fontStyle: "italic" },
+  demoScanBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: G_LIGHT,
+                      justifyContent: "center", alignItems: "center" },
 });

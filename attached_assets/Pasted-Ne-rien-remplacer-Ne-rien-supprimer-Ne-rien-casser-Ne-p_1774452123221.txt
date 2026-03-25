@@ -1,0 +1,148 @@
+Ne rien remplacer.
+Ne rien supprimer.
+Ne rien casser.
+Ne pas modifier la logique existante.
+
+Adapter uniquement la fonctionnalité de scan ticket selon la logique réelle du programme.
+
+---
+
+PROBLÈME ACTUEL :
+
+Dans l’application :
+
+- la fonctionnalité "scan ticket" / validation est visible dans l’espace Agent embarquement
+- mais elle n’est pas correctement appliquée dans l’espace Agent en route
+
+Or, selon la logique réelle du transport :
+
+👉 c’est l’Agent en route qui doit gérer le scan des tickets en situation réelle
+
+---
+
+OBJECTIF :
+
+Adapter le système pour que le scan ticket soit correctement disponible et fonctionnel dans l’espace Agent en route.
+
+---
+
+1. LOGIQUE MÉTIER À RESPECTER
+
+Quand un client réserve :
+
+- il reçoit un ticket (QR code / code)
+- il se présente au point d’embarquement (gare ou arrêt)
+
+Quand le bus arrive :
+
+👉 l’Agent en route doit pouvoir scanner le ticket du client
+
+---
+
+2. FONCTION SCAN (TRÈS IMPORTANT)
+
+Dans l’espace Agent en route, ajouter / activer :
+
+- scan QR code
+OU
+- saisie code ticket
+
+---
+
+3. VALIDATION DU TICKET
+
+Quand l’agent scanne :
+
+Le système doit :
+
+- vérifier que le ticket est valide
+- vérifier que le ticket correspond au bon trajet
+- vérifier que le ticket n’est pas déjà utilisé
+
+---
+
+4. ACTION APRÈS VALIDATION
+
+Si le ticket est valide :
+
+👉 automatiquement :
+
+- le passager est ajouté à la liste des passagers
+- le statut devient : "À bord"
+- le ticket est marqué comme utilisé / validé
+
+---
+
+5. CAS D’ERREUR
+
+Si problème :
+
+- ticket invalide
+- mauvais trajet
+- ticket déjà utilisé
+
+👉 afficher un message clair :
+- "Ticket invalide"
+- "Ticket déjà utilisé"
+- "Ce ticket ne correspond pas à ce trajet"
+
+---
+
+6. SYNCHRONISATION
+
+Après validation :
+
+- mise à jour en temps réel :
+  - liste passagers
+  - agent route
+  - agent suivi
+  - historique
+
+---
+
+7. IMPORTANT
+
+- ne pas supprimer la fonction existante
+- ne pas casser l’agent embarquement
+- adapter seulement pour que l’Agent en route ait aussi cette fonction
+
+---
+
+8. ADAPTATION AU PROGRAMME
+
+Respecter la logique réelle du terrain :
+
+- scan fait par l’agent en route
+- validation directe au moment de montée
+- ajout automatique dans la liste
+
+---
+
+9. DONNÉES DE SIMULATION
+
+Ajouter des tickets simulés pour test :
+
+- QR code ou code simple
+- passagers simulés
+- trajets simulés
+
+Pour pouvoir tester le scan en direct.
+
+---
+
+10. OBJECTIF FINAL
+
+Dans l’espace Agent en route :
+
+- possibilité de scanner un ticket
+- validation immédiate
+- ajout automatique du passager
+- synchronisation en temps réel
+
+---
+
+IMPORTANT FINAL :
+
+Ne rien casser.
+Ne pas modifier la logique existante.
+Adapter uniquement pour que le scan ticket soit correctement fonctionnel dans l’espace Agent en route selon la logique réelle du programme.
