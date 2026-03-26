@@ -1020,7 +1020,14 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
     return p.status === f;
   }
 
-  const arrivedCount = parcels.filter(p => ["arrivé","arrive"].includes(p.status)).length;
+  const arrivedCount  = parcels.filter(p => ["arrivé","arrive"].includes(p.status)).length;
+  const totalActionCount = parcels.filter(p => getNextAction(p) !== null).length;
+  const actionBreakdown = [
+    { key: "arrivé",     label: "arrivés",       count: parcels.filter(p => ["arrivé","arrive"].includes(p.status)).length },
+    { key: "en_gare",    label: "en gare",        count: parcels.filter(p => p.status === "en_gare").length },
+    { key: "en_transit", label: "en transit",     count: parcels.filter(p => p.status === "en_transit").length },
+    { key: "créé",       label: "créés",          count: parcels.filter(p => p.status === "créé").length },
+  ].filter(s => s.count > 0);
 
   /* ── Sort parcels: most recent first ── */
   const sortByDate = (list: Parcel[]) =>
@@ -1049,12 +1056,25 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
     const nextAction = getNextAction(p);
     const statusInfo = STATUSES[p.status] ?? { color: "#6B7280", bg: "#F3F4F6", label: p.status };
     const isHomeDelivery = p.deliveryType === "livraison_domicile";
+    const isDone = !nextAction;
+
     return (
-      <View key={p.id} style={[SL.card, { borderLeftWidth: 4, borderLeftColor: statusInfo.color }]}>
-        {/* Top row: ref + route + status badge + date */}
+      <View key={p.id} style={[
+        SL.card,
+        { borderLeftWidth: isDone ? 3 : 5, borderLeftColor: statusInfo.color },
+        isDone && { opacity: 0.72, elevation: 1, shadowOpacity: 0.03 },
+        !isDone && {
+          elevation: 4,
+          shadowColor: statusInfo.color,
+          shadowOpacity: 0.13,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+        },
+      ]}>
+        {/* Top row: ref + route + status badge + print icon + date */}
         <View style={SL.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={SL.ref}>{p.trackingRef}</Text>
+            <Text style={[SL.ref, isDone && { color: "#6B7280" }]}>{p.trackingRef}</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
               <Ionicons name="navigate-outline" size={12} color="#9CA3AF" />
               <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
@@ -1064,13 +1084,29 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
               <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
             </View>
           </View>
-          <View style={{ alignItems: "flex-end", gap: 5 }}>
+          {/* Right column: status badge + print + date */}
+          <View style={{ alignItems: "flex-end", gap: 6 }}>
             <StatusBadge status={p.status} />
-            {p.createdAt ? (
-              <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "500" }}>
-                {new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
-              </Text>
-            ) : null}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {p.createdAt ? (
+                <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "500" }}>
+                  {new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                onPress={() => printLabel({
+                  trackingRef: p.trackingRef,
+                  senderName: p.senderName, senderPhone: p.senderPhone,
+                  receiverName: p.receiverName, receiverPhone: p.receiverPhone,
+                  fromCity: p.fromCity, toCity: p.toCity,
+                  parcelType: p.parcelType, weight: p.weight ? String(p.weight) : "",
+                  amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
+                })}
+                style={{ padding: 4 }}
+              >
+                <Ionicons name="print-outline" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -1081,7 +1117,7 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
               {p.parcelType}{p.weight ? ` · ${p.weight}kg` : ""}
             </Text>
           </View>
-          <View style={{ backgroundColor: "#F1F5F9", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+          <View style={{ backgroundColor: "#EFF6FF", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
             <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "700" }}>
               {Number(p.amount).toLocaleString()} FCFA
             </Text>
@@ -1096,49 +1132,36 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
         {/* Progress bar */}
         <MiniProgress status={p.status} />
 
-        {/* Action buttons */}
-        <View style={{ flexDirection: "row", gap: 8, marginTop: 2 }}>
-          {nextAction && (
-            <TouchableOpacity
-              style={[SL.actionBtn, {
-                backgroundColor: nextAction.color, borderColor: nextAction.color,
-                flex: 1, flexDirection: "row", gap: 6,
-                shadowColor: nextAction.color, shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.3, shadowRadius: 5, elevation: 3,
-              }]}
-              onPress={() => handleStatusUpdate(p)}
-              disabled={updating === p.id}
-              activeOpacity={0.82}
-            >
-              {updating === p.id
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <>
-                    <Ionicons name="arrow-forward-circle-outline" size={16} color="#fff" />
-                    <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
-                  </>
-              }
-            </TouchableOpacity>
-          )}
-          {!nextAction && (
-            <View style={[SL.actionBtn, { flex: 1, backgroundColor: "#F9FAFB", borderColor: "#E2E8F0", flexDirection: "row", gap: 6, justifyContent: "center" }]}>
-              <Ionicons name="checkmark-done" size={15} color="#6B7280" />
-              <Text style={[SL.actionTxt, { color: "#9CA3AF" }]}>Terminé</Text>
-            </View>
-          )}
+        {/* Primary action — FULL WIDTH for maximum tap speed */}
+        {nextAction ? (
           <TouchableOpacity
-            style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: "#DDD6FE", paddingHorizontal: 14 }]}
-            onPress={() => printLabel({
-              trackingRef: p.trackingRef,
-              senderName: p.senderName, senderPhone: p.senderPhone,
-              receiverName: p.receiverName, receiverPhone: p.receiverPhone,
-              fromCity: p.fromCity, toCity: p.toCity,
-              parcelType: p.parcelType, weight: p.weight ? String(p.weight) : "",
-              amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
-            })}
+            style={{
+              backgroundColor: nextAction.color,
+              borderRadius: 12, paddingVertical: 16,
+              flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+              shadowColor: nextAction.color, shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+            }}
+            onPress={() => handleStatusUpdate(p)}
+            disabled={updating === p.id}
+            activeOpacity={0.8}
           >
-            <Ionicons name="print-outline" size={16} color={P} />
+            {updating === p.id
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <>
+                  <Ionicons name="arrow-forward-circle" size={20} color="#fff" />
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff", letterSpacing: -0.2 }}>
+                    {nextAction.label}
+                  </Text>
+                </>
+            }
           </TouchableOpacity>
-        </View>
+        ) : (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8 }}>
+            <Ionicons name="checkmark-done-circle" size={16} color="#9CA3AF" />
+            <Text style={{ fontSize: 12, color: "#9CA3AF", fontWeight: "600" }}>Terminé</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -1146,23 +1169,45 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
   return (
     <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
 
-      {/* Bannière arrivées urgentes */}
-      {filter === "tous" && arrivedCount > 0 && (
-        <TouchableOpacity onPress={() => setFilter("arrivé")}
-          style={{ marginHorizontal: 12, marginTop: 10, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#6EE7B7" }}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#059669", justifyContent: "center", alignItems: "center" }}>
-            <Ionicons name="location" size={18} color="#fff" />
+      {/* Bannière synthèse globale — affiché uniquement en vue "Tous" s'il y a des actions */}
+      {filter === "tous" && totalActionCount > 0 && (
+        <View style={{ marginHorizontal: 12, marginTop: 10, backgroundColor: "#FFF7ED", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FED7AA" }}>
+          {/* Header principal */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, padding: 12, paddingBottom: 10 }}>
+            <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#F97316", justifyContent: "center", alignItems: "center" }}>
+              <Ionicons name="flash" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#9A3412", letterSpacing: -0.3 }}>
+                {totalActionCount} action{totalActionCount > 1 ? "s" : ""} en attente
+              </Text>
+              <Text style={{ fontSize: 11, color: "#EA580C", marginTop: 1 }}>
+                Appuyez sur un filtre pour traiter chaque groupe
+              </Text>
+            </View>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 14, fontWeight: "800", color: "#065F46" }}>
-              {arrivedCount} colis arrivé{arrivedCount > 1 ? "s" : ""} — action requise
-            </Text>
-            <Text style={{ fontSize: 11, color: "#059669", marginTop: 1 }}>
-              Prêt{arrivedCount > 1 ? "s" : ""} pour retrait · Appuyer pour filtrer
-            </Text>
+          {/* Chips rapides cliquables par statut */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 12, paddingBottom: 12 }}>
+            {actionBreakdown.map(s => {
+              const STATUS_COLORS: Record<string, string> = {
+                arrivé: "#059669", en_gare: "#D97706", en_transit: "#2563EB", "créé": "#6B7280",
+              };
+              const col = STATUS_COLORS[s.key] ?? "#6B7280";
+              return (
+                <TouchableOpacity
+                  key={s.key}
+                  onPress={() => setFilter(s.key)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: col + "18", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: col + "44" }}
+                >
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: col }} />
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: col }}>
+                    {s.count} {s.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#059669" />
-        </TouchableOpacity>
+        </View>
       )}
 
       {/* Filter chips */}
