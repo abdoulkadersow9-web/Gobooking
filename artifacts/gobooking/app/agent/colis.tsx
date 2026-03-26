@@ -78,6 +78,41 @@ function getNextAction(parcel: Parcel): NextAction | null {
   return null;
 }
 
+function getStatusStep(status: string): number {
+  if (["créé","cree","en_attente"].includes(status)) return 1;
+  if (["en_gare","arrive_gare_depart"].includes(status)) return 2;
+  if (["chargé_bus","en_transit","en_route"].includes(status)) return 3;
+  if (["arrivé","arrive","en_livraison"].includes(status)) return 4;
+  if (["retiré","retire","livré","livre"].includes(status)) return 5;
+  return 0;
+}
+
+const STEP_COLORS = ["#6B7280","#D97706","#2563EB","#059669","#065F46"];
+const STEP_ICONS  = ["📝","🏢","🚌","📍","✅"];
+
+function MiniProgress({ status }: { status: string }) {
+  const step = getStatusStep(status);
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 }}>
+      {STEP_COLORS.map((color, i) => {
+        const filled  = i < step;
+        const current = i === step - 1;
+        return (
+          <React.Fragment key={i}>
+            <View style={{
+              width: current ? 20 : 14, height: 6, borderRadius: 3,
+              backgroundColor: filled ? color : "#E5E7EB",
+            }} />
+          </React.Fragment>
+        );
+      })}
+      <Text style={{ fontSize: 10, color: STEP_COLORS[step - 1] ?? "#9CA3AF", fontWeight: "700", marginLeft: 4 }}>
+        {STEP_ICONS[step - 1] ?? "⬜"} Étape {step > 0 ? step : "?"}/5
+      </Text>
+    </View>
+  );
+}
+
 function getNotifMessage(action: string, parcel: Parcel): string | null {
   const ref = parcel.trackingRef;
   const to  = parcel.toCity;
@@ -774,16 +809,34 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
         {/* Villes */}
         <View style={SC.card}>
           <View style={SC.cardHeader}><Ionicons name="navigate-outline" size={18} color={P} /><Text style={SC.cardTitle}>Trajet</Text></View>
-          <Text style={SC.label}>Ville de départ</Text>
-          <TouchableOpacity style={SC.pickerBtn} onPress={() => setShowFromPicker(true)}>
-            <Text style={SC.pickerTxt}>{fromCity}</Text>
-            <Ionicons name="chevron-down" size={16} color={P} />
-          </TouchableOpacity>
-          <Text style={SC.label}>Ville d'arrivée</Text>
-          <TouchableOpacity style={SC.pickerBtn} onPress={() => setShowToPicker(true)}>
-            <Text style={SC.pickerTxt}>{toCity}</Text>
-            <Ionicons name="chevron-down" size={16} color={P} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[SC.label, { marginBottom: 6 }]}>Départ</Text>
+              <TouchableOpacity style={SC.pickerBtn} onPress={() => setShowFromPicker(true)}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                  <Text style={{ fontSize: 14 }}>🏙️</Text>
+                  <Text style={SC.pickerTxt}>{fromCity}</Text>
+                </View>
+                <Ionicons name="chevron-down" size={14} color={P} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={{ width: 38, height: 46, borderRadius: 12, backgroundColor: P_LIGHT, borderWidth: 1.5, borderColor: "#DDD6FE", justifyContent: "center", alignItems: "center", marginBottom: 1 }}
+              onPress={() => { const tmp = fromCity; setFromCity(toCity); setToCity(tmp); }}
+            >
+              <Ionicons name="swap-horizontal" size={18} color={P} />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={[SC.label, { marginBottom: 6 }]}>Arrivée</Text>
+              <TouchableOpacity style={SC.pickerBtn} onPress={() => setShowToPicker(true)}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+                  <Text style={{ fontSize: 14 }}>📍</Text>
+                  <Text style={SC.pickerTxt}>{toCity}</Text>
+                </View>
+                <Ionicons name="chevron-down" size={14} color={P} />
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
 
         {/* Expéditeur */}
@@ -988,18 +1041,35 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
         ))}
       </ScrollView>
 
-      {loading && <ActivityIndicator color={P} style={{ marginTop: 24 }} />}
+      {loading && (
+        <View style={{ alignItems: "center", marginTop: 40, gap: 12 }}>
+          <ActivityIndicator color={P} size="large" />
+          <Text style={{ fontSize: 13, color: "#9CA3AF" }}>Chargement des colis…</Text>
+        </View>
+      )}
       {!loading && parcels.length === 0 && (
-        <View style={{ alignItems: "center", marginTop: 40, gap: 8 }}>
-          <Text style={{ fontSize: 36 }}>📦</Text>
-          <Text style={{ fontSize: 15, color: "#9CA3AF" }}>Aucun colis trouvé</Text>
-          <TouchableOpacity onPress={load}><Text style={{ color: P, fontWeight: "600" }}>Actualiser</Text></TouchableOpacity>
+        <View style={{ alignItems: "center", marginTop: 48, gap: 10, paddingHorizontal: 32 }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: P_LIGHT, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 32 }}>📦</Text>
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: "800", color: "#374151" }}>Aucun colis</Text>
+          <Text style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 19 }}>
+            Créez votre premier colis via l'onglet "Nouveau"
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: 4, backgroundColor: P, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 }}
+            onPress={load}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Actualiser</Text>
+          </TouchableOpacity>
         </View>
       )}
       {!loading && displayedParcels.length === 0 && parcels.length > 0 && (
-        <View style={{ alignItems: "center", marginTop: 40, gap: 8 }}>
-          <Text style={{ fontSize: 36 }}>📦</Text>
-          <Text style={{ fontSize: 15, color: "#9CA3AF" }}>Aucun colis pour ce filtre</Text>
+        <View style={{ alignItems: "center", marginTop: 48, gap: 8, paddingHorizontal: 32 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" }}>
+            <Ionicons name="filter-outline" size={28} color="#9CA3AF" />
+          </View>
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151" }}>Aucun colis dans cette étape</Text>
+          <Text style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center" }}>Essayez "Tous" pour voir tous les colis</Text>
         </View>
       )}
 
@@ -1020,11 +1090,13 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
                 <Text style={SL.metaTxt}>{p.parcelType} {p.weight ? `· ${p.weight}kg` : ""}</Text>
                 <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
               </View>
+              {/* Mini progress bar */}
+              <MiniProgress status={p.status} />
               {/* Delivery type badge */}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <View style={{ backgroundColor: p.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
                   <Text style={{ fontSize: 10, fontWeight: "700", color: p.deliveryType === "livraison_domicile" ? "#EA580C" : "#065F46" }}>
-                    {p.deliveryType === "livraison_domicile" ? "🛵 Domicile" : "🏠 Gare"}
+                    {p.deliveryType === "livraison_domicile" ? "🛵 Domicile" : "🏢 Gare"}
                   </Text>
                 </View>
               </View>
