@@ -184,8 +184,11 @@ export default function ColisScreen() {
         <View style={S.headerRow}>
           <View style={S.headerIcon}><Ionicons name="cube" size={22} color="#fff" /></View>
           <View>
-            <Text style={S.headerTitle}>📦 Gestion Colis</Text>
-            <Text style={S.headerSub}>{networkStatus.isOnline ? "Enregistrer · Suivre · Livrer" : "⚡ Hors ligne"}</Text>
+            <Text style={S.headerTitle}>Gestion Colis</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: networkStatus.isOnline ? "#34D399" : "#F87171" }} />
+              <Text style={S.headerSub}>{networkStatus.isOnline ? "En ligne · Suivre · Livrer" : "Hors ligne"}</Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity onPress={logout} style={S.logoutBtn}>
@@ -195,14 +198,15 @@ export default function ColisScreen() {
 
       {/* Tabs */}
       <View style={S.tabs}>
-        {(["retrait", "valider", "liste", "creer"] as TabType[]).map(t => (
-          <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
-            <Text style={[S.tabTxt, tab === t && S.tabTxtActive]}>
-              {t === "retrait" ? "📦 Retrait"
-               : t === "valider" ? "🔄 Progression"
-               : t === "liste" ? "📋 Historique"
-               : "➕ Nouveau"}
-            </Text>
+        {([
+          { key: "retrait",  icon: "qr-code-outline",          label: "Retrait"     },
+          { key: "valider",  icon: "checkmark-circle-outline",  label: "Progression" },
+          { key: "liste",    icon: "time-outline",              label: "Historique"  },
+          { key: "creer",    icon: "add-circle-outline",        label: "Nouveau"     },
+        ] as { key: TabType; icon: any; label: string }[]).map(t => (
+          <TouchableOpacity key={t.key} style={[S.tabBtn, tab === t.key && S.tabBtnActive]} onPress={() => setTab(t.key)}>
+            <Ionicons name={t.icon} size={20} color={tab === t.key ? "#fff" : "#C4B5FD"} />
+            <Text style={[S.tabTxt, tab === t.key && S.tabTxtActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -395,35 +399,35 @@ function ValiderTab({ token }: { token: string | null }) {
             )}
             {/* Validation panel */}
             {selected?.id === parcel.id ? (
-              <View style={{ backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, gap: 8, marginTop: 4, borderWidth: 1, borderColor: TEAL }}>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: TEAL }}>Ajuster le tarif (optionnel)</Text>
+              <View style={{ backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12, gap: 10, marginTop: 4, borderWidth: 1.5, borderColor: TEAL }}>
                 <TextInput
                   value={prixReel}
                   onChangeText={setPrixReel}
-                  placeholder="Prix réel FCFA (vide = conserver prix calculé)"
+                  placeholder="Ajuster le prix FCFA (optionnel)"
                   keyboardType="numeric"
-                  style={{ backgroundColor: "#fff", borderRadius: 8, borderWidth: 1, borderColor: "#CBD5E1", padding: 10, fontSize: 14 }}
+                  style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
                 />
                 <TextInput
                   value={notes}
                   onChangeText={setNotes}
-                  placeholder="Notes pour le client (optionnel)"
-                  style={{ backgroundColor: "#fff", borderRadius: 8, borderWidth: 1, borderColor: "#CBD5E1", padding: 10, fontSize: 14 }}
+                  placeholder="Note pour le client (optionnel)"
+                  style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
                 />
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: "#DCFCE7", borderRadius: 10, padding: 12, alignItems: "center" }}
+                    style={{ flex: 1, backgroundColor: "#059669", borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
                     onPress={handleValidate} disabled={acting}>
-                    <Text style={{ color: "#15803D", fontWeight: "800", fontSize: 14 }}>✅ Valider</Text>
+                    {acting ? <ActivityIndicator size="small" color="#fff" />
+                      : <><Ionicons name="checkmark-circle" size={16} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Valider</Text></>}
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: "#FEE2E2", borderRadius: 10, padding: 12, alignItems: "center" }}
-                    onPress={() => { setShowRefusModal(true); }}
-                    disabled={acting}>
-                    <Text style={{ color: "#DC2626", fontWeight: "800", fontSize: 14 }}>❌ Refuser</Text>
+                    style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                    onPress={() => setShowRefusModal(true)} disabled={acting}>
+                    <Ionicons name="close-circle" size={16} color="#fff" />
+                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Refuser</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={{ backgroundColor: "#F1F5F9", borderRadius: 10, padding: 12 }}
+                    style={{ backgroundColor: "#F1F5F9", borderRadius: 12, padding: 13 }}
                     onPress={() => setSelected(null)}>
                     <Ionicons name="close" size={18} color="#64748B" />
                   </TouchableOpacity>
@@ -431,9 +435,10 @@ function ValiderTab({ token }: { token: string | null }) {
               </View>
             ) : (
               <TouchableOpacity
-                style={{ backgroundColor: TEAL, borderRadius: 10, padding: 12, alignItems: "center", marginTop: 4 }}
+                style={{ backgroundColor: TEAL, borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 4, flexDirection: "row", justifyContent: "center", gap: 8 }}
                 onPress={() => { setSelected(parcel); setPrixReel(""); setNotes(""); }}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>👁 Examiner et décider</Text>
+                <Ionicons name="eye-outline" size={16} color="#fff" />
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Vérifier ce colis</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -461,9 +466,10 @@ function ValiderTab({ token }: { token: string | null }) {
                 <Text style={{ fontSize: 13, color: "#0F172A", fontWeight: "600" }}>{parcel.senderName} — {parcel.senderPhone}</Text>
                 <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.fromCity} → {parcel.toCity}</Text>
                 <TouchableOpacity
-                  style={{ backgroundColor: "#EA580C", borderRadius: 10, padding: 12, alignItems: "center", marginTop: 4 }}
+                  style={{ backgroundColor: "#EA580C", borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 4, flexDirection: "row", justifyContent: "center", gap: 8 }}
                   onPress={() => handleSendLivreur(parcel)} disabled={acting}>
-                  <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>🛵 Envoyer livreur</Text>
+                  {acting ? <ActivityIndicator size="small" color="#fff" />
+                    : <><Ionicons name="bicycle-outline" size={16} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Envoyer livreur</Text></>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -1103,19 +1109,18 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {nextAction && (
                   <TouchableOpacity
-                    style={[SL.actionBtn, { borderColor: nextAction.color, flex: 1 }]}
+                    style={[SL.actionBtn, { backgroundColor: nextAction.color, borderColor: nextAction.color, flex: 1 }]}
                     onPress={() => handleStatusUpdate(p)}
                     disabled={updating === p.id}
                   >
-                    {updating === p.id ? <ActivityIndicator size="small" color={nextAction.color} /> : (
-                      <Text style={[SL.actionTxt, { color: nextAction.color }]}>
-                        {nextAction.label}
-                      </Text>
-                    )}
+                    {updating === p.id
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
+                    }
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
-                  style={[SL.actionBtn, { borderColor: "#7C3AED", paddingHorizontal: 12 }]}
+                  style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: P_LIGHT, paddingHorizontal: 12 }]}
                   onPress={() => printLabel({
                     trackingRef: p.trackingRef,
                     senderName: p.senderName, senderPhone: p.senderPhone,
@@ -1125,7 +1130,7 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
                     amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
                   })}
                 >
-                  <Ionicons name="print-outline" size={16} color="#7C3AED" />
+                  <Ionicons name="print-outline" size={16} color={P} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1654,10 +1659,10 @@ const S = StyleSheet.create({
   headerSub: { color: "#DDD6FE", fontSize: 12, marginTop: 1 },
   logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   logoutTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  tabs: { flexDirection: "row", backgroundColor: "#3B0764" },
-  tabBtn: { flex: 1, paddingVertical: 12, alignItems: "center" },
-  tabBtnActive: { borderBottomWidth: 3, borderColor: "#A78BFA" },
-  tabTxt: { fontSize: 13, color: "#DDD6FE", fontWeight: "600" },
+  tabs: { flexDirection: "row", backgroundColor: "#3B0764", borderBottomWidth: 1, borderColor: "#4C1D95" },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center", gap: 3 },
+  tabBtnActive: { borderBottomWidth: 3, borderColor: "#fff" },
+  tabTxt: { fontSize: 10, color: "#C4B5FD", fontWeight: "600" },
   tabTxtActive: { color: "#fff", fontWeight: "800" },
 });
 
