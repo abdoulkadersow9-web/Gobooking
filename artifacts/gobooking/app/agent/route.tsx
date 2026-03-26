@@ -545,6 +545,7 @@ export default function RouteScreen() {
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <TouchableOpacity
             style={S.logoutBtn}
+            hitSlop={8}
             onPress={() =>
               Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
                 { text: "Annuler", style: "cancel" },
@@ -552,7 +553,7 @@ export default function RouteScreen() {
               ])
             }
           >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -1555,7 +1556,7 @@ const S = StyleSheet.create({
                   flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerTitle:  { color: "white", fontSize: 18, fontWeight: "700" },
   headerSub:    { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
-  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
   /* Empty state */
   emptyState:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },

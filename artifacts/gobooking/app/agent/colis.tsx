@@ -191,8 +191,8 @@ export default function ColisScreen() {
             </View>
           </View>
         </View>
-        <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-          <Text style={S.logoutTxt}>Déco.</Text>
+        <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
+          <Ionicons name="log-out-outline" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -1690,8 +1690,7 @@ const S = StyleSheet.create({
   headerIcon: { backgroundColor: P, borderRadius: 10, padding: 8 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   headerSub: { color: "#DDD6FE", fontSize: 12, marginTop: 1 },
-  logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  logoutTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
   tabs: { flexDirection: "row", backgroundColor: "#3B0764", borderBottomWidth: 1, borderColor: "#4C1D95" },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: "center", gap: 3 },
   tabBtnActive: { borderBottomWidth: 3, borderColor: "#fff" },

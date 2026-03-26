@@ -188,8 +188,8 @@ export default function SuiviScreen() {
           <TouchableOpacity onPress={() => load(true)} style={S.refreshBtn}>
             <Feather name="refresh-cw" size={14} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-            <Text style={S.logoutTxt}>Déco.</Text>
+          <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -401,8 +401,7 @@ const S = StyleSheet.create({
   headerTitle:{ color: "#fff", fontSize: 17, fontWeight: "800" },
   headerSub:  { color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 1 },
   refreshBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
-  logoutBtn:  { backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  logoutTxt:  { color: "#fff", fontSize: 12, fontWeight: "700" },
+  logoutBtn:  { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
   alarmBanner:{ backgroundColor: RED, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, shadowColor: RED, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   alarmTxt:   { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },

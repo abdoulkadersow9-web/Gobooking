@@ -199,8 +199,8 @@ export default function LogistiqueScreen() {
             <Text style={S.headerSub}>Gestion du parc bus</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-          <Text style={S.logoutTxt}>Déco.</Text>
+        <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
+          <Ionicons name="log-out-outline" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -445,8 +445,7 @@ const S = StyleSheet.create({
   headerIcon:  { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
   headerTitle: { color: "#fff", fontSize: 17, fontWeight: "800" },
   headerSub:   { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 1 },
-  logoutBtn:   { backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  logoutTxt:   { color: "#fff", fontSize: 12, fontWeight: "700" },
+  logoutBtn:   { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
   section:       { gap: 10 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

@@ -158,7 +158,8 @@ export default function ValidationScreen() {
             <Text style={styles.headerSub}>Confirmer les réservations</Text>
           </View>
           <TouchableOpacity
-            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}
+            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" }}
+            hitSlop={8}
             onPress={() =>
               Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
                 { text: "Annuler", style: "cancel" },
@@ -166,7 +167,7 @@ export default function ValidationScreen() {
               ])
             }
           >
-            <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Déco.</Text>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>

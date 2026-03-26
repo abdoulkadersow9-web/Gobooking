@@ -385,8 +385,8 @@ export default function TicketsScreen() {
               <Text style={S.headerSub}>Billet émis avec succès</Text>
             </View>
           </View>
-          <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-            <Text style={S.logoutTxt}>Déco.</Text>
+          <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 32 }]}>
@@ -454,8 +454,8 @@ export default function TicketsScreen() {
             <Text style={S.headerSub}>Vente guichet · {networkStatus.isOnline ? "En ligne" : "Hors ligne"}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={logout} style={S.logoutBtn}>
-          <Text style={S.logoutTxt}>Déco.</Text>
+        <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
+          <Ionicons name="log-out-outline" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -840,8 +840,7 @@ const S = StyleSheet.create({
   headerIcon:{ backgroundColor: G, borderRadius: 10, padding: 8 },
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   headerSub: { color: "#FDE68A", fontSize: 12, marginTop: 1 },
-  logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  logoutTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
   tabBar:     { flexDirection: "row", backgroundColor: G_DARK, paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   tab:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)" },
