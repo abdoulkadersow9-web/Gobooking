@@ -211,6 +211,7 @@ router.post("/parcels", async (req, res) => {
       senderName, senderPhone, receiverName, receiverPhone,
       fromCity, toCity, parcelType, weight, description,
       deliveryType, paymentMethod, notes, amount: customAmount,
+      photoBase64,
     } = req.body;
 
     if (!senderName || !senderPhone || !receiverName || !receiverPhone ||
@@ -248,6 +249,16 @@ router.post("/parcels", async (req, res) => {
       notes: notes || null,
       createdByAgent: true,
     } as any).returning();
+
+    /* Upload photo if provided */
+    if (photoBase64 && typeof photoBase64 === "string" && photoBase64.length > 100) {
+      const { uploadParcelPhoto } = await import("../lib/photoStorage");
+      const photoUrl = await uploadParcelPhoto(photoBase64, parcel[0].id);
+      if (photoUrl) {
+        await db.execute(sql`UPDATE parcels SET photo_url = ${photoUrl} WHERE id = ${parcel[0].id}`);
+        (parcel[0] as any).photoUrl = photoUrl;
+      }
+    }
 
     /* Store pickup code */
     await db.execute(sql`UPDATE parcels SET pickup_code = ${pickupCode}, pickup_code_sent_at = NOW(), created_by_agent = true WHERE id = ${parcel[0].id}`);

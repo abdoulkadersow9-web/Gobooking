@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView, Platform, Image, RefreshControl,
 } from "react-native";
 import * as Print from "expo-print";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -697,6 +698,9 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
   const [submitting, setSubmitting]   = useState(false);
   const [printing, setPrinting]       = useState(false);
   const [created, setCreated]         = useState<CreatedParcel | null>(null);
+  const [photoUri, setPhotoUri]       = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker]     = useState(false);
@@ -707,6 +711,29 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
     setDescription(""); setWeight(""); setAmount(""); setCreated(null);
     setFromCity("Abidjan"); setToCity("Bouaké"); setParcelType("Colis standard");
     setPaymentMethod("cash"); setDeliveryType("livraison_gare");
+    setPhotoUri(null); setPhotoBase64(null);
+  };
+
+  const pickPhoto = async (source: "camera" | "library") => {
+    const permResult = source === "camera"
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permResult.granted) {
+      Alert.alert("Permission refusée", "Autorisez l'accès pour continuer.");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true, allowsEditing: true, aspect: [4, 3] })
+        : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, base64: true, allowsEditing: true, aspect: [4, 3], mediaTypes: ImagePicker.MediaTypeOptions.Images });
+      if (!result.canceled && result.assets?.[0]) {
+        setPhotoUri(result.assets[0].uri);
+        setPhotoBase64(result.assets[0].base64 ?? null);
+      }
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleCreate = async () => {
@@ -721,10 +748,13 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
     try {
       const res = await apiFetch<{ trackingRef?: string; id?: string; pickupCode?: string }>("/agent/parcels", {
         token: token ?? undefined, method: "POST",
-        body: { fromCity, toCity, senderName: senderName.trim(), senderPhone: senderPhone.trim(),
+        body: {
+          fromCity, toCity, senderName: senderName.trim(), senderPhone: senderPhone.trim(),
           receiverName: receiverName.trim(), receiverPhone: receiverPhone.trim(),
           parcelType, description: description.trim() || undefined,
-          weight: weight.trim(), amount: Number(amount), paymentMethod, deliveryType },
+          weight: weight.trim(), amount: Number(amount), paymentMethod, deliveryType,
+          ...(photoBase64 ? { photoBase64 } : {}),
+        },
       });
       setCreated({
         trackingRef: res.trackingRef ?? res.id ?? "—",
@@ -938,6 +968,65 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
           </View>
         </View>
 
+        {/* ── Photo du colis ── */}
+        <View style={SC.card}>
+          <View style={SC.cardHeader}>
+            <Ionicons name="camera-outline" size={18} color={P} />
+            <Text style={SC.cardTitle}>Photo du colis</Text>
+            <View style={{ marginLeft: "auto", backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>Recommandé</Text>
+            </View>
+          </View>
+
+          {photoUri ? (
+            <View style={{ gap: 10 }}>
+              <Image source={{ uri: photoUri }} style={{ width: "100%", height: 180, borderRadius: 10 }} resizeMode="cover" />
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: P_LIGHT, borderRadius: 10, paddingVertical: 10, borderWidth: 1.5, borderColor: "#DDD6FE" }}
+                  onPress={() => pickPhoto("camera")}>
+                  <Ionicons name="camera" size={16} color={P} />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: P }}>Reprendre</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ width: 44, alignItems: "center", justifyContent: "center", backgroundColor: "#FEF2F2", borderRadius: 10, borderWidth: 1.5, borderColor: "#FECACA" }}
+                  onPress={() => { setPhotoUri(null); setPhotoBase64(null); }}>
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                <Text style={{ fontSize: 12, color: "#059669", fontWeight: "600" }}>Photo enregistrée — sera liée au colis</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ gap: 8 }}>
+              <Text style={{ fontSize: 12, color: "#6B7280", lineHeight: 17 }}>
+                Prenez une photo du colis pour preuve et contrôle en cas de litige.
+              </Text>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: P, borderRadius: 12, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                    shadowColor: P, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 4 }}
+                  onPress={() => pickPhoto("camera")} disabled={uploadingPhoto} activeOpacity={0.82}>
+                  {uploadingPhoto
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <><Ionicons name="camera" size={20} color="#fff" /><Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Prendre une photo</Text></>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ width: 52, backgroundColor: P_LIGHT, borderRadius: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#DDD6FE" }}
+                  onPress={() => pickPhoto("library")} disabled={uploadingPhoto}>
+                  <Ionicons name="images-outline" size={22} color={P} />
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center" }}>
+                La photo est optionnelle — cliquez sur "Enregistrer" ci-dessous pour continuer sans.
+              </Text>
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity style={[SC.submitBtn, submitting && { opacity: 0.6 }]}
           onPress={handleCreate} disabled={submitting}>
           {submitting ? <ActivityIndicator color="#fff" /> : (
@@ -1074,7 +1163,15 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
         {/* Top row: ref + route + status badge + print icon + date */}
         <View style={SL.cardTop}>
           <View style={{ flex: 1 }}>
-            <Text style={[SL.ref, isDone && { color: "#6B7280" }]}>{p.trackingRef}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[SL.ref, isDone && { color: "#6B7280" }]}>{p.trackingRef}</Text>
+              {p.photoUrl && (
+                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <Ionicons name="camera" size={10} color="#059669" />
+                  <Text style={{ fontSize: 9, fontWeight: "700", color: "#059669" }}>Photo</Text>
+                </View>
+              )}
+            </View>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
               <Ionicons name="navigate-outline" size={12} color="#9CA3AF" />
               <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
