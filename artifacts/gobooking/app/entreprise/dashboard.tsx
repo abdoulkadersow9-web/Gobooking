@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -302,14 +302,14 @@ export default function EntrepriseDashboard() {
             {alertesOpen && (
               <View style={ss.alertList}>
                 {alertes.map((a, i) => {
-                  const typeIcon = a.type === "bus" ? "🚌" : a.type === "colis" ? "📦" : "🗺️";
+                  const typeIcon: React.ComponentProps<typeof Ionicons>["name"] = a.type === "bus" ? "bus-outline" : a.type === "colis" ? "cube-outline" : "map-outline";
                   const isCritical = a.severity === "critical";
                   return (
                     <View
                       key={a.id + i}
                       style={[ss.alertRow, isCritical && { backgroundColor: "#FEE2E2" }, i === alertes.length - 1 && { borderBottomWidth: 0 }]}
                     >
-                      <Text style={{ fontSize: 16, marginRight: 8 }}>{typeIcon}</Text>
+                      <Ionicons name={typeIcon} size={16} color={isCritical ? RED : "#F59E0B"} style={{ marginRight: 8 }} />
                       <View style={{ flex: 1 }}>
                         <Text style={ss.alertMsg}>{a.message}</Text>
                         {!!a.detail && <Text style={ss.alertDetail}>{a.detail}</Text>}

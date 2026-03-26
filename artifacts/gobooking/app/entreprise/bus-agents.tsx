@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -170,7 +170,7 @@ export default function BusAgentsScreen() {
             <View key={bus.id} style={S.busCard}>
               <View style={S.busHeader}>
                 <View style={S.busIcon}>
-                  <Text style={{ fontSize: 22 }}>🚌</Text>
+                  <Ionicons name="bus" size={22} color={PRIMARY} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={S.busName}>{bus.busName}</Text>
@@ -253,7 +253,7 @@ export default function BusAgentsScreen() {
             <Text style={S.sheetTitle}>Affecter un agent</Text>
             {targetBus && (
               <View style={S.sheetBusInfo}>
-                <Text style={{ fontSize: 16 }}>🚌</Text>
+                <Ionicons name="bus" size={16} color={PRIMARY} />
                 <Text style={S.sheetBusName}>{targetBus.busName} — {targetBus.plateNumber}</Text>
               </View>
             )}

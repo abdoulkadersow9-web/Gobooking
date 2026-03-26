@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -94,7 +94,7 @@ function BusTrackingCard({
     <View style={[S.card, { borderLeftColor: sm.dot, borderLeftWidth: 4 }]}>
       <View style={S.cardHeader}>
         <View style={S.busIconWrap}>
-          <Text style={{ fontSize: 24 }}>🚌</Text>
+          <Ionicons name="bus" size={24} color="#64748B" />
         </View>
         <View style={S.cardInfo}>
           <Text style={S.cardName}>{bus.busName}</Text>
@@ -276,7 +276,7 @@ export default function BusSuiviScreen() {
       ) : filtered.length === 0 ? (
         <View style={S.center}>
           <View style={S.emptyIcon}>
-            <Text style={{ fontSize: 40 }}>🚌</Text>
+            <Ionicons name="bus" size={40} color="#64748B" />
           </View>
           <Text style={S.emptyTitle}>Aucun engin trouvé</Text>
           <Text style={S.emptySub}>

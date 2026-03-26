@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -190,7 +190,7 @@ export default function CarburantScreen() {
         </View>
       ) : logs.length === 0 ? (
         <View style={S.center}>
-          <View style={S.emptyIcon}><Text style={{ fontSize: 38 }}>⛽</Text></View>
+          <View style={S.emptyIcon}><Feather name="droplet" size={38} color="#64748B" /></View>
           <Text style={S.emptyTitle}>Aucun enregistrement</Text>
           <Text style={S.emptySub}>Appuyez sur + pour saisir un plein de carburant.</Text>
           <Pressable style={S.addEmptyBtn} onPress={openAdd}>
@@ -208,7 +208,7 @@ export default function CarburantScreen() {
             <View key={log.id} style={S.card}>
               <View style={S.cardLeft}>
                 <View style={S.fuelIcon}>
-                  <Text style={{ fontSize: 20 }}>⛽</Text>
+                  <Feather name="droplet" size={20} color="#0369A1" />
                 </View>
                 <View style={S.cardInfo}>
                   <Text style={S.cardBus}>{log.busName}</Text>
@@ -342,7 +342,7 @@ export default function CarburantScreen() {
                   style={[S.busOption, selBus === b.id && { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" }]}
                   onPress={() => { setSelBus(b.id); setShowBusPicker(false); }}
                 >
-                  <Text style={{ fontSize: 18 }}>🚌</Text>
+                  <Ionicons name="bus" size={18} color="#64748B" />
                   <View style={{ flex: 1 }}>
                     <Text style={S.busOptName}>{b.busName}</Text>
                     <Text style={S.busOptPlate}>{b.plateNumber}</Text>

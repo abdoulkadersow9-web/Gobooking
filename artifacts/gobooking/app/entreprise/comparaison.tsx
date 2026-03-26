@@ -101,7 +101,7 @@ export default function ComparaisonScreen() {
           </View>
           <View style={S.kpiDivider} />
           <View style={S.kpiCard}>
-            <Text style={{ fontSize: 16 }}>📊</Text>
+            <Feather name="bar-chart-2" size={16} color={PRIMARY} />
             <Text style={S.kpiVal}>{trips.length}</Text>
             <Text style={S.kpiLbl}>Total</Text>
           </View>
@@ -112,7 +112,7 @@ export default function ComparaisonScreen() {
         <View style={S.center}><ActivityIndicator size="large" color={PRIMARY} /></View>
       ) : trips.length === 0 ? (
         <View style={S.center}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>📊</Text>
+          <Feather name="bar-chart-2" size={40} color={PRIMARY} style={{ marginBottom: 12 }} />
           <Text style={S.emptyTitle}>Aucun trajet</Text>
           <Text style={S.emptySub}>Les trajets de votre compagnie apparaîtront ici classés par performance.</Text>
         </View>
@@ -126,13 +126,13 @@ export default function ComparaisonScreen() {
           {trips.length >= 2 && (
             <View style={S.highlightRow}>
               <View style={[S.highlightCard, { borderColor: "#BBF7D0" }]}>
-                <Text style={S.highlightEmoji}>🏆</Text>
+                <Feather name="award" size={22} color="#16A34A" />
                 <Text style={S.highlightLabel}>Meilleur</Text>
                 <Text style={S.highlightRoute} numberOfLines={1}>{best.from} → {best.to}</Text>
                 <Text style={[S.highlightVal, { color: PROFIT_GREEN }]}>{fmt(best.benefice)}</Text>
               </View>
               <View style={[S.highlightCard, { borderColor: "#FECACA" }]}>
-                <Text style={S.highlightEmoji}>📉</Text>
+                <Feather name="trending-down" size={22} color="#DC2626" />
                 <Text style={S.highlightLabel}>Plus faible</Text>
                 <Text style={S.highlightRoute} numberOfLines={1}>{worst.from} → {worst.to}</Text>
                 <Text style={[S.highlightVal, { color: worst.benefice < 0 ? LOSS_RED : "#94A3B8" }]}>{fmt(worst.benefice)}</Text>
@@ -171,8 +171,8 @@ export default function ComparaisonScreen() {
                       <Feather name="arrow-right" size={11} color="#94A3B8" />
                       <Text style={S.routeText}>{trip.to}</Text>
                     </View>
-                    <Text style={S.busText}>🚌 {trip.busName} · {trip.busType}</Text>
-                    <Text style={S.dateText}>📅 {fmtDate(trip.date)} {trip.departureTime}</Text>
+                    <Text style={S.busText}>{trip.busName} · {trip.busType}</Text>
+                    <Text style={S.dateText}>{fmtDate(trip.date)} {trip.departureTime}</Text>
                   </View>
 
                   {/* Indicator */}

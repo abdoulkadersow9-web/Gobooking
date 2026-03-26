@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -126,7 +126,7 @@ function TripCard({ trip, onStart, onEnd, onDelete }: {
       {/* Bus row */}
       <View style={TC.infoRow}>
         <View style={TC.infoChip}>
-          <Text style={TC.infoEmoji}>🚌</Text>
+          <Ionicons name="bus" size={14} color="#64748B" />
           <Text style={TC.infoText} numberOfLines={1}>{trip.busDisplayName ?? trip.to ?? "—"}</Text>
         </View>
         {trip.busPlate && (
@@ -457,7 +457,7 @@ export default function TrajetsScreen() {
             </View>
 
             {/* Date & Times */}
-            <Text style={[S.sectionLabel, { marginTop: 20 }]}>📅 Date & Horaires</Text>
+            <Text style={[S.sectionLabel, { marginTop: 20 }]}>Date & Horaires</Text>
             <Text style={S.label}>Date du trajet * (JJ/MM/AAAA)</Text>
             <TextInput style={S.input} value={form.date} onChangeText={v => setForm(p => ({ ...p, date: v }))} placeholder="25/03/2026" placeholderTextColor="#9CA3AF" keyboardType="numeric" />
 
@@ -476,7 +476,7 @@ export default function TrajetsScreen() {
             <TextInput style={S.input} value={form.duration} onChangeText={v => setForm(p => ({ ...p, duration: v }))} placeholder="4h00" placeholderTextColor="#9CA3AF" />
 
             {/* Price */}
-            <Text style={[S.sectionLabel, { marginTop: 20 }]}>💵 Tarif de la ligne</Text>
+            <Text style={[S.sectionLabel, { marginTop: 20 }]}>Tarif de la ligne</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <Text style={S.label}>Tarif / passager (FCFA) *</Text>
               {priceFromGrid && (
@@ -506,7 +506,7 @@ export default function TrajetsScreen() {
             ) : null}
 
             {/* Bus selector */}
-            <Text style={[S.sectionLabel, { marginTop: 20 }]}>🚌 Assignation du bus</Text>
+            <Text style={[S.sectionLabel, { marginTop: 20 }]}>Assignation du bus</Text>
             {buses.length === 0 ? (
               <View style={S.noBusBox}>
                 <Feather name="alert-circle" size={16} color="#92400E" />
@@ -522,7 +522,7 @@ export default function TrajetsScreen() {
                   const sel = form.busId === bus.id;
                   return (
                     <Pressable key={bus.id} style={[S.busOption, sel && S.busOptionActive]} onPress={() => setForm(p => ({ ...p, busId: sel ? "" : bus.id }))}>
-                      <Text style={{ fontSize: 22 }}>🚌</Text>
+                      <Ionicons name="bus" size={22} color={sel ? AMBER : "#64748B"} />
                       <View style={{ flex: 1 }}>
                         <Text style={[S.busOptionName, sel && { color: AMBER }]}>{bus.busName}</Text>
                         <Text style={S.busOptionSub}>{bus.plateNumber} · {bus.busType} · {bus.capacity} places</Text>

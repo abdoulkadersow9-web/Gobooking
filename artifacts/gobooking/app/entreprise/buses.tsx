@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -46,7 +46,7 @@ function BusCard({ bus, onEdit, onDelete }: { bus: Bus; onEdit: () => void; onDe
     <View style={S.card}>
       <View style={S.cardTop}>
         <View style={S.busIconWrap}>
-          <Text style={{ fontSize: 26 }}>🚌</Text>
+          <Ionicons name="bus" size={26} color={AMBER} />
         </View>
         <View style={S.cardInfo}>
           <Text style={S.cardName}>{bus.busName}</Text>
@@ -211,7 +211,7 @@ export default function BusesScreen() {
         <ActivityIndicator color={AMBER} size="large" style={{ marginTop: 60 }} />
       ) : buses.length === 0 ? (
         <View style={S.empty}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>🚌</Text>
+          <Ionicons name="bus" size={48} color={AMBER} style={{ marginBottom: 12 }} />
           <Text style={S.emptyTitle}>Aucun bus enregistré</Text>
           <Text style={S.emptySub}>Ajoutez votre premier bus pour commencer à planifier vos trajets.</Text>
           <Pressable style={S.emptyBtn} onPress={openCreate}>

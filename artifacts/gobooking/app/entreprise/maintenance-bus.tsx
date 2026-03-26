@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -61,7 +61,7 @@ function BusCard({ bus, onUpdate }: { bus: BusMaintenance; onUpdate: () => void 
     <View style={[S.card, { borderLeftColor: cm.dot, borderLeftWidth: 4 }]}>
       <View style={S.cardHeader}>
         <View style={S.busIcon}>
-          <Text style={{ fontSize: 22 }}>🚌</Text>
+          <Ionicons name="bus" size={22} color="#64748B" />
         </View>
         <View style={S.cardInfo}>
           <Text style={S.cardName}>{bus.busName}</Text>

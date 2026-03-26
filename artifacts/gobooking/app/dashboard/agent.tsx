@@ -748,8 +748,8 @@ export default function AgentDashboard() {
     ? ["#059669", "#047857"]
     : [PRIMARY, "#0F3BA0"];
 
-  const busStatusLabel = tripStatus === "en_route" ? "En route 🚌"
-    : tripStatus === "arrived" ? "Arrivé ✓"
+  const busStatusLabel = tripStatus === "en_route" ? "En route"
+    : tripStatus === "arrived" ? "Arrivé"
     : "En service";
 
   const TABS: { id: Tab; label: string; icon: string; badge?: number }[] = [

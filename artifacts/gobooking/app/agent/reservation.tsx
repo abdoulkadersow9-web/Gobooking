@@ -74,8 +74,8 @@ function paymentLabel(p: string) {
 
 function baggageTypeLabel(t: string | null) {
   if (t === "léger") return { label: "Léger (sac, cartable)", icon: "briefcase" as const };
-  if (t === "lourd") return { label: "Lourd (valise, carton)", icon: "package" as const };
-  if (t === "colis") return { label: "Colis / envoi groupé", icon: "box" as const };
+  if (t === "lourd") return { label: "Lourd (valise, carton)", icon: "briefcase-outline" as const };
+  if (t === "colis") return { label: "Colis / envoi groupé", icon: "cube-outline" as const };
   return { label: t ?? "Non précisé", icon: "briefcase" as const };
 }
 

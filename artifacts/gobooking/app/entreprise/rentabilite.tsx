@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -25,9 +25,9 @@ const LOSS_RED = "#DC2626";
 const AMBER = "#D97706";
 
 const EXPENSE_TYPES = [
-  { key: "carburant", label: "Carburant", icon: "⛽" },
-  { key: "peage",     label: "Péage",     icon: "🚧" },
-  { key: "autre",     label: "Autre",     icon: "📋" },
+  { key: "carburant", label: "Carburant", icon: "droplet"   as const },
+  { key: "peage",     label: "Péage",     icon: "map-pin"   as const },
+  { key: "autre",     label: "Autre",     icon: "file-text" as const },
 ];
 
 interface TripExpense {
@@ -208,7 +208,7 @@ export default function RentabiliteScreen() {
         <View style={S.center}><ActivityIndicator size="large" color={PRIMARY} /></View>
       ) : trips.length === 0 ? (
         <View style={S.center}>
-          <Text style={{ fontSize: 38, marginBottom: 12 }}>📊</Text>
+          <Feather name="bar-chart-2" size={38} color={PRIMARY} style={{ marginBottom: 12 }} />
           <Text style={S.emptyTitle}>Aucun trajet</Text>
           <Text style={S.emptySub}>Les trajets de votre compagnie apparaîtront ici avec leur bilan financier.</Text>
         </View>
@@ -240,7 +240,7 @@ export default function RentabiliteScreen() {
                   <View style={S.simInputBlock}>
                     <Text style={S.simLabel}>Prix ticket (FCFA)</Text>
                     <View style={S.simInputWrap}>
-                      <Text style={S.simInputPrefix}>💰</Text>
+                      <Feather name="dollar-sign" size={14} color="#64748B" />
                       <TextInput
                         style={S.simInput}
                         value={simPrix}
@@ -254,7 +254,7 @@ export default function RentabiliteScreen() {
                   <View style={S.simInputBlock}>
                     <Text style={S.simLabel}>Total places</Text>
                     <View style={S.simInputWrap}>
-                      <Text style={S.simInputPrefix}>💺</Text>
+                      <Feather name="users" size={14} color="#64748B" />
                       <TextInput
                         style={S.simInput}
                         value={simPlaces}
@@ -344,8 +344,8 @@ export default function RentabiliteScreen() {
                 </Pressable>
 
                 <View style={S.cardMeta}>
-                  <Text style={S.cardMetaText}>🚌 {trip.busName} · {trip.busType}</Text>
-                  <Text style={S.cardMetaText}>📅 {fmtDate(trip.date)} à {trip.departureTime}</Text>
+                  <Text style={S.cardMetaText}>{trip.busName} · {trip.busType}</Text>
+                  <Text style={S.cardMetaText}>{fmtDate(trip.date)} à {trip.departureTime}</Text>
                 </View>
 
                 {/* Conseil automatique */}
@@ -395,10 +395,10 @@ export default function RentabiliteScreen() {
                       <Text style={S.noExpText}>Aucune dépense enregistrée</Text>
                     ) : (
                       trip.expenses.map(exp => {
-                        const typeInfo = EXPENSE_TYPES.find(t => t.key === exp.type) ?? { icon: "📋", label: exp.type };
+                        const typeInfo = EXPENSE_TYPES.find(t => t.key === exp.type) ?? { icon: "file-text" as const, label: exp.type };
                         return (
                           <View key={exp.id} style={S.expRow}>
-                            <Text style={{ fontSize: 18, marginRight: 8 }}>{typeInfo.icon}</Text>
+                            <Feather name={typeInfo.icon} size={18} color="#64748B" style={{ marginRight: 8 }} />
                             <View style={{ flex: 1 }}>
                               <Text style={S.expType}>{typeInfo.label}</Text>
                               {exp.description ? <Text style={S.expDesc}>{exp.description}</Text> : null}
@@ -438,7 +438,7 @@ export default function RentabiliteScreen() {
             <Text style={S.sheetTitle}>Ajouter une dépense</Text>
             {addTarget && (
               <View style={S.sheetTripInfo}>
-                <Text style={{ fontSize: 14 }}>🚌</Text>
+                <Ionicons name="bus" size={14} color="#64748B" />
                 <Text style={S.sheetTripText}>{addTarget.from} → {addTarget.to} · {fmtDate(addTarget.date)}</Text>
               </View>
             )}
