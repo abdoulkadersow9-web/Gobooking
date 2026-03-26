@@ -112,9 +112,20 @@ export default function Login() {
               />
             </div>
 
-            <Button type="submit" className="w-full mt-2" size="lg" isLoading={isLoggingIn}>
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              className="w-full mt-2 h-12 rounded-xl font-bold text-white text-base transition-all duration-200 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
+              style={{ background: "linear-gradient(135deg, #FF6B00, #E55A00)", boxShadow: "0 4px 16px rgba(255,107,0,0.35)" }}
+            >
+              {isLoggingIn ? (
+                <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : null}
               Se connecter
-            </Button>
+            </button>
           </form>
         </div>
       </div>

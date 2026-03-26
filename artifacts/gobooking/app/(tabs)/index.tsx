@@ -1175,8 +1175,8 @@ const styles = StyleSheet.create({
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Activity section
-  section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 4 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
   sectionLink: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
   activityLoading: { height: 140, justifyContent: "center", alignItems: "center" },
@@ -1185,14 +1185,16 @@ const styles = StyleSheet.create({
   activityCard: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 14,
     gap: 6,
-    shadowColor: "#000",
+    shadowColor: "#0B3C5D",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     overflow: "hidden",
   },
   activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
@@ -1217,15 +1219,15 @@ const styles = StyleSheet.create({
   demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
 
   // Quick actions grid
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 10, padding: 16, paddingTop: 20 },
-  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 16, padding: 14, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  quickIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 12, padding: 16, paddingTop: 20 },
+  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 16, padding: 16, gap: 8, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: "#F1F5F9" },
+  quickIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   quickLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
+  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, lineHeight: 16 },
 
   // Dashboard shortcut cards
-  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  dashCardIcon: { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: "#F1F5F9" },
+  dashCardIcon: { width: 46, height: 46, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   dashCardText: { flex: 1 },
   dashCardTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   dashCardSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
@@ -1233,12 +1235,12 @@ const styles = StyleSheet.create({
   dashCardBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
 
   // Popular routes
-  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
-  routeCardPressed: { opacity: 0.85 },
-  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  routeCardIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  routeCardRoute: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
-  routeCardMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
-  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 4 },
+  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: "#F1F5F9" },
+  routeCardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  routeCardIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  routeCardRoute: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
+  routeCardMeta: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
+  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 6 },
   routeCardPrice: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.primary },
 });

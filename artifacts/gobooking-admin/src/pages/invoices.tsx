@@ -21,9 +21,14 @@ export default function Invoices() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-display font-bold">Factures & Reversements</h2>
-          <p className="text-muted-foreground mt-1">Consultez vos factures de commission mensuelles.</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #0B3C5D, #1E5B8A)" }}>
+            <FileText size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-display font-bold tracking-tight">Factures & Reversements</h2>
+            <p className="text-muted-foreground mt-0.5 text-sm">Consultez vos factures de commission mensuelles.</p>
+          </div>
         </div>
         <Button onClick={handleGenerate} isLoading={isPending} className="bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-secondary/20">
           Générer la facture du mois

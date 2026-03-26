@@ -12,6 +12,7 @@ import {
   Building2, AlertTriangle, ClipboardList, CheckCircle, Clock,
   Ticket, Activity, BarChart3, Map, ArrowUpRight, Zap, ChevronRight,
   Navigation, Package2, UserCheck, Settings, Check, X,
+  LayoutDashboard, ShieldCheck,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -481,9 +482,14 @@ function CompanyDashboard() {
     <div className="space-y-6 pb-6">
       {/* ── HEADER ── */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Tableau de bord</h2>
-          <p className="text-xs text-muted-foreground">Vue d'ensemble de votre compagnie</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #D97706, #B45309)" }}>
+            <LayoutDashboard size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Tableau de bord</h2>
+            <p className="text-xs text-muted-foreground">Vue d'ensemble de votre compagnie</p>
+          </div>
         </div>
         <button onClick={() => refetch()}
           className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground bg-card px-3 py-2 rounded-xl border border-border shadow-sm transition-colors">
@@ -742,9 +748,14 @@ function SuperAdminDashboard() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Supervision Globale</h2>
-          <p className="text-sm text-muted-foreground">Toutes compagnies · Temps réel</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+            <ShieldCheck size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Supervision Globale</h2>
+            <p className="text-sm text-muted-foreground">Toutes compagnies · Temps réel</p>
+          </div>
         </div>
         <button onClick={() => refetch()}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground bg-card px-4 py-2 rounded-xl border border-border shadow-sm transition-colors">

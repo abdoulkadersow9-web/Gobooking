@@ -127,15 +127,17 @@ function CompanySidebar({ onClose }: { onClose?: () => void }) {
           const Icon = item.icon;
           return (
             <Link key={item.path} href={item.path} onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium relative
                 ${isActive
-                  ? "bg-amber-500/20 text-amber-300 font-semibold"
+                  ? "bg-amber-500/15 text-amber-300 font-semibold"
                   : "text-white/60 hover:bg-white/8 hover:text-white"
                 }`}
             >
-              <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+              {isActive && <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-amber-400" />}
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${isActive ? "bg-amber-500/20" : "bg-transparent"}`}>
+                <Icon size={16} strokeWidth={isActive ? 2.5 : 2} />
+              </div>
               <span className="flex-1">{item.label}</span>
-              {isActive && <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
               {item.badge && (
                 <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">{item.badge}</span>
               )}
@@ -213,22 +215,28 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
       <nav className="flex-1 overflow-y-auto px-3 pt-3 space-y-3">
         {ADMIN_NAV_SECTIONS.map((section) => (
           <div key={section.label}>
-            <p className="text-[9px] font-bold tracking-widest px-3 py-1 opacity-40 uppercase" style={{ color: section.color }}>
-              {section.label}
-            </p>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 mt-1">
+              <div className="h-px flex-1 opacity-20" style={{ backgroundColor: section.color }} />
+              <p className="text-[9px] font-bold tracking-widest opacity-60 uppercase" style={{ color: section.color }}>
+                {section.label}
+              </p>
+              <div className="h-px flex-1 opacity-20" style={{ backgroundColor: section.color }} />
+            </div>
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const isActive = location === item.path;
                 const Icon = item.icon;
                 return (
                   <Link key={item.path} href={item.path} onClick={onClose}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium relative
                       ${isActive ? "font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white"}`}
-                    style={isActive ? { backgroundColor: section.color + "22", color: section.color } : {}}
+                    style={isActive ? { backgroundColor: section.color + "18", color: section.color } : {}}
                   >
-                    <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
+                    {isActive && <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full" style={{ backgroundColor: section.color }} />}
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={isActive ? { backgroundColor: section.color + "25" } : {}}>
+                      <Icon size={15} strokeWidth={isActive ? 2.5 : 2} />
+                    </div>
                     <span>{item.label}</span>
-                    {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full" style={{ backgroundColor: section.color }} />}
                   </Link>
                 );
               })}

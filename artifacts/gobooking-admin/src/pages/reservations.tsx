@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useReservations } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
-import { Search, Filter, ChevronDown, CheckCircle, Bus } from "lucide-react";
+import { Search, Filter, ChevronDown, CheckCircle, Bus, Ticket } from "lucide-react";
 
 function buildWALink(phone: string, message: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -30,10 +30,13 @@ export default function Reservations() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #D97706, #B45309)" }}>
+          <Ticket size={18} className="text-white" />
+        </div>
         <div>
-          <h2 className="text-2xl font-display font-bold">Réservations</h2>
-          <p className="text-muted-foreground mt-1">Gérez les billets et embarquements de vos clients.</p>
+          <h2 className="text-2xl font-display font-bold tracking-tight">Réservations</h2>
+          <p className="text-muted-foreground mt-0.5 text-sm">Gérez les billets et embarquements de vos clients.</p>
         </div>
       </div>
 

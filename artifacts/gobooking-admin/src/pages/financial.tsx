@@ -45,9 +45,14 @@ export default function FinancialDashboard() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-display font-bold text-foreground">Dashboard Financier</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">Vision globale des revenus et commissions GoBooking</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+            <DollarSign size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-display font-bold text-foreground tracking-tight">Dashboard Financier</h2>
+            <p className="text-muted-foreground text-sm mt-0.5">Vision globale des revenus et commissions GoBooking</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {/* Period filter */}
