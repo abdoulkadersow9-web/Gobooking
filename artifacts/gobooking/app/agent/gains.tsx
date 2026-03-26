@@ -95,8 +95,10 @@ export default function AgentGains() {
         </View>
       ) : (
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: insets.bottom + 24 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={GREEN} />}
         >
           {/* ── KPI strip ── */}

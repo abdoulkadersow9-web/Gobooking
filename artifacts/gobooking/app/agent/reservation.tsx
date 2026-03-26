@@ -275,6 +275,8 @@ export default function AgentReservation() {
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 14, gap: 8, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={TEAL} />}
         >
           {groupedByTrip.map(group => {

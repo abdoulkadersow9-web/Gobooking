@@ -119,7 +119,7 @@ export default function RapportScreen() {
       </View>
 
       {tab === "creer" ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {successMsg !== "" && (
             <View style={{ backgroundColor: "#DCFCE7", borderRadius: 12, padding: 14, flexDirection: "row", gap: 10, alignItems: "center" }}>
               <Ionicons name="checkmark-circle" size={22} color="#15803D" />
@@ -194,6 +194,8 @@ export default function RapportScreen() {
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 12 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadReports(); }} />}>
           {loadingReports ? (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 40 }}>

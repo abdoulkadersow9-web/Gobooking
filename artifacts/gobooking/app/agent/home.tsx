@@ -208,6 +208,7 @@ export default function AgentHome() {
         style={S.scroll}
         contentContainerStyle={S.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {visibleModules.map(mod => (
           <Pressable

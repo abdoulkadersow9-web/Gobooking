@@ -1117,7 +1117,7 @@ export default function EmbarquementScreen() {
 
       {/* ── Départ tab ── */}
       {activeTab === "depart" && (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {!selectedTrip ? (
             <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 32 }]}>
               <Ionicons name="git-branch-outline" size={44} color="#D1FAE5" />
@@ -1305,7 +1305,7 @@ export default function EmbarquementScreen() {
 
       {/* ── En Route tab ── */}
       {activeTab === "en_route" && (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
           {/* Scan en-route QR */}
           <View style={styles.card}>

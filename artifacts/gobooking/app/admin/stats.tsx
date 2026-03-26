@@ -76,7 +76,7 @@ export default function AdminStats() {
       {loading ? (
         <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={S.body}>
+        <ScrollView contentContainerStyle={S.body} style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text style={S.section}>Aujourd'hui</Text>
           <StatCard label="Réservations du jour" value={fmt(stats?.bookings_today)} icon="🎫" color={ACCENT} />
           <StatCard label="Revenus du jour"       value={fmtF(stats?.revenue_today)} icon="💰" color="#16a34a" />

@@ -201,7 +201,9 @@ export default function SuiviScreen() {
         </View>
       ) : (
         <ScrollView
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: 40 }}
+          keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
           showsVerticalScrollIndicator={false}
         >

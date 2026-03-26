@@ -389,7 +389,7 @@ export default function TicketsScreen() {
             <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-        <ScrollView contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 32 }]}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 32 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
           <Text style={S.successTitle}>Billet émis !</Text>
 

@@ -201,7 +201,12 @@ export default function SecuriteScreen() {
       </View>
 
       {tab === "buttons" ? (
-        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Info banner */}
           <View style={styles.infoBanner}>
             <Feather name="info" size={15} color="#1E40AF" />
@@ -300,6 +305,8 @@ export default function SecuriteScreen() {
             renderItem={({ item }) => <HistoryItem item={item} />}
             contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           />
         )
       )}

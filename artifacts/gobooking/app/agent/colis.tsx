@@ -324,7 +324,9 @@ function ValiderTab({ token }: { token: string | null }) {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#F8FAFC" }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-      contentContainerStyle={{ padding: 14, gap: 12 }}>
+      contentContainerStyle={{ padding: 14, gap: 12 }}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}>
 
       {result && (
         <View style={{ backgroundColor: result.ok ? "#ECFDF5" : "#FFF1F2", borderRadius: 12, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -752,7 +754,7 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
 
   if (created) {
     return (
-      <ScrollView contentContainerStyle={[SC.content, { alignItems: "center", paddingTop: 40 }]}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={[SC.content, { alignItems: "center", paddingTop: 40 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Ionicons name="checkmark-circle" size={72} color={G} />
         <Text style={{ fontSize: 24, fontWeight: "800", color: "#111827", marginTop: 12 }}>Colis enregistré !</Text>
 
