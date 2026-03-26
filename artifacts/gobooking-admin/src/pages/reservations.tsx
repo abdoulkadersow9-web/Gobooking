@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useReservations } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
-import { Search, Filter, ChevronDown, CheckCircle } from "lucide-react";
+import { Search, Filter, ChevronDown, CheckCircle, Bus } from "lucide-react";
 
 function buildWALink(phone: string, message: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -126,7 +126,7 @@ export default function Reservations() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
                             style={{ backgroundColor: "#128C7E" }}
                           >
-                            🚌 Bus proche
+                            <Bus size={12} className="shrink-0" /> Bus proche
                           </a>
                           <a
                             href={buildWALink(res.clientPhone, WA_TEMPLATES.rappel(res.bookingRef, res.tripFrom, res.tripTo, res.tripDate))}
@@ -135,7 +135,7 @@ export default function Reservations() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
                             style={{ backgroundColor: "#075E54" }}
                           >
-                            ⏰ Rappel
+                            <Clock size={12} className="shrink-0" /> Rappel
                           </a>
                         </div>
                       ) : (

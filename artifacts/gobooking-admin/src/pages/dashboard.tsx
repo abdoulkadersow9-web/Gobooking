@@ -8,7 +8,7 @@ import {
 } from "@/hooks/use-company";
 import { formatCurrency } from "@/lib/utils";
 import {
-  TrendingUp, Users, Package, MapPin, RefreshCw, Wallet, Bus,
+  TrendingUp, Users, User, Package, MapPin, RefreshCw, Wallet, Bus,
   Building2, AlertTriangle, ClipboardList, CheckCircle, Clock,
   Ticket, Activity, BarChart3, Map, ArrowUpRight, Zap, ChevronRight,
   Navigation, Package2, UserCheck, Settings,
@@ -49,13 +49,15 @@ function StatCard({
 }
 
 /* Section header */
-function SectionTitle({ emoji, title, href, color }: {
-  emoji: string; title: string; href?: string; color: string;
+function SectionTitle({ icon, title, href, color }: {
+  icon: React.ReactNode; title: string; href?: string; color: string;
 }) {
   return (
     <div className="flex items-center justify-between mb-3">
       <div className="flex items-center gap-2">
-        <span className="text-base">{emoji}</span>
+        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + "18", color }}>
+          {icon}
+        </div>
         <h3 className="text-sm font-bold text-foreground">{title}</h3>
       </div>
       {href && (
@@ -72,7 +74,7 @@ function TrajetsSection({ activeTrips, summary, dailyData }: any) {
   const today = new Date().toISOString().slice(0, 10);
   return (
     <div className="space-y-3">
-      <SectionTitle emoji="🚍" title="Trajets" href="/admin/trajets" color="#2563EB" />
+      <SectionTitle icon={<Bus size={14} />} title="Trajets" href="/admin/trajets" color="#2563EB" />
 
       {/* Stats rapides trajets */}
       <div className="grid grid-cols-3 gap-2">
@@ -156,7 +158,7 @@ function ColisSection({ parcelStats }: { parcelStats: any }) {
 
   return (
     <div className="space-y-3">
-      <SectionTitle emoji="📦" title="Colis" href="/admin/colis" color="#7C3AED" />
+      <SectionTitle icon={<Package size={14} />} title="Colis" href="/admin/colis" color="#7C3AED" />
 
       {/* Pipeline horizontal */}
       <div className="grid grid-cols-3 gap-2">
@@ -217,7 +219,7 @@ function AgencesSection() {
 
   return (
     <div className="space-y-3">
-      <SectionTitle emoji="🏢" title="Agences" href="/admin/agences" color="#D97706" />
+      <SectionTitle icon={<Building2 size={14} />} title="Agences" href="/admin/agences" color="#D97706" />
 
       {agences.length === 0 ? (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
@@ -292,7 +294,7 @@ function AgentsSection({ reports }: { reports: any[] }) {
 
   return (
     <div className="space-y-3">
-      <SectionTitle emoji="👥" title="Agents & Rapports" href="/admin/agents" color="#059669" />
+      <SectionTitle icon={<Users size={14} />} title="Agents & Rapports" href="/admin/agents" color="#059669" />
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/admin/agents">
@@ -356,7 +358,7 @@ function AlertesSection({ alerts }: { alerts: any[] }) {
   if (!alerts || alerts.length === 0) {
     return (
       <div className="space-y-2">
-        <SectionTitle emoji="⚠️" title="Alertes" href="/admin/alertes" color="#DC2626" />
+        <SectionTitle icon={<AlertTriangle size={14} />} title="Alertes" href="/admin/alertes" color="#DC2626" />
         <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex items-center gap-3">
           <CheckCircle size={18} className="text-emerald-500" />
           <p className="text-sm text-emerald-700 font-medium">Tout est normal — aucune alerte active</p>
@@ -367,7 +369,7 @@ function AlertesSection({ alerts }: { alerts: any[] }) {
 
   return (
     <div className="space-y-2">
-      <SectionTitle emoji="⚠️" title={`Alertes (${alerts.length})`} href="/admin/alertes" color="#DC2626" />
+      <SectionTitle icon={<AlertTriangle size={14} />} title={`Alertes (${alerts.length})`} href="/admin/alertes" color="#DC2626" />
       <div className="space-y-2">
         {alerts.slice(0, 4).map((a: any, i: number) => {
           const isUrgent = a.type === "bus_panne";
@@ -488,10 +490,12 @@ function CompanyDashboard() {
         </button>
       </div>
 
-      {/* ── 📊 STATISTIQUES ── */}
+      {/* ── STATISTIQUES ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-base">📊</span>
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-purple-100 text-purple-600">
+            <BarChart3 size={14} />
+          </div>
           <h3 className="text-sm font-bold text-foreground">Statistiques</h3>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -528,19 +532,19 @@ function CompanyDashboard() {
         </div>
       </div>
 
-      {/* ── ⚠️ ALERTES (priorité) ── */}
+      {/* ── ALERTES (priorité) ── */}
       <AlertesSection alerts={alerts as any[]} />
 
-      {/* ── 🚍 TRAJETS ── */}
+      {/* ── TRAJETS ── */}
       <TrajetsSection activeTrips={activeTrips} summary={summary} dailyData={dailyData} />
 
-      {/* ── 📦 COLIS ── */}
+      {/* ── COLIS ── */}
       <ColisSection parcelStats={parcelStats} />
 
-      {/* ── 🏢 AGENCES ── */}
+      {/* ── AGENCES ── */}
       <AgencesSection />
 
-      {/* ── 👥 AGENTS ── */}
+      {/* ── AGENTS ── */}
       <AgentsSection reports={reports as any[]} />
 
       {/* ── ⚡ ACTIONS RAPIDES ── */}
@@ -698,7 +702,7 @@ function RecentActivityPanel() {
       {recent.map((item, i) => (
         <div key={i} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/30 transition-colors">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={{ backgroundColor: item.bg, color: item.color }}>
-            {item.type === "reservation" ? "🎫" : item.type === "colis" ? "📦" : "👤"}
+            {item.type === "reservation" ? <Ticket size={14} /> : item.type === "colis" ? <Package size={14} /> : <User size={14} />}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{item.label}</p>

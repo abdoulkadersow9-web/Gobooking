@@ -1,17 +1,33 @@
 import React, { useState } from "react";
 import { useCompanyReports, useUpdateReport } from "@/hooks/use-company";
-import { ClipboardList, RefreshCw, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import { ClipboardList, RefreshCw, CheckCircle, XCircle, Clock, Filter, AlertCircle, Package, User, Bus, AlertTriangle, Lightbulb, FileText } from "lucide-react";
 
-const REPORT_TYPES: Record<string, { label: string; emoji: string; color: string }> = {
-  incident_voyage:   { label: "Incident voyage",    emoji: "🚨", color: "#DC2626" },
-  probleme_colis:    { label: "Problème colis",     emoji: "📦", color: "#EA580C" },
-  probleme_passager: { label: "Problème passager",  emoji: "👤", color: "#D97706" },
-  probleme_vehicule: { label: "Panne véhicule",     emoji: "🚌", color: "#7C3AED" },
-  fraude:            { label: "Fraude",             emoji: "⚠️", color: "#B91C1C" },
-  retard:            { label: "Retard",             emoji: "⏰", color: "#0369A1" },
-  suggestion:        { label: "Suggestion",         emoji: "💡", color: "#059669" },
-  autre:             { label: "Autre",              emoji: "📝", color: "#475569" },
+const REPORT_TYPES: Record<string, { label: string; color: string }> = {
+  incident_voyage:   { label: "Incident voyage",    color: "#DC2626" },
+  probleme_colis:    { label: "Problème colis",     color: "#EA580C" },
+  probleme_passager: { label: "Problème passager",  color: "#D97706" },
+  probleme_vehicule: { label: "Panne véhicule",     color: "#7C3AED" },
+  fraude:            { label: "Fraude",             color: "#B91C1C" },
+  retard:            { label: "Retard",             color: "#0369A1" },
+  suggestion:        { label: "Suggestion",         color: "#059669" },
+  autre:             { label: "Autre",              color: "#475569" },
 };
+
+const REPORT_ICONS: Record<string, React.FC<{ size?: number }>> = {
+  incident_voyage:   AlertCircle,
+  probleme_colis:    Package,
+  probleme_passager: User,
+  probleme_vehicule: Bus,
+  fraude:            AlertTriangle,
+  retard:            Clock,
+  suggestion:        Lightbulb,
+  autre:             FileText,
+};
+
+function ReportIcon({ type, size = 16 }: { type: string; size?: number }) {
+  const Icon = REPORT_ICONS[type] ?? FileText;
+  return <Icon size={size} />;
+}
 
 const STATUT_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   soumis:   { label: "Soumis",    color: "#D97706", bg: "#FEF9C3" },
@@ -112,7 +128,7 @@ export default function Reports() {
             }`}
             style={filterType === key ? { backgroundColor: rt.color, borderColor: rt.color } : {}}
           >
-            {rt.emoji} {rt.label}
+            <ReportIcon type={key} size={12} /> {rt.label}
           </button>
         ))}
       </div>
@@ -132,7 +148,7 @@ export default function Reports() {
       ) : (
         <div className="space-y-3">
           {filtered.map((report: any) => {
-            const rt = REPORT_TYPES[report.reportType] || { label: report.reportType, emoji: "📝", color: "#475569" };
+            const rt = REPORT_TYPES[report.reportType] || { label: report.reportType, color: "#475569" };
             const st = STATUT_STYLE[report.statut] || STATUT_STYLE.soumis;
             const date = new Date(report.createdAt).toLocaleDateString("fr-FR", {
               day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
@@ -147,7 +163,9 @@ export default function Reports() {
                 {/* Card header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/20">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{rt.emoji}</span>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: rt.color + "18", color: rt.color }}>
+                      <ReportIcon type={report.reportType} size={20} />
+                    </div>
                     <div>
                       <p className="font-semibold text-foreground text-sm">{rt.label}</p>
                       <p className="text-xs text-muted-foreground">

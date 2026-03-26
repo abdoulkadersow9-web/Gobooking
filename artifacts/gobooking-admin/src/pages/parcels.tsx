@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useParcels } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/Badge";
-import { Search, Package, ArrowRight } from "lucide-react";
+import { Search, Package, ArrowRight, Bus } from "lucide-react";
 
 function buildWALink(phone: string, message: string): string {
   const digits = phone.replace(/\D/g, "");
@@ -121,7 +121,7 @@ export default function Parcels() {
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
                               style={{ backgroundColor: "#25D366" }}
                             >
-                              📦 Colis arrivé
+                              <Package size={12} className="shrink-0" /> Colis arrivé
                             </a>
                           )}
                           {p.senderPhone && (
@@ -132,7 +132,7 @@ export default function Parcels() {
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-opacity hover:opacity-90"
                               style={{ backgroundColor: "#128C7E" }}
                             >
-                              🚌 En route
+                              <Bus size={12} className="shrink-0" /> En route
                             </a>
                           )}
                         </div>

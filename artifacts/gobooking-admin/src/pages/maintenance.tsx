@@ -12,7 +12,7 @@ const STATUS: Record<string, { label: string; color: string; bg: string }> = {
   termine:  { label: "Terminé ✓",  color: "#059669", bg: "#DCFCE7" },
   en_cours: { label: "En cours",   color: "#2563EB", bg: "#DBEAFE" },
   planifie: { label: "Planifié",   color: "#D97706", bg: "#FEF9C3" },
-  urgent:   { label: "Urgent ⚠️",  color: "#DC2626", bg: "#FEE2E2" },
+  urgent:   { label: "Urgent",     color: "#DC2626", bg: "#FEE2E2" },
 };
 
 export default function Maintenance() {

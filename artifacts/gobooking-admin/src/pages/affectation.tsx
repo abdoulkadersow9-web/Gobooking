@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, Bus, UserCheck, Map, Plus, Edit } from "lucide-react";
+import { Users, Bus, UserCheck, Map, Plus, Edit, AlertTriangle } from "lucide-react";
 import { useAgents, useTrips } from "@/hooks/use-company";
 
 export default function Affectation() {
@@ -56,12 +56,12 @@ export default function Affectation() {
                     <p className="text-xs text-muted-foreground mt-0.5">{t.date} · {t.departureTime}</p>
                     <div className="flex gap-2 mt-2">
                       {t.chauffeurNom ? (
-                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
-                          🚗 {t.chauffeurNom}
+                        <span className="inline-flex items-center gap-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                          <UserCheck size={11} /> {t.chauffeurNom}
                         </span>
                       ) : (
-                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
-                          ⚠️ Pas de chauffeur
+                        <span className="inline-flex items-center gap-1 text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                          <AlertTriangle size={11} /> Pas de chauffeur
                         </span>
                       )}
                     </div>

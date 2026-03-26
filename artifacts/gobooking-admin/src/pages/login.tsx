@@ -40,8 +40,8 @@ export default function Login() {
       <div className="relative z-10 w-full max-w-md p-6">
         <div className="bg-card rounded-3xl shadow-2xl p-8 border border-border/50 backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-accent/30">
-              <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 object-contain brightness-0 invert" />
+            <div className="mx-auto w-16 h-16 bg-[#FF6B00] rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-orange-500/40">
+              <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 object-contain" />
             </div>
             <h1 className="text-2xl font-display font-bold text-foreground">GoBooking Admin</h1>
             <p className="text-muted-foreground mt-2">Espace Administration — Compagnie & Super Admin</p>

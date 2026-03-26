@@ -1,5 +1,5 @@
 import React from "react";
-import { Bus, CheckCircle, AlertTriangle, Wrench, Clock } from "lucide-react";
+import { Bus, CheckCircle, AlertTriangle, Wrench, Clock, Info } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
@@ -86,7 +86,7 @@ export default function SuiviEngins() {
       </div>
 
       <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-700">
-        <strong>💡 Note :</strong> Les statuts des engins sont mis à jour par les agents logistique via l'application mobile.
+        <Info size={14} className="inline-block shrink-0 mr-1" /> <strong>Note :</strong> Les statuts des engins sont mis à jour par les agents logistique via l'application mobile.
         Les changements apparaissent ici en temps réel (actualisation toutes les 30s).
       </div>
     </div>

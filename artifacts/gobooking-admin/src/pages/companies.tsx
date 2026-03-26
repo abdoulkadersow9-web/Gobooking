@@ -84,10 +84,10 @@ export default function Companies() {
           onSubmit={async (data) => {
             try {
               await createCompany.mutateAsync(data);
-              toast({ title: "✅ Compagnie créée avec succès" });
+              toast({ title: "Compagnie créée avec succès" });
               setShowAdd(false);
             } catch (e: any) {
-              toast({ title: "❌ Erreur", description: e.message, variant: "destructive" });
+              toast({ title: "Erreur", description: e.message, variant: "destructive" });
             }
           }}
           isLoading={createCompany.isPending}
@@ -102,11 +102,11 @@ export default function Companies() {
           onSubmit={async (data) => {
             try {
               await createAgence.mutateAsync(data);
-              toast({ title: "✅ Agence créée avec succès" });
+              toast({ title: "Agence créée avec succès" });
               setShowAddAgence(null);
               refetch();
             } catch (e: any) {
-              toast({ title: "❌ Erreur", description: e.message, variant: "destructive" });
+              toast({ title: "Erreur", description: e.message, variant: "destructive" });
             }
           }}
           isLoading={createAgence.isPending}
