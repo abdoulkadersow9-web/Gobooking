@@ -75,7 +75,7 @@ export default function AgentGains() {
       <StatusBar barStyle="light-content" backgroundColor={GREEN_D} />
       {/* Header */}
       <LinearGradient colors={[GREEN_D, GREEN]} style={S.header}>
-        <Pressable style={S.backBtn} onPress={() => router.replace("/agent/home")}>
+        <Pressable style={S.backBtn} hitSlop={8} onPress={() => router.replace("/agent/home")}>
           <Feather name="arrow-left" size={18} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>

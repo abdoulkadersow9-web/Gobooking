@@ -184,6 +184,7 @@ export default function VenteScreen() {
           </View>
           <TouchableOpacity
             style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" }}
+            hitSlop={8}
             onPress={() =>
               Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
                 { text: "Annuler", style: "cancel" },

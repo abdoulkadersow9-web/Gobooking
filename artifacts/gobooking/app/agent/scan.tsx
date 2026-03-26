@@ -334,7 +334,7 @@ export default function AgentScan() {
       <StatusBar barStyle="light-content" backgroundColor={GREEN_BG} />
       {/* Header */}
       <View style={S.header}>
-        <Pressable onPress={() => router.replace("/agent/home")} style={S.backBtn}>
+        <Pressable onPress={() => router.replace("/agent/home")} style={S.backBtn} hitSlop={8}>
           <Feather name="arrow-left" size={18} color="white" />
         </Pressable>
         <Text style={S.title}>Scanner QR</Text>

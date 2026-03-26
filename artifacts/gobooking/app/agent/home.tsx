@@ -277,12 +277,9 @@ const S = StyleSheet.create({
   cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 },
 
   cardIconBox: { width: 52, height: 52, borderRadius: 14, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
-  cardEmoji:   { fontSize: 24 },
-
   cardBody:    { flex: 1, gap: 3 },
   cardLabel:   { fontSize: 15, fontWeight: "800" },
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
-  cardDesc:    { fontSize: 12, color: "#64748B", lineHeight: 17 },
 
   cardArrow:   { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
