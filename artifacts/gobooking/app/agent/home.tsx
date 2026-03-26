@@ -90,7 +90,7 @@ const ALL_MODULES = [
     label: "Agent Suivi & Alertes",
     sub: "Surveillance en temps réel",
     desc: "Surveiller les bus, gérer les alertes et situations critiques",
-    icon: "radio-outline" as const,
+    icon: "radio" as const,
     emoji: "📡",
     path: "/agent/suivi",
     color: "#BE123C",
@@ -220,16 +220,15 @@ export default function AgentHome() {
               end={{ x: 1, y: 1 }}
             >
               <View style={[S.cardAccent, { backgroundColor: mod.color }]} />
-              <View style={[S.cardIconBox, { backgroundColor: mod.color + "20", borderColor: mod.border }]}>
-                <Text style={S.cardEmoji}>{mod.emoji}</Text>
+              <View style={[S.cardIconBox, { backgroundColor: mod.color + "18", borderColor: mod.border }]}>
+                <Feather name={mod.icon} size={26} color={mod.color} />
               </View>
               <View style={S.cardBody}>
                 <Text style={[S.cardLabel, { color: mod.color }]}>{mod.label}</Text>
                 <Text style={S.cardSub}>{mod.sub}</Text>
-                <Text style={S.cardDesc}>{mod.desc}</Text>
               </View>
-              <View style={[S.cardArrow, { backgroundColor: mod.color }]}>
-                <Feather name="arrow-right" size={16} color="#fff" />
+              <View style={[S.cardArrow, { backgroundColor: mod.color + "18", borderWidth: 1, borderColor: mod.border }]}>
+                <Feather name="arrow-right" size={16} color={mod.color} />
               </View>
             </LinearGradient>
           </Pressable>
@@ -268,25 +267,25 @@ const S = StyleSheet.create({
   introSub:    { fontSize: 14, color: "#64748B", marginTop: 2 },
 
   scroll:        { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, gap: 10 },
 
-  card:        { borderRadius: 18, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  cardPressed: { opacity: 0.92, transform: [{ scale: 0.985 }] },
-  cardGradient:{ flexDirection: "row", alignItems: "center", padding: 18, gap: 14, position: "relative" },
-  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 5, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+  card:        { borderRadius: 16, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  cardPressed: { opacity: 0.90, transform: [{ scale: 0.983 }] },
+  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 15, paddingHorizontal: 16, gap: 14, position: "relative" },
+  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 },
 
-  cardIconBox: { width: 58, height: 58, borderRadius: 16, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
-  cardEmoji:   { fontSize: 26 },
+  cardIconBox: { width: 52, height: 52, borderRadius: 14, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
+  cardEmoji:   { fontSize: 24 },
 
-  cardBody:    { flex: 1, gap: 2 },
-  cardLabel:   { fontSize: 16, fontWeight: "800" },
+  cardBody:    { flex: 1, gap: 3 },
+  cardLabel:   { fontSize: 15, fontWeight: "800" },
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
-  cardDesc:    { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 17 },
+  cardDesc:    { fontSize: 12, color: "#64748B", lineHeight: 17 },
 
-  cardArrow:   { width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  cardArrow:   { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
-  extraRow:    { flexDirection: "row", gap: 12, marginTop: 6 },
-  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  extraRow:    { flexDirection: "row", gap: 10, marginTop: 4 },
+  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 12, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   extraBtnText:{ fontSize: 13, fontWeight: "700", color: NAVY },
 
 });

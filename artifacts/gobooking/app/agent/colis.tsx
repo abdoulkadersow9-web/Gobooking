@@ -845,52 +845,81 @@ function CreateTab({ token, networkStatus }: { token: string | null; networkStat
           </View>
         </View>
 
-        {/* Expéditeur */}
+        {/* Expéditeur + Destinataire regroupés */}
         <View style={SC.card}>
-          <View style={SC.cardHeader}><Ionicons name="person-outline" size={18} color={P} /><Text style={SC.cardTitle}>Expéditeur</Text></View>
-          <Text style={SC.label}>Nom *</Text>
-          <TextInput style={SC.input} placeholder="Ex: Konan Yao" value={senderName} onChangeText={setSenderName} />
-          <Text style={SC.label}>Téléphone *</Text>
-          <TextInput style={SC.input} placeholder="Ex: 07 01 23 45 67" value={senderPhone}
-            onChangeText={setSenderPhone} keyboardType="phone-pad" />
-        </View>
-
-        {/* Destinataire */}
-        <View style={SC.card}>
-          <View style={SC.cardHeader}><Ionicons name="person-add-outline" size={18} color={P} /><Text style={SC.cardTitle}>Destinataire</Text></View>
-          <Text style={SC.label}>Nom *</Text>
-          <TextInput style={SC.input} placeholder="Ex: Bamba Awa" value={receiverName} onChangeText={setReceiverName} />
-          <Text style={SC.label}>Téléphone *</Text>
-          <TextInput style={SC.input} placeholder="Ex: 05 05 99 88 77" value={receiverPhone}
-            onChangeText={setReceiverPhone} keyboardType="phone-pad" />
+          <View style={SC.cardHeader}><Ionicons name="people-outline" size={18} color={P} /><Text style={SC.cardTitle}>Personnes</Text></View>
+          {/* Expéditeur */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: P_LIGHT, justifyContent: "center", alignItems: "center" }}>
+              <Ionicons name="arrow-up" size={12} color={P} />
+            </View>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: P }}>Expéditeur</Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+            <TextInput style={[SC.input, { flex: 1 }]} placeholder="Nom *" value={senderName} onChangeText={setSenderName} returnKeyType="next" />
+            <TextInput style={[SC.input, { flex: 1 }]} placeholder="Téléphone *" value={senderPhone}
+              onChangeText={setSenderPhone} keyboardType="phone-pad" />
+          </View>
+          {/* Séparateur */}
+          <View style={{ height: 1, backgroundColor: "#EDE9FE", marginBottom: 12 }} />
+          {/* Destinataire */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center" }}>
+              <Ionicons name="arrow-down" size={12} color="#059669" />
+            </View>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#059669" }}>Destinataire</Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TextInput style={[SC.input, { flex: 1 }]} placeholder="Nom *" value={receiverName} onChangeText={setReceiverName} returnKeyType="next" />
+            <TextInput style={[SC.input, { flex: 1 }]} placeholder="Téléphone *" value={receiverPhone}
+              onChangeText={setReceiverPhone} keyboardType="phone-pad" />
+          </View>
         </View>
 
         {/* Détails colis */}
         <View style={SC.card}>
           <View style={SC.cardHeader}><Ionicons name="cube-outline" size={18} color={P} /><Text style={SC.cardTitle}>Détails du colis</Text></View>
-          <Text style={SC.label}>Type de colis</Text>
           <TouchableOpacity style={SC.pickerBtn} onPress={() => setShowTypePicker(true)}>
-            <Text style={SC.pickerTxt}>{parcelType}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+              <Ionicons name="cube-outline" size={15} color="#9CA3AF" />
+              <Text style={SC.pickerTxt}>{parcelType}</Text>
+            </View>
             <Ionicons name="chevron-down" size={16} color={P} />
           </TouchableOpacity>
-          <Text style={SC.label}>Description <Text style={{ color: "#9CA3AF" }}>(optionnel)</Text></Text>
-          <TextInput style={[SC.input, { minHeight: 50, textAlignVertical: "top" }]} placeholder="Ex: Chaussures rouges taille 42, fragile..." value={description} onChangeText={setDescription} multiline numberOfLines={2} />
-          <Text style={SC.label}>Poids (kg)</Text>
-          <TextInput style={SC.input} placeholder="Ex: 2.5" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
-          <Text style={SC.label}>Montant (FCFA) *</Text>
-          <TextInput style={SC.input} placeholder="Ex: 2500" value={amount} onChangeText={setAmount} keyboardType="number-pad" />
+          {/* Poids + Montant côte à côte */}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[SC.label, { marginBottom: 5 }]}>Poids (kg)</Text>
+              <TextInput style={SC.input} placeholder="Ex: 2.5" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[SC.label, { marginBottom: 5 }]}>Montant FCFA *</Text>
+              <TextInput style={SC.input} placeholder="Ex: 2500" value={amount} onChangeText={setAmount} keyboardType="number-pad" />
+            </View>
+          </View>
+          <TextInput
+            style={[SC.input, { minHeight: 44, textAlignVertical: "top" }]}
+            placeholder="Note / description (optionnel)"
+            value={description} onChangeText={setDescription} multiline numberOfLines={2}
+          />
         </View>
 
         {/* Livraison */}
         <View style={SC.card}>
-          <View style={SC.cardHeader}><Ionicons name="home-outline" size={18} color={P} /><Text style={SC.cardTitle}>Mode de livraison</Text></View>
+          <View style={SC.cardHeader}><Ionicons name="home-outline" size={18} color={P} /><Text style={SC.cardTitle}>Livraison</Text></View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            {DELIVERY_TYPES.map(d => (
-              <TouchableOpacity key={d.key} style={[SC.optBtn, deliveryType === d.key && SC.optBtnSel]}
-                onPress={() => setDeliveryType(d.key)}>
-                <Text style={[SC.optTxt, deliveryType === d.key && SC.optTxtSel]}>{d.label}</Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[SC.optBtn, { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }, deliveryType === "livraison_gare" && SC.optBtnSel]}
+              onPress={() => setDeliveryType("livraison_gare")}>
+              <Ionicons name="business-outline" size={14} color={deliveryType === "livraison_gare" ? P : "#9CA3AF"} />
+              <Text style={[SC.optTxt, deliveryType === "livraison_gare" && SC.optTxtSel]}>En gare</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[SC.optBtn, { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }, deliveryType === "livraison_domicile" && SC.optBtnSel]}
+              onPress={() => setDeliveryType("livraison_domicile")}>
+              <Ionicons name="bicycle-outline" size={14} color={deliveryType === "livraison_domicile" ? P : "#9CA3AF"} />
+              <Text style={[SC.optTxt, deliveryType === "livraison_domicile" && SC.optTxtSel]}>À domicile</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
