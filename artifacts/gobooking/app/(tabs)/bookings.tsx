@@ -446,7 +446,7 @@ export default function BookingsScreen() {
           style: "default",
           onPress: async () => {
             try {
-              await apiFetch(`/bookings/${bookingId}/voucher`, { token, method: "POST" });
+              await apiFetch(`/bookings/${bookingId}/voucher`, { token: token ?? undefined, method: "POST" });
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert("Bon émis", "Votre bon de voyage a été ajouté à votre espace fidélité.");
               loadData(true);

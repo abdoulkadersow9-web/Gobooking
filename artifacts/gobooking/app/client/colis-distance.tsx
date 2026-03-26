@@ -143,7 +143,7 @@ export default function ColisDistanceScreen() {
         declaredValue: declaredValue || "0",
         photoUrl: photoBase64 || undefined,
       };
-      const result = await apiFetch<Created>("/parcels/create-remote", { token, method: "POST", body });
+      const result = await apiFetch<Created>("/parcels/create-remote", { token: token ?? undefined, method: "POST", body });
       setCreated(result);
     } catch (e: any) {
       setError(e?.message ?? "Erreur lors de l'envoi. Réessayez.");

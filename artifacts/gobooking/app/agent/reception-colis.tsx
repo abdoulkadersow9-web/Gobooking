@@ -83,7 +83,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function ReceptionColisScreen() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
   const [activeTab, setActiveTab] = useState<"creer" | "retrait" | "gerer" | "liste">("creer");
 
@@ -101,6 +101,7 @@ export default function ReceptionColisScreen() {
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
       <OfflineBanner status={networkStatus} />
 
+      {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={styles.headerIcon}>
@@ -112,24 +113,45 @@ export default function ReceptionColisScreen() {
               {networkStatus.isOnline ? "Suivi professionnel des colis" : "Mode hors ligne"}
             </Text>
           </View>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            hitSlop={8}
+            onPress={() =>
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ])
+            }
+          >
+            <Ionicons name="log-out-outline" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <View style={styles.tabs}>
-          {([
-            { key: "creer",   label: "Créer",   icon: "add-circle-outline"      },
-            { key: "retrait", label: "Retrait",  icon: "qr-code-outline"         },
-            { key: "gerer",   label: "Gérer",    icon: "search-outline"          },
-            { key: "liste",   label: "Liste",    icon: "list-outline"            },
-          ] as const).map((t) => (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.tab, activeTab === t.key && styles.tabActive]}
-              onPress={() => setActiveTab(t.key)}
-            >
-              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? G_DARK : "rgba(255,255,255,0.6)"} />
-              <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      </View>
+
+      {/* ── Barre d'onglets ── */}
+      <View style={styles.tabBar}>
+        {([
+          { key: "creer",   label: "Créer",   icon: "add-circle-outline" },
+          { key: "retrait", label: "Retrait",  icon: "qr-code-outline"    },
+          { key: "gerer",   label: "Gérer",    icon: "search-outline"     },
+          { key: "liste",   label: "Liste",    icon: "list-outline"       },
+        ] as const).map((t) => (
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tab, activeTab === t.key && styles.tabActive]}
+            onPress={() => setActiveTab(t.key)}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name={t.icon as any}
+              size={14}
+              color={activeTab === t.key ? G_DARK : "rgba(255,255,255,0.7)"}
+            />
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>
+              {t.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {activeTab === "creer"   && <CreerTab token={token} onCreated={() => setActiveTab("retrait")} />}
@@ -1039,17 +1061,18 @@ const styles = StyleSheet.create({
   denied: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, backgroundColor: "#fff" },
   deniedText: { fontSize: 16, color: "#EF4444", fontWeight: "600" },
 
-  header: { backgroundColor: G_DARK, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 0 },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  header: { backgroundColor: G_DARK, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   headerIcon: { backgroundColor: G, borderRadius: 10, padding: 8 },
-  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   headerSub: { color: "#A7F3D0", fontSize: 12, marginTop: 1 },
+  logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
-  tabs: { flexDirection: "row", gap: 0 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: "center", borderBottomWidth: 2, borderBottomColor: "transparent" },
-  tabActive: { borderBottomColor: "#34D399" },
-  tabText: { fontSize: 14, color: "#A7F3D0", fontWeight: "500" },
-  tabTextActive: { color: "#fff", fontWeight: "700" },
+  tabBar: { flexDirection: "row", backgroundColor: G_DARK, paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+  tab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)" },
+  tabActive: { backgroundColor: "#fff" },
+  tabText: { fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.7)" },
+  tabTextActive: { color: G_DARK, fontWeight: "800" },
 
   scroll: { flex: 1, backgroundColor: "#F9FAFB" },
   content: { padding: 16, gap: 14, paddingBottom: 40 },

@@ -78,9 +78,9 @@ export default function RapportScreen() {
     setSuccessMsg("");
     try {
       await apiFetch("/agent/reports", {
-        token,
+        token: token ?? undefined,
         method: "POST",
-        body: { reportType, description: description.trim(), relatedId: relatedId.trim() || undefined },
+        body: JSON.stringify({ reportType, description: description.trim(), relatedId: relatedId.trim() || undefined }),
       });
       setSuccessMsg("Rapport envoyé avec succès à la direction.");
       setReportType("");

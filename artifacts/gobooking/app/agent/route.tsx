@@ -582,7 +582,12 @@ export default function RouteScreen() {
       )}
 
       {!loading && trips.length > 0 && (
-        <View style={{ flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
 
           {/* ── Sélecteur de trajet (si plusieurs) ── */}
           {trips.length > 1 && (
@@ -772,7 +777,7 @@ export default function RouteScreen() {
             </TouchableOpacity>
           </View>
 
-        </View>
+        </ScrollView>
       )}
 
       {/* ════════════════════════════════════════════════
