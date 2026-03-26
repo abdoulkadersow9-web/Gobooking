@@ -415,15 +415,15 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 16,
-    paddingTop: 24,
+    paddingTop: 26,
   },
   sectionTitle: {
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     color: Colors.light.textMuted,
-    marginBottom: 10,
+    marginBottom: 12,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
 
   // Wallet card
@@ -474,14 +474,14 @@ const styles = StyleSheet.create({
   // Loyalty card
   loyaltyCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: "#0B3C5D",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
   },
   loyaltyTop: {
     flexDirection: "row",

@@ -538,9 +538,9 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 20, paddingBottom: 16, paddingTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  header:       { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:  { fontSize: 23, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.4 },
+  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
   historyBtn:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
   historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },

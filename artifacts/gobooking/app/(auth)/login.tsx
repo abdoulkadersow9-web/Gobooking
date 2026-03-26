@@ -365,16 +365,17 @@ const styles = StyleSheet.create({
 
   /* Title */
   welcomeTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: Colors.light.text,
     marginBottom: 2,
+    letterSpacing: -0.5,
   },
   welcomeSubtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: Colors.light.textSecondary,
-    marginBottom: 16,
+    marginBottom: 20,
   },
 
   /* Error banner */
@@ -448,14 +449,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.light.primary,
-    borderRadius: 14,
-    paddingVertical: 15,
-    marginTop: 6,
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginTop: 8,
     shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
   },
   loginButtonPressed: {
     opacity: 0.9,
@@ -467,7 +468,8 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: "white",
     fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
   },
 
   /* Footer */
