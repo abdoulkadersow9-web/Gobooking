@@ -1,0 +1,287 @@
+Bonjour,
+
+J’ai une amélioration importante à ajouter et préciser dans le système.
+
+⸻
+
+IMPORTANT :
+
+Toujours suivre ma logique.
+Ne rien casser.
+Ne rien mélanger.
+Garder tout ce qui fonctionne déjà.
+Continuer uniquement en amélioration.
+
+⸻
+
+CONTEXTE :
+
+Le système actuel fonctionne bien (réservation, ticket, embarquement, colis).
+
+Nous mettons en place une logique complète :
+	•	Agent Bagage
+	•	Gestion des colis par départ
+	•	Validation centralisée
+	•	Bordereau complet avec dépenses
+	•	Impression et contrôle terrain
+	•	Synchronisation totale avec l’entreprise
+	•	Système d’alerte avant départ
+	•	Gestion des photos (preuve et contrôle)
+
+⸻
+
+1. MODULE AGENT BAGAGE
+
+Client en ligne :
+	•	Réservation
+	•	Déclaration bagage
+	•	Envoi photo
+	•	Validation agent
+	•	Bagage lié au ticket
+
+Client à la gare :
+	•	Achat ticket
+	•	Choix bagage
+	•	Passage chez agent bagage
+
+⸻
+
+Agent bagage :
+	•	Page dédiée
+	•	Voir départs en cours
+	•	Scanner ticket ou entrer référence
+	•	Ajouter bagage
+	•	Définir prix
+	•	Confirmer paiement
+
+⸻
+
+OPTION :
+
+➡️ L’agent bagage peut prendre une photo du bagage
+
+⸻
+
+Résultat :
+	•	Ticket bagage (QR code)
+	•	Impression
+	•	Liaison avec passager
+	•	Photo liée au passager
+	•	Mise à jour automatique
+
+⸻
+
+2. GESTION DES COLIS (TRÈS IMPORTANT)
+
+LOGIQUE CORRECTE :
+
+➡️ La photo du colis se fait uniquement à la création du colis
+➡️ PAS au moment du départ
+
+⸻
+
+CAS 1 : CLIENT EN LIGNE
+	•	Le client crée le colis
+	•	Il ajoute directement la photo du colis
+
+⸻
+
+CAS 2 : AGENT COLIS
+	•	L’agent crée le colis en gare
+	•	Il a l’option de prendre la photo du colis
+
+⸻
+
+RÉSULTAT :
+
+➡️ Chaque colis est enregistré avec :
+	•	photo
+	•	référence
+	•	informations
+
+⸻
+
+EXEMPLE :
+	•	600 colis enregistrés dans la journée
+	•	20 colis seulement partent
+
+➡️ Les 20 colis sont déjà enregistrés AVEC photo avant le départ
+
+⸻
+
+AU MOMENT DU DÉPART :
+
+➡️ On sélectionne seulement les colis déjà créés
+➡️ Aucun ajout de photo à ce moment
+
+⸻
+
+3. GESTION DES PHOTOS
+
+Toutes les photos :
+	•	bagages
+	•	colis
+
+⸻
+
+DOIVENT ÊTRE ENREGISTRÉES :
+
+➡️ Dans l’historique de l’entreprise
+➡️ Dans l’historique des agents selon leur rôle
+
+⸻
+
+OBJECTIF :
+	•	preuve
+	•	contrôle
+	•	gestion des litiges
+
+⸻
+
+4. SYNCHRONISATION GLOBALE
+	•	Mise à jour en temps réel
+
+➡️ Tous les agents voient :
+	•	passagers
+	•	bagages
+	•	colis
+	•	absents
+
+⸻
+
+5. VALIDATION CENTRALE
+
+Tous les agents terminent :
+	•	ticket
+	•	bagage
+	•	colis
+	•	embarquement
+
+⸻
+
+➡️ Données envoyées à l’agent de validation
+
+⸻
+
+6. AGENT DE VALIDATION
+
+Reçoit :
+	•	passagers
+	•	absents
+	•	bagages + photos
+	•	colis + photos
+	•	dépenses
+
+⸻
+
+VALIDATION :
+
+➡️ Quand il valide :
+	•	départ validé
+	•	car en route
+	•	données complètes
+
+⸻
+
+7. ACTIONS AUTOMATIQUES APRÈS VALIDATION
+
+1. ENVOI À L’ENTREPRISE
+
+➡️ Bordereau complet avec :
+	•	passagers
+	•	bagages
+	•	colis
+	•	photos
+	•	dépenses
+	•	montants
+
+⸻
+
+2. ENVOI AU GUICHET
+
+➡️ Bordereau prêt à imprimer
+
+⸻
+
+CONTENU IMPRIMÉ :
+	•	passagers
+	•	absents
+	•	bagages
+	•	colis
+	•	destinations
+
+⸻
+
+RÈGLE :
+
+❌ Aucun montant
+❌ Aucun prix
+
+⸻
+
+8. AGENT GUICHET
+
+Avant validation :
+
+➡️ Ajoute :
+	•	péage
+	•	ration
+	•	dépenses
+
+➡️ Envoyé validation
+
+⸻
+
+9. AGENT EN ROUTE
+	•	Bordereau physique
+	•	Liste téléphone
+
+➡️ Double contrôle
+
+⸻
+
+10. ALERTE AVANT DÉPART
+
+➡️ 5 minutes avant :
+
+Message automatique :
+
+➡️ “L’agent de validation attend validation pour valider le départ”
+
+⸻
+
+11. PENDANT TRAJET
+	•	Ajouts
+	•	réservations
+
+➡️ Mise à jour automatique
+
+⸻
+
+12. ARRIVÉE
+
+➡️ Validation arrivée
+
+⸻
+
+13. ENTREPRISE
+
+➡️ Reçoit tout :
+	•	bordereau
+	•	photos
+	•	historique
+
+⸻
+
+OBJECTIF FINAL :
+
+Un système où :
+	•	tout est enregistré à la source
+	•	tout est validé correctement
+	•	tout est traçable
+
+⸻
+
+On met en place cette logique.
+
+Merci.
