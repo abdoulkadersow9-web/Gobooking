@@ -141,9 +141,9 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   iconPill: {
-    width: 44,
-    height: 32,
-    borderRadius: 16,
+    width: 48,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
@@ -152,9 +152,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primaryLight,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.2,
+    letterSpacing: 0.15,
     textAlign: "center",
   },
 });

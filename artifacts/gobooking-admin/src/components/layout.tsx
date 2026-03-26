@@ -99,7 +99,9 @@ function CompanySidebar({ onClose }: { onClose?: () => void }) {
       {/* Logo */}
       <div className="h-18 flex items-center px-5 py-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center font-bold text-white text-base">G</div>
+          <div className="w-9 h-9 rounded-xl bg-[#FF6B00] flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="GoBooking" className="w-6 h-6 object-contain" />
+          </div>
           <div>
             <span className="font-bold text-base text-white block leading-tight">GoBooking</span>
             <span className="text-[11px] text-white/50">Espace Compagnie</span>
@@ -158,10 +160,11 @@ function CompanySidebar({ onClose }: { onClose?: () => void }) {
           return (
             <Link key={item.path} href={item.path} onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-xs
-                ${isActive ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}
+                ${isActive ? "bg-white/10 text-white font-semibold" : "text-white/40 hover:text-white/70 hover:bg-white/5"}`}
             >
-              <Icon size={14} />
+              <Icon size={14} strokeWidth={isActive ? 2.5 : 2} />
               <span>{item.label}</span>
+              {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-white/50" />}
             </Link>
           );
         })}
@@ -192,7 +195,9 @@ function AdminSidebar({ onClose }: { onClose?: () => void }) {
     <div className="flex flex-col h-full">
       <div className="h-18 flex items-center px-5 py-4 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-purple-600 flex items-center justify-center font-bold text-white text-base">G</div>
+          <div className="w-9 h-9 rounded-xl bg-[#FF6B00] flex items-center justify-center shadow-lg shadow-orange-500/30 shrink-0">
+            <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="GoBooking" className="w-6 h-6 object-contain" />
+          </div>
           <div>
             <span className="font-bold text-base text-white block leading-tight">GoBooking</span>
             <span className="text-[11px] text-white/50">Super Admin</span>
@@ -257,7 +262,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const allNavItems = isSuperAdmin
     ? ADMIN_NAV_SECTIONS.flatMap((s) => s.items)
     : [...COMPANY_MAIN_NAV, ...COMPANY_SECONDARY_NAV];
-  const currentLabel = allNavItems.find((n) => n.path === location)?.label || "GoBooking";
+  const currentNavItem = allNavItems.find((n) => n.path === location);
+  const currentLabel = currentNavItem?.label || "GoBooking";
+  const CurrentIcon = currentNavItem?.icon;
 
   return (
     <div className="min-h-screen bg-background flex overflow-hidden">
@@ -291,20 +298,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main */}
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 md:px-5 shrink-0 shadow-sm z-10">
+        <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 md:px-5 shrink-0 z-10">
           <div className="flex items-center gap-3">
             <button className="md:hidden p-2 -ml-1 rounded-xl text-muted-foreground hover:bg-muted" onClick={() => setIsMobileMenuOpen(true)}>
               <Menu size={21} />
             </button>
-            <h1 className="text-base font-bold text-foreground">{currentLabel}</h1>
+            <div className="flex items-center gap-2.5">
+              <div className="w-0.5 h-5 rounded-full hidden md:block" style={{ backgroundColor: roleColor }} />
+              {CurrentIcon && (
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center hidden md:flex" style={{ backgroundColor: roleColor + "15", color: roleColor }}>
+                  <CurrentIcon size={14} />
+                </div>
+              )}
+              <h1 className="text-base font-bold text-foreground tracking-tight">{currentLabel}</h1>
+            </div>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="hidden md:block text-right">
               <p className="text-sm font-semibold text-foreground leading-tight">{user?.name || roleLabel}</p>
-              <p className="text-xs text-muted-foreground">{roleLabel}</p>
+              <p className="text-[11px] text-muted-foreground">{roleLabel}</p>
             </div>
             <div
-              className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm text-white"
+              className="h-8 w-8 rounded-full flex items-center justify-center font-bold text-sm text-white shadow-sm"
               style={{ backgroundColor: roleColor }}
             >
               {(user?.name?.[0] || (isSuperAdmin ? "A" : "C")).toUpperCase()}

@@ -136,7 +136,7 @@ const tl = StyleSheet.create({
   dot:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
   dotActive: { borderWidth: 3 },
   line:      { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 8 },
-  label:     { fontSize: 9, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 3, textAlign: "center" },
+  label:     { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", marginTop: 3, textAlign: "center" },
   bonBadge:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "#DDD6FE" },
   bonLabel:  { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
 });

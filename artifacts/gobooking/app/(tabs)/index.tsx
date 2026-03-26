@@ -1177,7 +1177,7 @@ const styles = StyleSheet.create({
   // Activity section
   section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 4 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
   sectionLink: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
   activityLoading: { height: 140, justifyContent: "center", alignItems: "center" },
 

@@ -30,19 +30,20 @@ function StatCard({
 }) {
   const inner = (
     <div className="bg-card rounded-2xl p-4 border border-border shadow-sm relative overflow-hidden group hover:shadow-md transition-all active:scale-95">
-      <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500"
+      <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full opacity-8 group-hover:scale-125 transition-transform duration-500"
         style={{ backgroundColor: color }} />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl opacity-60" style={{ backgroundColor: color }} />
       <div className="flex items-start justify-between relative z-10">
         <div>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{label}</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">{label}</p>
           <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
-          {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+          {sub && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
         </div>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-border bg-background shadow-sm" style={{ color }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: color + "15", color }}>
           {icon}
         </div>
       </div>
-      {href && <div className="absolute right-4 bottom-4" style={{ color }}><ArrowUpRight size={13} /></div>}
+      {href && <div className="absolute right-3.5 bottom-3.5" style={{ color }}><ArrowUpRight size={12} /></div>}
     </div>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
@@ -54,11 +55,12 @@ function SectionTitle({ icon, title, href, color }: {
 }) {
   return (
     <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + "18", color }}>
+      <div className="flex items-center gap-2.5">
+        <div className="w-1 h-5 rounded-full" style={{ backgroundColor: color }} />
+        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + "15", color }}>
           {icon}
         </div>
-        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+        <h3 className="text-sm font-bold text-foreground tracking-tight">{title}</h3>
       </div>
       {href && (
         <Link href={href} className="flex items-center gap-1 text-xs font-semibold hover:underline transition-colors" style={{ color }}>
@@ -579,14 +581,15 @@ function KpiCard({
 }) {
   const inner = (
     <div className="bg-card rounded-2xl p-5 shadow-sm border border-border relative overflow-hidden group hover:shadow-md transition-all duration-200">
-      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-10 group-hover:scale-125 transition-transform duration-500" style={{ backgroundColor: color }} />
+      <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full opacity-8 group-hover:scale-125 transition-transform duration-500" style={{ backgroundColor: color }} />
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl opacity-60" style={{ backgroundColor: color }} />
       <div className="flex justify-between items-start relative z-10">
         <div>
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">{title}</p>
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">{title}</p>
           <h4 className="text-2xl font-bold text-foreground">{value}</h4>
-          {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+          {sub && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
         </div>
-        <div className="p-2.5 rounded-xl border border-border bg-background shadow-sm" style={{ color }}>
+        <div className="p-2.5 rounded-xl shadow-sm" style={{ backgroundColor: color + "15", color }}>
           {icon}
         </div>
       </div>
@@ -766,8 +769,11 @@ function SuperAdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-card rounded-2xl p-5 shadow-sm border border-border">
-          <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-            <BarChart3 size={16} className="text-purple-500" />
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2 tracking-tight">
+            <div className="w-1 h-4 rounded-full bg-purple-500 mr-0.5" />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-purple-500/10 text-purple-500">
+              <BarChart3 size={13} />
+            </div>
             Revenus 7 derniers jours
           </h3>
           <div className="h-52">
@@ -785,8 +791,11 @@ function SuperAdminDashboard() {
 
         <div className="bg-card rounded-2xl p-5 shadow-sm border border-border flex flex-col">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <Building2 size={16} className="text-purple-500" />
+            <h3 className="text-sm font-bold flex items-center gap-2 tracking-tight">
+              <div className="w-1 h-4 rounded-full bg-purple-500" />
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-purple-500/10 text-purple-500">
+                <Building2 size={13} />
+              </div>
               Compagnies ({(companies as any[]).length})
             </h3>
             <Link href="/admin/companies" className="text-xs text-purple-600 font-semibold hover:underline flex items-center gap-1">
@@ -811,8 +820,11 @@ function SuperAdminDashboard() {
 
       {/* Recent activity */}
       <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
-        <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-          <Clock size={16} className="text-blue-500" />
+        <h3 className="text-sm font-bold mb-4 flex items-center gap-2 tracking-tight">
+          <div className="w-1 h-4 rounded-full bg-blue-500" />
+          <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-500">
+            <Clock size={13} />
+          </div>
           Dernières activités
           <span className="text-xs font-normal text-muted-foreground ml-1">(réservations, colis, inscriptions)</span>
         </h3>
@@ -821,8 +833,11 @@ function SuperAdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
-          <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
-            <Activity size={16} className="text-amber-500" />
+          <h3 className="text-sm font-bold mb-4 flex items-center gap-2 tracking-tight">
+            <div className="w-1 h-4 rounded-full bg-amber-500" />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-500">
+              <Activity size={13} />
+            </div>
             Activité réservations
           </h3>
           <div className="grid grid-cols-3 gap-3">
@@ -845,8 +860,11 @@ function SuperAdminDashboard() {
 
         <div className="bg-card rounded-2xl p-5 shadow-sm border border-border">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold flex items-center gap-2">
-              <ClipboardList size={16} className="text-red-500" />
+            <h3 className="text-sm font-bold flex items-center gap-2 tracking-tight">
+              <div className="w-1 h-4 rounded-full bg-red-500" />
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500">
+                <ClipboardList size={13} />
+              </div>
               Rapports agents en attente
             </h3>
             <Link href="/admin/rapports" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">

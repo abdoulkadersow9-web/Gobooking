@@ -4,6 +4,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/Button";
 
+const DEMO_ACCOUNTS = [
+  { label: "Compagnie",   email: "compagnie@test.com",  color: "#D97706", bg: "#FEF3C7" },
+  { label: "Super Admin", email: "admin@test.com",       color: "#7C3AED", bg: "#EDE9FE" },
+];
+
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +31,15 @@ export default function Login() {
     }
   };
 
+  const quickLogin = async (acc: typeof DEMO_ACCOUNTS[0]) => {
+    try {
+      await login({ email: acc.email, password: "test123" });
+      setLocation("/admin/dashboard");
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Échec", description: err.message });
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-sidebar">
       <div className="absolute inset-0 z-0">
@@ -44,10 +58,36 @@ export default function Login() {
               <img src={`${import.meta.env.BASE_URL}images/logo.png`} alt="Logo" className="w-10 h-10 object-contain" />
             </div>
             <h1 className="text-2xl font-display font-bold text-foreground">GoBooking Admin</h1>
-            <p className="text-muted-foreground mt-2">Espace Administration — Compagnie & Super Admin</p>
+            <p className="text-muted-foreground mt-2 text-sm">Espace Administration — Compagnie &amp; Super Admin</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Demo quick access */}
+          <div className="mb-6 rounded-2xl border border-border bg-muted/40 p-4">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Accès rapide démo</p>
+            <div className="grid grid-cols-2 gap-2">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => quickLogin(acc)}
+                  disabled={isLoggingIn}
+                  className="flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all hover:shadow-sm active:scale-95 text-left"
+                  style={{ backgroundColor: acc.bg, borderColor: acc.color + "40" }}
+                >
+                  <span className="text-xs font-bold" style={{ color: acc.color }}>{acc.label}</span>
+                  <span className="text-[10px] text-muted-foreground font-mono truncate w-full text-center">{acc.email}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground font-medium">ou connexion manuelle</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-foreground mb-1.5">Email professionnel</label>
               <input 
@@ -55,7 +95,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm"
                 placeholder="admin@compagnie.com"
               />
             </div>
@@ -67,7 +107,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border text-foreground focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm"
                 placeholder="••••••••"
               />
             </div>

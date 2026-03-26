@@ -2489,7 +2489,7 @@ const S = StyleSheet.create({
   tabText:        { fontSize: 12, color: "#94A3B8", fontWeight: "500" },
   tabTextActive:  { color: PRIMARY, fontWeight: "700" },
 
-  sectionTitle:   { fontSize: 15, fontWeight: "700", color: "#1E293B" },
+  sectionTitle:   { fontSize: 15, fontWeight: "700", color: "#1E293B", letterSpacing: -0.2 },
   sectionRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   subLabel:       { fontSize: 12, color: "#64748B" },
 

@@ -1664,7 +1664,7 @@ const S = StyleSheet.create({
   body:         { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32, gap: 0 },
 
   /* Section title */
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 14, letterSpacing: -0.3 },
 
   /* Passenger list header */
   passengerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
