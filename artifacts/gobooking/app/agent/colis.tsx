@@ -1047,50 +1047,86 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
   /* ── Parcel card renderer (shared) ── */
   const renderCard = (p: Parcel) => {
     const nextAction = getNextAction(p);
+    const statusInfo = STATUSES[p.status] ?? { color: "#6B7280", bg: "#F3F4F6", label: p.status };
+    const isHomeDelivery = p.deliveryType === "livraison_domicile";
     return (
-      <View key={p.id} style={SL.card}>
+      <View key={p.id} style={[SL.card, { borderLeftWidth: 4, borderLeftColor: statusInfo.color }]}>
+        {/* Top row: ref + route + status badge + date */}
         <View style={SL.cardTop}>
           <View style={{ flex: 1 }}>
             <Text style={SL.ref}>{p.trackingRef}</Text>
-            <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
-            <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+              <Ionicons name="navigate-outline" size={12} color="#9CA3AF" />
+              <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+              <Ionicons name="person-outline" size={11} color="#9CA3AF" />
+              <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+            </View>
           </View>
-          <View style={{ alignItems: "flex-end", gap: 4 }}>
+          <View style={{ alignItems: "flex-end", gap: 5 }}>
             <StatusBadge status={p.status} />
             {p.createdAt ? (
-              <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+              <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "500" }}>
                 {new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
               </Text>
             ) : null}
           </View>
         </View>
-        <View style={SL.meta}>
-          <Text style={SL.metaTxt}>{p.parcelType}{p.weight ? ` · ${p.weight}kg` : ""}</Text>
-          <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
-        </View>
-        <MiniProgress status={p.status} />
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View style={{ backgroundColor: p.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-            <Text style={{ fontSize: 10, fontWeight: "700", color: p.deliveryType === "livraison_domicile" ? "#EA580C" : "#065F46" }}>
-              {p.deliveryType === "livraison_domicile" ? "Domicile" : "Gare"}
+
+        {/* Meta row: type + weight + amount + livraison */}
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+          <View style={{ backgroundColor: "#F1F5F9", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, color: "#475569", fontWeight: "600" }}>
+              {p.parcelType}{p.weight ? ` · ${p.weight}kg` : ""}
+            </Text>
+          </View>
+          <View style={{ backgroundColor: "#F1F5F9", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "700" }}>
+              {Number(p.amount).toLocaleString()} FCFA
+            </Text>
+          </View>
+          <View style={{ backgroundColor: isHomeDelivery ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 11, fontWeight: "700", color: isHomeDelivery ? "#EA580C" : "#065F46" }}>
+              {isHomeDelivery ? "Domicile" : "Gare"}
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+
+        {/* Progress bar */}
+        <MiniProgress status={p.status} />
+
+        {/* Action buttons */}
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 2 }}>
           {nextAction && (
             <TouchableOpacity
-              style={[SL.actionBtn, { backgroundColor: nextAction.color, borderColor: nextAction.color, flex: 1 }]}
+              style={[SL.actionBtn, {
+                backgroundColor: nextAction.color, borderColor: nextAction.color,
+                flex: 1, flexDirection: "row", gap: 6,
+                shadowColor: nextAction.color, shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.3, shadowRadius: 5, elevation: 3,
+              }]}
               onPress={() => handleStatusUpdate(p)}
               disabled={updating === p.id}
+              activeOpacity={0.82}
             >
               {updating === p.id
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
+                : <>
+                    <Ionicons name="arrow-forward-circle-outline" size={16} color="#fff" />
+                    <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
+                  </>
               }
             </TouchableOpacity>
           )}
+          {!nextAction && (
+            <View style={[SL.actionBtn, { flex: 1, backgroundColor: "#F9FAFB", borderColor: "#E2E8F0", flexDirection: "row", gap: 6, justifyContent: "center" }]}>
+              <Ionicons name="checkmark-done" size={15} color="#6B7280" />
+              <Text style={[SL.actionTxt, { color: "#9CA3AF" }]}>Terminé</Text>
+            </View>
+          )}
           <TouchableOpacity
-            style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: P_LIGHT, paddingHorizontal: 12 }]}
+            style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: "#DDD6FE", paddingHorizontal: 14 }]}
             onPress={() => printLabel({
               trackingRef: p.trackingRef,
               senderName: p.senderName, senderPhone: p.senderPhone,
@@ -1188,24 +1224,33 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
 
           {/* ── VUE PAR SECTIONS (filtre Tous) ── */}
           {filter === "tous" ? (
-            grouped.map(section => (
-              <View key={section.key} style={{ marginBottom: 20 }}>
-                {/* Section header */}
+            grouped.map((section) => (
+              <View key={section.key} style={{ marginBottom: 24 }}>
+                {/* Section header — accent bar + icon + label + count */}
                 <View style={{
-                  flexDirection: "row", alignItems: "center", gap: 8,
-                  backgroundColor: section.bg, borderRadius: 10,
-                  paddingHorizontal: 12, paddingVertical: 8,
-                  marginBottom: 10, borderWidth: 1,
-                  borderColor: section.color + "33",
+                  flexDirection: "row", alignItems: "center",
+                  backgroundColor: section.bg,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  marginBottom: 12,
+                  shadowColor: section.color,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.12,
+                  shadowRadius: 6,
+                  elevation: 2,
                 }}>
-                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: section.color, justifyContent: "center", alignItems: "center" }}>
-                    <Ionicons name={section.icon} size={14} color="#fff" />
-                  </View>
-                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "800", color: section.color, letterSpacing: -0.2 }}>
-                    {section.label}
-                  </Text>
-                  <View style={{ backgroundColor: section.color, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{section.items.length}</Text>
+                  {/* Left accent bar */}
+                  <View style={{ width: 5, alignSelf: "stretch", backgroundColor: section.color }} />
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: section.color, justifyContent: "center", alignItems: "center" }}>
+                      <Ionicons name={section.icon} size={17} color="#fff" />
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 15, fontWeight: "800", color: section.color, letterSpacing: -0.3 }}>
+                      {section.label}
+                    </Text>
+                    <View style={{ backgroundColor: section.color, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>{section.items.length}</Text>
+                    </View>
                   </View>
                 </View>
                 {/* Cards in this section */}
@@ -1219,19 +1264,26 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
             <View>
               {activeFilter && (
                 <View style={{
-                  flexDirection: "row", alignItems: "center", gap: 8,
-                  backgroundColor: activeFilter.color + "15", borderRadius: 10,
-                  paddingHorizontal: 12, paddingVertical: 9,
-                  marginBottom: 12, borderWidth: 1,
-                  borderColor: activeFilter.color + "44",
+                  flexDirection: "row", alignItems: "center",
+                  backgroundColor: activeFilter.color + "15",
+                  borderRadius: 12, overflow: "hidden",
+                  marginBottom: 14,
+                  shadowColor: activeFilter.color,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1, shadowRadius: 5, elevation: 2,
                 }}>
-                  <Ionicons name={activeFilter.icon} size={16} color={activeFilter.color} />
-                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "800", color: activeFilter.color }}>
-                    {activeFilter.label}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: activeFilter.color, fontWeight: "600" }}>
-                    {displayedParcels.length} colis · du plus récent
-                  </Text>
+                  <View style={{ width: 5, alignSelf: "stretch", backgroundColor: activeFilter.color }} />
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11 }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: activeFilter.color, justifyContent: "center", alignItems: "center" }}>
+                      <Ionicons name={activeFilter.icon} size={16} color="#fff" />
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 15, fontWeight: "800", color: activeFilter.color }}>
+                      {activeFilter.label}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: activeFilter.color, fontWeight: "700", backgroundColor: activeFilter.color + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                      {displayedParcels.length} colis
+                    </Text>
+                  </View>
                 </View>
               )}
               <View style={{ gap: 10 }}>
@@ -1792,14 +1844,14 @@ const SL = StyleSheet.create({
   chipActive: { backgroundColor: P, borderColor: P },
   chipTxt:    { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   chipTxtActive: { color: "#fff" },
-  card:       { backgroundColor: "#fff", borderRadius: 14, padding: 14, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, gap: 8 },
+  card:       { backgroundColor: "#fff", borderRadius: 14, padding: 16, elevation: 3, shadowColor: "#0B3C5D", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, gap: 10, overflow: "hidden" },
   cardTop:    { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  ref:        { fontSize: 14, fontWeight: "800", color: P },
-  route:      { fontSize: 12, color: "#374151", fontWeight: "600", marginTop: 2 },
-  names:      { fontSize: 11, color: "#6B7280", marginTop: 2 },
+  ref:        { fontSize: 15, fontWeight: "800", color: P, letterSpacing: -0.2 },
+  route:      { fontSize: 12, color: "#374151", fontWeight: "600" },
+  names:      { fontSize: 11, color: "#9CA3AF" },
   meta:       { flexDirection: "row", justifyContent: "space-between" },
   metaTxt:    { fontSize: 12, color: "#6B7280" },
-  actionBtn:  { borderWidth: 1.5, borderRadius: 10, paddingVertical: 9, alignItems: "center" },
+  actionBtn:  { borderWidth: 1.5, borderRadius: 11, paddingVertical: 12, alignItems: "center", justifyContent: "center" },
   actionTxt:  { fontSize: 13, fontWeight: "700" },
 });
 
