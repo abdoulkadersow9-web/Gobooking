@@ -37,22 +37,22 @@ const DELIVERY_TYPES = [
 ];
 
 const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
-  créé:          { label: "Créé",           color: "#6B7280", bg: "#F3F4F6" },
-  cree:          { label: "Créé",           color: "#6B7280", bg: "#F3F4F6" },
-  en_attente:    { label: "En attente",     color: "#6B7280", bg: "#F3F4F6" },
-  en_gare:       { label: "En gare",        color: "#D97706", bg: "#FEF3C7" },
-  "chargé_bus":  { label: "Chargé bus",     color: "#7C3AED", bg: "#EDE9FE" },
-  en_transit:    { label: "En transit",     color: "#2563EB", bg: "#DBEAFE" },
-  en_route:      { label: "En route",       color: "#2563EB", bg: "#DBEAFE" },
-  arrivé:        { label: "Arrivé ✅",      color: G,         bg: "#D1FAE5" },
-  arrive:        { label: "Arrivé ✅",      color: G,         bg: "#D1FAE5" },
-  en_livraison:  { label: "En livraison 🛵",color: "#EA580C", bg: "#FFF7ED" },
-  livré:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
-  livre:         { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5" },
-  retiré:        { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5" },
-  retire:        { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5" },
-  annulé:        { label: "Annulé",         color: "#DC2626", bg: "#FEE2E2" },
-  arrive_gare_depart: { label: "Arrivé gare", color: G,       bg: "#D1FAE5" },
+  créé:          { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
+  cree:          { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
+  en_attente:    { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
+  en_gare:       { label: "En gare",    color: "#D97706", bg: "#FEF3C7" },
+  arrive_gare_depart: { label: "En gare", color: "#D97706", bg: "#FEF3C7" },
+  "chargé_bus":  { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
+  en_transit:    { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
+  en_route:      { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
+  arrivé:        { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
+  arrive:        { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
+  en_livraison:  { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
+  livré:         { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
+  livre:         { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
+  retiré:        { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
+  retire:        { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
+  annulé:        { label: "Annulé",     color: "#DC2626", bg: "#FEE2E2" },
 };
 
 type NextAction = { label: string; route: string; color: string };
@@ -150,7 +150,7 @@ export default function ColisScreen() {
           <View style={S.headerIcon}><Ionicons name="cube" size={22} color="#fff" /></View>
           <View>
             <Text style={S.headerTitle}>📦 Gestion Colis</Text>
-            <Text style={S.headerSub}>{networkStatus.isOnline ? "Créer · Recevoir · Suivre" : "⚡ Hors ligne"}</Text>
+            <Text style={S.headerSub}>{networkStatus.isOnline ? "Enregistrer · Suivre · Livrer" : "⚡ Hors ligne"}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={logout} style={S.logoutBtn}>
@@ -164,9 +164,9 @@ export default function ColisScreen() {
           <TouchableOpacity key={t} style={[S.tabBtn, tab === t && S.tabBtnActive]} onPress={() => setTab(t)}>
             <Text style={[S.tabTxt, tab === t && S.tabTxtActive]}>
               {t === "retrait" ? "📦 Retrait"
-               : t === "valider" ? "✅ Valider"
-               : t === "liste" ? "📋 Liste"
-               : "➕ Créer"}
+               : t === "valider" ? "🔄 Progression"
+               : t === "liste" ? "📋 Historique"
+               : "➕ Nouveau"}
             </Text>
           </TouchableOpacity>
         ))}
@@ -911,35 +911,78 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
     ]);
   };
 
-  const FILTERS = ["tous", "⚡ Action", "créé", "en_gare", "chargé_bus", "en_transit", "arrivé", "en_livraison", "retiré", "livré"];
+  const STEP_FILTERS = [
+    { key: "tous",      label: "Tous",       icon: "📋", color: "#6B7280" },
+    { key: "créé",      label: "Créé",       icon: "📝", color: "#6B7280" },
+    { key: "en_gare",   label: "En gare",    icon: "🏢", color: "#D97706" },
+    { key: "en_transit",label: "En transit", icon: "🚌", color: "#2563EB" },
+    { key: "arrivé",    label: "Arrivé",     icon: "📍", color: "#059669" },
+    { key: "retiré",    label: "Retiré",     icon: "✅", color: "#065F46" },
+  ];
 
-  const parcelsNeedingAction = parcels.filter(p => getNextAction(p) !== null && (p.status === "arrivé" || p.status === "arrive" || p.status === "en_livraison"));
-  const displayedParcels = filter === "⚡ Action"
-    ? parcels.filter(p => getNextAction(p) !== null)
-    : filter !== "tous"
-      ? parcels.filter(p => p.status === filter)
-      : parcels;
+  function matchesFilter(p: Parcel, f: string): boolean {
+    if (f === "tous") return true;
+    if (f === "créé")       return ["créé","cree","en_attente"].includes(p.status);
+    if (f === "en_gare")    return ["en_gare","arrive_gare_depart"].includes(p.status);
+    if (f === "en_transit") return ["chargé_bus","en_transit","en_route"].includes(p.status);
+    if (f === "arrivé")     return ["arrivé","arrive","en_livraison"].includes(p.status);
+    if (f === "retiré")     return ["retiré","retire","livré","livre"].includes(p.status);
+    return p.status === f;
+  }
+
+  const displayedParcels = parcels.filter(p => matchesFilter(p, filter));
+  const arrivedCount = parcels.filter(p => ["arrivé","arrive"].includes(p.status)).length;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F5F3FF" }}>
-      {/* Action needed banner */}
-      {filter === "tous" && parcelsNeedingAction.length > 0 && (
-        <TouchableOpacity onPress={() => setFilter("⚡ Action")}
-          style={{ margin: 12, marginBottom: 4, backgroundColor: "#FFFBEB", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#FCD34D" }}>
-          <Ionicons name="flash" size={18} color="#D97706" />
-          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#D97706" }}>
-            {parcelsNeedingAction.length} colis en attente d'action (retrait/livraison)
+    <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+
+      {/* Pipeline 5 étapes */}
+      <View style={{ backgroundColor: "#fff", marginHorizontal: 12, marginTop: 10, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#E2E8F0" }}>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: "#9CA3AF", marginBottom: 8, letterSpacing: 0.5 }}>FLUX DU COLIS</Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {[
+            { icon: "📝", label: "Créé",   color: "#6B7280" },
+            { icon: "🏢", label: "En gare", color: "#D97706" },
+            { icon: "🚌", label: "Transit", color: "#2563EB" },
+            { icon: "📍", label: "Arrivé",  color: "#059669" },
+            { icon: "✅", label: "Retiré",  color: "#065F46" },
+          ].map((step, i) => (
+            <React.Fragment key={step.label}>
+              <View style={{ alignItems: "center", flex: 1 }}>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: step.color + "18", justifyContent: "center", alignItems: "center", marginBottom: 4 }}>
+                  <Text style={{ fontSize: 14 }}>{step.icon}</Text>
+                </View>
+                <Text style={{ fontSize: 9, fontWeight: "700", color: step.color, textAlign: "center" }}>{step.label}</Text>
+              </View>
+              {i < 4 && <View style={{ height: 1.5, flex: 0.3, backgroundColor: "#E5E7EB", marginBottom: 18 }} />}
+            </React.Fragment>
+          ))}
+        </View>
+      </View>
+
+      {/* Bannière arrivées en attente */}
+      {filter === "tous" && arrivedCount > 0 && (
+        <TouchableOpacity onPress={() => setFilter("arrivé")}
+          style={{ marginHorizontal: 12, marginTop: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 11, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#6EE7B7" }}>
+          <Text style={{ fontSize: 16 }}>📍</Text>
+          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#065F46" }}>
+            {arrivedCount} colis arrivé{arrivedCount > 1 ? "s" : ""} — prêt{arrivedCount > 1 ? "s" : ""} pour retrait
           </Text>
-          <Ionicons name="chevron-forward" size={16} color="#D97706" />
+          <Ionicons name="chevron-forward" size={16} color="#059669" />
         </TouchableOpacity>
       )}
 
       {/* Filter chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 52 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8, alignItems: "center" }}>
-        {FILTERS.map(f => (
-          <TouchableOpacity key={f} style={[SL.chip, filter === f && SL.chipActive, f === "⚡ Action" && { borderColor: "#D97706", backgroundColor: filter === f ? "#D97706" : "#FFFBEB" }]} onPress={() => setFilter(f)}>
-            <Text style={[SL.chipTxt, filter === f && SL.chipTxtActive, f === "⚡ Action" && filter !== f && { color: "#D97706" }]}>
-              {f === "tous" ? "Tous" : f === "⚡ Action" ? "⚡ Action" : (STATUSES[f]?.label ?? f)}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 52 }} contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 7, alignItems: "center" }}>
+        {STEP_FILTERS.map(f => (
+          <TouchableOpacity
+            key={f.key}
+            style={[SL.chip, filter === f.key && { backgroundColor: f.color, borderColor: f.color }]}
+            onPress={() => setFilter(f.key)}
+          >
+            <Text style={[SL.chipTxt, filter === f.key && { color: "#fff" }]}>
+              {f.icon} {f.label}
+              {f.key !== "tous" && ` (${parcels.filter(p => matchesFilter(p, f.key)).length})`}
             </Text>
           </TouchableOpacity>
         ))}
@@ -1144,13 +1187,54 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
   const isHomeDelivery = colis?.deliveryType === "livraison_domicile";
   const isDone = colis && (colis.status === "retiré" || colis.status === "retire" || colis.status === "livré" || colis.status === "livre");
 
+  const retraitStep = colis ? (isDone ? 3 : 2) : 1;
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#F5F3FF" }} contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+
+      {/* ── Indicateur de progression ── */}
+      <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E5E7EB" }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {[
+            { num: 1, label: "Identifier",  icon: "🔍" },
+            { num: 2, label: "Vérifier",    icon: "📋" },
+            { num: 3, label: "Retrait ✓",   icon: "✅" },
+          ].map((s, i) => {
+            const done   = retraitStep > s.num;
+            const active = retraitStep === s.num;
+            return (
+              <React.Fragment key={s.num}>
+                <View style={{ alignItems: "center", flex: 1 }}>
+                  <View style={{
+                    width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center", marginBottom: 5,
+                    backgroundColor: done ? "#065F46" : active ? P : "#F3F4F6",
+                    borderWidth: active ? 2 : 0, borderColor: P,
+                  }}>
+                    {done
+                      ? <Ionicons name="checkmark" size={18} color="#fff" />
+                      : <Text style={{ fontSize: 13 }}>{s.icon}</Text>
+                    }
+                  </View>
+                  <Text style={{
+                    fontSize: 10, fontWeight: "700", textAlign: "center",
+                    color: done ? "#065F46" : active ? P : "#9CA3AF",
+                  }}>{s.label}</Text>
+                </View>
+                {i < 2 && (
+                  <View style={{ flex: 0.4, height: 2, marginBottom: 20,
+                    backgroundColor: retraitStep > s.num ? "#065F46" : "#E5E7EB",
+                  }} />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </View>
+      </View>
 
       {/* STEP 1: Scan / Search */}
       <View style={SS.card}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <Text style={SS.cardTitle}>🔍 Identifier le colis</Text>
+          <Text style={SS.cardTitle}>🔍 Étape 1 — Identifier le colis</Text>
           <TouchableOpacity style={[SS.scanToggle, scanning && SS.scanToggleActive]}
             onPress={async () => {
               if (!permission?.granted) await requestPermission();
@@ -1209,6 +1293,14 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
       {/* STEP 2: Colis result card */}
       {colis && (
         <View style={[SS.resultCard, isDone && { borderColor: "#86EFAC" }]}>
+          {/* Étape 2 label */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <View style={{ backgroundColor: isDone ? "#ECFDF5" : P_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <Text style={{ fontSize: 10, fontWeight: "800", color: isDone ? "#065F46" : P }}>
+                {isDone ? "✅ ÉTAPE 3 — RETRAIT EFFECTUÉ" : "📋 ÉTAPE 2 — VÉRIFICATION COLIS"}
+              </Text>
+            </View>
+          </View>
           {/* Header */}
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
             <View style={{ flex: 1 }}>
