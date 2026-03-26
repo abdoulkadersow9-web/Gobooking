@@ -17,9 +17,14 @@ export default function Carburant() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Carburant</h2>
-          <p className="text-sm text-muted-foreground mt-1">Suivi consommation & coûts carburant</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #EA580C, #C2410C)" }}>
+            <Fuel size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Carburant</h2>
+            <p className="text-sm text-muted-foreground">Suivi consommation & coûts carburant</p>
+          </div>
         </div>
         <button className="flex items-center gap-2 bg-orange-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-700 transition-colors shadow-sm">
           <Plus size={16} /> Enregistrer plein

@@ -31,9 +31,14 @@ export default function SuiviEngins() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Suivi Engins</h2>
-        <p className="text-sm text-muted-foreground mt-1">État de la flotte de bus</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #0369A1, #0284C7)" }}>
+          <Bus size={18} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Suivi Engins</h2>
+          <p className="text-sm text-muted-foreground">État de la flotte de bus</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

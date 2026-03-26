@@ -70,9 +70,14 @@ export default function Reports() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Rapports Agents</h2>
-          <p className="text-sm text-muted-foreground mt-1">Incidents, problèmes et suggestions signalés par vos agents</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #059669, #047857)" }}>
+            <ClipboardList size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Rapports Agents</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Incidents, problèmes et suggestions signalés par vos agents</p>
+          </div>
         </div>
         <button
           onClick={() => refetch()}

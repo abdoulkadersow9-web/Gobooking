@@ -16,9 +16,14 @@ const STATUS_LABELS: Record<string, { label: string; color: string; bg: string }
 export default function Embarquement() {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Embarquement</h2>
-        <p className="text-sm text-muted-foreground mt-1">Suivi du scan passagers par trajet</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #2563EB, #1D4ED8)" }}>
+          <UserCheck size={18} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Embarquement</h2>
+          <p className="text-sm text-muted-foreground">Suivi du scan passagers par trajet</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

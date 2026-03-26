@@ -30,9 +30,14 @@ export default function ColisHistorique() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Historique Colis</h2>
-        <p className="text-sm text-muted-foreground mt-1">Tous les colis traités par votre compagnie</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+          <History size={18} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Historique Colis</h2>
+          <p className="text-sm text-muted-foreground">Tous les colis traités par votre compagnie</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4">

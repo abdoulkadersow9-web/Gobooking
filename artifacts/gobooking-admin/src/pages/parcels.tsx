@@ -39,10 +39,13 @@ export default function Parcels() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+          <Package size={18} className="text-white" />
+        </div>
         <div>
-          <h2 className="text-2xl font-display font-bold">Gestion des Colis</h2>
-          <p className="text-muted-foreground mt-1">Suivez les expéditions de marchandises.</p>
+          <h2 className="text-2xl font-display font-bold tracking-tight">Gestion des Colis</h2>
+          <p className="text-muted-foreground text-sm mt-0.5">Suivez les expéditions de marchandises.</p>
         </div>
       </div>
 

@@ -11,9 +11,14 @@ const mockLiveBuses = [
 export default function SuiviLive() {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Suivi Live GPS</h2>
-        <p className="text-sm text-muted-foreground mt-1">Positions en temps réel de la flotte</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #0369A1, #0284C7)" }}>
+          <Radio size={18} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Suivi Live GPS</h2>
+          <p className="text-sm text-muted-foreground">Positions en temps réel de la flotte</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

@@ -335,7 +335,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-4 md:p-5 bg-background">
+        <div className="flex-1 overflow-auto p-5 md:p-6 bg-background">
           <motion.div
             key={location}
             initial={{ opacity: 0, y: 6 }}

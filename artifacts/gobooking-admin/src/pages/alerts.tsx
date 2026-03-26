@@ -122,12 +122,14 @@ export default function AlertsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <AlertTriangle size={24} className="text-red-500" />
-            Alertes & Anomalies
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">Surveillance en temps réel des incidents</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #DC2626, #B91C1C)" }}>
+            <AlertTriangle size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Alertes & Anomalies</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Surveillance en temps réel des incidents</p>
+          </div>
         </div>
         <button
           onClick={() => refetch()}

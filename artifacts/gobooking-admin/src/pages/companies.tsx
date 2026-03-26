@@ -42,11 +42,16 @@ export default function Companies() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Compagnies de transport</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Hiérarchie : <span className="font-semibold text-purple-600">Compagnie → Agences → Agents</span>
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #7C3AED, #5B21B6)" }}>
+            <Building2 size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Compagnies de transport</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Hiérarchie : <span className="font-semibold text-purple-600">Compagnie → Agences → Agents</span>
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => refetch()}

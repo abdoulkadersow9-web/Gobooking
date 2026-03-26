@@ -258,27 +258,27 @@ const S = StyleSheet.create({
   rolePillText: { color: "rgba(255,255,255,0.9)", fontSize: 12, fontWeight: "600" },
   logoutBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
 
-  intro:       { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 8 },
-  introTitle:  { fontSize: 20, fontWeight: "800", color: "#0F172A" },
-  introSub:    { fontSize: 14, color: "#64748B", marginTop: 2 },
+  intro:       { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  introTitle:  { fontSize: 20, fontWeight: "800", color: "#0F172A", letterSpacing: -0.3 },
+  introSub:    { fontSize: 13, color: "#64748B", marginTop: 2 },
 
   scroll:        { flex: 1 },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 32, gap: 10 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 36, gap: 12 },
 
-  card:        { borderRadius: 16, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  cardPressed: { opacity: 0.90, transform: [{ scale: 0.983 }] },
-  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 15, paddingHorizontal: 16, gap: 14, position: "relative" },
-  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 16, borderBottomLeftRadius: 16 },
+  card:        { borderRadius: 18, overflow: "hidden", shadowColor: "#0B3C5D", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  cardPressed: { opacity: 0.88, transform: [{ scale: 0.981 }] },
+  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 16, gap: 14, position: "relative" },
+  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
 
   cardIconBox: { width: 52, height: 52, borderRadius: 14, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
   cardBody:    { flex: 1, gap: 3 },
-  cardLabel:   { fontSize: 15, fontWeight: "800" },
+  cardLabel:   { fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
 
-  cardArrow:   { width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  cardArrow:   { width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
-  extraRow:    { flexDirection: "row", gap: 10, marginTop: 4 },
-  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 12, paddingVertical: 12, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  extraRow:    { flexDirection: "row", gap: 10, marginTop: 2 },
+  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
   extraBtnText:{ fontSize: 13, fontWeight: "700", color: NAVY },
 
 });

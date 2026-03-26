@@ -1,5 +1,5 @@
 import React from "react";
-import { Star, ThumbsUp, ThumbsDown, MessageCircle } from "lucide-react";
+import { Star, ThumbsUp, ThumbsDown, MessageCircle, MessageSquare } from "lucide-react";
 
 const mockAvis = [
   { id: 1, nom: "Kofi Asante",   note: 5, commentaire: "Service excellent, bus confortable et ponctuel !", trajet: "Abidjan → Bouaké", date: "2026-03-24" },
@@ -26,9 +26,14 @@ export default function Avis() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-foreground">Avis clients</h2>
-        <p className="text-sm text-muted-foreground mt-1">Feedback et satisfaction des passagers</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}>
+          <MessageSquare size={18} className="text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Avis clients</h2>
+          <p className="text-sm text-muted-foreground">Feedback et satisfaction des passagers</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

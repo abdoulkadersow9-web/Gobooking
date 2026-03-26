@@ -21,9 +21,14 @@ export default function Maintenance() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Maintenance</h2>
-          <p className="text-sm text-muted-foreground mt-1">Suivi des interventions sur la flotte</p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, #059669, #047857)" }}>
+            <Wrench size={18} className="text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground tracking-tight">Maintenance</h2>
+            <p className="text-sm text-muted-foreground">Suivi des interventions sur la flotte</p>
+          </div>
         </div>
         <button className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm">
           <Plus size={16} /> Nouvelle intervention
