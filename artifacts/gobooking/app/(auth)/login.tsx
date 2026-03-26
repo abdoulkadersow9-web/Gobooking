@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -110,9 +111,10 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: Colors.light.primary }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <StatusBar barStyle="light-content" backgroundColor={Colors.light.primaryDark} />
       <ScrollView
         contentContainerStyle={[
           styles.container,

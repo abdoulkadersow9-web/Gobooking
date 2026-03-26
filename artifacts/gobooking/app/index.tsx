@@ -95,7 +95,7 @@ export default function SplashScreen() {
         <Text style={S.tagline}>Voyagez partout en Côte d'Ivoire</Text>
       </Animated.View>
 
-      <Text style={S.version}>v2.0 · Côte d'Ivoire 🇨🇮</Text>
+      <Text style={S.version}>v2.0 · Côte d'Ivoire</Text>
     </View>
   );
 }

@@ -7,6 +7,7 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -71,6 +72,7 @@ export default function AgentGains() {
 
   return (
     <View style={[S.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" backgroundColor={GREEN_D} />
       {/* Header */}
       <LinearGradient colors={[GREEN_D, GREEN]} style={S.header}>
         <Pressable style={S.backBtn} onPress={() => router.replace("/agent/home")}>

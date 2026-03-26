@@ -8,6 +8,7 @@ import {
   Linking,
   RefreshControl,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -194,6 +195,7 @@ export default function AgentReservation() {
 
   return (
     <SafeAreaView style={S.root} edges={["top"]}>
+      <StatusBar barStyle="light-content" backgroundColor="#164E63" />
       {/* Header */}
       <LinearGradient colors={["#164E63", "#0E7490"]} style={S.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>

@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -330,6 +331,7 @@ export default function AgentScan() {
   ═══════════════════════════════════════════════════════════════ */
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
+      <StatusBar barStyle="light-content" backgroundColor={GREEN_BG} />
       {/* Header */}
       <View style={S.header}>
         <Pressable onPress={() => router.replace("/agent/home")} style={S.backBtn}>

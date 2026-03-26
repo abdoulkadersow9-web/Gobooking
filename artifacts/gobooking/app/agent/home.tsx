@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -159,6 +160,7 @@ export default function AgentHome() {
 
   return (
     <SafeAreaView style={S.root} edges={["top"]}>
+      <StatusBar barStyle="light-content" backgroundColor={NAVY} />
       {/* Header */}
       <LinearGradient colors={[NAVY, "#1A5C8A"]} style={S.header}>
         <View style={S.headerLeft}>
