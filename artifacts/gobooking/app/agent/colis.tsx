@@ -1262,214 +1262,199 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
   const retraitStep = colis ? (isDone ? 3 : 2) : 1;
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#F5F3FF" }} contentContainerStyle={{ padding: 16, gap: 14 }} keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ flex: 1, backgroundColor: "#F5F3FF" }} contentContainerStyle={{ padding: 16, gap: 12 }} keyboardShouldPersistTaps="handled">
 
-      {/* ── Indicateur de progression ── */}
-      <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E5E7EB" }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {[
-            { num: 1, label: "Identifier",  icon: "🔍" },
-            { num: 2, label: "Vérifier",    icon: "📋" },
-            { num: 3, label: "Retrait ✓",   icon: "✅" },
-          ].map((s, i) => {
-            const done   = retraitStep > s.num;
-            const active = retraitStep === s.num;
-            return (
-              <React.Fragment key={s.num}>
-                <View style={{ alignItems: "center", flex: 1 }}>
-                  <View style={{
-                    width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center", marginBottom: 5,
-                    backgroundColor: done ? "#065F46" : active ? P : "#F3F4F6",
-                    borderWidth: active ? 2 : 0, borderColor: P,
-                  }}>
-                    {done
-                      ? <Ionicons name="checkmark" size={18} color="#fff" />
-                      : <Text style={{ fontSize: 13 }}>{s.icon}</Text>
-                    }
-                  </View>
-                  <Text style={{
-                    fontSize: 10, fontWeight: "700", textAlign: "center",
-                    color: done ? "#065F46" : active ? P : "#9CA3AF",
-                  }}>{s.label}</Text>
+      {/* ── Indicateur de progression compact ── */}
+      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#EDE9FE" }}>
+        {[
+          { num: 1, label: "Identifier", icon: "🔍" },
+          { num: 2, label: "Vérifier",   icon: "📋" },
+          { num: 3, label: "Retiré ✓",   icon: "✅" },
+        ].map((s, i) => {
+          const done   = retraitStep > s.num;
+          const active = retraitStep === s.num;
+          return (
+            <React.Fragment key={s.num}>
+              <View style={{ flex: 1, alignItems: "center", gap: 4 }}>
+                <View style={{
+                  width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center",
+                  backgroundColor: done ? "#059669" : active ? P : "#F3F4F6",
+                  borderWidth: active ? 2 : 0, borderColor: P,
+                }}>
+                  {done
+                    ? <Ionicons name="checkmark" size={16} color="#fff" />
+                    : <Text style={{ fontSize: 13 }}>{s.icon}</Text>
+                  }
                 </View>
-                {i < 2 && (
-                  <View style={{ flex: 0.4, height: 2, marginBottom: 20,
-                    backgroundColor: retraitStep > s.num ? "#065F46" : "#E5E7EB",
-                  }} />
-                )}
-              </React.Fragment>
-            );
-          })}
-        </View>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: done ? "#059669" : active ? P : "#9CA3AF" }}>{s.label}</Text>
+              </View>
+              {i < 2 && <View style={{ flex: 0.3, height: 2, marginBottom: 18, backgroundColor: retraitStep > s.num ? "#059669" : "#E5E7EB" }} />}
+            </React.Fragment>
+          );
+        })}
       </View>
 
-      {/* STEP 1: Scan / Search */}
-      <View style={SS.card}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <Text style={SS.cardTitle}>🔍 Étape 1 — Identifier le colis</Text>
-          <TouchableOpacity style={[SS.scanToggle, scanning && SS.scanToggleActive]}
+      {/* ── Zone scanner : toujours visible ── */}
+      <View style={{ backgroundColor: "#fff", borderRadius: 16, overflow: "hidden", borderWidth: 1.5, borderColor: scanning ? P : "#E5E7EB" }}>
+        {scanning && permission?.granted ? (
+          <View>
+            <View style={{ height: 220 }}>
+              <CameraView style={{ flex: 1 }} facing="back"
+                onBarcodeScanned={({ data }) => handleQR(data)} barcodeScannerSettings={{ barcodeTypes: ["qr"] }} />
+              <View style={{ position: "absolute", inset: 0, justifyContent: "center", alignItems: "center" }}>
+                <View style={{ width: 160, height: 160, borderWidth: 2.5, borderColor: "#A78BFA", borderRadius: 14 }} />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 12, backgroundColor: P_LIGHT }}
+              onPress={() => setScanning(false)}>
+              <Feather name="x-circle" size={16} color={P} />
+              <Text style={{ color: P, fontWeight: "700", fontSize: 13 }}>Fermer le scanner</Text>
+            </TouchableOpacity>
+          </View>
+        ) : scanning && !permission?.granted ? (
+          <TouchableOpacity onPress={requestPermission}
+            style={{ padding: 20, alignItems: "center", gap: 8 }}>
+            <Ionicons name="camera-outline" size={32} color={P} />
+            <Text style={{ color: P, fontWeight: "700", fontSize: 13 }}>Autoriser la caméra</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={{ padding: 20, alignItems: "center", gap: 10 }}
             onPress={async () => {
               if (!permission?.granted) await requestPermission();
-              setScanning(v => !v);
-            }}>
-            <Feather name="camera" size={15} color={scanning ? "#fff" : P} />
-            <Text style={[SS.scanToggleTxt, scanning && { color: "#fff" }]}>{scanning ? "Fermer" : "Scanner QR"}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {scanning && permission?.granted && (
-          <View style={{ height: 200, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
-            <CameraView style={{ flex: 1 }} facing="back"
-              onBarcodeScanned={({ data }) => handleQR(data)} barcodeScannerSettings={{ barcodeTypes: ["qr"] }} />
-            <View style={{ position: "absolute", inset: 0, justifyContent: "center", alignItems: "center" }}>
-              <View style={{ width: 150, height: 150, borderWidth: 2.5, borderColor: "#A78BFA", borderRadius: 12 }} />
-              <Text style={{ color: "#fff", fontSize: 11, marginTop: 8, backgroundColor: "rgba(0,0,0,0.5)", paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 }}>
-                Pointez vers le QR du colis
-              </Text>
+              setScanning(true);
+            }}
+            activeOpacity={0.75}>
+            <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: P_LIGHT, justifyContent: "center", alignItems: "center" }}>
+              <Ionicons name="qr-code-outline" size={38} color={P} />
             </View>
-          </View>
-        )}
-        {scanning && !permission?.granted && (
-          <TouchableOpacity onPress={requestPermission} style={{ padding: 14, alignItems: "center", backgroundColor: P_LIGHT, borderRadius: 10 }}>
-            <Text style={{ color: P, fontWeight: "600" }}>Autoriser l'accès à la caméra</Text>
+            <Text style={{ fontSize: 15, fontWeight: "800", color: "#111827" }}>Scanner le QR du colis</Text>
+            <Text style={{ fontSize: 12, color: "#9CA3AF" }}>Touchez pour activer la caméra</Text>
           </TouchableOpacity>
         )}
+      </View>
 
-        <View style={{ flexDirection: "row", gap: 8, marginTop: scanning ? 8 : 0 }}>
-          <TextInput style={[SS.input, { flex: 1 }]} placeholder="Code colis (ex: PKG-20260324-ABC)"
-            value={manualRef} onChangeText={setManualRef} autoCapitalize="characters"
-            onSubmitEditing={() => search(manualRef)} returnKeyType="search" />
+      {/* ── Saisie manuelle : toujours visible ── */}
+      <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E5E7EB" }}>
+        <Text style={{ fontSize: 11, fontWeight: "700", color: "#9CA3AF", marginBottom: 8, letterSpacing: 0.5 }}>OU SAISIR LE CODE MANUELLEMENT</Text>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <TextInput
+            style={[SS.input, { flex: 1 }]}
+            placeholder="Ex: PKG-20260324-ABC"
+            value={manualRef} onChangeText={setManualRef}
+            autoCapitalize="characters"
+            onSubmitEditing={() => search(manualRef)}
+            returnKeyType="search"
+          />
           <TouchableOpacity style={SS.searchBtn} onPress={() => search(manualRef)} disabled={loading}>
-            {loading ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="search" size={18} color="#fff" />}
+            {loading
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Feather name="search" size={18} color="#fff" />
+            }
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Notification sent feedback */}
+      {/* ── Feedback action effectuée ── */}
       {lastAction && (
-        <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: "#86EFAC", gap: 6 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
-            <Text style={{ fontSize: 14, fontWeight: "800", color: "#16A34A" }}>Action effectuée : {lastAction.label}</Text>
+        <View style={{ backgroundColor: "#ECFDF5", borderRadius: 14, padding: 14, borderWidth: 1.5, borderColor: "#86EFAC", flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+          <Ionicons name="checkmark-circle" size={22} color="#16A34A" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46" }}>{lastAction.label}</Text>
+            {lastAction.notif && (
+              <Text style={{ fontSize: 11, color: "#15803D", marginTop: 4, fontStyle: "italic" }}>📱 "{lastAction.notif}"</Text>
+            )}
           </View>
-          {lastAction.notif && (
-            <View style={{ backgroundColor: "#DCFCE7", borderRadius: 8, padding: 10, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, color: "#166534", fontWeight: "600", marginBottom: 3 }}>📱 SMS envoyé au client :</Text>
-              <Text style={{ fontSize: 12, color: "#15803D", fontStyle: "italic" }}>"{lastAction.notif}"</Text>
-              <Text style={{ fontSize: 10, color: "#86EFAC", marginTop: 4 }}>→ {colis?.receiverPhone}</Text>
-            </View>
-          )}
         </View>
       )}
 
-      {/* STEP 2: Colis result card */}
+      {/* ── Carte résultat (colis trouvé) ── */}
       {colis && (
-        <View style={[SS.resultCard, isDone && { borderColor: "#86EFAC" }]}>
-          {/* Étape 2 label */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
-            <View style={{ backgroundColor: isDone ? "#ECFDF5" : P_LIGHT, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-              <Text style={{ fontSize: 10, fontWeight: "800", color: isDone ? "#065F46" : P }}>
-                {isDone ? "✅ ÉTAPE 3 — RETRAIT EFFECTUÉ" : "📋 ÉTAPE 2 — VÉRIFICATION COLIS"}
-              </Text>
-            </View>
-          </View>
-          {/* Header */}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+        <View style={{ backgroundColor: "#fff", borderRadius: 16, borderWidth: 2, borderColor: isDone ? "#86EFAC" : P, overflow: "hidden" }}>
+          {/* Header coloré */}
+          <View style={{ backgroundColor: isDone ? "#ECFDF5" : P_LIGHT, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 17, fontWeight: "800", color: P }}>{colis.trackingRef}</Text>
-              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "600", marginTop: 2 }}>{colis.fromCity} → {colis.toCity}</Text>
+              <Text style={{ fontSize: 16, fontWeight: "900", color: isDone ? "#065F46" : P, letterSpacing: 0.5 }}>{colis.trackingRef}</Text>
+              <Text style={{ fontSize: 12, color: isDone ? "#059669" : "#6D28D9", marginTop: 2, fontWeight: "600" }}>{colis.fromCity} → {colis.toCity}</Text>
             </View>
             <StatusBadge status={colis.status} />
           </View>
 
-          {/* Delivery mode badge (prominent) */}
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: isHomeDelivery ? "#FFF7ED" : "#F0FDF4", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-            <Text style={{ fontSize: 20 }}>{isHomeDelivery ? "🛵" : "🏢"}</Text>
-            <View style={{ flex: 1 }}>
+          <View style={{ padding: 14, gap: 10 }}>
+            {/* Delivery mode badge */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: isHomeDelivery ? "#FFF7ED" : "#F0FDF4", borderRadius: 10, padding: 10 }}>
+              <Text style={{ fontSize: 22 }}>{isHomeDelivery ? "🛵" : "🏢"}</Text>
               <Text style={{ fontSize: 13, fontWeight: "800", color: isHomeDelivery ? "#EA580C" : "#065F46" }}>
                 {isHomeDelivery ? "Livraison à domicile" : "Retrait en gare"}
               </Text>
-              <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
-                {isHomeDelivery ? "Le client attend une livraison chez lui" : "Le client vient chercher en gare"}
-              </Text>
             </View>
-          </View>
 
-          {/* Parcel details */}
-          {[
-            { icon: "person-outline" as const, label: "Expéditeur",   val: `${colis.senderName}` },
-            { icon: "person-add-outline" as const, label: "Destinataire", val: `${colis.receiverName}` },
-            { icon: "call-outline" as const,    label: "Tél. destinataire", val: colis.receiverPhone },
-            { icon: "cube-outline" as const,    label: "Type",         val: colis.parcelType },
-            { icon: "cash-outline" as const,    label: "Montant",      val: `${Number(colis.amount).toLocaleString()} FCFA` },
-          ].map(r => (
-            <View key={r.label} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderColor: "#EDE9FE" }}>
-              <Ionicons name={r.icon} size={15} color="#9CA3AF" />
-              <Text style={{ fontSize: 12, color: "#6B7280", width: 110 }}>{r.label}</Text>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: "#111827", flex: 1 }}>{r.val}</Text>
+            {/* Info essentielle : 3 lignes compactes */}
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="person-outline" size={14} color="#9CA3AF" />
+                <Text style={{ fontSize: 12, color: "#6B7280", width: 90 }}>Destinataire</Text>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: "#111827", flex: 1 }}>{colis.receiverName}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="call-outline" size={14} color="#9CA3AF" />
+                <Text style={{ fontSize: 12, color: "#6B7280", width: 90 }}>Téléphone</Text>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827", flex: 1 }}>{colis.receiverPhone}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="cash-outline" size={14} color="#9CA3AF" />
+                <Text style={{ fontSize: 12, color: "#6B7280", width: 90 }}>Montant</Text>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827", flex: 1 }}>{Number(colis.amount).toLocaleString()} FCFA</Text>
+              </View>
             </View>
-          ))}
 
-          {/* Done state */}
-          {isDone && (
-            <View style={{ alignItems: "center", paddingTop: 14, gap: 4 }}>
-              <Ionicons name="checkmark-circle" size={36} color="#16A34A" />
-              <Text style={{ fontSize: 14, fontWeight: "800", color: "#16A34A" }}>Colis finalisé</Text>
-              <Text style={{ fontSize: 12, color: "#6B7280" }}>Aucune action supplémentaire requise</Text>
-            </View>
-          )}
+            {/* SMS preview (before action) */}
+            {!isDone && na && (na.route === "retirer" || na.route === "lancer-livraison" || na.route === "deliver" || na.route === "arrive") && (
+              <View style={{ backgroundColor: "#F0F9FF", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#BAE6FD" }}>
+                <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "600", marginBottom: 3 }}>📱 SMS destinataire :</Text>
+                <Text style={{ fontSize: 11, color: "#0284C7", fontStyle: "italic" }}>"{getNotifMessage(na.route, colis)}"</Text>
+              </View>
+            )}
 
-          {/* Action button(s) */}
-          {!isDone && na && (
-            <View style={{ marginTop: 12, gap: 10 }}>
-              {/* Notification preview */}
-              {(na.route === "retirer" || na.route === "lancer-livraison" || na.route === "deliver" || na.route === "arrive") && (
-                <View style={{ backgroundColor: "#F0F9FF", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: "#BAE6FD" }}>
-                  <Text style={{ fontSize: 11, color: "#0369A1", fontWeight: "600" }}>📱 SMS sera envoyé au destinataire ({colis.receiverPhone}) :</Text>
-                  <Text style={{ fontSize: 11, color: "#0284C7", marginTop: 3, fontStyle: "italic" }}>
-                    "{getNotifMessage(na.route, colis)}"
-                  </Text>
-                </View>
-              )}
-
-              {na.route === "retirer" ? (
-                /* ── Retrait : requiert confirmation QR ou code ── */
+            {/* ── Bouton action principal ── */}
+            {isDone ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#ECFDF5", borderRadius: 12, paddingVertical: 14 }}>
+                <Ionicons name="checkmark-circle" size={24} color="#059669" />
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#059669" }}>Retrait effectué</Text>
+              </View>
+            ) : na ? (
+              na.route === "retirer" ? (
                 <TouchableOpacity
-                  style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
+                  style={{ backgroundColor: na.color, borderRadius: 14, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 4, shadowColor: na.color, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
                   onPress={() => { setPickupCode(""); setRetraitScanMode(false); lastRetraitScan.current = ""; setShowRetraitConfirm(true); }}
                   disabled={updating}
                 >
-                  <Ionicons name="qr-code-outline" size={20} color="#fff" />
-                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>✅ Retrait — Scanner / Saisir code</Text>
+                  <Ionicons name="shield-checkmark-outline" size={20} color="#fff" />
+                  <Text style={{ color: "#fff", fontSize: 15, fontWeight: "900" }}>Valider le retrait</Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
-                  onPress={() => {
-                    Alert.alert(na.label, `Confirmer pour : ${colis.trackingRef} ?`, [
-                      { text: "Annuler", style: "cancel" },
-                      { text: "Confirmer", onPress: () => handleAction(na) },
-                    ]);
-                  }}
+                  style={{ backgroundColor: na.color, borderRadius: 14, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 4, shadowColor: na.color, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } }}
+                  onPress={() => Alert.alert(na.label, `Confirmer pour : ${colis.trackingRef} ?`, [
+                    { text: "Annuler", style: "cancel" },
+                    { text: "Confirmer", onPress: () => handleAction(na) },
+                  ])}
                   disabled={updating}
                 >
                   {updating
                     ? <ActivityIndicator color="#fff" />
-                    : <><Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>{na.label}</Text><Ionicons name="arrow-forward-circle" size={20} color="#fff" /></>
+                    : <><Text style={{ color: "#fff", fontSize: 15, fontWeight: "900" }}>{na.label}</Text><Ionicons name="arrow-forward-circle" size={20} color="#fff" /></>
                   }
                 </TouchableOpacity>
-              )}
-            </View>
-          )}
-
-          {/* No action but not done */}
-          {!isDone && !na && (
-            <View style={{ alignItems: "center", paddingTop: 10, gap: 4 }}>
-              <Ionicons name="hourglass-outline" size={28} color="#D97706" />
-              <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "600" }}>En attente d'étape précédente</Text>
-              <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center" }}>Ce colis doit d'abord passer par une autre étape (chargement, transit…)</Text>
-            </View>
-          )}
+              )
+            ) : (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7", borderRadius: 12, padding: 12 }}>
+                <Ionicons name="hourglass-outline" size={20} color="#D97706" />
+                <Text style={{ fontSize: 13, color: "#D97706", fontWeight: "700" }}>En attente d'étape précédente</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
@@ -1478,7 +1463,7 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
         <View style={{ backgroundColor: "#fff", borderRadius: 14, borderWidth: 1.5, borderColor: "#BBF7D0", overflow: "hidden" }}>
           <View style={{ backgroundColor: "#ECFDF5", paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Ionicons name="checkmark-circle" size={18} color="#059669" />
-            <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46" }}>Retraits effectués</Text>
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46" }}>Session — Retraits effectués</Text>
             <View style={{ marginLeft: "auto", backgroundColor: "#059669", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
               <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{recentPickups.length}</Text>
             </View>
@@ -1504,36 +1489,13 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
         </View>
       )}
 
-      {/* Workflow guide */}
-      <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 8, borderWidth: 1, borderColor: "#E5E7EB" }}>
-        <Text style={{ fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 4 }}>📋 Flux de suivi colis</Text>
-        {[
-          { icon: "📝", step: "1. Créé",          desc: "Colis enregistré" },
-          { icon: "🏢", step: "2. En gare",        desc: "Déposé à la gare de départ" },
-          { icon: "🚌", step: "3. Chargé bus",     desc: "Mis dans le bus" },
-          { icon: "🔄", step: "4. En transit",     desc: "En route vers destination" },
-          { icon: "📍", step: "5. Arrivé ✅",      desc: "À destination → SMS client" },
-          { icon: "✅", step: "6a. Retiré",        desc: "(Gare) Client vient chercher → SMS" },
-          { icon: "🛵", step: "6b. En livraison",  desc: "(Domicile) Livreur part → SMS" },
-          { icon: "🎁", step: "7b. Livré",         desc: "Livraison confirmée → SMS" },
-        ].map(s => (
-          <View key={s.step} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
-            <Text style={{ fontSize: 14, width: 22 }}>{s.icon}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, fontWeight: "700", color: "#374151" }}>{s.step}</Text>
-              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{s.desc}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Rapport button */}
+      {/* Rapport */}
       <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 13, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
         onPress={() => router.push("/agent/rapport" as never)}
       >
-        <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+        <Feather name="alert-triangle" size={15} color="#fff" />
+        <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
       </TouchableOpacity>
     {/* ── Modal validation retrait : code sécurisé ── */}
     <Modal visible={showRetraitConfirm} transparent animationType="slide" onRequestClose={() => { setShowRetraitConfirm(false); setPickupCode(""); setCodeError(""); }}>
