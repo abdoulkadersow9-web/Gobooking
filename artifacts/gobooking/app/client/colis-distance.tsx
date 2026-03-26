@@ -20,8 +20,8 @@ const CITIES = [
 ];
 const PARCEL_TYPES = ["Documents", "Colis standard", "Fragile", "Alimentaire", "Électronique", "Vêtements", "Autre"];
 const DELIVERY_TYPES = [
-  { key: "livraison_gare",     label: "🏢 Retrait en gare" },
-  { key: "livraison_domicile", label: "🛵 Livraison à domicile" },
+  { key: "livraison_gare",     label: "Retrait en gare" },
+  { key: "livraison_domicile", label: "Livraison à domicile" },
 ];
 
 interface Created { trackingRef: string; amount: number; status: string }
@@ -156,7 +156,7 @@ export default function ColisDistanceScreen() {
         <StatusBar barStyle="light-content" backgroundColor={TEAL_DARK} />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 28, gap: 20 }}>
           <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: "#DCFCE7", justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 44 }}>✅</Text>
+            <Feather name="check-circle" size={44} color="#059669" />
           </View>
           <Text style={{ fontSize: 22, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>Demande envoyée !</Text>
           <Text style={{ fontSize: 14, color: "#475569", textAlign: "center", lineHeight: 22 }}>
@@ -174,7 +174,7 @@ export default function ColisDistanceScreen() {
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
               <Text style={{ color: "#64748B", fontSize: 13 }}>Statut</Text>
               <View style={{ backgroundColor: "#FEF9C3", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#854D0E" }}>⏳ En validation</Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#854D0E" }}>En validation</Text>
               </View>
             </View>
           </View>
@@ -244,7 +244,7 @@ export default function ColisDistanceScreen() {
 
           {/* Expéditeur */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>👤 Expéditeur</Text>
+            <Text style={S.sectionTitle}>Expéditeur</Text>
             <Text style={S.fieldLabel}>Nom complet *</Text>
             <TextInput value={senderName} onChangeText={setSenderName} placeholder="Votre nom" style={S.input} />
             <Text style={S.fieldLabel}>Téléphone *</Text>
@@ -269,7 +269,7 @@ export default function ColisDistanceScreen() {
 
           {/* Colis */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>📦 Informations du colis</Text>
+            <Text style={S.sectionTitle}>Informations du colis</Text>
             <TypePicker value={parcelType} onSelect={setParcelType} />
             <Text style={S.fieldLabel}>Poids estimé (kg) *</Text>
             <TextInput value={weight} onChangeText={setWeight} placeholder="Ex: 2.5" keyboardType="decimal-pad" style={S.input} />

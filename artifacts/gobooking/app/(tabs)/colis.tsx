@@ -41,11 +41,11 @@ type Filter = "tous" | "en_cours" | "livres";
 
 const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string; label: string }> = {
   en_attente:            { color: "#B45309", bg: "#FFFBEB", strip: "#F59E0B", label: "En attente" },
-  en_attente_validation: { color: "#D97706", bg: "#FEF9C3", strip: "#F59E0B", label: "⏳ En validation" },
-  valide:                { color: "#059669", bg: "#D1FAE5", strip: "#10B981", label: "✅ Validé" },
-  refuse:                { color: "#DC2626", bg: "#FEE2E2", strip: "#EF4444", label: "❌ Refusé" },
-  en_attente_ramassage:  { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "🛵 Ramassage" },
-  ramassage_en_cours:    { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "🛵 En cours ramassage" },
+  en_attente_validation: { color: "#D97706", bg: "#FEF9C3", strip: "#F59E0B", label: "En validation" },
+  valide:                { color: "#059669", bg: "#D1FAE5", strip: "#10B981", label: "Validé" },
+  refuse:                { color: "#DC2626", bg: "#FEE2E2", strip: "#EF4444", label: "Refusé" },
+  en_attente_ramassage:  { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "Ramassage" },
+  ramassage_en_cours:    { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "En cours ramassage" },
   confirme:              { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Confirmé" },
   en_cours_ramassage:    { color: "#7C3AED", bg: "#F5F3FF", strip: "#8B5CF6", label: "Ramassage" },
   arrive_gare_depart:    { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "Gare départ" },

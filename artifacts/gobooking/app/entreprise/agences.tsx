@@ -229,7 +229,10 @@ function AgenceCard({
       {expanded && (
         <View style={s.agentsSection}>
           {agence.address && (
-            <Text style={s.agenceAddress}>📍 {agence.address}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 6 }}>
+              <Feather name="map-pin" size={12} color="#64748B" />
+              <Text style={s.agenceAddress}>{agence.address}</Text>
+            </View>
           )}
 
           {/* Agents list */}

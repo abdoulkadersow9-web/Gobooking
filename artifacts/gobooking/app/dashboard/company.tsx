@@ -496,7 +496,7 @@ export default function CompanyDashboard() {
       [
         { text: "Annuler", style: "cancel" },
         {
-          text: "✅ Accepter",
+          text: "Accepter",
           onPress: async () => {
             setReservations(prev => prev.map(r => r.id === reservationId ? { ...r, bagageStatus: "accepté" } : r));
             if (token) {
@@ -505,7 +505,7 @@ export default function CompanyDashboard() {
           },
         },
         {
-          text: "❌ Refuser",
+          text: "Refuser",
           style: "destructive",
           onPress: () => {
             Alert.prompt(
@@ -1389,17 +1389,17 @@ export default function CompanyDashboard() {
             if (group.length === 0) return null;
             const roleMeta = AGENT_ROLE_META[roleKey];
             const ROLE_ICON: Record<string, string> = {
-              route:           "🚌",
-              embarquement:    "🎫",
-              vente:           "🏪",
-              reception_colis: "📦",
-              validation:      "✅",
+              route:           "bus",
+              embarquement:    "log-in",
+              vente:           "shopping-bag",
+              reception_colis: "package",
+              validation:      "check-circle",
             };
             return (
               <View key={roleKey} style={{ marginBottom: 12 }}>
                 {/* Entête de groupe */}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#E2E8F0", marginBottom: 6 }}>
-                  <Text style={{ fontSize: 16 }}>{ROLE_ICON[roleKey]}</Text>
+                  <Feather name={ROLE_ICON[roleKey] as never} size={16} color={roleMeta.text} />
                   <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: roleMeta.text }}>
                     {roleMeta.label}s
                   </Text>

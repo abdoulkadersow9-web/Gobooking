@@ -537,10 +537,10 @@ export default function CarsEnRouteMap() {
         setActiveRequest({ requestId, tripId:selectedBus.id });
         setRequestStatus("pending");
         setShowQR(false);
-        setSuccessMsg("⏳ Demande envoyée — en attente de confirmation...");
+        setSuccessMsg("Demande envoyée — en attente de confirmation...");
         startReqPoll(selectedBus.id, requestId);
       } else {
-        setSuccessMsg("✅ Demande envoyée ! L'agent vous contactera.");
+        setSuccessMsg("Demande envoyée. L'agent vous contactera.");
         setTimeout(()=>setSuccessMsg(""), 5000);
       }
     } catch(err){
@@ -582,7 +582,7 @@ export default function CarsEnRouteMap() {
           <Feather name="arrow-left" size={22} color="#f8fafc"/>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>🚌 Cars en route</Text>
+          <Text style={styles.headerTitle}>Cars en route</Text>
           <Text style={styles.headerSub}>
             {filtered.length} bus{filtered.length>1?"":""}
             {clientPos?" · Tri par distance":""}
@@ -757,7 +757,7 @@ export default function CarsEnRouteMap() {
                   </View>
                   {bus.gpsLive && (
                     <View style={styles.gpsBadge}>
-                      <Text style={styles.gpsBadgeText}>GPS 🟢</Text>
+                      <Text style={styles.gpsBadgeText}>GPS Live</Text>
                     </View>
                   )}
                 </View>

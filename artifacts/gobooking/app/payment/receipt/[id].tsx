@@ -19,11 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
-const METHOD_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
-  wave:   { label: "Wave",          color: "#1BA5E0", emoji: "💙" },
-  orange: { label: "Orange Money",  color: "#FF6B00", emoji: "🟠" },
-  mtn:    { label: "MTN MoMo",      color: "#FFCB00", emoji: "💛" },
-  card:   { label: "Carte bancaire",color: "#1A56DB", emoji: "💳" },
+const METHOD_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+  wave:   { label: "Wave",          color: "#1BA5E0", icon: "zap"         },
+  orange: { label: "Orange Money",  color: "#FF6B00", icon: "smartphone"  },
+  mtn:    { label: "MTN MoMo",      color: "#FFCB00", icon: "smartphone"  },
+  card:   { label: "Carte bancaire",color: "#1A56DB", icon: "credit-card" },
 };
 
 interface Receipt {
@@ -206,7 +206,7 @@ export default function ReceiptScreen() {
     );
   }
 
-  const m = METHOD_LABELS[receipt.method] ?? { label: receipt.method, color: "#6B7280", emoji: "💳" };
+  const m = METHOD_LABELS[receipt.method] ?? { label: receipt.method, color: "#6B7280", icon: "credit-card" };
   const paidAt = new Date(receipt.createdAt).toLocaleString("fr-FR", {
     day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
@@ -242,7 +242,7 @@ export default function ReceiptScreen() {
           </View>
           <Text style={ss.amountLabel}>Montant total payé</Text>
           <View style={ss.methodPill}>
-            <Text style={[ss.methodEmoji]}>{m.emoji}</Text>
+            <Feather name={m.icon as never} size={16} color={m.color} />
             <Text style={[ss.methodPillLabel, { color: m.color }]}>{m.label}</Text>
           </View>
         </View>

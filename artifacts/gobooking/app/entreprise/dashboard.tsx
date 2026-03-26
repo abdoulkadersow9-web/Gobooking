@@ -227,7 +227,7 @@ export default function EntrepriseDashboard() {
     >
       <View style={ss.headerRow}>
         <View>
-          <Text style={ss.headerGreet}>Bonjour 👋</Text>
+          <Text style={ss.headerGreet}>Bonjour</Text>
           <Text style={ss.headerName}>{user?.name ?? "Compagnie"}</Text>
         </View>
         <Pressable style={ss.headerBtn} onPress={() => router.push("/entreprise/parametres")}>
@@ -286,7 +286,7 @@ export default function EntrepriseDashboard() {
             <Pressable style={ss.alertHeader} onPress={() => setAlertesOpen(o => !o)}>
               <View style={ss.alertTitleRow}>
                 <View style={ss.alertIconBox}>
-                  <Text style={{ fontSize: 16 }}>⚠️</Text>
+                  <Feather name="alert-triangle" size={16} color="#B91C1C" />
                 </View>
                 <View>
                   <Text style={ss.alertTitle}>Alertes</Text>

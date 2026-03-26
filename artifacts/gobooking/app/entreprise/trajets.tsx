@@ -385,7 +385,7 @@ export default function TrajetsScreen() {
         <ActivityIndicator color={AMBER} size="large" style={{ marginTop: 60 }} />
       ) : visible.length === 0 ? (
         <View style={S.empty}>
-          <Text style={{ fontSize: 48, marginBottom: 12 }}>🗓️</Text>
+          <Feather name="calendar" size={48} color={AMBER} style={{ marginBottom: 12 }} />
           <Text style={S.emptyTitle}>
             {filter === "all" ? "Aucun trajet planifié" : "Aucun trajet dans cette catégorie"}
           </Text>
@@ -425,7 +425,7 @@ export default function TrajetsScreen() {
           <ScrollView contentContainerStyle={S.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             {/* Route */}
-            <Text style={S.sectionLabel}>🗺️ Itinéraire</Text>
+            <Text style={S.sectionLabel}>Itinéraire</Text>
             <View style={S.row2}>
               <View style={{ flex: 1 }}>
                 <Text style={S.label}>Ville de départ *</Text>

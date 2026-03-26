@@ -21,9 +21,9 @@ import { apiFetch } from "@/utils/api";
 
 /* ── Payment method config ─────────────────────────────────────────────── */
 const METHODS = [
-  { id: "wave",   label: "Wave",          sub: "Paiement Wave CI",         color: "#1BA5E0", textColor: "white", icon: "💙" },
-  { id: "orange", label: "Orange Money",  sub: "Paiement mobile Orange",   color: "#FF6B00", textColor: "white", icon: "🟠" },
-  { id: "mtn",    label: "MTN MoMo",      sub: "Mobile Money MTN",          color: "#FFCB00", textColor: "#000", icon: "💛" },
+  { id: "wave",   label: "Wave",          sub: "Paiement Wave CI",         color: "#1BA5E0", textColor: "white", icon: "zap"        },
+  { id: "orange", label: "Orange Money",  sub: "Paiement mobile Orange",   color: "#FF6B00", textColor: "white", icon: "smartphone" },
+  { id: "mtn",    label: "MTN MoMo",      sub: "Mobile Money MTN",          color: "#FFCB00", textColor: "#000",  icon: "smartphone" },
 ];
 
 type PayStep = "choose" | "processing" | "success" | "failed";
@@ -158,9 +158,9 @@ export default function CinetPayScreen() {
       <View style={[ss.flex, { paddingTop: topPad, backgroundColor: "#F0FDF4" }]}>
         <Animated.View style={[ss.successBox, { opacity: successAnim, transform: [{ scale: successAnim }] }]}>
           <View style={ss.successCircle}>
-            <Text style={{ fontSize: 52 }}>✅</Text>
+            <Feather name="check-circle" size={52} color="#059669" />
           </View>
-          <Text style={ss.successTitle}>Paiement confirmé ✅</Text>
+          <Text style={ss.successTitle}>Paiement confirmé</Text>
           <Text style={ss.successSub}>Votre billet est prêt. Bon voyage !</Text>
           <View style={ss.successRef}>
             <Text style={ss.successRefLabel}>RÉFÉRENCE</Text>
@@ -208,7 +208,7 @@ export default function CinetPayScreen() {
     return (
       <View style={[ss.flex, ss.center, { paddingTop: topPad, backgroundColor: "#FFF" }]}>
         <View style={ss.failedCircle}>
-          <Text style={{ fontSize: 48 }}>❌</Text>
+          <Feather name="x-circle" size={48} color="#DC2626" />
         </View>
         <Text style={ss.failedTitle}>Paiement échoué</Text>
         <Text style={ss.failedSub}>{error || "Une erreur est survenue lors du paiement."}</Text>
@@ -269,7 +269,7 @@ export default function CinetPayScreen() {
               onPress={() => { Haptics.selectionAsync(); setMethod(m.id); }}
             >
               <View style={[ss.methodIcon, { backgroundColor: m.color }]}>
-                <Text style={{ fontSize: 22 }}>{m.icon}</Text>
+                <Feather name={m.icon as never} size={22} color="white" />
               </View>
               <View style={ss.methodInfo}>
                 <Text style={[ss.methodLabel, sel && { color: m.color }]}>{m.label}</Text>

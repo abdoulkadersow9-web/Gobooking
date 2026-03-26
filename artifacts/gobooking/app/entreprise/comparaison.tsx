@@ -89,13 +89,13 @@ export default function ComparaisonScreen() {
 
         <View style={S.kpiRow}>
           <View style={S.kpiCard}>
-            <Text style={{ fontSize: 16 }}>🟢</Text>
+            <Feather name="trending-up" size={16} color="#34D399" />
             <Text style={[S.kpiVal, { color: "#34D399" }]}>{profitable}</Text>
             <Text style={S.kpiLbl}>Rentable{profitable !== 1 ? "s" : ""}</Text>
           </View>
           <View style={S.kpiDivider} />
           <View style={S.kpiCard}>
-            <Text style={{ fontSize: 16 }}>🔴</Text>
+            <Feather name="trending-down" size={16} color="#F87171" />
             <Text style={[S.kpiVal, { color: "#F87171" }]}>{lossMaking}</Text>
             <Text style={S.kpiLbl}>Non rentable{lossMaking !== 1 ? "s" : ""}</Text>
           </View>
@@ -177,7 +177,7 @@ export default function ComparaisonScreen() {
 
                   {/* Indicator */}
                   <View style={[S.indicator, { backgroundColor: profit ? "#F0FDF4" : "#FEF2F2" }]}>
-                    <Text style={{ fontSize: 14 }}>{profit ? "🟢" : "🔴"}</Text>
+                    <Feather name={profit ? "trending-up" : "trending-down"} size={14} color={profit ? PROFIT_GREEN : LOSS_RED} />
                     <Text style={[S.indicatorText, { color: profit ? PROFIT_GREEN : LOSS_RED }]}>
                       {profit ? "Rentable" : "Perte"}
                     </Text>

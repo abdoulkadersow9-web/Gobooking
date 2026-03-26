@@ -322,7 +322,7 @@ export default function HomeScreen() {
             />
             <View>
               <Text style={styles.greeting}>
-                {firstName ? `Bonjour, ${firstName} 👋` : "GoBooking 🚌"}
+                {firstName ? `Bonjour, ${firstName}` : "GoBooking"}
               </Text>
               <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
             </View>
@@ -564,17 +564,20 @@ export default function HomeScreen() {
                   >
                     {/* Badges */}
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-                      <View style={{ backgroundColor: "rgba(26,86,219,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>⭐ Recommandé</Text>
+                      <View style={{ backgroundColor: "rgba(26,86,219,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Feather name="star" size={9} color="white" />
+                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>Recommandé</Text>
                       </View>
                       {isNearby && (
-                        <View style={{ backgroundColor: "rgba(5,150,105,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 }}>
-                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>📍 À proximité</Text>
+                        <View style={{ backgroundColor: "rgba(5,150,105,0.85)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Feather name="map-pin" size={9} color="white" />
+                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "white" }}>À proximité</Text>
                         </View>
                       )}
                       {hasGps && (
-                        <View style={{ backgroundColor: "rgba(52,211,153,0.18)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#34D399" }}>
-                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#34D399" }}>🟢 GPS Live</Text>
+                        <View style={{ backgroundColor: "rgba(52,211,153,0.18)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: "#34D399", flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Feather name="radio" size={9} color="#34D399" />
+                          <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: "#34D399" }}>GPS Live</Text>
                         </View>
                       )}
                     </View>

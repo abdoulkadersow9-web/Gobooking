@@ -272,7 +272,7 @@ export default function ParcelSendScreen() {
               </View>
 
               <View style={styles.field}>
-                <Text style={styles.fieldLabel}>📍 Ville de destination</Text>
+                <Text style={styles.fieldLabel}>Ville de destination</Text>
                 <Pressable
                   style={styles.cityPicker}
                   onPress={() => { setShowToCities(!showToCities); setShowFromCities(false); }}

@@ -17,11 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
-const METHOD_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
-  wave:   { label: "Wave",          color: "#1BA5E0", emoji: "💙" },
-  orange: { label: "Orange Money",  color: "#FF6B00", emoji: "🟠" },
-  mtn:    { label: "MTN MoMo",      color: "#FFCB00", emoji: "💛" },
-  card:   { label: "Carte bancaire",color: "#1A56DB", emoji: "💳" },
+const METHOD_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+  wave:   { label: "Wave",          color: "#1BA5E0", icon: "zap"          },
+  orange: { label: "Orange Money",  color: "#FF6B00", icon: "smartphone"   },
+  mtn:    { label: "MTN MoMo",      color: "#FFCB00", icon: "smartphone"   },
+  card:   { label: "Carte bancaire",color: "#1A56DB", icon: "credit-card"  },
 };
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string; icon: string }> = {
@@ -84,7 +84,7 @@ export default function PaymentHistoryScreen() {
   const onRefresh = () => { setRefreshing(true); load(true); };
 
   const renderItem = ({ item }: { item: PaymentItem }) => {
-    const m = METHOD_LABELS[item.method] ?? { label: item.method, color: "#6B7280", emoji: "💳" };
+    const m = METHOD_LABELS[item.method] ?? { label: item.method, color: "#6B7280", icon: "credit-card" };
     const date = new Date(item.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
     const time = new Date(item.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const isParcel = item.refType === "parcel";
@@ -104,13 +104,13 @@ export default function PaymentHistoryScreen() {
           <View style={[ss.methodIcon, { backgroundColor: isParcel ? "#DBEAFE" : m.color + "20" }]}>
             {isParcel
               ? <Feather name="package" size={22} color="#1D4ED8" />
-              : <Text style={{ fontSize: 22 }}>{m.emoji}</Text>
+              : <Feather name={m.icon as never} size={22} color={m.color} />
             }
           </View>
           <View style={{ flex: 1 }}>
             {isParcel && item.parcel ? (
               <>
-                <Text style={ss.route} numberOfLines={1}>📦 {item.parcel.from} → {item.parcel.to}</Text>
+                <Text style={ss.route} numberOfLines={1}>{item.parcel.from} → {item.parcel.to}</Text>
                 <Text style={ss.ref} numberOfLines={1}>{item.parcel.trackingRef}</Text>
               </>
             ) : item.booking ? (
@@ -122,7 +122,7 @@ export default function PaymentHistoryScreen() {
               <Text style={ss.route}>Paiement GoBooking</Text>
             )}
             <View style={ss.metaRow}>
-              <Text style={[ss.methodLabel, { color: m.color }]}>{m.emoji} {m.label}</Text>
+              <Text style={[ss.methodLabel, { color: m.color }]}>{m.label}</Text>
               <Text style={ss.metaDot}>·</Text>
               <Text style={ss.dateLabel}>{date} à {time}</Text>
             </View>

@@ -14,9 +14,9 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 const METHODS = [
-  { id: "wave",   label: "Wave",          sub: "Paiement Wave CI",         color: "#1BA5E0", icon: "💙" },
-  { id: "orange", label: "Orange Money",  sub: "Paiement mobile Orange",   color: "#FF6B00", icon: "🟠" },
-  { id: "mtn",    label: "MTN MoMo",      sub: "Mobile Money MTN",          color: "#FFCB00", icon: "💛" },
+  { id: "wave",   label: "Wave",          sub: "Paiement Wave CI",         color: "#1BA5E0", icon: "zap"        },
+  { id: "orange", label: "Orange Money",  sub: "Paiement mobile Orange",   color: "#FF6B00", icon: "smartphone" },
+  { id: "mtn",    label: "MTN MoMo",      sub: "Mobile Money MTN",          color: "#FFCB00", icon: "smartphone" },
 ];
 
 type Step = "choose" | "processing" | "success" | "failed";
@@ -89,7 +89,7 @@ export default function ParcelCinetPayScreen() {
     return (
       <View style={[ss.flex, { paddingTop: topPad, backgroundColor: "#EFF6FF" }]}>
         <Animated.View style={[ss.successBox, { opacity: successAnim, transform: [{ scale: successAnim }] }]}>
-          <View style={ss.successCircle}><Text style={{ fontSize: 52 }}>📦</Text></View>
+          <View style={ss.successCircle}><Feather name="package" size={52} color="#0B3C5D" /></View>
           <Text style={ss.successTitle}>Colis confirmé !</Text>
           <Text style={ss.successSub}>Votre colis est enregistré. Vous pouvez le suivre avec votre référence.</Text>
           <View style={ss.successRef}>
@@ -128,7 +128,7 @@ export default function ParcelCinetPayScreen() {
   if (step === "failed") {
     return (
       <View style={[ss.flex, ss.center, { paddingTop: topPad }]}>
-        <View style={ss.failedCircle}><Text style={{ fontSize: 48 }}>❌</Text></View>
+        <View style={ss.failedCircle}><Feather name="x-circle" size={48} color="#DC2626" /></View>
         <Text style={ss.failedTitle}>Paiement échoué</Text>
         <Text style={ss.failedSub}>{error || "Une erreur est survenue lors du paiement."}</Text>
         <Pressable style={[ss.primaryBtn, { backgroundColor: "#0B3C5D", marginTop: 24 }]} onPress={() => { setStep("choose"); setError(""); }}>
@@ -188,7 +188,7 @@ export default function ParcelCinetPayScreen() {
               style={[ss.methodCard, sel && { borderColor: m.color, borderWidth: 2, backgroundColor: m.color + "10" }]}
               onPress={() => { Haptics.selectionAsync(); setMethod(m.id); }}>
               <View style={[ss.methodIcon, { backgroundColor: m.color }]}>
-                <Text style={{ fontSize: 22 }}>{m.icon}</Text>
+                <Feather name={m.icon as never} size={22} color="white" />
               </View>
               <View style={ss.methodInfo}>
                 <Text style={[ss.methodLabel, sel && { color: m.color }]}>{m.label}</Text>

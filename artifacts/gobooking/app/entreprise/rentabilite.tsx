@@ -57,15 +57,15 @@ interface TripRent {
   expenses: TripExpense[];
 }
 
-function getConseil(trip: TripRent): { label: string; icon: string; color: string; bg: string; border: string } {
+function getConseil(trip: TripRent): { label: string; iconName: string; color: string; bg: string; border: string } {
   const fillRate = trip.totalSeats > 0 ? trip.bookedSeats / trip.totalSeats : 0;
   if (fillRate < 0.5) {
-    return { label: "Bus peu rempli", icon: "⚠️", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A" };
+    return { label: "Bus peu rempli", iconName: "alert-triangle", color: "#92400E", bg: "#FFFBEB", border: "#FDE68A" };
   }
   if (trip.benefice < 0) {
-    return { label: "Trajet non rentable", icon: "🔴", color: LOSS_RED, bg: "#FEF2F2", border: "#FECACA" };
+    return { label: "Trajet non rentable", iconName: "trending-down", color: LOSS_RED, bg: "#FEF2F2", border: "#FECACA" };
   }
-  return { label: "Trajet rentable", icon: "🟢", color: PROFIT_GREEN, bg: "#F0FDF4", border: "#BBF7D0" };
+  return { label: "Trajet rentable", iconName: "trending-up", color: PROFIT_GREEN, bg: "#F0FDF4", border: "#BBF7D0" };
 }
 
 interface Summary {
@@ -350,7 +350,7 @@ export default function RentabiliteScreen() {
 
                 {/* Conseil automatique */}
                 <View style={[S.conseilBadge, { backgroundColor: conseil.bg, borderColor: conseil.border }]}>
-                  <Text style={S.conseilIcon}>{conseil.icon}</Text>
+                  <Feather name={conseil.iconName as never} size={14} color={conseil.color} style={{ marginRight: 4 }} />
                   <Text style={[S.conseilLabel, { color: conseil.color }]}>{conseil.label}</Text>
                   {trip.totalSeats > 0 && (
                     <Text style={[S.conseilSub, { color: conseil.color }]}>
