@@ -1020,45 +1020,112 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
     return p.status === f;
   }
 
-  const displayedParcels = parcels.filter(p => matchesFilter(p, filter));
   const arrivedCount = parcels.filter(p => ["arrivé","arrive"].includes(p.status)).length;
+
+  /* ── Sort parcels: most recent first ── */
+  const sortByDate = (list: Parcel[]) =>
+    [...list].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  /* ── Group sections (order = urgency priority) ── */
+  const SECTIONS = [
+    { key: "en_transit", label: "En transit",  icon: "bus-outline"              as const, color: "#2563EB", bg: "#DBEAFE" },
+    { key: "arrivé",     label: "Arrivé",       icon: "location"                 as const, color: "#059669", bg: "#D1FAE5" },
+    { key: "en_gare",    label: "En gare",      icon: "business-outline"         as const, color: "#D97706", bg: "#FEF3C7" },
+    { key: "créé",       label: "Créé",         icon: "add-circle-outline"       as const, color: "#6B7280", bg: "#F3F4F6" },
+    { key: "retiré",     label: "Retiré",       icon: "checkmark-circle-outline" as const, color: "#065F46", bg: "#ECFDF5" },
+    { key: "annulé",     label: "Annulé",       icon: "close-circle-outline"     as const, color: "#DC2626", bg: "#FEE2E2" },
+  ];
+
+  const grouped = SECTIONS.map(s => ({
+    ...s,
+    items: sortByDate(parcels.filter(p => matchesFilter(p, s.key))),
+  })).filter(s => s.items.length > 0);
+
+  const displayedParcels = sortByDate(parcels.filter(p => matchesFilter(p, filter)));
+  const activeFilter = STEP_FILTERS.find(f => f.key === filter);
+
+  /* ── Parcel card renderer (shared) ── */
+  const renderCard = (p: Parcel) => {
+    const nextAction = getNextAction(p);
+    return (
+      <View key={p.id} style={SL.card}>
+        <View style={SL.cardTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={SL.ref}>{p.trackingRef}</Text>
+            <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
+            <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: 4 }}>
+            <StatusBadge status={p.status} />
+            {p.createdAt ? (
+              <Text style={{ fontSize: 10, color: "#9CA3AF" }}>
+                {new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <View style={SL.meta}>
+          <Text style={SL.metaTxt}>{p.parcelType}{p.weight ? ` · ${p.weight}kg` : ""}</Text>
+          <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
+        </View>
+        <MiniProgress status={p.status} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View style={{ backgroundColor: p.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+            <Text style={{ fontSize: 10, fontWeight: "700", color: p.deliveryType === "livraison_domicile" ? "#EA580C" : "#065F46" }}>
+              {p.deliveryType === "livraison_domicile" ? "Domicile" : "Gare"}
+            </Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          {nextAction && (
+            <TouchableOpacity
+              style={[SL.actionBtn, { backgroundColor: nextAction.color, borderColor: nextAction.color, flex: 1 }]}
+              onPress={() => handleStatusUpdate(p)}
+              disabled={updating === p.id}
+            >
+              {updating === p.id
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
+              }
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: P_LIGHT, paddingHorizontal: 12 }]}
+            onPress={() => printLabel({
+              trackingRef: p.trackingRef,
+              senderName: p.senderName, senderPhone: p.senderPhone,
+              receiverName: p.receiverName, receiverPhone: p.receiverPhone,
+              fromCity: p.fromCity, toCity: p.toCity,
+              parcelType: p.parcelType, weight: p.weight ? String(p.weight) : "",
+              amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
+            })}
+          >
+            <Ionicons name="print-outline" size={16} color={P} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
 
-      {/* Pipeline 5 étapes */}
-      <View style={{ backgroundColor: "#fff", marginHorizontal: 12, marginTop: 10, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#E2E8F0" }}>
-        <Text style={{ fontSize: 11, fontWeight: "700", color: "#9CA3AF", marginBottom: 8, letterSpacing: 0.5 }}>FLUX DU COLIS</Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {([
-            { icon: "add-circle-outline"      as const, label: "Créé",   color: "#6B7280" },
-            { icon: "business-outline"        as const, label: "En gare", color: "#D97706" },
-            { icon: "bus-outline"             as const, label: "Transit", color: "#2563EB" },
-            { icon: "location-outline"        as const, label: "Arrivé",  color: "#059669" },
-            { icon: "checkmark-circle-outline"as const, label: "Retiré",  color: "#065F46" },
-          ]).map((step, i) => (
-            <React.Fragment key={step.label}>
-              <View style={{ alignItems: "center", flex: 1 }}>
-                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: step.color + "18", justifyContent: "center", alignItems: "center", marginBottom: 4 }}>
-                  <Ionicons name={step.icon} size={16} color={step.color} />
-                </View>
-                <Text style={{ fontSize: 9, fontWeight: "700", color: step.color, textAlign: "center" }}>{step.label}</Text>
-              </View>
-              {i < 4 && <View style={{ height: 1.5, flex: 0.3, backgroundColor: "#E5E7EB", marginBottom: 18 }} />}
-            </React.Fragment>
-          ))}
-        </View>
-      </View>
-
-      {/* Bannière arrivées en attente */}
+      {/* Bannière arrivées urgentes */}
       {filter === "tous" && arrivedCount > 0 && (
         <TouchableOpacity onPress={() => setFilter("arrivé")}
-          style={{ marginHorizontal: 12, marginTop: 8, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 11, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#6EE7B7" }}>
-          <Ionicons name="location" size={18} color="#059669" />
-          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#065F46" }}>
-            {arrivedCount} colis arrivé{arrivedCount > 1 ? "s" : ""} — prêt{arrivedCount > 1 ? "s" : ""} pour retrait
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color="#059669" />
+          style={{ marginHorizontal: 12, marginTop: 10, backgroundColor: "#ECFDF5", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: "#6EE7B7" }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#059669", justifyContent: "center", alignItems: "center" }}>
+            <Ionicons name="location" size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#065F46" }}>
+              {arrivedCount} colis arrivé{arrivedCount > 1 ? "s" : ""} — action requise
+            </Text>
+            <Text style={{ fontSize: 11, color: "#059669", marginTop: 1 }}>
+              Prêt{arrivedCount > 1 ? "s" : ""} pour retrait · Appuyer pour filtrer
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#059669" />
         </TouchableOpacity>
       )}
 
@@ -1088,6 +1155,7 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
           <Text style={{ fontSize: 13, color: "#9CA3AF" }}>Chargement des colis…</Text>
         </View>
       )}
+
       {!loading && parcels.length === 0 && (
         <View style={{ alignItems: "center", marginTop: 48, gap: 10, paddingHorizontal: 32 }}>
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: P_LIGHT, justifyContent: "center", alignItems: "center" }}>
@@ -1104,6 +1172,7 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
           </TouchableOpacity>
         </View>
       )}
+
       {!loading && displayedParcels.length === 0 && parcels.length > 0 && (
         <View style={{ alignItems: "center", marginTop: 48, gap: 8, paddingHorizontal: 32 }}>
           <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" }}>
@@ -1114,64 +1183,65 @@ function ListTab({ token, setTab }: { token: string | null; setTab(t: TabType): 
         </View>
       )}
 
-      <ScrollView contentContainerStyle={{ padding: 12, gap: 10 }}>
-        {displayedParcels.map(p => {
-          const nextAction = getNextAction(p);
-          return (
-            <View key={p.id} style={SL.card}>
-              <View style={SL.cardTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={SL.ref}>{p.trackingRef}</Text>
-                  <Text style={SL.route}>{p.fromCity} → {p.toCity}</Text>
-                  <Text style={SL.names}>{p.senderName} → {p.receiverName}</Text>
+      {!loading && parcels.length > 0 && (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 12, paddingTop: 8, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+
+          {/* ── VUE PAR SECTIONS (filtre Tous) ── */}
+          {filter === "tous" ? (
+            grouped.map(section => (
+              <View key={section.key} style={{ marginBottom: 20 }}>
+                {/* Section header */}
+                <View style={{
+                  flexDirection: "row", alignItems: "center", gap: 8,
+                  backgroundColor: section.bg, borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 8,
+                  marginBottom: 10, borderWidth: 1,
+                  borderColor: section.color + "33",
+                }}>
+                  <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: section.color, justifyContent: "center", alignItems: "center" }}>
+                    <Ionicons name={section.icon} size={14} color="#fff" />
+                  </View>
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "800", color: section.color, letterSpacing: -0.2 }}>
+                    {section.label}
+                  </Text>
+                  <View style={{ backgroundColor: section.color, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{section.items.length}</Text>
+                  </View>
                 </View>
-                <StatusBadge status={p.status} />
+                {/* Cards in this section */}
+                <View style={{ gap: 10 }}>
+                  {section.items.map(p => renderCard(p))}
+                </View>
               </View>
-              <View style={SL.meta}>
-                <Text style={SL.metaTxt}>{p.parcelType} {p.weight ? `· ${p.weight}kg` : ""}</Text>
-                <Text style={SL.metaTxt}>{Number(p.amount).toLocaleString()} FCFA</Text>
-              </View>
-              {/* Mini progress bar */}
-              <MiniProgress status={p.status} />
-              {/* Delivery type badge */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <View style={{ backgroundColor: p.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0FDF4", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "700", color: p.deliveryType === "livraison_domicile" ? "#EA580C" : "#065F46" }}>
-                    {p.deliveryType === "livraison_domicile" ? "Domicile" : "Gare"}
+            ))
+          ) : (
+            /* ── VUE FILTRÉE (statut précis) ── */
+            <View>
+              {activeFilter && (
+                <View style={{
+                  flexDirection: "row", alignItems: "center", gap: 8,
+                  backgroundColor: activeFilter.color + "15", borderRadius: 10,
+                  paddingHorizontal: 12, paddingVertical: 9,
+                  marginBottom: 12, borderWidth: 1,
+                  borderColor: activeFilter.color + "44",
+                }}>
+                  <Ionicons name={activeFilter.icon} size={16} color={activeFilter.color} />
+                  <Text style={{ flex: 1, fontSize: 14, fontWeight: "800", color: activeFilter.color }}>
+                    {activeFilter.label}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: activeFilter.color, fontWeight: "600" }}>
+                    {displayedParcels.length} colis · du plus récent
                   </Text>
                 </View>
-              </View>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {nextAction && (
-                  <TouchableOpacity
-                    style={[SL.actionBtn, { backgroundColor: nextAction.color, borderColor: nextAction.color, flex: 1 }]}
-                    onPress={() => handleStatusUpdate(p)}
-                    disabled={updating === p.id}
-                  >
-                    {updating === p.id
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={[SL.actionTxt, { color: "#fff" }]}>{nextAction.label}</Text>
-                    }
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  style={[SL.actionBtn, { backgroundColor: P_LIGHT, borderColor: P_LIGHT, paddingHorizontal: 12 }]}
-                  onPress={() => printLabel({
-                    trackingRef: p.trackingRef,
-                    senderName: p.senderName, senderPhone: p.senderPhone,
-                    receiverName: p.receiverName, receiverPhone: p.receiverPhone,
-                    fromCity: p.fromCity, toCity: p.toCity,
-                    parcelType: p.parcelType, weight: p.weight ? String(p.weight) : "",
-                    amount: p.amount, deliveryType: p.deliveryType ?? "livraison_gare",
-                  })}
-                >
-                  <Ionicons name="print-outline" size={16} color={P} />
-                </TouchableOpacity>
+              )}
+              <View style={{ gap: 10 }}>
+                {displayedParcels.map(p => renderCard(p))}
               </View>
             </View>
-          );
-        })}
-      </ScrollView>
+          )}
+
+        </ScrollView>
+      )}
     </View>
   );
 }
