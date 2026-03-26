@@ -837,13 +837,16 @@ export default function EmbarquementScreen() {
           {/* Manual dismiss */}
           <TouchableOpacity
             onPress={resetScanResult}
+            activeOpacity={0.8}
             style={{
-              backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 30,
-              paddingHorizontal: 36, paddingVertical: 14, borderWidth: 1,
-              borderColor: "rgba(255,255,255,0.25)",
+              backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 18,
+              paddingHorizontal: 48, paddingVertical: 18, borderWidth: 1.5,
+              borderColor: "rgba(255,255,255,0.4)",
+              flexDirection: "row", alignItems: "center", gap: 10,
             }}
           >
-            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "700" }}>
+            <Ionicons name="qr-code-outline" size={22} color="#fff" />
+            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", letterSpacing: 0.5 }}>
               Nouveau scan
             </Text>
           </TouchableOpacity>
@@ -980,10 +983,9 @@ export default function EmbarquementScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Scanner un billet</Text>
-            <TouchableOpacity style={styles.scanBtn} onPress={openCamera}>
-              <Ionicons name="qr-code-outline" size={28} color="#fff" />
-              <Text style={styles.scanBtnText}>Ouvrir le scanner QR</Text>
+            <TouchableOpacity style={styles.scanBtn} onPress={openCamera} activeOpacity={0.85}>
+              <Ionicons name="qr-code-outline" size={34} color="#fff" />
+              <Text style={styles.scanBtnText}>Scanner un billet QR</Text>
             </TouchableOpacity>
 
             <View style={styles.divider}>
@@ -1093,7 +1095,7 @@ export default function EmbarquementScreen() {
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                      <Ionicons name="checkmark-circle-outline" size={24} color="#fff" />
                       <Text style={styles.validateBtnText}>Valider l'embarquement</Text>
                     </>
                   )}
@@ -1101,6 +1103,7 @@ export default function EmbarquementScreen() {
               )}
 
               <TouchableOpacity style={styles.retryBtn} onPress={reset}>
+                <Ionicons name="refresh-outline" size={15} color={G} />
                 <Text style={styles.retryBtnText}>Nouveau scan</Text>
               </TouchableOpacity>
             </View>
@@ -1583,8 +1586,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: "#fff", borderRadius: 14, padding: 18, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
   cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827", marginBottom: 14 },
 
-  scanBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 14, borderRadius: 10 },
-  scanBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  scanBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 20, paddingHorizontal: 16, borderRadius: 16, shadowColor: G, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
+  scanBtnText: { color: "#fff", fontSize: 18, fontWeight: "800", letterSpacing: 0.3 },
 
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 14 },
   divLine: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
@@ -1619,18 +1622,18 @@ const styles = StyleSheet.create({
   tripInfoText: { fontSize: 13, color: "#374151", flex: 1 },
   tripTime: { fontSize: 13, fontWeight: "600", color: G },
 
-  validateBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 10 },
+  validateBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 18, paddingHorizontal: 16, borderRadius: 14, shadowColor: G, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 5 },
   validateBtnDisabled: { opacity: 0.6 },
-  validateBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  validateBtnText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.2 },
 
   callBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#EFF6FF", borderRadius: 8, paddingVertical: 10 },
   callBtnText: { color: "#0369A1", fontSize: 13, fontWeight: "600" },
 
-  boardBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: G, borderRadius: 8, paddingVertical: 10 },
-  boardBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  boardBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: G, borderRadius: 10, paddingVertical: 13, shadowColor: G, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 4 },
+  boardBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 
-  retryBtn: { borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 8, padding: 10, alignItems: "center" },
-  retryBtnText: { color: G, fontSize: 14, fontWeight: "500" },
+  retryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16 },
+  retryBtnText: { color: G, fontSize: 14, fontWeight: "600" },
 
   tips: { backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 6 },
   tipsTitle: { fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 4 },

@@ -267,15 +267,15 @@ const S = StyleSheet.create({
 
   card:        { borderRadius: 18, overflow: "hidden", shadowColor: "#0B3C5D", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
   cardPressed: { opacity: 0.88, transform: [{ scale: 0.981 }] },
-  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 16, gap: 14, position: "relative" },
-  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 20, paddingHorizontal: 18, gap: 14, position: "relative" },
+  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 5, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
 
-  cardIconBox: { width: 52, height: 52, borderRadius: 14, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
+  cardIconBox: { width: 56, height: 56, borderRadius: 15, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
   cardBody:    { flex: 1, gap: 3 },
-  cardLabel:   { fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+  cardLabel:   { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
 
-  cardArrow:   { width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  cardArrow:   { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
   extraRow:    { flexDirection: "row", gap: 10, marginTop: 2 },
   extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
