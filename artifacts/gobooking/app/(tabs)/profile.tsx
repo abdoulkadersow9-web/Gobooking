@@ -205,7 +205,7 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.loyaltyHint}>
             {tripsToNextReward === 0
-              ? "🎉 Voyage gratuit disponible !"
+              ? "Voyage gratuit disponible !"
               : `Encore ${tripsToNextReward} voyage${tripsToNextReward > 1 ? "s" : ""} pour un voyage gratuit`}
           </Text>
         </View>

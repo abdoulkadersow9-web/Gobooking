@@ -290,7 +290,7 @@ export default function ParcelPaymentScreen() {
               </View>
               <View style={styles.phoneRow}>
                 <View style={styles.countryCode}>
-                  <Text style={styles.countryCodeText}>🇨🇮 +225</Text>
+                  <Text style={styles.countryCodeText}>+225</Text>
                 </View>
                 <TextInput
                   style={styles.phoneInput}

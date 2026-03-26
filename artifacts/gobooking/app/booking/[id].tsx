@@ -455,7 +455,7 @@ export default function BookingDetailScreen() {
               );
             }}
           >
-            <Text style={styles.waIcon}>💬</Text>
+            <Feather name="message-circle" size={18} color="#25D366" />
             <Text style={styles.waClientBtnText}>Partager sur WhatsApp</Text>
           </Pressable>
         ) : null}
@@ -484,7 +484,7 @@ export default function BookingDetailScreen() {
                   );
                 }}
               >
-                <Text style={{ fontSize: 13 }}>💬</Text>
+                <Feather name="message-circle" size={13} color="#25D366" />
                 <Text style={styles.callAgentBtnText}>WA</Text>
               </Pressable>
               <Pressable

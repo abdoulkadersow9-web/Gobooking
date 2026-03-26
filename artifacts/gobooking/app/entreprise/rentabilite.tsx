@@ -223,7 +223,7 @@ export default function RentabiliteScreen() {
             <Pressable style={S.simHeader} onPress={() => setSimOpen(o => !o)}>
               <View style={S.simTitleRow}>
                 <View style={S.simIconBox}>
-                  <Text style={{ fontSize: 16 }}>🔮</Text>
+                  <Feather name="sliders" size={16} color="#7C3AED" />
                 </View>
                 <View>
                   <Text style={S.simTitle}>Simulateur de gain</Text>

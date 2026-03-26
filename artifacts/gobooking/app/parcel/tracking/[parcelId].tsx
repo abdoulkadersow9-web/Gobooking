@@ -40,7 +40,7 @@ const STATUS_STEPS = [
   { id: "en_transit",         label: "En transit",        desc: "Votre colis est en cours de transport",           icon: "truck"         },
   { id: "arrive_destination", label: "Arrivé",            desc: "Votre colis est arrivé à destination",            icon: "flag"          },
   { id: "en_livraison",       label: "En livraison",      desc: "Le livreur est en route avec votre colis",        icon: "navigation"    },
-  { id: "livre",              label: "Livré",             desc: "Votre colis a été livré avec succès ! 🎉",        icon: "gift"          },
+  { id: "livre",              label: "Livré",             desc: "Votre colis a été livré avec succès.",            icon: "gift"          },
 ];
 
 /* Map each status to its step index for progress calculation */

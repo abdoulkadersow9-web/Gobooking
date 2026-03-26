@@ -246,7 +246,7 @@ export default function ParcelSendScreen() {
               <Text style={styles.stepDesc}>Sélectionnez les villes d'expédition et de destination</Text>
 
               <View style={styles.field}>
-                <Text style={styles.fieldLabel}>🏙️ Ville de départ</Text>
+                <Text style={styles.fieldLabel}>Ville de départ</Text>
                 <Pressable
                   style={styles.cityPicker}
                   onPress={() => { setShowFromCities(!showFromCities); setShowToCities(false); }}
@@ -331,7 +331,7 @@ export default function ParcelSendScreen() {
                 <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
                 <View style={styles.phoneRow}>
                   <View style={styles.countryCode}>
-                    <Text style={styles.countryCodeText}>🇨🇮 +225</Text>
+                    <Text style={styles.countryCodeText}>+225</Text>
                   </View>
                   <TextInput
                     style={[styles.input, { flex: 1 }]}
@@ -368,7 +368,7 @@ export default function ParcelSendScreen() {
                 <Text style={styles.fieldLabel}>Numéro de téléphone</Text>
                 <View style={styles.phoneRow}>
                   <View style={styles.countryCode}>
-                    <Text style={styles.countryCodeText}>🇨🇮 +225</Text>
+                    <Text style={styles.countryCodeText}>+225</Text>
                   </View>
                   <TextInput
                     style={[styles.input, { flex: 1 }]}

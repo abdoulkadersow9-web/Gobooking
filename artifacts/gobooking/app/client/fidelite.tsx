@@ -105,7 +105,7 @@ export default function FideliteScreen() {
               );
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert(
-                "Récompense débloquée ! 🎉",
+                "Récompense débloquée !",
                 `${result.walletCredited.toLocaleString("fr-FR")} FCFA ont été ajoutés à votre portefeuille.`
               );
               await load();
@@ -182,7 +182,7 @@ export default function FideliteScreen() {
             {profile.status === "Gold" && (
               <View style={styles.goldBanner}>
                 <Feather name="star" size={14} color="#FFF" />
-                <Text style={styles.goldText}>Niveau maximum atteint — Félicitations ! 🎉</Text>
+                <Text style={styles.goldText}>Niveau maximum atteint — Félicitations !</Text>
               </View>
             )}
           </LinearGradient>

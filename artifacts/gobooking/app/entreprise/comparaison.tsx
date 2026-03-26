@@ -146,7 +146,7 @@ export default function ComparaisonScreen() {
             const profit = trip.benefice >= 0;
             const isTop3 = idx < 3;
             const rank = idx + 1;
-            const rankEmoji = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+            const rankColor = rank === 1 ? "#B45309" : rank === 2 ? "#6B7280" : rank === 3 ? "#92400E" : null;
 
             /* Margin % */
             const margin = trip.totalRecettes > 0
@@ -157,11 +157,8 @@ export default function ComparaisonScreen() {
               <View key={trip.tripId} style={[S.card, isTop3 && profit && { borderLeftWidth: 3, borderLeftColor: PROFIT_GREEN }]}>
                 <View style={S.cardTop}>
                   {/* Rank */}
-                  <View style={[S.rankBox, isTop3 && profit && { backgroundColor: "#F0FDF4" }]}>
-                    {rankEmoji
-                      ? <Text style={{ fontSize: 18 }}>{rankEmoji}</Text>
-                      : <Text style={S.rankNum}>#{rank}</Text>
-                    }
+                  <View style={[S.rankBox, isTop3 && profit && { backgroundColor: "#FEF9C3" }]}>
+                    <Text style={[S.rankNum, rankColor && profit && { color: rankColor, fontWeight: "800" }]}>#{rank}</Text>
                   </View>
 
                   {/* Route & Bus */}

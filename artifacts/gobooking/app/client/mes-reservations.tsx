@@ -116,7 +116,7 @@ function BookingCard({ item }: { item: Booking }) {
           }));
         }}
       >
-        <Text style={S.waIcon}>💬</Text>
+        <Feather name="message-circle" size={16} color="#25D366" />
         <Text style={S.waBtnText}>Partager sur WhatsApp</Text>
       </Pressable>
     </Pressable>

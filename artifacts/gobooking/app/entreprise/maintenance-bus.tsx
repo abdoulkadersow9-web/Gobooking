@@ -268,7 +268,7 @@ export default function MaintenanceBusScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={S.center}>
-          <View style={S.emptyIcon}><Text style={{ fontSize: 38 }}>🔧</Text></View>
+          <View style={S.emptyIcon}><Feather name="tool" size={36} color="#D97706" /></View>
           <Text style={S.emptyTitle}>Aucun engin trouvé</Text>
           <Text style={S.emptySub}>
             {filter !== "all" ? "Aucun bus avec cette condition." : "Ajoutez des bus dans la gestion de la flotte."}

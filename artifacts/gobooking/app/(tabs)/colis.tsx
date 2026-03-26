@@ -305,7 +305,7 @@ export default function ColisScreen() {
                 onPress={() => router.push("/client/colis-distance" as never)}
               >
                 <View style={styles.remoteBannerIcon}>
-                  <Text style={{ fontSize: 28 }}>📷</Text>
+                  <Feather name="camera" size={26} color="#0E7490" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.remoteBannerTitle}>Déposer à distance</Text>
