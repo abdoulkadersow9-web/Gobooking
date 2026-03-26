@@ -389,7 +389,7 @@ function BookingCard({
             });
           }}
         >
-          <Text style={{ fontSize: 16, color: "#7C2D12" }}>★</Text>
+          <Feather name="star" size={14} color="#7C2D12" />
           <Text style={[styles.ctaText, { color: "#7C2D12" }]}>Laisser un avis</Text>
         </Pressable>
       )}

@@ -1359,9 +1359,9 @@ export default function RouteScreen() {
                           <View style={S.stopCardHeader}>
                             <Text style={S.stopCardTitle}>{stop.name}</Text>
                             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                              {st === "passé"    && <View style={S.stopStatusPasse}><Text style={S.stopStatusTxt}>✓ Passé</Text></View>}
-                              {st === "en_cours" && <View style={S.stopStatusEnCours}><Text style={[S.stopStatusTxt, { color: "#1E40AF" }]}>▶ En cours</Text></View>}
-                              {st === "prévu"    && <View style={S.stopStatusPrevu}><Text style={[S.stopStatusTxt, { color: "#64748B" }]}>○ Prévu</Text></View>}
+                              {st === "passé"    && <View style={S.stopStatusPasse}><Feather name="check" size={10} color="#065F46" /><Text style={S.stopStatusTxt}>Passé</Text></View>}
+                              {st === "en_cours" && <View style={S.stopStatusEnCours}><Feather name="play" size={10} color="#1E40AF" /><Text style={[S.stopStatusTxt, { color: "#1E40AF" }]}>En cours</Text></View>}
+                              {st === "prévu"    && <View style={S.stopStatusPrevu}><Feather name="clock" size={10} color="#64748B" /><Text style={[S.stopStatusTxt, { color: "#64748B" }]}>Prévu</Text></View>}
                               {stop.passengers.length > 0 && (
                                 <View style={S.stopBadge}>
                                   <Text style={S.stopBadgeText}>{stop.passengers.length} pax</Text>
@@ -1735,9 +1735,9 @@ const S = StyleSheet.create({
   stopBadgeText:     { fontSize: 11, fontWeight: "700", color: G },
   stopCity:          { fontSize: 12, color: "#6B7280", marginTop: 1 },
   stopEstTime:       { fontSize: 11, color: "#1E40AF", fontWeight: "700" },
-  stopStatusPasse:   { backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  stopStatusEnCours: { backgroundColor: "#DBEAFE", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
-  stopStatusPrevu:   { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2 },
+  stopStatusPasse:   { backgroundColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 3 },
+  stopStatusEnCours: { backgroundColor: "#DBEAFE", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 3 },
+  stopStatusPrevu:   { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, flexDirection: "row", alignItems: "center", gap: 3 },
   stopStatusTxt:     { fontSize: 10, fontWeight: "800", color: G },
   stopPassList:      { marginTop: 8, gap: 4 },
   stopPassRow:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4",

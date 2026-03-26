@@ -2059,7 +2059,7 @@ export default function CompanyDashboard() {
                 {seatActionLoading
                   ? <Text style={S.modalSubmitText}>En cours...</Text>
                   : <Text style={S.modalSubmitText}>
-                      {selectedSeat?.status === "blocked" ? "✓ Débloquer ce siège" : "⊘ Bloquer (maintenance)"}
+                      {selectedSeat?.status === "blocked" ? "Débloquer ce siège" : "Bloquer (maintenance)"}
                     </Text>
                 }
               </TouchableOpacity>
@@ -2156,7 +2156,7 @@ export default function CompanyDashboard() {
             />
             {newTripPriceFromGrid && newTrip.price ? (
               <Text style={{ fontSize: 11, color: "#15803D", marginBottom: 6 }}>
-                ✓ Tarif suggéré : {Number(newTrip.price).toLocaleString("fr-FR")} FCFA ({newTrip.from} → {newTrip.to})
+                Tarif suggéré : {Number(newTrip.price).toLocaleString("fr-FR")} FCFA ({newTrip.from} → {newTrip.to})
               </Text>
             ) : null}
             <BusSelector buses={buses} selected={newTrip.busId} onSelect={bus => setNewTrip(p => ({ ...p, busId: bus.id, busName: bus.busName, totalSeats: bus.capacity }))} />

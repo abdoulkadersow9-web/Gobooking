@@ -11,7 +11,7 @@ import {
   TrendingUp, Users, User, Package, MapPin, RefreshCw, Wallet, Bus,
   Building2, AlertTriangle, ClipboardList, CheckCircle, Clock,
   Ticket, Activity, BarChart3, Map, ArrowUpRight, Zap, ChevronRight,
-  Navigation, Package2, UserCheck, Settings,
+  Navigation, Package2, UserCheck, Settings, Check, X,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -331,13 +331,13 @@ function AgentsSection({ reports }: { reports: any[] }) {
                 <p className="text-[10px] text-muted-foreground">{r.agentName || "Agent"}</p>
               </div>
               <div className="flex gap-1.5 shrink-0">
-                <button className="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-semibold"
+                <button className="text-[10px] px-2 py-1 bg-emerald-100 text-emerald-700 rounded font-semibold flex items-center gap-1"
                   onClick={() => updateReport.mutate({ id: r.id, statut: "traite" })}>
-                  ✓
+                  <Check size={10} />
                 </button>
-                <button className="text-[10px] px-2 py-1 bg-red-100 text-red-700 rounded font-semibold"
+                <button className="text-[10px] px-2 py-1 bg-red-100 text-red-700 rounded font-semibold flex items-center gap-1"
                   onClick={() => updateReport.mutate({ id: r.id, statut: "rejete" })}>
-                  ✗
+                  <X size={10} />
                 </button>
               </div>
             </div>
@@ -643,13 +643,13 @@ function AgentReportsPanel() {
             <div className="flex justify-between items-center pt-1">
               <span className="text-xs text-muted-foreground">{r.agentName} · {new Date(r.createdAt).toLocaleDateString("fr-FR")}</span>
               <div className="flex gap-2">
-                <button className="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-200 transition-colors"
+                <button className="text-xs px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 font-semibold hover:bg-emerald-200 transition-colors flex items-center gap-1.5"
                   onClick={() => updateReport.mutate({ id: r.id, statut: "traite" })} disabled={updateReport.isPending}>
-                  ✓ Traiter
+                  <Check size={12} /> Traiter
                 </button>
-                <button className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold hover:bg-red-200 transition-colors"
+                <button className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold hover:bg-red-200 transition-colors flex items-center gap-1.5"
                   onClick={() => updateReport.mutate({ id: r.id, statut: "rejete" })} disabled={updateReport.isPending}>
-                  ✗ Rejeter
+                  <X size={12} /> Rejeter
                 </button>
               </div>
             </div>
