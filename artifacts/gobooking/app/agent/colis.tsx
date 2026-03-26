@@ -1042,6 +1042,10 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
   const [retraitScanMode, setRetraitScanMode] = useState(false);
   const lastRetraitScan = useRef<string>("");
 
+  /* Historique retraits de la session */
+  type RecentPickup = { ref: string; receiver: string; phone: string; time: string; amount: string };
+  const [recentPickups, setRecentPickups] = useState<RecentPickup[]>([]);
+
   const search = useCallback(async (ref: string) => {
     if (!ref.trim()) { Alert.alert("Erreur", "Entrez un numéro de suivi."); return; }
     setLoading(true);
@@ -1062,7 +1066,7 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
     lastScan.current = data;
     setScanning(false);
     const qr = validateQR(data);
-    const ref = qr?.ref ?? data;
+    const ref = (qr.valid ? qr.ref : null) ?? data;
     setManualRef(ref);
     search(ref);
   };
@@ -1099,6 +1103,16 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
       setPickupCode("");
       const notif = `Votre colis ${colis.trackingRef} a été retiré avec succès. Merci !`;
       setLastAction({ label: "✅ Retrait validé", notif });
+      setRecentPickups(prev => [
+        {
+          ref: colis.trackingRef,
+          receiver: colis.receiverName,
+          phone: colis.receiverPhone,
+          time: new Date().toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" }),
+          amount: `${Number(colis.amount).toLocaleString()} FCFA`,
+        },
+        ...prev.slice(0, 9),
+      ]);
       await search(colis.trackingRef);
     } catch (e: any) {
       if (e?.message?.includes("incorrect")) {
@@ -1258,7 +1272,7 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
                 /* ── Retrait : requiert confirmation QR ou code ── */
                 <TouchableOpacity
                   style={{ backgroundColor: na.color, borderRadius: 12, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, elevation: 3, shadowColor: na.color, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } }}
-                  onPress={() => { setRetraitInputCode(""); setRetraitScanMode(false); lastRetraitScan.current = ""; setShowRetraitConfirm(true); }}
+                  onPress={() => { setPickupCode(""); setRetraitScanMode(false); lastRetraitScan.current = ""; setShowRetraitConfirm(true); }}
                   disabled={updating}
                 >
                   <Ionicons name="qr-code-outline" size={20} color="#fff" />
@@ -1292,6 +1306,37 @@ function RetraitTab({ token, networkStatus }: { token: string | null; networkSta
               <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center" }}>Ce colis doit d'abord passer par une autre étape (chargement, transit…)</Text>
             </View>
           )}
+        </View>
+      )}
+
+      {/* ── Historique retraits de la session ── */}
+      {recentPickups.length > 0 && (
+        <View style={{ backgroundColor: "#fff", borderRadius: 14, borderWidth: 1.5, borderColor: "#BBF7D0", overflow: "hidden" }}>
+          <View style={{ backgroundColor: "#ECFDF5", paddingHorizontal: 14, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={18} color="#059669" />
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46" }}>Retraits effectués</Text>
+            <View style={{ marginLeft: "auto", backgroundColor: "#059669", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{recentPickups.length}</Text>
+            </View>
+          </View>
+          {recentPickups.map((r, idx) => (
+            <View key={r.ref + idx} style={{
+              flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 10,
+              borderTopWidth: idx > 0 ? 1 : 0, borderColor: "#F0FDF4", gap: 10,
+            }}>
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center" }}>
+                <Ionicons name="checkmark" size={18} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46" }}>{r.ref}</Text>
+                <Text style={{ fontSize: 11, color: "#374151", marginTop: 1 }}>{r.receiver} · {r.phone}</Text>
+              </View>
+              <View style={{ alignItems: "flex-end", gap: 2 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#059669" }}>{r.amount}</Text>
+                <Text style={{ fontSize: 10, color: "#9CA3AF" }}>{r.time}</Text>
+              </View>
+            </View>
+          ))}
         </View>
       )}
 

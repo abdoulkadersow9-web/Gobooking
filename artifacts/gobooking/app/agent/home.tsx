@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -113,8 +113,23 @@ const ALL_MODULES = [
   },
 ];
 
+function useLiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const dayNames = ["Dimanche","Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi"];
+  const monthNames = ["jan.","fév.","mar.","avr.","mai","juin","juil.","aoû.","sep.","oct.","nov.","déc."];
+  const day = dayNames[now.getDay()];
+  const date = `${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+  const time = now.toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" });
+  return { day, date, time };
+}
+
 export default function AgentHome() {
   const { user, logout } = useAuth();
+  const clock = useLiveClock();
 
   const roleLabel = () => {
     const r = user?.agentRole;
@@ -162,15 +177,28 @@ export default function AgentHome() {
             )}
           </View>
         </View>
-        <Pressable onPress={logout} style={S.logoutBtn} hitSlop={8}>
-          <Feather name="log-out" size={18} color="rgba(255,255,255,0.8)" />
-        </Pressable>
+        <View style={{ alignItems: "flex-end", gap: 6 }}>
+          <Pressable onPress={logout} style={S.logoutBtn} hitSlop={8}>
+            <Feather name="log-out" size={18} color="rgba(255,255,255,0.8)" />
+          </Pressable>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800", letterSpacing: 0.5 }}>{clock.time}</Text>
+            <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 1 }}>{clock.day} {clock.date}</Text>
+          </View>
+        </View>
       </LinearGradient>
 
       {/* Intro */}
       <View style={S.intro}>
-        <Text style={S.introTitle}>Choisissez votre module</Text>
-        <Text style={S.introSub}>Accédez à votre espace de travail</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={S.introTitle}>Mon espace de travail</Text>
+          <View style={{ backgroundColor: "#EFF6FF", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#BFDBFE" }}>
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#1D4ED8" }}>
+              {visibleModules.length} module{visibleModules.length > 1 ? "s" : ""}
+            </Text>
+          </View>
+        </View>
+        <Text style={S.introSub}>Sélectionnez votre module pour commencer</Text>
       </View>
 
       {/* Module cards */}
