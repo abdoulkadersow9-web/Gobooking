@@ -130,7 +130,7 @@ function buildTicketHtml(c: Confirmed): string {
 <body>
 <div class="ticket">
   <div class="header">
-    <div class="logo">🚌 GoBooking</div>
+    <div class="logo">GoBooking</div>
     <div class="sub">Billet de transport · Côte d'Ivoire</div>
   </div>
 
@@ -154,7 +154,7 @@ function buildTicketHtml(c: Confirmed): string {
     </tr>
   </table>
 
-  ${isOffline ? '<div class="offline-badge">⚡ Billet hors ligne — sera synchronisé</div>' : ""}
+  ${isOffline ? '<div class="offline-badge">Billet hors ligne — sera synchronisé</div>' : ""}
 
   <div class="qr-section">
     <img src="${qrUrl}" alt="QR Code ${c.bookingRef}" />
@@ -246,7 +246,7 @@ export default function TicketsScreen() {
     return (
       <SafeAreaView style={S.denied}>
         <StatusBar barStyle="dark-content" />
-        <Text style={{ fontSize: 48 }}>🔒</Text>
+        <Ionicons name="lock-closed" size={52} color="#D1D5DB" />
         <Text style={S.deniedTitle}>Accès non autorisé</Text>
         <Text style={S.deniedSub}>Cet espace est réservé aux agents GoBooking.</Text>
         <TouchableOpacity style={S.deniedBtn} onPress={() => router.replace("/agent/home" as never)}>
@@ -381,7 +381,7 @@ export default function TicketsScreen() {
           <View style={S.headerRow}>
             <View style={S.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
             <View>
-              <Text style={S.headerTitle}>🎫 Espace Ticketing</Text>
+              <Text style={S.headerTitle}>Espace Ticketing</Text>
               <Text style={S.headerSub}>Billet émis avec succès</Text>
             </View>
           </View>
@@ -450,8 +450,8 @@ export default function TicketsScreen() {
         <View style={S.headerRow}>
           <View style={S.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
           <View>
-            <Text style={S.headerTitle}>🎫 Espace Ticketing</Text>
-            <Text style={S.headerSub}>🏪 Vente guichet · {networkStatus.isOnline ? "En ligne" : "⚡ Hors ligne"}</Text>
+            <Text style={S.headerTitle}>Espace Ticketing</Text>
+            <Text style={S.headerSub}>Vente guichet · {networkStatus.isOnline ? "En ligne" : "Hors ligne"}</Text>
           </View>
         </View>
         <TouchableOpacity onPress={logout} style={S.logoutBtn}>
@@ -502,11 +502,11 @@ export default function TicketsScreen() {
                       {trip.guichetSeats !== undefined && trip.guichetSeats > 0 ? (
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
                           <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: G_DARK }}>🏪 {trip.guichetSeats} guichet</Text>
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: G_DARK }}>{trip.guichetSeats} guichet</Text>
                           </View>
                           {(trip.onlineSeats ?? 0) > 0 && (
                             <View style={{ backgroundColor: "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
-                              <Text style={{ fontSize: 11, fontWeight: "600", color: "#1D4ED8" }}>🌐 {trip.onlineSeats} en ligne</Text>
+                              <Text style={{ fontSize: 11, fontWeight: "600", color: "#1D4ED8" }}>{trip.onlineSeats} en ligne</Text>
                             </View>
                           )}
                         </View>
@@ -610,7 +610,7 @@ export default function TicketsScreen() {
             onPress={() => router.push("/agent/rapport" as never)}
           >
             <Feather name="alert-triangle" size={16} color="#fff" />
-            <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -635,10 +635,10 @@ export default function TicketsScreen() {
                 </Text>
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
                   <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: G_DARK }}>🏪 {dGuichet} guichet</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: G_DARK }}>{dGuichet} guichet</Text>
                   </View>
                   <View style={{ backgroundColor: "#EFF6FF", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#1D4ED8" }}>🌐 {dOnline} en ligne</Text>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#1D4ED8" }}>{dOnline} en ligne</Text>
                   </View>
                 </View>
               </View>
@@ -694,7 +694,7 @@ export default function TicketsScreen() {
                 {selectedBus && (
                   <View style={{ backgroundColor: G_LIGHT, borderRadius: 10, padding: 10, marginTop: 4 }}>
                     <Text style={{ fontSize: 12, color: G_DARK, fontWeight: "600" }}>
-                      🚌 {selectedBus.busName} · capacité : {selectedBus.capacity} places
+                      {selectedBus.busName} · capacité : {selectedBus.capacity} places
                     </Text>
                     <Text style={{ fontSize: 11, color: "#92400E", marginTop: 2 }}>
                       Guichet ({dGuichet || "0"}) + En ligne ({dOnline || "0"}) = {(parseInt(dGuichet) || 0) + (parseInt(dOnline) || 0)} / {selectedBus.capacity}
@@ -753,7 +753,7 @@ export default function TicketsScreen() {
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={[S.label, { color: G_DARK }]}>🏪 Places guichet</Text>
+                    <Text style={[S.label, { color: G_DARK }]}>Places guichet</Text>
                     <View style={S.countRow}>
                       <TouchableOpacity style={S.countBtn} onPress={() => setDGuichet(v => String(Math.max(0, parseInt(v || "0") - 1)))}>
                         <Ionicons name="remove" size={18} color={G} />
@@ -766,7 +766,7 @@ export default function TicketsScreen() {
                     </View>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[S.label, { color: "#1D4ED8" }]}>🌐 Places en ligne</Text>
+                    <Text style={[S.label, { color: "#1D4ED8" }]}>Places en ligne</Text>
                     <View style={S.countRow}>
                       <TouchableOpacity style={[S.countBtn, { borderColor: "#1D4ED8" }]} onPress={() => setDOnline(v => String(Math.max(0, parseInt(v || "0") - 1)))}>
                         <Ionicons name="remove" size={18} color="#1D4ED8" />
@@ -800,8 +800,8 @@ export default function TicketsScreen() {
                 <View style={S.recapRow}><Text style={S.recapKey}>Date</Text><Text style={S.recapVal}>{dDate || "—"}</Text></View>
                 <View style={S.recapRow}><Text style={S.recapKey}>Heure</Text><Text style={S.recapVal}>{dHeure || "—"}</Text></View>
                 <View style={S.recapRow}><Text style={S.recapKey}>Bus</Text><Text style={S.recapVal}>{selectedBus?.busName ?? "Non sélectionné"}</Text></View>
-                <View style={S.recapRow}><Text style={S.recapKey}>🏪 Guichet</Text><Text style={S.recapVal}>{dGuichet} places</Text></View>
-                <View style={S.recapRow}><Text style={S.recapKey}>🌐 En ligne</Text><Text style={S.recapVal}>{dOnline} places</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Guichet</Text><Text style={S.recapVal}>{dGuichet} places</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>En ligne</Text><Text style={S.recapVal}>{dOnline} places</Text></View>
                 <View style={[S.recapRow, { borderTopWidth: 1, borderColor: "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
                   <Text style={[S.recapKey, { fontWeight: "700", color: G_DARK }]}>TOTAL PLACES</Text>
                   <Text style={[S.recapVal, { fontWeight: "800", color: G, fontSize: 18 }]}>

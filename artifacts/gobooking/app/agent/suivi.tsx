@@ -30,9 +30,9 @@ function authHeader(token: string | null) {
 }
 
 const RESPONSE_OPTIONS = [
-  { id: "panne",    label: "🔧 Panne mécanique", color: "#DC2626", bg: "#FEE2E2" },
-  { id: "controle", label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
-  { id: "pause",    label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
+  { id: "panne",    label: "Panne mécanique", color: "#DC2626", bg: "#FEE2E2" },
+  { id: "controle", label: "Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
+  { id: "pause",    label: "Pause normale",     color: "#166534", bg: "#DCFCE7" },
 ];
 
 const BUS_STATUS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
@@ -116,7 +116,7 @@ export default function SuiviScreen() {
         body: JSON.stringify({ busId: bus.id, message }),
       });
       if (res.ok) {
-        Alert.alert("✅ Alerte déclenchée", "L'Agent Suivi est notifié.");
+        Alert.alert("Alerte déclenchée", "L'Agent Suivi est notifié.");
         setTriggerBus(null);
         await load(true);
       } else {
@@ -134,7 +134,7 @@ export default function SuiviScreen() {
         method: "POST",
         headers: { ...authHeader(token), "Content-Type": "application/json" },
       });
-      Alert.alert("📨 Demande envoyée", "L'agent en route va être notifié et devra répondre.");
+      Alert.alert("Demande envoyée", "L'agent en route va être notifié et devra répondre.");
       await load(true);
     } catch { Alert.alert("Erreur", "Problème réseau."); }
     setActing(false);
@@ -149,7 +149,7 @@ export default function SuiviScreen() {
         headers: { ...authHeader(token), "Content-Type": "application/json" },
       });
       if (res.ok) {
-        Alert.alert("✅ Alerte résolue", "La situation est normalisée.");
+        Alert.alert("Alerte résolue", "La situation est normalisée.");
         await load(true);
       }
     } catch {}
@@ -159,7 +159,7 @@ export default function SuiviScreen() {
   if (user?.role !== "agent") {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
-        <Text style={{ fontSize: 48 }}>🔒</Text>
+        <Ionicons name="lock-closed" size={52} color="#D1D5DB" />
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>Accès non autorisé</Text>
         <TouchableOpacity style={{ backgroundColor: RED, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10 }}
           onPress={() => router.replace("/agent/home" as never)}>
@@ -178,9 +178,9 @@ export default function SuiviScreen() {
         <View style={S.headerRow}>
           <View style={S.headerIcon}><Ionicons name="radio" size={22} color="#fff" /></View>
           <View>
-            <Text style={S.headerTitle}>📡 Suivi & Alertes</Text>
+            <Text style={S.headerTitle}>Suivi & Alertes</Text>
             <Text style={S.headerSub}>
-              {hasAlerts ? `🚨 ${data!.alerts.length} alerte(s) active(s)` : "Surveillance en temps réel"}
+              {hasAlerts ? `${data!.alerts.length} alerte(s) active(s)` : "Surveillance en temps réel"}
             </Text>
           </View>
         </View>
@@ -211,7 +211,7 @@ export default function SuiviScreen() {
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <View style={S.alarmBanner}>
                 <Ionicons name="warning" size={24} color="#fff" />
-                <Text style={S.alarmTxt}>🚨 {data!.alerts.length} ALERTE{data!.alerts.length > 1 ? "S" : ""} ACTIVE{data!.alerts.length > 1 ? "S" : ""}</Text>
+                <Text style={S.alarmTxt}>{data!.alerts.length} ALERTE{data!.alerts.length > 1 ? "S" : ""} ACTIVE{data!.alerts.length > 1 ? "S" : ""}</Text>
                 <Ionicons name="warning" size={24} color="#fff" />
               </View>
             </Animated.View>
@@ -219,7 +219,7 @@ export default function SuiviScreen() {
 
           {/* ── ALERTS LIST ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>🚨 Alertes ({data?.alerts?.length ?? 0})</Text>
+            <Text style={S.sectionTitle}>Alertes ({data?.alerts?.length ?? 0})</Text>
             {!data?.alerts?.length && (
               <View style={S.empty}><Ionicons name="checkmark-circle" size={32} color="#4ADE80" />
                 <Text style={S.emptyTxt}>Aucune alerte active</Text>
@@ -252,20 +252,20 @@ export default function SuiviScreen() {
                   {hasResponse && responseOpt && (
                     <View style={[S.responsePill, { backgroundColor: responseOpt.bg }]}>
                       <Text style={[S.responseTxt, { color: responseOpt.color }]}>
-                        ✅ Réponse agent route : {responseOpt.label}
+                        Réponse agent route : {responseOpt.label}
                       </Text>
                     </View>
                   )}
                   {!hasResponse && reqRequested && (
                     <View style={S.waitPill}>
                       <ActivityIndicator size="small" color="#D97706" />
-                      <Text style={S.waitTxt}>⏳ En attente de réponse — agent en route notifié</Text>
+                      <Text style={S.waitTxt}>En attente de réponse — agent en route notifié</Text>
                     </View>
                   )}
                   {!hasResponse && !reqRequested && (
                     <View style={[S.waitPill, { backgroundColor: "#FFF1F2", borderColor: "#FECDD3" }]}>
                       <Ionicons name="alert-circle-outline" size={14} color={RED} />
-                      <Text style={[S.waitTxt, { color: RED }]}>🚨 Aucune réponse — action requise</Text>
+                      <Text style={[S.waitTxt, { color: RED }]}>Aucune réponse — action requise</Text>
                     </View>
                   )}
 
@@ -299,7 +299,7 @@ export default function SuiviScreen() {
 
           {/* ── BUS LIST ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>🚌 Bus en temps réel ({data?.buses?.length ?? 0})</Text>
+            <Text style={S.sectionTitle}>Bus en temps réel ({data?.buses?.length ?? 0})</Text>
             {!data?.buses?.length && (
               <View style={S.empty}><Text style={S.emptyTxt}>Aucun bus trouvé</Text></View>
             )}
@@ -315,9 +315,9 @@ export default function SuiviScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={S.busName}>{bus.busName}</Text>
                       <Text style={S.busPlate}>{bus.plateNumber}</Text>
-                      {bus.currentLocation && <Text style={S.busLoc}>📍 {bus.currentLocation}</Text>}
-                      {trip && <Text style={S.busTrip}>🗺️ {trip.from} → {trip.to} · {trip.departureTime}</Text>}
-                      {bus.issue && <Text style={S.busIssue}>⚠️ {bus.issue}</Text>}
+                      {bus.currentLocation && <Text style={S.busLoc}>{bus.currentLocation}</Text>}
+                      {trip && <Text style={S.busTrip}>{trip.from} → {trip.to} · {trip.departureTime}</Text>}
+                      {bus.issue && <Text style={S.busIssue}>{bus.issue}</Text>}
                     </View>
                     <View style={[S.statusPill, { backgroundColor: st.bg }]}>
                       <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
@@ -344,7 +344,7 @@ export default function SuiviScreen() {
       <Modal visible={!!triggerBus} transparent animationType="slide">
         <View style={S.modalBg}>
           <View style={S.modalBox}>
-            <Text style={S.modalTitle}>⚠️ Déclencher une alerte</Text>
+            <Text style={S.modalTitle}>Déclencher une alerte</Text>
             <Text style={S.modalSub}>Bus : {triggerBus?.busName} ({triggerBus?.plateNumber})</Text>
 
             <Text style={S.modalLabel}>Message (optionnel)</Text>
@@ -386,7 +386,7 @@ export default function SuiviScreen() {
         onPress={() => router.push("/agent/rapport" as never)}
       >
         <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

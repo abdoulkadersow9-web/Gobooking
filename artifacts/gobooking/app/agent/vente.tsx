@@ -179,7 +179,7 @@ export default function VenteScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Espace Vente</Text>
             <Text style={styles.headerSub}>
-              {networkStatus.isOnline ? "Vente de billets en gare" : "⚡ Mode hors ligne actif"}
+              {networkStatus.isOnline ? "Vente de billets en gare" : "Mode hors ligne actif"}
             </Text>
           </View>
           <TouchableOpacity

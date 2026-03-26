@@ -109,22 +109,23 @@ export default function ReceptionColisScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Gestion Colis</Text>
             <Text style={styles.headerSub}>
-              {networkStatus.isOnline ? "Suivi professionnel des colis" : "⚡ Mode hors ligne"}
+              {networkStatus.isOnline ? "Suivi professionnel des colis" : "Mode hors ligne"}
             </Text>
           </View>
         </View>
         <View style={styles.tabs}>
           {([
-            { key: "creer",   label: "✚ Créer",   },
-            { key: "retrait", label: "📦 Retrait", },
-            { key: "gerer",   label: "🔍 Gérer",   },
-            { key: "liste",   label: "📋 Liste",   },
+            { key: "creer",   label: "Créer",   icon: "add-circle-outline"      },
+            { key: "retrait", label: "Retrait",  icon: "qr-code-outline"         },
+            { key: "gerer",   label: "Gérer",    icon: "search-outline"          },
+            { key: "liste",   label: "Liste",    icon: "list-outline"            },
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
               style={[styles.tab, activeTab === t.key && styles.tabActive]}
               onPress={() => setActiveTab(t.key)}
             >
+              <Ionicons name={t.icon as any} size={14} color={activeTab === t.key ? G_DARK : "rgba(255,255,255,0.6)"} />
               <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
@@ -565,7 +566,7 @@ function RetraitTab({ token }: { token: string | null }) {
     } catch (e: any) {
       const msg = e?.message ?? "Erreur lors de la validation.";
       if (msg.includes("incorrect") || msg.includes("invalide")) {
-        setCodeError("❌ Code incorrect. Vérifiez le SMS envoyé au destinataire.");
+        setCodeError("Code incorrect. Vérifiez le SMS envoyé au destinataire.");
       } else if (msg.includes("requis")) {
         setCodeError("Le code de retrait est obligatoire.");
       } else {

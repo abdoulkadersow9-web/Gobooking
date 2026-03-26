@@ -176,7 +176,7 @@ export default function LogistiqueScreen() {
   if (!isAgent) {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
-        <Text style={{ fontSize: 48 }}>🔒</Text>
+        <Ionicons name="lock-closed-outline" size={52} color="#CBD5E1" />
         <Text style={{ fontSize: 20, fontWeight: "700" }}>Accès non autorisé</Text>
         <TouchableOpacity style={{ backgroundColor: BLUE, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10 }}
           onPress={() => router.replace("/agent/home" as never)}>
@@ -195,7 +195,7 @@ export default function LogistiqueScreen() {
         <View style={S.headerRow}>
           <View style={S.headerIcon}><Ionicons name="bus" size={22} color="#fff" /></View>
           <View>
-            <Text style={S.headerTitle}>🚛 Logistique</Text>
+            <Text style={S.headerTitle}>Logistique</Text>
             <Text style={S.headerSub}>Gestion du parc bus</Text>
           </View>
         </View>
@@ -218,7 +218,7 @@ export default function LogistiqueScreen() {
           {/* ── STATS ── */}
           {data?.stats && (
             <View style={S.section}>
-              <Text style={S.sectionTitle}>📊 Tableau de bord</Text>
+              <Text style={S.sectionTitle}>Tableau de bord</Text>
               <View style={S.statsGrid}>
                 <StatCard label="En route"   value={data.stats.busesEnRoute}     color="#166534" bg="#DCFCE7" icon="navigate" />
                 <StatCard label="Attente"    value={data.stats.busesEnAttente}   color="#D97706" bg="#FEF3C7" icon="time" />
@@ -232,7 +232,7 @@ export default function LogistiqueScreen() {
           {/* ── ALERTES ── */}
           {!!data?.alerts?.length && (
             <View style={S.section}>
-              <Text style={S.sectionTitle}>🚨 Anomalies ({data.alerts.length})</Text>
+              <Text style={S.sectionTitle}>Anomalies ({data.alerts.length})</Text>
               {data.alerts.map(a => (
                 <View key={a.id} style={S.alertCard}>
                   <Ionicons name="warning" size={20} color="#DC2626" />
@@ -250,7 +250,7 @@ export default function LogistiqueScreen() {
 
           {/* ── DÉPARTS PROGRAMMÉS ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>🗓️ Départs ({departures.length})</Text>
+            <Text style={S.sectionTitle}>Départs ({departures.length})</Text>
             {!departures.length && (
               <View style={S.empty}>
                 <Ionicons name="calendar-outline" size={28} color="#CBD5E1" />
@@ -267,10 +267,10 @@ export default function LogistiqueScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={S.depRoute}>{dep.villeDepart} → {dep.villeArrivee}</Text>
-                      <Text style={S.depSub}>🕐 {dep.heureDepart}</Text>
-                      {dep.busName && dep.busName !== "—" && <Text style={S.depSub}>🚌 {dep.busName} ({dep.plateNumber})</Text>}
-                      {dep.chauffeurNom && <Text style={S.depSub}>👤 Chauffeur : {dep.chauffeurNom}</Text>}
-                      {dep.agentRouteNom && <Text style={S.depSub}>📡 Agent route : {dep.agentRouteNom}</Text>}
+                      <Text style={S.depSub}>{dep.heureDepart}</Text>
+                      {dep.busName && dep.busName !== "—" && <Text style={S.depSub}>{dep.busName} ({dep.plateNumber})</Text>}
+                      {dep.chauffeurNom && <Text style={S.depSub}>Chauffeur : {dep.chauffeurNom}</Text>}
+                      {dep.agentRouteNom && <Text style={S.depSub}>Agent route : {dep.agentRouteNom}</Text>}
                     </View>
                     <TouchableOpacity onPress={() => setStatusDep(dep)}>
                       <View style={[S.badge, { backgroundColor: st.bg }]}>
@@ -285,7 +285,7 @@ export default function LogistiqueScreen() {
 
           {/* ── FLOTTE BUS ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>🚌 Flotte ({data?.buses?.length ?? 0})</Text>
+            <Text style={S.sectionTitle}>Flotte ({data?.buses?.length ?? 0})</Text>
             {!data?.buses?.length && <View style={S.empty}><Text style={S.emptyTxt}>Aucun bus</Text></View>}
             {data?.buses?.map(bus => {
               const st = getBusStatus(bus.logisticStatus);
@@ -297,7 +297,7 @@ export default function LogistiqueScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={S.busName}>{bus.busName}</Text>
                       <Text style={S.busPlate}>{bus.plateNumber} · {bus.busType} · {bus.capacity} places</Text>
-                      {bus.currentLocation && <Text style={S.busLoc}>📍 {bus.currentLocation}</Text>}
+                      {bus.currentLocation && <Text style={S.busLoc}>{bus.currentLocation}</Text>}
                     </View>
                     <TouchableOpacity onPress={() => setStatusBus(bus)} style={[S.statusBadge, { backgroundColor: st.bg }]}>
                       <Ionicons name={st.icon as any} size={12} color={st.color} />
@@ -330,7 +330,7 @@ export default function LogistiqueScreen() {
 
           {/* ── TRAJETS DU JOUR ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>🗺️ Trajets du jour ({data?.trips?.length ?? 0})</Text>
+            <Text style={S.sectionTitle}>Trajets du jour ({data?.trips?.length ?? 0})</Text>
             {!data?.trips?.length && <View style={S.empty}><Text style={S.emptyTxt}>Aucun trajet aujourd'hui</Text></View>}
             {data?.trips?.map(trip => (
               <View key={trip.id} style={S.tripCard}>
@@ -355,7 +355,7 @@ export default function LogistiqueScreen() {
             onPress={() => router.push("/agent/rapport" as never)}
           >
             <Feather name="alert-triangle" size={16} color="#fff" />
-            <Text style={S.rapportBtnTxt}>📋 Faire un rapport</Text>
+            <Text style={S.rapportBtnTxt}>Faire un rapport</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -365,7 +365,7 @@ export default function LogistiqueScreen() {
         <View style={S.modalBg}>
           <View style={[S.modalBox, { gap: 14 }]}>
             <View style={S.modalTitleRow}>
-              <Text style={S.modalTitle}>🚌 Changer statut — {statusBus?.busName}</Text>
+              <Text style={S.modalTitle}>Changer statut — {statusBus?.busName}</Text>
               <TouchableOpacity onPress={() => setStatusBus(null)}>
                 <Feather name="x" size={22} color="#64748B" />
               </TouchableOpacity>
@@ -391,7 +391,7 @@ export default function LogistiqueScreen() {
         <View style={S.modalBg}>
           <View style={[S.modalBox, { gap: 14 }]}>
             <View style={S.modalTitleRow}>
-              <Text style={S.modalTitle}>🗓️ Changer statut départ</Text>
+              <Text style={S.modalTitle}>Changer statut départ</Text>
               <TouchableOpacity onPress={() => setStatusDep(null)}>
                 <Feather name="x" size={22} color="#64748B" />
               </TouchableOpacity>

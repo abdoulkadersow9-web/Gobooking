@@ -38,9 +38,9 @@ const DEMO_TICKETS_ROUTE = [
 
 /* ── Constante stable hors composant (ne se recrée jamais) ── */
 const RESP = [
-  { id: "panne"    as const, label: "🔧 Panne mécanique",  color: "#DC2626", bg: "#FEE2E2" },
-  { id: "controle" as const, label: "🚔 Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
-  { id: "pause"    as const, label: "☕ Pause normale",     color: "#166534", bg: "#DCFCE7" },
+  { id: "panne"    as const, label: "Panne mécanique",  color: "#DC2626", bg: "#FEE2E2" },
+  { id: "controle" as const, label: "Contrôle routier", color: "#D97706", bg: "#FEF3C7" },
+  { id: "pause"    as const, label: "Pause normale",     color: "#166534", bg: "#DCFCE7" },
 ] as const;
 
 interface LiveTrip {
@@ -89,7 +89,7 @@ const DEMO_ALERTS_FALLBACK = [
   {
     id: "sim-demo-1",
     type: "arret_prolonge",
-    message: "⚠️ [Simulation] Arrêt anormal à Yamoussoukro — véhicule immobile depuis 12 min",
+    message: "[Simulation] Arrêt anormal à Yamoussoukro — véhicule immobile depuis 12 min",
     status: "active" as const,
     response: null as null,
     responseRequested: true,
@@ -258,7 +258,7 @@ export default function RouteScreen() {
       anomalyInjected.current.delete("arret_prolonge");
       anomalyInjected.current.delete("vitesse_anormale");
       speedZeroRef.current = null;
-      Alert.alert("✅ Anomalie résolue", "L'alerte a été clôturée. Le suivi continue.");
+      Alert.alert("Anomalie résolue", "L'alerte a été clôturée. Le suivi continue.");
       setAlertActing(null);
       return;
     }
@@ -271,7 +271,7 @@ export default function RouteScreen() {
         body: JSON.stringify({ response }),
       });
       if (res.ok) {
-        Alert.alert("✅ Réponse envoyée", "L'Agent Suivi a été notifié.");
+        Alert.alert("Réponse envoyée", "L'Agent Suivi a été notifié.");
         await loadMyDeparture();
       }
     } catch { Alert.alert("Erreur", "Problème réseau."); }
@@ -399,7 +399,7 @@ export default function RouteScreen() {
         setAutoAlerts(prev => [...prev.filter(a => a.type !== "arret_prolonge"), {
           id: `auto-${now}`,
           type: "arret_prolonge",
-          message: `🚨 Arrêt prolongé détecté — véhicule immobile depuis ${stoppedMin} min (détection automatique)`,
+          message: `Arrêt prolongé détecté — véhicule immobile depuis ${stoppedMin} min (détection automatique)`,
           status: "active",
           response: null,
           responseRequested: true,
@@ -420,7 +420,7 @@ export default function RouteScreen() {
       setAutoAlerts(prev => [...prev.filter(a => a.type !== "vitesse_anormale"), {
         id: `auto-speed-${now}`,
         type: "vitesse_anormale",
-        message: `⚡ Vitesse anormale détectée : ${Math.round(speed)} km/h — vérification requise`,
+        message: `Vitesse anormale détectée : ${Math.round(speed)} km/h — vérification requise`,
         status: "active",
         response: null,
         responseRequested: false,
@@ -440,7 +440,7 @@ export default function RouteScreen() {
       setAutoAlerts(prev => [...prev.filter(a => a.type !== "gps_perdu"), {
         id: `auto-gps-${Date.now()}`,
         type: "gps_perdu",
-        message: "📡 Signal GPS perdu — position non disponible",
+        message: "Signal GPS perdu — position non disponible",
         status: "active",
         response: null,
         responseRequested: false,
@@ -539,7 +539,7 @@ export default function RouteScreen() {
         <View>
           <Text style={S.headerTitle}>Agent En Route</Text>
           <Text style={S.headerSub}>
-            {syncTime ? `🟢 ${syncTime} · auto 15s` : (user?.name ?? "En route")}
+            {syncTime ? `${syncTime} · auto 15s` : (user?.name ?? "En route")}
           </Text>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -562,7 +562,7 @@ export default function RouteScreen() {
       {/* ── État vide / chargement ── */}
       {!loading && trips.length === 0 && (
         <View style={S.emptyState}>
-          <Text style={S.emptyIcon}>🚌</Text>
+          <Ionicons name="bus-outline" size={52} color="#CBD5E1" />
           <Text style={S.emptyTitle}>Aucun trajet en cours</Text>
           <Text style={S.emptySub}>Les trajets "En route" apparaîtront ici automatiquement.</Text>
           <TouchableOpacity style={S.refreshBtn} onPress={handleRefresh} disabled={refreshing}>
@@ -801,13 +801,13 @@ export default function RouteScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={S.tabsScroll}>
             <View style={S.tabs}>
               {([
-                { key: "passagers", label: "👥 Passagers" },
-                { key: "scan",      label: "🔍 Scan" },
-                { key: "montee",    label: "➕ Montée" },
-                { key: "trajet",    label: "📍 Trajet" },
-                { key: "arrets",    label: `🗺 Arrêts${stopData.length > 0 ? ` (${stopData.length})` : ""}` },
-                { key: "contacts",  label: "📞 Contacts" },
-                { key: "alertes",   label: `🚨 Alertes${allAlerts.length > 0 ? ` (${allAlerts.length})` : ""}` },
+                { key: "passagers", label: "Passagers" },
+                { key: "scan",      label: "Scan" },
+                { key: "montee",    label: "Montée" },
+                { key: "trajet",    label: "Trajet" },
+                { key: "arrets",    label: `Arrêts${stopData.length > 0 ? ` (${stopData.length})` : ""}` },
+                { key: "contacts",  label: "Contacts" },
+                { key: "alertes",   label: `Alertes${allAlerts.length > 0 ? ` (${allAlerts.length})` : ""}` },
               ] as const).map(t => (
                 <TouchableOpacity key={t.key}
                   style={[S.tabBtn, tab === t.key && S.tabBtnActive]}
@@ -850,7 +850,7 @@ export default function RouteScreen() {
 
                 {!passLoading && passengers.length === 0 && (
                   <View style={S.emptyCard}>
-                    <Text style={{ fontSize: 36 }}>👥</Text>
+                    <Ionicons name="people-outline" size={36} color="#CBD5E1" />
                     <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151" }}>Aucun passager</Text>
                     <Text style={S.emptySub}>Ajoutez un passager via le bouton vert ci-dessous</Text>
                   </View>
@@ -962,10 +962,10 @@ export default function RouteScreen() {
                         S.scanResultTitle,
                         { color: scanResult.status === "valid" ? G_DARK : scanResult.status === "already_used" ? "#92400E" : scanResult.status === "offline" ? "#374151" : "#991B1B" },
                       ]}>
-                        {scanResult.status === "valid"        ? "✅ Passager validé — À bord !" :
-                         scanResult.status === "already_used" ? "⚠️ Billet déjà utilisé" :
-                         scanResult.status === "offline"      ? "📡 Hors ligne" :
-                                                                "❌ Billet invalide"}
+                        {scanResult.status === "valid"        ? "Passager validé — À bord !" :
+                         scanResult.status === "already_used" ? "Billet déjà utilisé" :
+                         scanResult.status === "offline"      ? "Hors ligne" :
+                                                                "Billet invalide"}
                       </Text>
                     </View>
                     {scanResult.passenger && (
@@ -1106,7 +1106,7 @@ export default function RouteScreen() {
                 {/* Tickets de simulation */}
                 {!scanResult && (
                   <View style={S.demoSection}>
-                    <Text style={S.demoTitle}>🧪 Tickets de test (simulation)</Text>
+                    <Text style={S.demoTitle}>Tickets de test (simulation)</Text>
                     <Text style={{ fontSize: 11, color: "#9CA3AF", marginBottom: 10 }}>
                       Appuyez sur une référence pour la tester directement
                     </Text>
@@ -1305,12 +1305,12 @@ export default function RouteScreen() {
                 {myDeparture && (
                   <View style={S.departureBadge}>
                     <Text style={{ fontSize: 13, fontWeight: "800", color: "#0369A1" }}>
-                      🗓️ {myDeparture.villeDepart} → {myDeparture.villeArrivee}
+                      {myDeparture.villeDepart} → {myDeparture.villeArrivee}
                     </Text>
                     <Text style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>
-                      ⏰ {myDeparture.heureDepart} · {myDeparture.busName ?? "Bus"}{myDeparture.plateNumber ? ` (${myDeparture.plateNumber})` : ""}
+                      {myDeparture.heureDepart} · {myDeparture.busName ?? "Bus"}{myDeparture.plateNumber ? ` (${myDeparture.plateNumber})` : ""}
                     </Text>
-                    {myDeparture.chauffeurNom && <Text style={{ fontSize: 11, color: "#64748B" }}>👤 {myDeparture.chauffeurNom}</Text>}
+                    {myDeparture.chauffeurNom && <Text style={{ fontSize: 11, color: "#64748B" }}>{myDeparture.chauffeurNom}</Text>}
                   </View>
                 )}
               </>
@@ -1400,7 +1400,7 @@ export default function RouteScreen() {
                 {passLoading && <ActivityIndicator color={G} style={{ marginTop: 20 }} />}
                 {!passLoading && passengers.length === 0 && (
                   <View style={S.emptyCard}>
-                    <Text style={{ fontSize: 32 }}>📞</Text>
+                    <Ionicons name="call-outline" size={32} color="#CBD5E1" />
                     <Text style={S.emptySub}>Aucun contact disponible</Text>
                   </View>
                 )}
@@ -1455,7 +1455,7 @@ export default function RouteScreen() {
             {tab === "alertes" && (
               <View style={S.alertsContainer}>
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={S.sectionTitle}>🚨 Mes alertes à bord</Text>
+                  <Text style={S.sectionTitle}>Mes alertes à bord</Text>
                   {allAlerts.length > 0 && (
                     <View style={{ backgroundColor: "#DC2626", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 }}>
                       <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>{allAlerts.length} active(s)</Text>
@@ -1493,7 +1493,7 @@ export default function RouteScreen() {
                         <View style={S.alertRequestBanner}>
                           <Ionicons name="mail-open-outline" size={16} color="#D97706" />
                           <Text style={S.alertRequestText}>
-                            📨 L'agent suivi demande votre réponse !
+                            L'agent suivi demande votre réponse !
                           </Text>
                         </View>
                       )}
@@ -1501,7 +1501,7 @@ export default function RouteScreen() {
                         <View style={[S.alertResponseBanner, { backgroundColor: responseOpt.bg }]}>
                           <Ionicons name="checkmark-circle" size={16} color={responseOpt.color} />
                           <Text style={[S.alertResponseText, { color: responseOpt.color }]}>
-                            ✅ Réponse envoyée : {responseOpt.label}
+                            Réponse envoyée : {responseOpt.label}
                           </Text>
                         </View>
                       )}

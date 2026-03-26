@@ -67,7 +67,7 @@ const RESULT_CONFIG: Record<ResultStatus, {
   valid: {
     bg:          GREEN_BG,
     light:       GREEN_LIGHT,
-    icon:        "✅",
+    icon:        "ok",
     featherIcon: "check-circle",
     title:       "Embarquement validé",
     subtitle:    "Le passager peut embarquer",
@@ -75,7 +75,7 @@ const RESULT_CONFIG: Record<ResultStatus, {
   already_used: {
     bg:          RED_BG,
     light:       RED_LIGHT,
-    icon:        "⛔",
+    icon:        "used",
     featherIcon: "x-circle",
     title:       "Billet déjà utilisé",
     subtitle:    "Ce passager a déjà été enregistré",
@@ -83,7 +83,7 @@ const RESULT_CONFIG: Record<ResultStatus, {
   invalid: {
     bg:          RED_BG,
     light:       RED_LIGHT,
-    icon:        "❌",
+    icon:        "invalid",
     featherIcon: "alert-circle",
     title:       "Billet invalide",
     subtitle:    "Référence introuvable ou QR falsifié",
@@ -91,7 +91,7 @@ const RESULT_CONFIG: Record<ResultStatus, {
   offline: {
     bg:          AMBER_BG,
     light:       "#FEF3C7",
-    icon:        "⏳",
+    icon:        "offline",
     featherIcon: "wifi-off",
     title:       "Scan hors ligne",
     subtitle:    "Sera validé à la reconnexion",

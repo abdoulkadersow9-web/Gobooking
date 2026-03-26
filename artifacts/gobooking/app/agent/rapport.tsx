@@ -12,15 +12,15 @@ import { apiFetch } from "@/utils/api";
 const ROSE = "#BE123C";
 const ROSE_LT = "#FFF1F2";
 
-const REPORT_TYPES = [
-  { key: "incident_voyage",     label: "Incident durant le voyage",    emoji: "🚨", color: "#DC2626" },
-  { key: "probleme_colis",      label: "Problème avec un colis",       emoji: "📦", color: "#EA580C" },
-  { key: "probleme_passager",   label: "Problème avec un passager",    emoji: "👤", color: "#D97706" },
-  { key: "probleme_vehicule",   label: "Problème véhicule / panne",    emoji: "🚌", color: "#7C3AED" },
-  { key: "fraude",              label: "Suspicion de fraude",          emoji: "⚠️", color: "#B91C1C" },
-  { key: "retard",              label: "Retard important",             emoji: "⏰", color: "#0369A1" },
-  { key: "suggestion",          label: "Suggestion d'amélioration",    emoji: "💡", color: "#059669" },
-  { key: "autre",               label: "Autre",                        emoji: "📝", color: "#475569" },
+const REPORT_TYPES: { key: string; label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; color: string }[] = [
+  { key: "incident_voyage",     label: "Incident durant le voyage",    icon: "warning-outline",          color: "#DC2626" },
+  { key: "probleme_colis",      label: "Problème avec un colis",       icon: "cube-outline",              color: "#EA580C" },
+  { key: "probleme_passager",   label: "Problème avec un passager",    icon: "person-outline",            color: "#D97706" },
+  { key: "probleme_vehicule",   label: "Problème véhicule / panne",    icon: "bus-outline",               color: "#7C3AED" },
+  { key: "fraude",              label: "Suspicion de fraude",          icon: "shield-outline",            color: "#B91C1C" },
+  { key: "retard",              label: "Retard important",             icon: "time-outline",              color: "#0369A1" },
+  { key: "suggestion",          label: "Suggestion d'amélioration",    icon: "bulb-outline",              color: "#059669" },
+  { key: "autre",               label: "Autre",                        icon: "document-text-outline",     color: "#475569" },
 ];
 
 interface Report {
@@ -82,7 +82,7 @@ export default function RapportScreen() {
         method: "POST",
         body: { reportType, description: description.trim(), relatedId: relatedId.trim() || undefined },
       });
-      setSuccessMsg("✅ Rapport envoyé avec succès à la direction.");
+      setSuccessMsg("Rapport envoyé avec succès à la direction.");
       setReportType("");
       setDescription("");
       setRelatedId("");
@@ -101,7 +101,7 @@ export default function RapportScreen() {
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={S.headerTitle}>📋 Rapports</Text>
+          <Text style={S.headerTitle}>Rapports</Text>
           <Text style={S.headerSub}>Signaler un incident ou une suggestion</Text>
         </View>
       </View>
@@ -109,10 +109,12 @@ export default function RapportScreen() {
       {/* Tabs */}
       <View style={S.tabs}>
         <TouchableOpacity style={[S.tabBtn, tab === "creer" && S.tabBtnActive]} onPress={() => setTab("creer")}>
-          <Text style={[S.tabTxt, tab === "creer" && S.tabTxtActive]}>✍️ Nouveau</Text>
+          <Ionicons name="add-circle-outline" size={14} color={tab === "creer" ? "#fff" : "rgba(255,255,255,0.6)"} />
+          <Text style={[S.tabTxt, tab === "creer" && S.tabTxtActive]}>Nouveau</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[S.tabBtn, tab === "historique" && S.tabBtnActive]} onPress={() => setTab("historique")}>
-          <Text style={[S.tabTxt, tab === "historique" && S.tabTxtActive]}>📄 Historique</Text>
+          <Ionicons name="time-outline" size={14} color={tab === "historique" ? "#fff" : "rgba(255,255,255,0.6)"} />
+          <Text style={[S.tabTxt, tab === "historique" && S.tabTxtActive]}>Historique</Text>
         </TouchableOpacity>
       </View>
 
@@ -141,7 +143,7 @@ export default function RapportScreen() {
                   key={rt.key}
                   style={[S.typeOption, reportType === rt.key && { borderColor: rt.color, borderWidth: 2, backgroundColor: rt.color + "12" }]}
                   onPress={() => setReportType(rt.key)}>
-                  <Text style={{ fontSize: 20 }}>{rt.emoji}</Text>
+                  <Ionicons name={rt.icon} size={20} color={reportType === rt.key ? rt.color : "#9CA3AF"} />
                   <Text style={[S.typeLabel, { color: reportType === rt.key ? rt.color : "#374151" }]}>{rt.label}</Text>
                   {reportType === rt.key && <Ionicons name="checkmark-circle" size={20} color={rt.color} />}
                 </TouchableOpacity>
@@ -199,7 +201,7 @@ export default function RapportScreen() {
             </View>
           ) : reports.length === 0 ? (
             <View style={{ alignItems: "center", paddingTop: 50, gap: 12 }}>
-              <Text style={{ fontSize: 48 }}>📋</Text>
+              <Ionicons name="document-text-outline" size={52} color="#D1D5DB" />
               <Text style={{ fontSize: 16, fontWeight: "700", color: "#374151" }}>Aucun rapport envoyé</Text>
               <Text style={{ fontSize: 13, color: "#6B7280", textAlign: "center" }}>Vos rapports apparaîtront ici une fois soumis</Text>
             </View>
@@ -211,7 +213,7 @@ export default function RapportScreen() {
               <View key={report.id} style={S.reportCard}>
                 <View style={S.reportCardHeader}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={{ fontSize: 20 }}>{rt?.emoji ?? "📝"}</Text>
+                    <Ionicons name={rt?.icon ?? "document-text-outline"} size={20} color={rt?.color ?? "#374151"} />
                     <Text style={{ fontSize: 13, fontWeight: "700", color: rt?.color ?? "#374151", flex: 1 }}>{rt?.label ?? report.reportType}</Text>
                   </View>
                   <View style={{ backgroundColor: st.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
@@ -244,7 +246,7 @@ const S = StyleSheet.create({
   headerSub:   { color: "rgba(255,255,255,0.75)", fontSize: 12 },
 
   tabs:         { flexDirection: "row", backgroundColor: "#9F1239" },
-  tabBtn:       { flex: 1, paddingVertical: 12, alignItems: "center" },
+  tabBtn:       { flex: 1, paddingVertical: 12, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 },
   tabBtnActive: { borderBottomWidth: 3, borderColor: "#FECDD3" },
   tabTxt:       { fontSize: 14, color: "#FECDD3", fontWeight: "600" },
   tabTxtActive: { color: "#fff", fontWeight: "800" },

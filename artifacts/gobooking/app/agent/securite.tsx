@@ -132,7 +132,7 @@ export default function SecuriteScreen() {
               });
 
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              Alert.alert("✅ Alerte envoyée", `Votre alerte "${cfg.label}" a été transmise à la compagnie.`);
+              Alert.alert("Alerte envoyée", `Votre alerte "${cfg.label}" a été transmise à la compagnie.`);
               setMessage("");
               setSosTapped(false);
               fetchHistory();
@@ -161,7 +161,7 @@ export default function SecuriteScreen() {
           <Text style={styles.histBadgeText}>{cfg.label}</Text>
         </View>
         <Text style={styles.histDate}>{date}</Text>
-        {item.busName && <Text style={styles.histBus}>🚌 {item.busName}</Text>}
+        {item.busName && <Text style={styles.histBus}>{item.busName}</Text>}
         {item.message && <Text style={styles.histMsg}>"{item.message}"</Text>}
         <View style={[styles.histStatus, { backgroundColor: item.status === "resolved" ? "#D1FAE5" : "#FEE2E2" }]}>
           <Text style={{ fontSize: 11, fontWeight: "600", color: item.status === "resolved" ? "#059669" : "#DC2626" }}>

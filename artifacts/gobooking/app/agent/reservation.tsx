@@ -144,7 +144,7 @@ export default function AgentReservation() {
   /* ── Confirm ── */
   const confirmBooking = async (booking: OnlineBooking) => {
     const bagInfo = booking.baggageCount > 0
-      ? `\n🧳 Bagage : ${baggageTypeLabel(booking.baggageType).label} (×${booking.baggageCount})`
+      ? `\nBagage : ${baggageTypeLabel(booking.baggageType).label} (×${booking.baggageCount})`
       : "";
     Alert.alert(
       "Confirmer la réservation",
@@ -159,7 +159,7 @@ export default function AgentReservation() {
               method: "POST",
               body: {},
             });
-            Alert.alert("✅ Succès", `Réservation ${booking.bookingRef} confirmée${booking.baggageCount > 0 ? " avec le bagage" : ""} !`);
+            Alert.alert("Succès", `Réservation ${booking.bookingRef} confirmée${booking.baggageCount > 0 ? " avec le bagage" : ""} !`);
             await load(true);
           } catch (e: any) {
             Alert.alert("Erreur", e?.message ?? "Impossible de confirmer la réservation");
@@ -183,7 +183,7 @@ export default function AgentReservation() {
       });
       setCancelModal(null);
       setCancelReason("");
-      Alert.alert("❌ Annulée", `Réservation ${cancelModal.bookingRef} annulée. Le siège a été libéré.`);
+      Alert.alert("Annulée", `Réservation ${cancelModal.bookingRef} annulée. Le siège a été libéré.`);
       await load(true);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible d'annuler la réservation");
@@ -203,8 +203,8 @@ export default function AgentReservation() {
           <Text style={S.headerTitle}>Réservations</Text>
           <Text style={S.headerSub}>
             {lastSync
-              ? `🟢 Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
-              : `⏳ Chargement… · ${user?.name}`}
+              ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
+              : `Chargement… · ${user?.name}`}
           </Text>
         </View>
         <TouchableOpacity onPress={() => load()} style={S.refreshBtn}>
@@ -233,15 +233,16 @@ export default function AgentReservation() {
       {/* Filter chips */}
       <View style={S.filterRow}>
         {([
-          { key: "pending",   label: `⏳ En attente${pendingCount > 0 ? ` (${pendingCount})` : ""}` },
-          { key: "confirmed", label: "✅ Confirmées" },
-          { key: "all",       label: "📋 Toutes" },
+          { key: "pending",   label: `En attente${pendingCount > 0 ? ` (${pendingCount})` : ""}`, icon: "time-outline" as const },
+          { key: "confirmed", label: "Confirmées",  icon: "checkmark-circle-outline" as const },
+          { key: "all",       label: "Toutes",      icon: "list-outline" as const },
         ] as const).map(f => (
           <TouchableOpacity
             key={f.key}
             style={[S.chip, filter === f.key && S.chipActive]}
             onPress={() => setFilter(f.key)}
           >
+            <Ionicons name={f.icon} size={13} color={filter === f.key ? TEAL : "#6B7280"} />
             <Text style={[S.chipTxt, filter === f.key && S.chipTxtActive]}>{f.label}</Text>
           </TouchableOpacity>
         ))}
@@ -255,7 +256,7 @@ export default function AgentReservation() {
         </View>
       ) : displayed.length === 0 ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 10 }}>
-          <Text style={{ fontSize: 48 }}>🖥️</Text>
+          <Ionicons name="calendar-outline" size={52} color="#CBD5E1" />
           <Text style={{ fontSize: 16, fontWeight: "700", color: "#374151" }}>
             {filter === "pending" ? "Aucune réservation en attente" : "Aucune réservation"}
           </Text>
@@ -337,7 +338,7 @@ export default function AgentReservation() {
                     <Text style={S.clientName}>{b.passengers?.[0]?.name ?? "Client inconnu"}</Text>
                     {b.contactPhone ? (
                       <TouchableOpacity onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g, "")}`)} activeOpacity={0.7}>
-                        <Text style={S.clientPhone}>📞 {b.contactPhone}</Text>
+                        <Text style={S.clientPhone}>{b.contactPhone}</Text>
                       </TouchableOpacity>
                     ) : (
                       <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>Pas de téléphone</Text>
@@ -382,12 +383,12 @@ export default function AgentReservation() {
                 {b.trip && (b.trip.guichetSeats > 0 || b.trip.onlineSeats > 0) && (
                   <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
                     <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: "#16A34A", fontWeight: "700", marginBottom: 2 }}>🏢 Guichet</Text>
+                      <Text style={{ fontSize: 11, color: "#16A34A", fontWeight: "700", marginBottom: 2 }}>Guichet</Text>
                       <Text style={{ fontSize: 15, fontWeight: "900", color: "#166534" }}>{b.trip.guichetSeats}</Text>
                       <Text style={{ fontSize: 10, color: "#4ADE80" }}>places dispo</Text>
                     </View>
                     <View style={{ flex: 1, backgroundColor: TEAL_L, borderRadius: 10, padding: 10, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: TEAL, fontWeight: "700", marginBottom: 2 }}>🌐 En ligne</Text>
+                      <Text style={{ fontSize: 11, color: TEAL, fontWeight: "700", marginBottom: 2 }}>En ligne</Text>
                       <Text style={{ fontSize: 15, fontWeight: "900", color: "#164E63" }}>{b.trip.onlineSeats}</Text>
                       <Text style={{ fontSize: 10, color: TEAL }}>places dispo</Text>
                     </View>
@@ -432,7 +433,7 @@ export default function AgentReservation() {
                       ) : null}
                       {isPending && (
                         <Text style={S.baggageValidationNote}>
-                          ✅ Le bagage sera automatiquement validé à la confirmation de la réservation.
+                          Le bagage sera automatiquement validé à la confirmation de la réservation.
                         </Text>
                       )}
                     </View>
@@ -445,7 +446,7 @@ export default function AgentReservation() {
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                   <View style={{ backgroundColor: "#DBEAFE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
                     <Text style={{ fontSize: 11, color: "#1D4ED8", fontWeight: "700" }}>
-                      🌐 Réservation {b.bookingSource === "mobile" ? "Mobile" : "En ligne"}
+                      Réservation {b.bookingSource === "mobile" ? "Mobile" : "En ligne"}
                     </Text>
                   </View>
                   <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
@@ -510,7 +511,7 @@ export default function AgentReservation() {
         onPress={() => router.push("/agent/rapport" as never)}
       >
         <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
       </TouchableOpacity>
 
       {/* Cancel modal */}
@@ -587,7 +588,7 @@ const S = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: "#F3F4F6", marginVertical: 10 },
 
   filterRow:   { flexDirection: "row", gap: 8, paddingHorizontal: 14, paddingVertical: 12 },
-  chip:        { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E5E7EB" },
+  chip:        { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: "#fff", borderWidth: 1.5, borderColor: "#E5E7EB", flexDirection: "row", alignItems: "center", gap: 5 },
   chipActive:  { backgroundColor: TEAL, borderColor: TEAL },
   chipTxt:     { fontSize: 12, color: "#6B7280", fontWeight: "600" },
   chipTxtActive: { color: "#fff" },

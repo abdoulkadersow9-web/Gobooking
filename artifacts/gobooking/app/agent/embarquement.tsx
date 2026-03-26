@@ -529,7 +529,7 @@ export default function EmbarquementScreen() {
           type:     "refusé",
           ref:      e?.bookingRef ?? e?.ref,
           errorMsg: bTrip
-            ? `⚠️ Mauvais trajet !\nCe QR est pour ${bTrip.from} → ${bTrip.to} (${bTrip.departureTime}), pas pour le trajet sélectionné.`
+            ? `Mauvais trajet !\nCe QR est pour ${bTrip.from} → ${bTrip.to} (${bTrip.departureTime}), pas pour le trajet sélectionné.`
             : "Ce QR appartient à un autre trajet.",
         });
       } else {
@@ -690,9 +690,9 @@ export default function EmbarquementScreen() {
 
     /* Type badge label */
     const typeBadge =
-      scanResult.scanType === "colis"  ? "📦 COLIS"
-      : scanResult.scanType === "bagage" ? "🧳 BAGAGE"
-      : "🪑 PASSAGER";
+      scanResult.scanType === "colis"  ? "COLIS"
+      : scanResult.scanType === "bagage" ? "BAGAGE"
+      : "PASSAGER";
 
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: bgColor, alignItems: "center", justifyContent: "center" }} edges={["top", "bottom"]}>
@@ -856,7 +856,7 @@ export default function EmbarquementScreen() {
     return (
       <SafeAreaView edges={["top", "bottom"]} style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#fff", padding: 32 }}>
         <StatusBar barStyle="dark-content" />
-        <Text style={{ fontSize: 48 }}>🔒</Text>
+        <Ionicons name="lock-closed" size={52} color="#D1D5DB" />
         <Text style={{ fontSize: 20, fontWeight: "700", color: "#111827" }}>Accès non autorisé</Text>
         <Text style={{ fontSize: 14, color: "#6B7280", textAlign: "center" }}>Cet écran est réservé aux agents d'embarquement.</Text>
         <TouchableOpacity style={{ backgroundColor: G, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 10, marginTop: 8 }}
@@ -1551,7 +1551,7 @@ export default function EmbarquementScreen() {
         onPress={() => router.push("/agent/rapport" as never)}
       >
         <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>📋 Faire un rapport</Text>
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

@@ -162,7 +162,7 @@ export default function AgentHome() {
       {/* Header */}
       <LinearGradient colors={[NAVY, "#1A5C8A"]} style={S.header}>
         <View style={S.headerLeft}>
-          <Text style={S.headerHello}>Bonjour 👋</Text>
+          <Text style={S.headerHello}>Bonjour</Text>
           <Text style={S.headerName}>{user?.name ?? "Agent"}</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
             {roleLabel() && (
