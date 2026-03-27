@@ -11,71 +11,47 @@ import {
 
 import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
+const MIN_DISPLAY_MS = 900;
+
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
-  const [splashDone, setSplashDone] = useState(false);
+  const [minTimeDone, setMinTimeDone] = useState(false);
+  const navigatedRef = useRef(false);
 
-  /* ── Valeurs d'animation ── */
-  const logoOpacity   = useRef(new Animated.Value(0)).current;
-  const logoTranslateY = useRef(new Animated.Value(30)).current; // part de 30px plus bas
-  const textOpacity   = useRef(new Animated.Value(0)).current;
-  const textTranslateY = useRef(new Animated.Value(16)).current;
+  const logoOpacity    = useRef(new Animated.Value(0)).current;
+  const logoScale      = useRef(new Animated.Value(0.85)).current;
+  const textOpacity    = useRef(new Animated.Value(0)).current;
+  const textTranslateY = useRef(new Animated.Value(12)).current;
 
-  /* ── Animation au montage ── */
   useEffect(() => {
     Animated.sequence([
-      /* 1. Logo : fade in + légère montée */
       Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: false,
-        }),
-        Animated.timing(logoTranslateY, {
-          toValue: 0,
-          duration: 700,
-          useNativeDriver: false,
-        }),
+        Animated.timing(logoOpacity,  { toValue: 1, duration: 380, useNativeDriver: false }),
+        Animated.spring(logoScale,    { toValue: 1, tension: 80, friction: 7, useNativeDriver: false }),
       ]),
-      /* 2. Texte : même effet, légèrement décalé */
       Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: false,
-        }),
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: false,
-        }),
+        Animated.timing(textOpacity,    { toValue: 1, duration: 280, useNativeDriver: false }),
+        Animated.timing(textTranslateY, { toValue: 0, duration: 280, useNativeDriver: false }),
       ]),
     ]).start();
 
-    /* Timer splash : 2.5s */
-    const t = setTimeout(() => setSplashDone(true), 2500);
+    const t = setTimeout(() => setMinTimeDone(true), MIN_DISPLAY_MS);
     return () => clearTimeout(t);
   }, []);
 
-  /* ── Redirection quand timer + auth prêts ── */
   useEffect(() => {
-    if (!splashDone || isLoading) return;
+    if (!minTimeDone || isLoading || navigatedRef.current) return;
+    navigatedRef.current = true;
     if (user) {
       router.replace(getDashboardPath(user.role, user.agentRole) as never);
     } else {
       router.replace("/(auth)/login");
     }
-  }, [splashDone, isLoading, user]);
+  }, [minTimeDone, isLoading, user]);
 
   return (
     <View style={S.container}>
-      {/* Logo animé : fade in + montée */}
-      <Animated.View
-        style={{
-          opacity: logoOpacity,
-          transform: [{ translateY: logoTranslateY }],
-        }}
-      >
+      <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
         <Image
           source={require("../assets/logo.png")}
           style={S.logo}
@@ -83,7 +59,6 @@ export default function SplashScreen() {
         />
       </Animated.View>
 
-      {/* Texte animé : fade in + montée */}
       <Animated.View
         style={{
           opacity: textOpacity,
