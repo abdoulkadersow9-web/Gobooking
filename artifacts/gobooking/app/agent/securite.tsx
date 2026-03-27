@@ -47,7 +47,7 @@ const ALERT_CONFIG: Record<AlertType, {
 
 /* ─── Screen ─────────────────────────────────────────────────────────── */
 export default function SecuriteScreen() {
-  const { token, user } = useAuth();
+  const { token, user, logout } = useAuth();
   const insets           = useSafeAreaInsets();
 
   const [sending,   setSending]   = useState<AlertType | null>(null);
@@ -76,10 +76,14 @@ export default function SecuriteScreen() {
     try {
       const data = await apiFetch<AlertRecord[]>("/agent/alerts", { token: token ?? undefined });
       setHistory(data ?? []);
-    } catch { /* silent */ } finally {
+    } catch (e: any) {
+      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+        logout(); router.replace("/(auth)/login" as never); return;
+      }
+    } finally {
       setLoadHist(false);
     }
-  }, [token]);
+  }, [token, logout]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 

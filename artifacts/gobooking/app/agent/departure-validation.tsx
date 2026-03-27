@@ -103,7 +103,7 @@ const EXPENSE_TYPES = [
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function AgentDepartureValidation() {
-  const { user, token: authToken } = useAuth();
+  const { user, token: authToken, logout } = useAuth();
   const token = authToken ?? "";
   const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
 
@@ -145,11 +145,14 @@ export default function AgentDepartureValidation() {
       const r = await fetch(`${API}/agent/validation-depart/trips`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (r.status === 401 || r.status === 403) {
+        logout(); router.replace("/(auth)/login" as never); return;
+      }
       const data = await r.json();
       setTrips(Array.isArray(data) ? data : []);
     } catch { setTrips([]); }
     finally { setTL(false); setRefr(false); }
-  }, [token]);
+  }, [token, logout]);
 
   useEffect(() => { loadTrips(); }, [loadTrips]);
 

@@ -40,7 +40,7 @@ interface EarningsData {
 }
 
 export default function AgentGains() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const [data, setData]       = useState<EarningsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,8 +51,10 @@ export default function AgentGains() {
       if (isRefresh) setRefreshing(true);
       const res = await apiFetch<EarningsData>("/agent/earnings", { token: token ?? undefined });
       setData(res);
-    } catch {
-      /* keep existing data */
+    } catch (e: any) {
+      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+        logout(); router.replace("/(auth)/login" as never); return;
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
