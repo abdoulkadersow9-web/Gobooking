@@ -105,6 +105,18 @@ const ALL_MODULES = [
     border: "#67E8F9",
     roles: ["agent_reservation"],
   },
+  {
+    id: "bagage",
+    label: "Agent Bagage",
+    sub: "Enregistrement des bagages",
+    desc: "Scanner le billet, enregistrer le bagage, définir le prix, confirmer le paiement",
+    icon: "briefcase" as const,
+    path: "/agent/bagage",
+    color: "#92400E",
+    gradient: ["#FFFBEB", "#FEF3C7"] as [string, string],
+    border: "#FCD34D",
+    roles: ["bagage", "agent_bagage"],
+  },
 ];
 
 function useLiveClock() {
@@ -135,6 +147,7 @@ export default function AgentHome() {
     if (r === "agent_route" || r === "route") return "Agent En Route";
     if (r === "suivi") return "Agent Suivi";
     if (r === "agent_reservation") return "Agent Réservation";
+    if (r === "agent_bagage" || r === "bagage") return "Agent Bagage";
     return r;
   };
 

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -3527,6 +3527,214 @@ router.patch("/buses/:busId/update", async (req, res) => {
   } catch (err) {
     console.error("[agent/buses/update]", err);
     res.status(500).json({ error: "Erreur lors de la mise à jour" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE AGENT BAGAGE
+   GET  /agent/bagage/trips         — départs d'aujourd'hui avec nb bagages
+   GET  /agent/bagage/booking/:ref  — lookup passager par booking ref
+   GET  /agent/bagage/items/:tripId — liste des bagages pour un départ
+   POST /agent/bagage/items         — créer un bagage item + photo optionnelle
+   PATCH /agent/bagage/items/:id    — mettre à jour status
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/bagage/trips ─── */
+router.get("/bagage/trips", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId = agentRows[0]?.companyId ?? null;
+
+    const today     = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
+
+    let trips = companyId
+      ? await db.select().from(tripsTable).where(eq(tripsTable.companyId, companyId)).orderBy(desc(tripsTable.date)).limit(40)
+      : await db.select().from(tripsTable).orderBy(desc(tripsTable.date)).limit(20);
+
+    trips = trips.filter(t =>
+      (t.date === today || t.date === yesterday) &&
+      !["arrived", "cancelled"].includes(t.status ?? "")
+    );
+
+    const enriched = await Promise.all(trips.map(async (trip) => {
+      const bookings = await db.select().from(bookingsTable)
+        .where(and(
+          eq(bookingsTable.tripId, trip.id),
+          inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+        ));
+      const withBagage  = bookings.filter(b => (b as any).baggage_count > 0 || ((b.bagages as any[] ?? []).length > 0));
+      const bagageItems = await db.select().from(bagageItemsTable).where(eq(bagageItemsTable.tripId, trip.id));
+      return {
+        id:              trip.id,
+        from:            trip.from,
+        to:              trip.to,
+        date:            trip.date,
+        departureTime:   trip.departureTime,
+        busName:         trip.busName,
+        busType:         trip.busType,
+        status:          trip.status,
+        totalPassengers: bookings.length,
+        passengersWithBagage: withBagage.length,
+        bagageItemCount: bagageItems.length,
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("[bagage/trips]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/bagage/booking/:ref ─── */
+router.get("/bagage/booking/:ref", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const ref = req.params.ref?.trim().toUpperCase();
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.bookingRef, ref)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation non trouvée" }); return; }
+    const b = rows[0];
+
+    const userRow = await db.select().from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+    const tripRow = await db.select().from(tripsTable).where(eq(tripsTable.id, b.tripId)).limit(1);
+
+    const existingBagages = await db.select().from(bagageItemsTable)
+      .where(eq(bagageItemsTable.bookingId, b.id))
+      .orderBy(desc(bagageItemsTable.createdAt));
+
+    res.json({
+      bookingId:       b.id,
+      bookingRef:      b.bookingRef,
+      passengerName:   userRow[0]?.name ?? "Inconnu",
+      passengerPhone:  userRow[0]?.phone ?? "",
+      tripId:          b.tripId,
+      from:            tripRow[0]?.from ?? "",
+      to:              tripRow[0]?.to ?? "",
+      departureTime:   tripRow[0]?.departureTime ?? "",
+      date:            tripRow[0]?.date ?? "",
+      status:          b.status,
+      bagageStatus:    (b as any).bagage_status ?? "en_attente",
+      existingBagages: existingBagages,
+      declaresOnline:  (b as any).baggage_count > 0,
+      declarationType: (b as any).baggage_type ?? null,
+    });
+  } catch (err) {
+    console.error("[bagage/booking/:ref]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/bagage/items/:tripId ─── */
+router.get("/bagage/items/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const items = await db.select().from(bagageItemsTable)
+      .where(eq(bagageItemsTable.tripId, req.params.tripId))
+      .orderBy(desc(bagageItemsTable.createdAt));
+
+    res.json(items);
+  } catch (err) {
+    console.error("[bagage/items/:tripId]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/bagage/items ─── */
+router.post("/bagage/items", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { bookingId, tripId, passengerName, passengerPhone, bookingRef,
+            bagageType, description, weightKg, price, paymentMethod,
+            notes, photoBase64 } = req.body;
+
+    if (!bookingId || !tripId || !passengerName) {
+      res.status(400).json({ error: "bookingId, tripId, passengerName requis" });
+      return;
+    }
+
+    const agentRows  = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId  = agentRows[0]?.companyId ?? null;
+    const agentId    = user.id;
+
+    // Generate tracking ref
+    const prefix    = "BG";
+    const random    = Math.random().toString(36).toUpperCase().substr(2, 8);
+    const trackingRef = `${prefix}${random}`;
+
+    // Upload photo if provided
+    let photoUrl: string | null = null;
+    if (photoBase64) {
+      try {
+        const { uploadParcelPhoto } = await import("../lib/photoStorage");
+        photoUrl = await uploadParcelPhoto(photoBase64, `bagage_${trackingRef}`);
+      } catch (e) {
+        console.error("[bagage photo upload]", e);
+      }
+    }
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(bagageItemsTable).values({
+      id,
+      trackingRef,
+      bookingId,
+      tripId,
+      agentId,
+      companyId,
+      passengerName,
+      passengerPhone:   passengerPhone ?? null,
+      bookingRef:       bookingRef ?? null,
+      bagageType:       bagageType ?? "valise",
+      description:      description ?? null,
+      weightKg:         weightKg ?? null,
+      price:            price ?? 0,
+      paymentMethod:    paymentMethod ?? "espèces",
+      paymentStatus:    "payé",
+      photoUrl,
+      status:           "accepté",
+      notes:            notes ?? null,
+    } as any);
+
+    // Update booking bagage_status
+    await db.execute(sql`
+      UPDATE bookings SET bagage_status = 'accepté', bagage_price = ${price ?? 0}
+      WHERE id = ${bookingId}
+    `);
+
+    res.json({ success: true, id, trackingRef, photoUrl });
+  } catch (err) {
+    console.error("[bagage/items POST]", err);
+    res.status(500).json({ error: "Erreur lors de l'enregistrement du bagage" });
+  }
+});
+
+/* ─── PATCH /agent/bagage/items/:id ─── */
+router.patch("/bagage/items/:id", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { status, notes } = req.body;
+    await db.execute(sql`
+      UPDATE bagage_items
+      SET status = ${status ?? "accepté"},
+          notes  = ${notes ?? null}
+      WHERE id = ${req.params.id}
+    `);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[bagage/items PATCH]", err);
+    res.status(500).json({ error: "Erreur serveur" });
   }
 });
 

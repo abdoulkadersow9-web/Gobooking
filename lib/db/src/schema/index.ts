@@ -32,3 +32,4 @@ export * from "./fuel_logs";
 export * from "./trip_expenses";
 export * from "./departures";
 export * from "./agent_reports";
+export * from "./bagage_items";
