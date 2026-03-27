@@ -1,11 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Pressable,
   RefreshControl,
@@ -14,7 +13,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,6 +23,7 @@ import { apiFetch } from "@/utils/api";
 const INDIGO  = "#3730A3";
 const INDIGO2 = "#4F46E5";
 const LIGHT   = "#EEF2FF";
+const RED     = "#DC2626";
 
 const CI_CITIES = [
   "Abidjan","Bouaké","Yamoussoukro","Korhogo","San Pedro","Daloa","Man","Gagnoa",
@@ -32,52 +31,103 @@ const CI_CITIES = [
   "Aboisso","Sassandra","Tabou","Guiglo","Odienné","Séguéla","Katiola","Tiassalé",
 ];
 
-const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
-
 type Trip = {
   id: string; from_city: string; to_city: string; date: string;
   departure_time: string; arrival_time: string; status: string; price: number;
   bus_name: string; bus_id: string | null; total_seats: number;
   passenger_count: number; parcel_count: number;
 };
+
 type Bus = {
   id: string; bus_name: string; plate_number: string; bus_type: string;
-  capacity: number; availability_status: string;
+  capacity: number; availability_status: string; location_source?: string;
+  from_city?: string; to_city?: string;
+};
+
+type AuditLog = {
+  id: string; action: string; target_id: string; created_at: string;
+  old_data?: any; new_data?: any; reason?: string;
 };
 
 type FormState = {
   from: string; to: string; date: string;
   departureTime: string; arrivalTime: string;
-  price: string; busId: string;
+  price: string; busId: string; reason: string;
 };
 
 function today() { return new Date().toISOString().slice(0, 10); }
+
+function actionLabel(action: string): { label: string; icon: string; color: string } {
+  if (action === "chef_create_trip")       return { label: "Création de trajet",      icon: "plus-circle",  color: INDIGO2 };
+  if (action === "chef_modify_trip")       return { label: "Modification de trajet",   icon: "edit-2",       color: "#D97706" };
+  if (action === "chef_cancel_trip")       return { label: "Annulation de trajet",     icon: "x-circle",     color: RED };
+  if (action === "chef_emergency_transfer") return { label: "Transfert d'urgence",     icon: "alert-triangle", color: "#DC2626" };
+  return { label: action, icon: "activity", color: "#6B7280" };
+}
+
+function tripStatusInfo(s: string) {
+  if (s === "scheduled") return { label: "Programmé", color: "#D97706", bg: "#FEF3C7" };
+  if (s === "en_route")  return { label: "En route",  color: "#166534", bg: "#DCFCE7" };
+  if (s === "completed") return { label: "Arrivé",    color: "#6B7280", bg: "#F3F4F6" };
+  if (s === "cancelled") return { label: "Annulé",    color: RED,       bg: "#FEE2E2" };
+  return { label: s,   color: "#6B7280", bg: "#F3F4F6" };
+}
+
+function busAvailLabel(b: Bus): { label: string; color: string; bg: string; selectable: boolean } {
+  if (b.availability_status === "disponible" || b.availability_status === "en_attente")
+    return { label: "Disponible",   color: "#166534", bg: "#DCFCE7", selectable: true };
+  if (b.availability_status === "en_service")
+    return { label: `En route → ${b.to_city ?? "?"}`, color: "#D97706", bg: "#FEF3C7", selectable: false };
+  if (b.availability_status === "en_panne")
+    return { label: "En panne",     color: RED,       bg: "#FEE2E2", selectable: false };
+  if (b.availability_status === "en_maintenance")
+    return { label: "Maintenance",  color: "#6B7280", bg: "#F3F4F6", selectable: false };
+  if (b.availability_status === "affecté")
+    return { label: "Affecté",      color: "#7C3AED", bg: "#EDE9FE", selectable: false };
+  return     { label: b.availability_status, color: "#6B7280", bg: "#F3F4F6", selectable: true };
+}
 
 export default function ChefTrips() {
   const { token } = useAuth();
   const authToken = token ?? "";
 
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  /* ── État global ── */
+  const [trips,       setTrips]       = useState<Trip[]>([]);
+  const [buses,       setBuses]       = useState<Bus[]>([]);
+  const [auditLogs,   setAuditLogs]   = useState<AuditLog[]>([]);
+  const [agenceCity,  setAgenceCity]  = useState<string>("");
+  const [loading,     setLoading]     = useState(true);
+  const [refreshing,  setRefreshing]  = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [activeTab,   setActiveTab]   = useState<"trips" | "historique">("trips");
 
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  /* ── Modaux ── */
+  const [showForm,     setShowForm]     = useState(false);  // Créer / modifier
+  const [showTransfer, setShowTransfer] = useState(false);  // Transfert urgence
+  const [editId,       setEditId]       = useState<string | null>(null);
+  const [transferTripId, setTransferTripId] = useState<string | null>(null);
+
   const [form, setForm] = useState<FormState>({
     from: "", to: "", date: today(), departureTime: "07:00",
-    arrivalTime: "12:00", price: "", busId: "",
+    arrivalTime: "12:00", price: "", busId: "", reason: "",
   });
 
+  const [xferForm, setXferForm] = useState({
+    newBusId: "", location: "", detail: "",
+  });
+
+  /* ── Chargement données ── */
   const load = useCallback(async () => {
     try {
-      const [t, b] = await Promise.all([
+      const [t, b, a] = await Promise.all([
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
-        apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
+        apiFetch<{ buses: Bus[]; agenceCity: string }>("/agent/chef/available-buses", { token: authToken }),
+        apiFetch<{ logs: AuditLog[] }>("/agent/chef/audit-log", { token: authToken }),
       ]);
       setTrips(t.trips ?? []);
-      setBuses((b.buses ?? []).filter(b => b.availability_status === "disponible"));
+      setBuses(b.buses ?? []);
+      setAgenceCity(b.agenceCity ?? "");
+      setAuditLogs(a.logs ?? []);
     } catch (e: any) {
       console.error("[chef-trips]", e);
     } finally {
@@ -87,12 +137,12 @@ export default function ChefTrips() {
   }, [authToken]);
 
   useEffect(() => { load(); }, [load]);
-
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
+  /* ── Créer / Modifier un départ ── */
   function openCreate() {
     setEditId(null);
-    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "12:00", price: "", busId: "" });
+    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "12:00", price: "", busId: "", reason: "" });
     setShowForm(true);
   }
 
@@ -101,36 +151,34 @@ export default function ChefTrips() {
     setForm({
       from: trip.from_city, to: trip.to_city, date: trip.date,
       departureTime: trip.departure_time, arrivalTime: trip.arrival_time,
-      price: String(trip.price ?? ""), busId: trip.bus_id ?? "",
+      price: String(trip.price ?? ""), busId: trip.bus_id ?? "", reason: "",
     });
     setShowForm(true);
   }
 
   async function saveTrip() {
-    if (!form.from || !form.to || !form.date || !form.departureTime) {
+    if (!editId && (!form.from || !form.to || !form.date || !form.departureTime)) {
       Alert.alert("Champs manquants", "Veuillez remplir : départ, destination, date et heure.");
       return;
     }
-    if (form.from === form.to) {
+    if (!editId && form.from === form.to) {
       Alert.alert("Erreur", "La ville de départ et d'arrivée doivent être différentes.");
       return;
     }
-
     setSaving(true);
     try {
       if (editId) {
         await apiFetch(`/agent/chef/trips/${editId}`, {
           method: "PUT", token: authToken,
           body: JSON.stringify({
-            departureTime: form.departureTime,
-            arrivalTime: form.arrivalTime,
+            departureTime: form.departureTime, arrivalTime: form.arrivalTime,
             price: form.price ? Number(form.price) : undefined,
-            busId: form.busId || undefined,
+            busId: form.busId || undefined, reason: form.reason || undefined,
           }),
         });
         Alert.alert("Succès", "Départ modifié avec succès.");
       } else {
-        await apiFetch("/agent/chef/trips", {
+        const r = await apiFetch<any>("/agent/chef/trips", {
           method: "POST", token: authToken,
           body: JSON.stringify({
             from: form.from, to: form.to, date: form.date,
@@ -139,7 +187,7 @@ export default function ChefTrips() {
             busId: form.busId || undefined,
           }),
         });
-        Alert.alert("Départ programmé ✅", `${form.from} → ${form.to} le ${form.date} à ${form.departureTime}.\nLes agents de l'agence ont été notifiés.`);
+        Alert.alert("✅ Départ programmé", `${form.from} → ${form.to}\n${form.date} à ${form.departureTime}\nCar : ${r.busName ?? "À définir"}\nLes agents ont été notifiés.`);
       }
       setShowForm(false);
       load();
@@ -150,17 +198,19 @@ export default function ChefTrips() {
     }
   }
 
-  async function cancelTrip(tripId: string, route: string) {
+  /* ── Annuler un trajet ── */
+  function askCancelTrip(tripId: string, route: string) {
     Alert.alert(
       "Confirmer l'annulation",
-      `Annuler le départ ${route} ? Les passagers seront notifiés par SMS.`,
+      `Annuler le départ « ${route} » ?\n\nLes passagers seront notifiés par SMS.`,
       [
         { text: "Non", style: "cancel" },
         {
           text: "Annuler le départ", style: "destructive",
           onPress: async () => {
             try {
-              await apiFetch(`/agent/chef/trips/${tripId}`, { method: "DELETE", token: authToken });
+              await apiFetch(`/agent/chef/trips/${tripId}`, { method: "DELETE", token: authToken,
+                body: JSON.stringify({ reason: "Annulé par le chef d'agence" }) });
               load();
             } catch (e: any) {
               Alert.alert("Erreur", e.message ?? "Impossible d'annuler ce départ.");
@@ -171,20 +221,55 @@ export default function ChefTrips() {
     );
   }
 
-  function tripStatusInfo(s: string) {
-    if (s === "scheduled") return { label: "Programmé", color: "#D97706", bg: "#FEF3C7" };
-    if (s === "en_route")  return { label: "En route",  color: "#166534", bg: "#DCFCE7" };
-    if (s === "completed") return { label: "Arrivé",    color: "#6B7280", bg: "#F3F4F6" };
-    if (s === "cancelled") return { label: "Annulé",    color: "#DC2626", bg: "#FEE2E2" };
-    return { label: s, color: "#6B7280", bg: "#F3F4F6" };
+  /* ── Ouvrir le modal transfert d'urgence ── */
+  function openTransfer(tripId: string) {
+    setTransferTripId(tripId);
+    setXferForm({ newBusId: "", location: "", detail: "" });
+    setShowTransfer(true);
   }
 
+  /* ── Confirmer transfert d'urgence ── */
+  async function confirmTransfer() {
+    if (!xferForm.newBusId) {
+      Alert.alert("Car requis", "Veuillez sélectionner le car de remplacement.");
+      return;
+    }
+    if (!transferTripId) return;
+    setSaving(true);
+    try {
+      const r = await apiFetch<any>(`/agent/chef/trips/${transferTripId}/emergency-transfer`, {
+        method: "POST", token: authToken,
+        body: JSON.stringify({
+          newBusId: xferForm.newBusId,
+          location: xferForm.location || undefined,
+          detail:   xferForm.detail   || undefined,
+        }),
+      });
+      setShowTransfer(false);
+      Alert.alert(
+        "🚨 Transfert effectué",
+        `Ancien car : ${r.oldBus?.name ?? "—"}\nNouveau car : ${r.newBus?.name ?? "—"} (${r.newBus?.plate})\n\n${r.passengersNotified} passagers notifiés par SMS/push.\n${r.colisTransferred} colis conservés.`
+      );
+      load();
+    } catch (e: any) {
+      Alert.alert("Erreur transfert", e.message ?? "Une erreur s'est produite.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ── Grouper les trajets par date ── */
   const grouped: { [date: string]: Trip[] } = {};
   trips.filter(t => t.status !== "cancelled").forEach(t => {
     if (!grouped[t.date]) grouped[t.date] = [];
     grouped[t.date].push(t);
   });
   const sortedDates = Object.keys(grouped).sort();
+
+  const availableBuses = buses.filter(b => {
+    const info = busAvailLabel(b);
+    return info.selectable;
+  });
 
   if (loading) {
     return (
@@ -198,7 +283,7 @@ export default function ChefTrips() {
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFF" }} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={INDIGO} />
 
-      {/* Header */}
+      {/* ── Header ── */}
       <LinearGradient colors={[INDIGO, INDIGO2]} style={s.header}>
         <View style={s.headerRow}>
           <Pressable onPress={() => router.back()} style={s.backBtn}>
@@ -206,11 +291,20 @@ export default function ChefTrips() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={s.headerTitle}>Gestion des départs</Text>
-            <Text style={s.headerSub}>{trips.filter(t => t.status !== "cancelled").length} trajet(s) en vue</Text>
+            {agenceCity ? <Text style={s.headerSub}>Agence de {agenceCity}</Text> : null}
           </View>
           <Pressable style={s.addBtn} onPress={openCreate}>
             <Feather name="plus" size={20} color={INDIGO2} />
           </Pressable>
+        </View>
+
+        {/* Tabs */}
+        <View style={s.tabBar}>
+          {([["trips","Départs"],["historique","Historique"]] as const).map(([key, label]) => (
+            <Pressable key={key} style={[s.tab, activeTab === key && s.tabActive]} onPress={() => setActiveTab(key)}>
+              <Text style={[s.tabText, activeTab === key && s.tabTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
         </View>
       </LinearGradient>
 
@@ -219,107 +313,169 @@ export default function ChefTrips() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={INDIGO2} />}
         contentContainerStyle={{ paddingBottom: 100, paddingTop: 8 }}
       >
-        {sortedDates.length === 0 ? (
-          <View style={s.emptyState}>
-            <Feather name="calendar" size={48} color="#9CA3AF" />
-            <Text style={s.emptyTitle}>Aucun départ programmé</Text>
-            <Text style={s.emptyText}>Programmez votre premier départ en appuyant sur le bouton ci-dessous.</Text>
-            <Pressable style={s.emptyBtn} onPress={openCreate}>
-              <Feather name="plus-circle" size={16} color="white" />
-              <Text style={s.emptyBtnText}>Programmer un départ</Text>
-            </Pressable>
-          </View>
-        ) : (
-          sortedDates.map(dateKey => {
-            const dateLabel = dateKey === today()
-              ? "Aujourd'hui — " + new Date(dateKey).toLocaleDateString("fr-CI", { day: "numeric", month: "long" })
-              : new Date(dateKey).toLocaleDateString("fr-CI", { weekday: "long", day: "numeric", month: "long" });
-            return (
-              <View key={dateKey} style={{ marginTop: 16, paddingHorizontal: 16 }}>
-                <Text style={s.dateHeader}>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</Text>
-                {grouped[dateKey].map(trip => {
-                  const st = tripStatusInfo(trip.status);
-                  const pct = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
-                  const canEdit   = trip.status === "scheduled";
-                  const canCancel = trip.status === "scheduled";
-                  return (
-                    <View key={trip.id} style={s.tripCard}>
-                      <View style={s.tripTop}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
-                          <View style={s.tripMeta}>
-                            <Feather name="clock" size={12} color="#6B7280" />
-                            <Text style={s.tripMetaText}>{trip.departure_time}</Text>
-                            <Feather name="truck" size={12} color="#6B7280" />
-                            <Text style={s.tripMetaText}>{trip.bus_name}</Text>
+        {/* ──── TAB : DÉPARTS ──── */}
+        {activeTab === "trips" && (
+          <>
+            {sortedDates.length === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="calendar" size={48} color="#9CA3AF" />
+                <Text style={s.emptyTitle}>Aucun départ programmé</Text>
+                <Text style={s.emptyText}>Appuyez sur « + » pour programmer un premier départ.</Text>
+                <Pressable style={s.emptyBtn} onPress={openCreate}>
+                  <Feather name="plus-circle" size={16} color="white" />
+                  <Text style={s.emptyBtnText}>Programmer un départ</Text>
+                </Pressable>
+              </View>
+            ) : (
+              sortedDates.map(dateKey => {
+                const dateLabel = dateKey === today()
+                  ? "Aujourd'hui — " + new Date(dateKey).toLocaleDateString("fr-CI", { day: "numeric", month: "long" })
+                  : new Date(dateKey).toLocaleDateString("fr-CI", { weekday: "long", day: "numeric", month: "long" });
+
+                return (
+                  <View key={dateKey} style={{ marginTop: 16, paddingHorizontal: 16 }}>
+                    <Text style={s.dateHeader}>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</Text>
+
+                    {grouped[dateKey].map(trip => {
+                      const st  = tripStatusInfo(trip.status);
+                      const pct = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
+                      const canEdit     = trip.status === "scheduled";
+                      const canCancel   = trip.status === "scheduled";
+                      const canTransfer = trip.status === "en_route" || trip.status === "scheduled";
+
+                      return (
+                        <View key={trip.id} style={s.tripCard}>
+                          <View style={s.tripTop}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
+                              <View style={s.tripMeta}>
+                                <Feather name="clock" size={12} color="#6B7280" />
+                                <Text style={s.tripMetaText}>{trip.departure_time}</Text>
+                                <Feather name="truck" size={12} color="#6B7280" />
+                                <Text style={s.tripMetaText}>{trip.bus_name}</Text>
+                              </View>
+                            </View>
+                            <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
+                              <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
+                            </View>
+                          </View>
+
+                          {/* Stats */}
+                          <View style={s.tripStats}>
+                            <View style={s.tripStatItem}>
+                              <Feather name="users" size={14} color={INDIGO2} />
+                              <Text style={s.tripStatVal}>{trip.passenger_count}</Text>
+                              <Text style={s.tripStatLabel}>pax</Text>
+                            </View>
+                            <View style={s.tripStatItem}>
+                              <Feather name="package" size={14} color="#7C3AED" />
+                              <Text style={s.tripStatVal}>{trip.parcel_count}</Text>
+                              <Text style={s.tripStatLabel}>colis</Text>
+                            </View>
+                            <View style={s.tripStatItem}>
+                              <Feather name="bar-chart-2" size={14} color="#166534" />
+                              <Text style={s.tripStatVal}>{trip.total_seats - trip.passenger_count}</Text>
+                              <Text style={s.tripStatLabel}>libres</Text>
+                            </View>
+                          </View>
+
+                          {/* Barre remplissage */}
+                          <View style={s.fillBg}>
+                            <View style={[s.fillBar, {
+                              width: `${Math.min(100, pct)}%`,
+                              backgroundColor: pct >= 90 ? RED : pct >= 60 ? "#D97706" : "#166534",
+                            }]} />
+                          </View>
+                          <Text style={s.fillLabel}>{Math.round(pct)}% rempli</Text>
+
+                          {/* Actions */}
+                          <View style={s.tripActions}>
+                            {canEdit && (
+                              <Pressable style={[s.actionBtn, { backgroundColor: LIGHT, borderColor: INDIGO2 }]} onPress={() => openEdit(trip)}>
+                                <Feather name="edit-2" size={13} color={INDIGO2} />
+                                <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Modifier</Text>
+                              </Pressable>
+                            )}
+                            {canTransfer && (
+                              <Pressable style={[s.actionBtn, { backgroundColor: "#FEF2F2", borderColor: RED }]} onPress={() => openTransfer(trip.id)}>
+                                <Feather name="alert-triangle" size={13} color={RED} />
+                                <Text style={[s.actionBtnText, { color: RED }]}>Panne</Text>
+                              </Pressable>
+                            )}
+                            {canCancel && (
+                              <Pressable style={[s.actionBtn, { backgroundColor: "#FEE2E2", borderColor: "#B91C1C" }]}
+                                onPress={() => askCancelTrip(trip.id, `${trip.from_city} → ${trip.to_city}`)}>
+                                <Feather name="x-circle" size={13} color="#B91C1C" />
+                                <Text style={[s.actionBtnText, { color: "#B91C1C" }]}>Annuler</Text>
+                              </Pressable>
+                            )}
                           </View>
                         </View>
-                        <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
-                          <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
-                        </View>
-                      </View>
+                      );
+                    })}
+                  </View>
+                );
+              })
+            )}
+          </>
+        )}
 
-                      {/* Stats */}
-                      <View style={s.tripStats}>
-                        <View style={s.tripStatItem}>
-                          <Feather name="users" size={14} color={INDIGO2} />
-                          <Text style={s.tripStatVal}>{trip.passenger_count}</Text>
-                          <Text style={s.tripStatLabel}>passagers</Text>
-                        </View>
-                        <View style={s.tripStatItem}>
-                          <Feather name="package" size={14} color="#7C3AED" />
-                          <Text style={s.tripStatVal}>{trip.parcel_count}</Text>
-                          <Text style={s.tripStatLabel}>colis</Text>
-                        </View>
-                        <View style={s.tripStatItem}>
-                          <Feather name="bar-chart-2" size={14} color="#166534" />
-                          <Text style={s.tripStatVal}>{trip.total_seats - trip.passenger_count}</Text>
-                          <Text style={s.tripStatLabel}>places libres</Text>
-                        </View>
-                      </View>
-
-                      {/* Barre remplissage */}
-                      <View style={s.fillBg}>
-                        <View style={[s.fillBar, {
-                          width: `${Math.min(100, pct)}%`,
-                          backgroundColor: pct >= 90 ? "#DC2626" : pct >= 60 ? "#D97706" : "#166534",
-                        }]} />
-                      </View>
-                      <Text style={s.fillLabel}>{Math.round(pct)}% rempli</Text>
-
-                      {/* Actions */}
-                      {(canEdit || canCancel) && (
-                        <View style={s.tripActions}>
-                          {canEdit && (
-                            <Pressable style={[s.actionBtn, { backgroundColor: LIGHT, borderColor: INDIGO2 }]} onPress={() => openEdit(trip)}>
-                              <Feather name="edit-2" size={14} color={INDIGO2} />
-                              <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Modifier</Text>
-                            </Pressable>
-                          )}
-                          {canCancel && (
-                            <Pressable style={[s.actionBtn, { backgroundColor: "#FEE2E2", borderColor: "#DC2626" }]}
-                              onPress={() => cancelTrip(trip.id, `${trip.from_city} → ${trip.to_city}`)}>
-                              <Feather name="x-circle" size={14} color="#DC2626" />
-                              <Text style={[s.actionBtnText, { color: "#DC2626" }]}>Annuler</Text>
-                            </Pressable>
-                          )}
+        {/* ──── TAB : HISTORIQUE ──── */}
+        {activeTab === "historique" && (
+          <View style={{ paddingHorizontal: 16, marginTop: 16 }}>
+            <Text style={s.sectionTitle}>Journal des actions</Text>
+            {auditLogs.length === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="clock" size={36} color="#9CA3AF" />
+                <Text style={s.emptyText}>Aucune action enregistrée pour l'instant.</Text>
+              </View>
+            ) : (
+              auditLogs.map(log => {
+                const info = actionLabel(log.action);
+                const date = new Date(log.created_at).toLocaleDateString("fr-CI", {
+                  day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                });
+                return (
+                  <View key={log.id} style={s.auditCard}>
+                    <View style={[s.auditIcon, { backgroundColor: info.color + "18" }]}>
+                      <Feather name={info.icon as any} size={16} color={info.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.auditAction, { color: info.color }]}>{info.label}</Text>
+                      <Text style={s.auditDate}>{date}</Text>
+                      {log.reason && <Text style={s.auditReason}>Motif : {log.reason}</Text>}
+                      {log.old_data && (
+                        <View style={s.auditDiff}>
+                          <View style={[s.auditDiffBox, { backgroundColor: "#FEE2E2" }]}>
+                            <Text style={s.auditDiffLabel}>Avant</Text>
+                            <Text style={s.auditDiffText}>{JSON.stringify(log.old_data, null, 1).slice(0, 120)}</Text>
+                          </View>
+                          <Feather name="arrow-right" size={14} color="#9CA3AF" />
+                          <View style={[s.auditDiffBox, { backgroundColor: "#DCFCE7", flex: 1 }]}>
+                            <Text style={s.auditDiffLabel}>Après</Text>
+                            <Text style={s.auditDiffText}>{JSON.stringify(log.new_data, null, 1).slice(0, 120)}</Text>
+                          </View>
                         </View>
                       )}
                     </View>
-                  );
-                })}
-              </View>
-            );
-          })
+                  </View>
+                );
+              })
+            )}
+          </View>
         )}
       </ScrollView>
 
       {/* FAB */}
-      <Pressable style={s.fab} onPress={openCreate}>
-        <Feather name="plus" size={24} color="white" />
-      </Pressable>
+      {activeTab === "trips" && (
+        <Pressable style={s.fab} onPress={openCreate}>
+          <Feather name="plus" size={24} color="white" />
+        </Pressable>
+      )}
 
-      {/* ── Modal formulaire départ ── */}
+      {/* ═══════════════════════════════════════════════════════════
+           MODAL : Créer / Modifier un départ
+         ═══════════════════════════════════════════════════════════ */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFF" }} edges={["top"]}>
           <LinearGradient colors={[INDIGO, INDIGO2]} style={s.modalHeader}>
@@ -332,37 +488,30 @@ export default function ChefTrips() {
 
           <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-            {/* Ville de départ */}
             {!editId && (
               <>
                 <Text style={s.label}>Ville de départ *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {CI_CITIES.map(c => (
-                      <Pressable key={c}
-                        style={[s.cityChip, form.from === c && s.cityChipActive]}
-                        onPress={() => setForm(f => ({ ...f, from: c }))}>
-                        <Text style={[s.cityChipText, form.from === c && s.cityChipActiveText]}>{c}</Text>
+                      <Pressable key={c} style={[s.chip, form.from === c && s.chipActive]} onPress={() => setForm(f => ({ ...f, from: c }))}>
+                        <Text style={[s.chipText, form.from === c && s.chipActiveText]}>{c}</Text>
                       </Pressable>
                     ))}
                   </View>
                 </ScrollView>
 
-                {/* Ville d'arrivée */}
                 <Text style={s.label}>Destination *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {CI_CITIES.filter(c => c !== form.from).map(c => (
-                      <Pressable key={c}
-                        style={[s.cityChip, form.to === c && s.cityChipActive]}
-                        onPress={() => setForm(f => ({ ...f, to: c }))}>
-                        <Text style={[s.cityChipText, form.to === c && s.cityChipActiveText]}>{c}</Text>
+                      <Pressable key={c} style={[s.chip, form.to === c && s.chipActive]} onPress={() => setForm(f => ({ ...f, to: c }))}>
+                        <Text style={[s.chipText, form.to === c && s.chipActiveText]}>{c}</Text>
                       </Pressable>
                     ))}
                   </View>
                 </ScrollView>
 
-                {/* Date */}
                 <Text style={s.label}>Date du départ *</Text>
                 <TextInput
                   style={s.input} value={form.date} placeholder="AAAA-MM-JJ"
@@ -372,35 +521,28 @@ export default function ChefTrips() {
               </>
             )}
 
-            {/* Heure de départ */}
             <Text style={s.label}>Heure de départ *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {["05:00","06:00","07:00","08:00","09:00","10:00","12:00","13:00","14:00","15:00","16:00","18:00","20:00"].map(h => (
-                  <Pressable key={h}
-                    style={[s.timeChip, form.departureTime === h && s.timeChipActive]}
-                    onPress={() => setForm(f => ({ ...f, departureTime: h }))}>
+                  <Pressable key={h} style={[s.timeChip, form.departureTime === h && s.timeChipActive]} onPress={() => setForm(f => ({ ...f, departureTime: h }))}>
                     <Text style={[s.timeChipText, form.departureTime === h && { color: "white" }]}>{h}</Text>
                   </Pressable>
                 ))}
               </View>
             </ScrollView>
 
-            {/* Heure d'arrivée */}
             <Text style={s.label}>Heure d'arrivée estimée</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {["06:00","07:00","08:00","09:00","10:00","11:00","12:00","14:00","16:00","18:00","20:00","22:00"].map(h => (
-                  <Pressable key={h}
-                    style={[s.timeChip, form.arrivalTime === h && s.timeChipActive]}
-                    onPress={() => setForm(f => ({ ...f, arrivalTime: h }))}>
+                  <Pressable key={h} style={[s.timeChip, form.arrivalTime === h && s.timeChipActive]} onPress={() => setForm(f => ({ ...f, arrivalTime: h }))}>
                     <Text style={[s.timeChipText, form.arrivalTime === h && { color: "white" }]}>{h}</Text>
                   </Pressable>
                 ))}
               </View>
             </ScrollView>
 
-            {/* Prix */}
             <Text style={s.label}>Tarif (FCFA)</Text>
             <TextInput
               style={s.input} value={form.price} placeholder="Ex : 2500"
@@ -408,63 +550,163 @@ export default function ChefTrips() {
               onChangeText={v => setForm(f => ({ ...f, price: v }))}
             />
 
-            {/* Car */}
-            <Text style={s.label}>Car affecté</Text>
+            {/* Car — cars de l'agence uniquement */}
+            <Text style={s.label}>Car de l'agence{agenceCity ? ` (${agenceCity})` : ""}</Text>
             {buses.length === 0 ? (
-              <View style={[s.input, { justifyContent: "center" }]}>
-                <Text style={{ color: "#9CA3AF" }}>Aucun car disponible — tous sont en service</Text>
+              <View style={[s.input, s.inputCenter]}>
+                <Text style={{ color: "#9CA3AF" }}>Aucun car disponible dans l'agence</Text>
               </View>
             ) : (
-              <>
-                <Pressable
-                  style={[s.input, { justifyContent: "center" }]}
-                  onPress={() => setForm(f => ({ ...f, busId: "" }))}>
-                  <Text style={{ color: !form.busId ? INDIGO2 : "#9CA3AF" }}>
-                    {form.busId ? buses.find(b => b.id === form.busId)?.bus_name ?? "Sélectionner un car"
-                      : "— Pas de car pour l'instant —"}
-                  </Text>
-                </Pressable>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8, marginBottom: 16 }}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {buses.map(b => (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                  <Pressable
+                    style={[s.busChip, !form.busId && s.busChipActive]}
+                    onPress={() => setForm(f => ({ ...f, busId: "" }))}>
+                    <Text style={[s.busChipText, !form.busId && { color: "white" }]}>Sans car</Text>
+                  </Pressable>
+                  {buses.map(b => {
+                    const avail = busAvailLabel(b);
+                    const selected = form.busId === b.id;
+                    const disabled = !avail.selectable;
+                    return (
                       <Pressable key={b.id}
-                        style={[s.busChip, form.busId === b.id && s.busChipActive]}
-                        onPress={() => setForm(f => ({ ...f, busId: b.id }))}>
-                        <Feather name="truck" size={13} color={form.busId === b.id ? "white" : INDIGO2} />
-                        <Text style={[s.busChipText, form.busId === b.id && { color: "white" }]}>
-                          {b.bus_name} · {b.capacity} places
-                        </Text>
-                        <Text style={[{ fontSize: 10, color: form.busId === b.id ? "#C7D2FE" : "#9CA3AF" }]}>
-                          {b.plate_number}
-                        </Text>
+                        style={[s.busChip, selected && s.busChipActive, disabled && { opacity: 0.45 }]}
+                        onPress={() => { if (!disabled) setForm(f => ({ ...f, busId: b.id })); }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <Feather name="truck" size={13} color={selected ? "white" : INDIGO2} />
+                          <Text style={[s.busChipText, selected && { color: "white" }]}>{b.bus_name}</Text>
+                        </View>
+                        <Text style={{ fontSize: 10, color: selected ? "#C7D2FE" : "#9CA3AF" }}>{b.plate_number} · {b.capacity} pl.</Text>
+                        <View style={[{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, alignSelf: "flex-start", backgroundColor: avail.bg }]}>
+                          <Text style={{ fontSize: 9, color: avail.color, fontWeight: "700" }}>{avail.label}</Text>
+                        </View>
+                        {b.location_source === "affecté_agence" && (
+                          <Text style={{ fontSize: 9, color: "#6366F1" }}>⭐ Affecté à l'agence</Text>
+                        )}
                       </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+
+            {editId && (
+              <>
+                <Text style={s.label}>Motif de la modification</Text>
+                <TextInput
+                  style={[s.input, { minHeight: 70 }]}
+                  value={form.reason} placeholder="Ex : Retard fournisseur, changement de car…"
+                  placeholderTextColor="#9CA3AF" multiline
+                  onChangeText={v => setForm(f => ({ ...f, reason: v }))}
+                />
               </>
             )}
 
-            {/* Résumé */}
             {!editId && form.from && form.to && form.date && (
               <View style={s.summary}>
                 <Feather name="navigation" size={16} color={INDIGO2} />
                 <Text style={s.summaryText}>
-                  {form.from} → {form.to}{"  "}
-                  le {form.date}{"  "}
-                  à {form.departureTime}
-                  {form.busId && `\nCar : ${buses.find(b => b.id === form.busId)?.bus_name}`}
+                  {form.from} → {form.to}{"  "}le {form.date}{"  "}à {form.departureTime}
+                  {form.busId ? `\nCar : ${buses.find(b => b.id === form.busId)?.bus_name}` : ""}
                 </Text>
               </View>
             )}
 
-            {/* Bouton save */}
             <Pressable style={[s.saveBtn, saving && { opacity: 0.7 }]} onPress={saveTrip} disabled={saving}>
-              {saving ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
+              {saving ? <ActivityIndicator color="white" size="small" /> : (
                 <>
                   <Feather name="check-circle" size={18} color="white" />
                   <Text style={s.saveBtnText}>{editId ? "Enregistrer les modifications" : "Programmer ce départ"}</Text>
+                </>
+              )}
+            </Pressable>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════
+           MODAL : Transfert d'urgence (panne)
+         ═══════════════════════════════════════════════════════════ */}
+      <Modal visible={showTransfer} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#FFF5F5" }} edges={["top"]}>
+          <LinearGradient colors={["#991B1B", "#DC2626"]} style={s.modalHeader}>
+            <Pressable onPress={() => setShowTransfer(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color="white" />
+            </Pressable>
+            <Text style={s.modalTitle}>🚨 Transfert d'urgence</Text>
+            <View style={{ width: 30 }} />
+          </LinearGradient>
+
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            {/* Avertissement */}
+            <View style={s.alertBox}>
+              <Feather name="alert-triangle" size={20} color="#DC2626" />
+              <View style={{ flex: 1 }}>
+                <Text style={s.alertTitle}>Car en panne — Action irréversible</Text>
+                <Text style={s.alertText}>L'ancien car sera marqué EN PANNE. Tous les passagers et colis resteront sur le trajet. Les passagers seront notifiés par SMS et push.</Text>
+              </View>
+            </View>
+
+            {/* Lieu de la panne */}
+            <Text style={s.label}>Lieu de la panne</Text>
+            <TextInput
+              style={s.input} value={xferForm.location}
+              placeholder="Ex : Entrée de Bouaké, axe Yamoussoukro…"
+              placeholderTextColor="#9CA3AF"
+              onChangeText={v => setXferForm(f => ({ ...f, location: v }))}
+            />
+
+            {/* Détail */}
+            <Text style={s.label}>Détail de la panne</Text>
+            <TextInput
+              style={[s.input, { minHeight: 70 }]}
+              value={xferForm.detail}
+              placeholder="Ex : Pneu crevé, moteur, accident…"
+              placeholderTextColor="#9CA3AF" multiline
+              onChangeText={v => setXferForm(f => ({ ...f, detail: v }))}
+            />
+
+            {/* Car de remplacement — disponibles seulement */}
+            <Text style={s.label}>Car de remplacement *</Text>
+            <Text style={s.labelSub}>Cars disponibles dans l'agence {agenceCity ? `(${agenceCity})` : ""}</Text>
+            {availableBuses.length === 0 ? (
+              <View style={[s.input, s.inputCenter, { borderColor: RED }]}>
+                <Feather name="alert-circle" size={18} color={RED} />
+                <Text style={{ color: RED, marginTop: 4 }}>Aucun car disponible dans l'agence actuellement</Text>
+              </View>
+            ) : (
+              availableBuses.map(b => {
+                const selected = xferForm.newBusId === b.id;
+                return (
+                  <Pressable key={b.id}
+                    style={[s.busCard, selected && s.busCardSelected]}
+                    onPress={() => setXferForm(f => ({ ...f, newBusId: b.id }))}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={[s.busIconSmall, { backgroundColor: selected ? "#DC262620" : "#F3F4F6" }]}>
+                        <Feather name="truck" size={18} color={selected ? RED : "#6B7280"} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.busCardName, selected && { color: RED }]}>{b.bus_name}</Text>
+                        <Text style={s.busCardMeta}>{b.plate_number} · {b.bus_type} · {b.capacity} places</Text>
+                        {b.location_source === "affecté_agence" && (
+                          <Text style={s.busCardSub}>⭐ Affecté à l'agence</Text>
+                        )}
+                      </View>
+                      {selected && <Feather name="check-circle" size={20} color={RED} />}
+                    </View>
+                  </Pressable>
+                );
+              })
+            )}
+
+            <Pressable
+              style={[s.saveBtn, { backgroundColor: RED, marginTop: 16 }, (saving || !xferForm.newBusId) && { opacity: 0.6 }]}
+              onPress={confirmTransfer}
+              disabled={saving || !xferForm.newBusId}>
+              {saving ? <ActivityIndicator color="white" size="small" /> : (
+                <>
+                  <Feather name="alert-triangle" size={18} color="white" />
+                  <Text style={s.saveBtnText}>Confirmer le transfert d'urgence</Text>
                 </>
               )}
             </Pressable>
@@ -476,16 +718,20 @@ export default function ChefTrips() {
 }
 
 const s = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 20 },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 0 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
   backBtn: { padding: 8, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 10 },
   headerTitle: { fontSize: 18, fontWeight: "800", color: "white" },
   headerSub: { fontSize: 12, color: "#A5B4FC", marginTop: 1 },
-  addBtn: {
-    width: 36, height: 36, borderRadius: 10,
-    backgroundColor: "white", justifyContent: "center", alignItems: "center",
-  },
+  addBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
 
+  tabBar: { flexDirection: "row", gap: 4, paddingBottom: 0 },
+  tab: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: "transparent" },
+  tabActive: { borderBottomColor: "white" },
+  tabText: { fontSize: 14, fontWeight: "600", color: "rgba(255,255,255,0.6)" },
+  tabTextActive: { color: "white" },
+
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },
   dateHeader: { fontSize: 13, fontWeight: "700", color: INDIGO2, marginBottom: 8, textTransform: "capitalize" },
 
   tripCard: {
@@ -499,76 +745,73 @@ const s = StyleSheet.create({
   tripMetaText: { fontSize: 12, color: "#6B7280", marginRight: 6 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: "700" },
-
   tripStats: { flexDirection: "row", gap: 16, marginBottom: 10 },
   tripStatItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   tripStatVal: { fontSize: 14, fontWeight: "700", color: "#111827" },
   tripStatLabel: { fontSize: 11, color: "#9CA3AF" },
-
   fillBg: { height: 5, backgroundColor: "#F3F4F6", borderRadius: 4, overflow: "hidden" },
   fillBar: { height: 5, borderRadius: 4 },
   fillLabel: { fontSize: 10, color: "#9CA3AF", marginTop: 3 },
-
-  tripActions: { flexDirection: "row", gap: 8, marginTop: 12 },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5 },
+  tripActions: { flexDirection: "row", gap: 6, marginTop: 12, flexWrap: "wrap" },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1.5 },
   actionBtnText: { fontSize: 12, fontWeight: "700" },
 
-  emptyState: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, marginTop: 40 },
+  emptyState: { alignItems: "center", padding: 40, marginTop: 20 },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#374151", marginTop: 12 },
   emptyText: { fontSize: 14, color: "#9CA3AF", textAlign: "center", marginTop: 6, lineHeight: 20 },
   emptyBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: INDIGO2, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, marginTop: 20 },
   emptyBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
 
+  auditCard: { flexDirection: "row", gap: 12, backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: "#F3F4F6" },
+  auditIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  auditAction: { fontSize: 14, fontWeight: "700" },
+  auditDate: { fontSize: 11, color: "#9CA3AF", marginTop: 2 },
+  auditReason: { fontSize: 12, color: "#6B7280", marginTop: 4, fontStyle: "italic" },
+  auditDiff: { flexDirection: "row", gap: 8, marginTop: 8, alignItems: "center" },
+  auditDiffBox: { flex: 1, borderRadius: 8, padding: 8 },
+  auditDiffLabel: { fontSize: 10, fontWeight: "700", color: "#6B7280", marginBottom: 2 },
+  auditDiffText: { fontSize: 10, color: "#374151", fontFamily: "monospace" },
+
   fab: {
     position: "absolute", bottom: 28, right: 20,
-    width: 58, height: 58, borderRadius: 29,
-    backgroundColor: INDIGO2, justifyContent: "center", alignItems: "center",
+    width: 58, height: 58, borderRadius: 29, backgroundColor: INDIGO2,
+    justifyContent: "center", alignItems: "center",
     shadowColor: INDIGO, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
   },
 
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16 },
   modalTitle: { fontSize: 17, fontWeight: "800", color: "white" },
+  label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
+  labelSub: { fontSize: 11, color: "#9CA3AF", marginBottom: 8, marginTop: -4 },
+  input: { backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: "#111827", marginBottom: 14 },
+  inputCenter: { justifyContent: "center", alignItems: "center", gap: 6 },
 
-  label: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 8 },
-  input: {
-    backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB",
-    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: "#111827", marginBottom: 16,
-  },
-
-  cityChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB",
-  },
-  cityChipActive: { backgroundColor: INDIGO2, borderColor: INDIGO2 },
-  cityChipText: { fontSize: 13, fontWeight: "600", color: "#374151" },
-  cityChipActiveText: { color: "white" },
-
-  timeChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
-    backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB",
-  },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB" },
+  chipActive: { backgroundColor: INDIGO2, borderColor: INDIGO2 },
+  chipText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  chipActiveText: { color: "white" },
+  timeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB" },
   timeChipActive: { backgroundColor: INDIGO2, borderColor: INDIGO2 },
   timeChipText: { fontSize: 13, fontWeight: "700", color: "#374151" },
 
-  busChip: {
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-    backgroundColor: LIGHT, borderWidth: 1.5, borderColor: "#C7D2FE",
-    gap: 5, alignItems: "flex-start",
-  },
+  busChip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: LIGHT, borderWidth: 1.5, borderColor: "#C7D2FE", gap: 4, alignItems: "flex-start" },
   busChipActive: { backgroundColor: INDIGO2, borderColor: INDIGO },
   busChipText: { fontSize: 13, fontWeight: "700", color: INDIGO2 },
 
-  summary: {
-    backgroundColor: LIGHT, borderRadius: 14, padding: 14,
-    flexDirection: "row", gap: 10, alignItems: "flex-start", marginBottom: 16,
-    borderWidth: 1, borderColor: "#C7D2FE",
-  },
+  busCard: { backgroundColor: "white", borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 2, borderColor: "#E5E7EB" },
+  busCardSelected: { borderColor: RED, backgroundColor: "#FFF5F5" },
+  busIconSmall: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  busCardName: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  busCardMeta: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  busCardSub: { fontSize: 11, color: "#6366F1", marginTop: 2 },
+
+  alertBox: { flexDirection: "row", gap: 12, backgroundColor: "#FEE2E2", borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: "#FECACA" },
+  alertTitle: { fontSize: 14, fontWeight: "700", color: "#DC2626" },
+  alertText: { fontSize: 12, color: "#7F1D1D", marginTop: 4, lineHeight: 18 },
+
+  summary: { backgroundColor: LIGHT, borderRadius: 14, padding: 14, flexDirection: "row", gap: 10, alignItems: "flex-start", marginBottom: 14, borderWidth: 1, borderColor: "#C7D2FE" },
   summaryText: { fontSize: 14, color: INDIGO, fontWeight: "600", lineHeight: 20, flex: 1 },
 
-  saveBtn: {
-    backgroundColor: INDIGO2, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 10, paddingVertical: 16, borderRadius: 16, marginTop: 8,
-  },
+  saveBtn: { backgroundColor: INDIGO2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16, marginTop: 8 },
   saveBtnText: { color: "white", fontSize: 16, fontWeight: "800" },
 });

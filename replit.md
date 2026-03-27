@@ -4,7 +4,7 @@
 GoBooking is a full-stack mobile bus ticket booking application designed to streamline bus travel. It connects passengers with bus operators, facilitating ticket purchases and parcel deliveries. The platform aims to modernize inter-city travel, enhance user convenience, and provide robust management tools for transport companies and agents. Key capabilities include real-time bus search, seat selection, secure payment processing, parcel tracking, and role-based dashboards for different user types.
 
 ## User Preferences
-I want iterative development. I want to be asked before making major changes. I prefer detailed explanations. Do not make changes to the folder `Z`. Do not make changes to the file `Y`.
+Iterative development. Detailed explanations. Mobile icons: Ionicons or Feather ONLY. Admin web: lucide-react ONLY. API port: 8080. All routes under `/api`. Password hash: SHA-256 `password + "gobooking_salt_2024"`. Token pattern: `const { user, token: authToken } = useAuth(); const token = authToken ?? "";`.
 
 ## System Architecture
 
