@@ -117,6 +117,18 @@ const ALL_MODULES = [
     border: "#FCD34D",
     roles: ["bagage", "agent_bagage"],
   },
+  {
+    id: "validation_depart",
+    label: "Validation Départ",
+    sub: "Bordereau · Dépenses · Départ",
+    desc: "Synthèse passagers, bagages, colis, dépenses — valider le départ en route",
+    icon: "check-square" as const,
+    path: "/agent/departure-validation",
+    color: "#4338CA",
+    gradient: ["#EEF2FF", "#E0E7FF"] as [string, string],
+    border: "#A5B4FC",
+    roles: ["validation_depart", "agent_validation_depart"],
+  },
 ];
 
 function useLiveClock() {

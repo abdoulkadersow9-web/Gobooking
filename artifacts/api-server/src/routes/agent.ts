@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -3735,6 +3735,271 @@ router.patch("/bagage/items/:id", async (req, res) => {
   } catch (err) {
     console.error("[bagage/items PATCH]", err);
     res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULE AGENT VALIDATION DÉPART
+   GET  /agent/validation-depart/trips          — départs du jour à valider
+   GET  /agent/validation-depart/trip/:tripId   — bordereau complet
+   POST /agent/validation-depart/expenses       — ajouter dépense
+   POST /agent/validation-depart/validate/:id   — valider le départ
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/validation-depart/trips ─── */
+router.get("/validation-depart/trips", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId = agentRows[0]?.companyId ?? null;
+
+    const today     = new Date().toISOString().split("T")[0];
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
+
+    let trips = companyId
+      ? await db.select().from(tripsTable).where(eq(tripsTable.companyId, companyId)).orderBy(desc(tripsTable.date)).limit(50)
+      : await db.select().from(tripsTable).orderBy(desc(tripsTable.date)).limit(30);
+
+    trips = trips.filter(t =>
+      (t.date === today || t.date === yesterday) &&
+      !["arrived", "cancelled"].includes(t.status ?? "")
+    );
+
+    const enriched = await Promise.all(trips.map(async (trip) => {
+      const bookings = await db.select().from(bookingsTable).where(and(
+        eq(bookingsTable.tripId, trip.id),
+        inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé", "absent"])
+      ));
+      const boarded   = bookings.filter(b => ["boarded", "validated"].includes(b.status ?? ""));
+      const absents   = bookings.filter(b => ["confirmed", "payé", "absent"].includes(b.status ?? ""));
+      const bagages   = await db.select().from(bagageItemsTable).where(eq(bagageItemsTable.tripId, trip.id));
+      const colis     = await db.select().from(parcelsTable).where(and(
+        eq(parcelsTable.tripId, trip.id),
+        inArray(parcelsTable.status as any, ["en_gare", "chargé_bus", "en_transit"])
+      ));
+      const expenses  = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.tripId, trip.id));
+      const totalExp  = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+      return {
+        id: trip.id, from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName, busType: trip.busType,
+        status: trip.status,
+        totalPassengers: bookings.length,
+        boardedCount:    boarded.length,
+        absentCount:     absents.length,
+        bagageCount:     bagages.length,
+        colisCount:      colis.length,
+        expenseTotal:    totalExp,
+        isValidated:     trip.status === "en_route",
+      };
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error("[validation-depart/trips]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/validation-depart/trip/:tripId ─── */
+router.get("/validation-depart/trip/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    const bookings = await db.select().from(bookingsTable).where(and(
+      eq(bookingsTable.tripId, tripId),
+      inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé", "absent"])
+    ));
+
+    const passengerDetails = await Promise.all(bookings.map(async (b) => {
+      const uRows = await db.select({ name: usersTable.name, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+      return {
+        bookingId:  b.id,
+        bookingRef: b.bookingRef,
+        name:       uRows[0]?.name ?? "Inconnu",
+        phone:      uRows[0]?.phone ?? "",
+        status:     b.status,
+        seatNums:   b.seatNumbers ?? [],
+        price:      (b as any).total_price ?? (b as any).totalPrice ?? 0,
+        bagageStatus: (b as any).bagage_status ?? null,
+      };
+    }));
+
+    const bagages = await db.select().from(bagageItemsTable).where(eq(bagageItemsTable.tripId, tripId));
+    const colis   = await db.select().from(parcelsTable).where(and(
+      eq(parcelsTable.tripId, tripId),
+      inArray(parcelsTable.status as any, ["en_gare", "chargé_bus", "en_transit"])
+    ));
+    const expenses = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.tripId, tripId));
+
+    const boarded  = passengerDetails.filter(p => ["boarded","validated"].includes(p.status ?? ""));
+    const absents  = passengerDetails.filter(p => ["confirmed","payé","absent"].includes(p.status ?? ""));
+    const totalBagageRevenue = bagages.reduce((s, b) => s + (b.price ?? 0), 0);
+    const totalColisRevenue  = colis.reduce((s, c) => s + (c.amount ?? 0), 0);
+    const totalExpenses      = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+    const totalPassengerRevenue = boarded.reduce((s, p) => s + (p.price ?? 0), 0);
+
+    res.json({
+      trip: {
+        id: trip.id, from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName, busType: trip.busType, status: trip.status,
+      },
+      passengers:    passengerDetails,
+      boarded,
+      absents,
+      bagages,
+      colis,
+      expenses,
+      summary: {
+        totalPassengers:       passengerDetails.length,
+        boardedCount:          boarded.length,
+        absentCount:           absents.length,
+        bagageCount:           bagages.length,
+        colisCount:            colis.length,
+        totalPassengerRevenue,
+        totalBagageRevenue,
+        totalColisRevenue,
+        totalExpenses,
+        netRevenue: totalPassengerRevenue + totalBagageRevenue + totalColisRevenue - totalExpenses,
+      },
+    });
+  } catch (err) {
+    console.error("[validation-depart/trip/:id]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/validation-depart/expenses ─── */
+router.post("/validation-depart/expenses", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId, type, amount, description } = req.body;
+    if (!tripId || !amount) { res.status(400).json({ error: "tripId et amount requis" }); return; }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const companyId = agentRows[0]?.companyId;
+    if (!companyId) { res.status(400).json({ error: "Agent sans compagnie" }); return; }
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(tripExpensesTable).values({
+      id, companyId, tripId,
+      type:        type ?? "autre",
+      amount:      parseInt(amount),
+      description: description ?? null,
+    } as any);
+
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error("[validation-depart/expenses]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/validation-depart/validate/:tripId ─── */
+router.post("/validation-depart/validate/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    if (trip.status === "en_route") {
+      res.status(400).json({ error: "Ce départ est déjà validé" }); return;
+    }
+
+    /* 1. Set trip en_route */
+    await db.execute(sql`UPDATE trips SET status = 'en_route', started_at = NOW() WHERE id = ${tripId}`);
+
+    /* 2. Mark absent passengers (confirmed but not boarded) */
+    await db.execute(sql`
+      UPDATE bookings SET status = 'absent'
+      WHERE trip_id = ${tripId}
+        AND status IN ('confirmed', 'payé')
+    `);
+
+    /* 3. Transition colis en_gare → en_transit */
+    await db.execute(sql`
+      UPDATE parcels SET status = 'en_transit', status_updated_at = NOW()
+      WHERE trip_id = ${tripId}
+        AND status IN ('en_gare', 'chargé_bus')
+    `);
+
+    /* 4. Mark bagage items as chargé */
+    await db.execute(sql`
+      UPDATE bagage_items SET status = 'chargé'
+      WHERE trip_id = ${tripId}
+        AND status = 'accepté'
+    `);
+
+    /* 5. Build bordereau for response */
+    const bookings  = await db.select().from(bookingsTable).where(eq(bookingsTable.tripId, tripId));
+    const bagages   = await db.select().from(bagageItemsTable).where(eq(bagageItemsTable.tripId, tripId));
+    const colis     = await db.select().from(parcelsTable).where(eq(parcelsTable.tripId, tripId));
+    const expenses  = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.tripId, tripId));
+
+    const boarded   = bookings.filter(b => ["boarded","validated"].includes(b.status ?? ""));
+    const absents   = bookings.filter(b => b.status === "absent");
+
+    /* 6. Notify boarded passengers */
+    for (const b of boarded) {
+      const uRows = await db.select({ pushToken: usersTable.pushToken })
+        .from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+      sendExpoPush(
+        uRows[0]?.pushToken,
+        `🚌 GoBooking — Départ en cours`,
+        `Votre bus ${trip.from} → ${trip.to} est en route ! Bon voyage.`
+      ).catch(() => {});
+    }
+
+    /* 7. Audit */
+    auditLog(
+      { userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_VALIDATE ?? "DEPARTURE_VALIDATED", tripId, "trip",
+      { from: trip.from, to: trip.to, boardedCount: boarded.length, absentCount: absents.length,
+        bagageCount: bagages.length, colisCount: colis.length }
+    ).catch(() => {});
+
+    const totalBagageRevenue = bagages.reduce((s, b) => s + (b.price ?? 0), 0);
+    const totalColisRevenue  = colis.reduce((s, c) => s + (c.amount ?? 0), 0);
+    const totalExpenses      = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+    res.json({
+      success: true,
+      message: `Départ ${trip.from} → ${trip.to} validé`,
+      bordereau: {
+        tripId, from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName,
+        boardedCount: boarded.length,
+        absentCount:  absents.length,
+        bagageCount:  bagages.length,
+        colisCount:   colis.length,
+        totalBagageRevenue,
+        totalColisRevenue,
+        totalExpenses,
+        validatedAt: new Date().toISOString(),
+        validatedBy: user.name,
+      }
+    });
+  } catch (err) {
+    console.error("[validation-depart/validate]", err);
+    res.status(500).json({ error: "Erreur lors de la validation" });
   }
 });
 

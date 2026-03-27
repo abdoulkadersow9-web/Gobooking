@@ -42,7 +42,10 @@ I want iterative development. I want to be asked before making major changes. I 
     - **Remote Parcels**: Client-initiated parcel requests with photo upload, agent validation, and optional home delivery.
     - **Baggage Review**: For agents to validate passenger baggage, including photo viewing.
 - **Agent System**:
-    - **Roles**: `agent_ticket` (sales), `agent_embarquement` (boarding), `agent_colis` (parcel handling), `logistique`, `route`, `suivi`, `agent_reservation`.
+    - **Roles**: `agent_ticket` (sales), `agent_embarquement` (boarding), `agent_colis` (parcel handling), `logistique`, `route`, `suivi`, `agent_reservation`, `bagage` (Module 2), `validation_depart` (Module 3).
+    - **Module 2 — Agent Bagage**: `bagage_items` table; 5 API endpoints `/agent/bagage/*`; 4-step flow (departures → passenger lookup → form → QR ticket); color `#92400E`.
+    - **Module 3 — Agent Validation Départ**: `departure-validation.tsx`; 4 API endpoints `/agent/validation-depart/*`; full bordereau (passengers, absents, bagages + photos, colis + photos, expenses); VALIDATE button → trips.status='en_route', colis→en_transit, push notifications; color `#4338CA` indigo.
+    - **Demo accounts** (password `test123`): `agent@test.com`, `embarquement@test.com`, `reservation@test.com`, `colis@test.com`, `logistique@test.com`, `suivi@test.com`, `compagnie@test.com`, `admin@test.com`, `bagage@test.com`, `validepart@test.com`.
     - **Dashboards**: Role-specific dashboards with dedicated functionalities and UI themes.
     - **Reporting**: System for agents to submit various types of reports (incidents, problems, suggestions).
 - **Company Management**: Dashboards for company administrators to manage buses, routes, agents, and view analytics.
