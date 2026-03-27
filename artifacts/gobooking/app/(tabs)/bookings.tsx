@@ -564,7 +564,7 @@ export default function BookingsScreen() {
               onVoucherRequest={handleVoucherRequest}
             />
           )}
-          contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}
+          contentContainerStyle={{ padding: 18, paddingBottom: bottomPad }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -600,36 +600,36 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:  { fontSize: 23, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.4 },
-  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
+  header:       { paddingHorizontal: 22, paddingBottom: 22, paddingTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:  { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
+  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
   historyBtn:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
   historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  filterBar:         { backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, maxHeight: 56 },
-  filterBarContent:  { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row", alignItems: "center" },
-  filterTab:         { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "transparent" },
+  filterBar:         { backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, maxHeight: 60 },
+  filterBarContent:  { paddingHorizontal: 18, paddingVertical: 14, gap: 10, flexDirection: "row", alignItems: "center" },
+  filterTab:         { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "transparent" },
   filterTabActive:   { backgroundColor: "#EEF4FF", borderColor: "#1650D0" },
   filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
-  card:         { backgroundColor: Colors.light.card, borderRadius: 20, padding: 18, marginBottom: 14, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
+  card:         { backgroundColor: Colors.light.card, borderRadius: 22, padding: 20, marginBottom: 16, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: "#F1F5F9" },
   cardPressed:  { transform: [{ scale: 0.985 }] },
   cardExpired:  { borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
   cardCancelled:{ borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
-  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   refText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.text },
   dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
-  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
   cityBlock:    { flex: 1 },
-  timeText:     { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.5 },
-  cityText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 3 },
+  timeText:     { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.5 },
+  cityText:     { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 4 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
-  routeLine:    { width: 24, height: 1.5, backgroundColor: Colors.light.border },
+  routeLine:    { width: 28, height: 1.5, backgroundColor: Colors.light.border },
 
   rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 5, backgroundColor: "#EFF6FF", borderRadius: 8, padding: 8, marginTop: 6, borderWidth: 1, borderColor: "#BFDBFE" },
   rule45Text:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1 },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
   amountText:   { fontSize: 17, fontFamily: "Inter_700Bold" },
 
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12, borderRadius: 14, paddingVertical: 14, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderRadius: 16, paddingVertical: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
   waitingRow:   { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, borderRadius: 10, padding: 10 },
   waitingText:  { fontSize: 11, fontFamily: "Inter_500Medium", flex: 1 },

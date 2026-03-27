@@ -280,7 +280,7 @@ export default function ColisScreen() {
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           refreshControl={
             token
               ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
@@ -344,22 +344,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 18,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 22,
+    gap: 14,
   },
   headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 2 },
+  headerTitle: { fontSize: 24, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 3 },
   sendBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 7,
     backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
   sendBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
 
@@ -370,16 +370,16 @@ const styles = StyleSheet.create({
   },
   filterScroll: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    gap: 10,
   },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: "#E2E8F0",
@@ -401,22 +401,22 @@ const styles = StyleSheet.create({
   chipCountText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#64748B" },
   chipCountTextActive: { color: "white" },
 
-  list: { padding: 16, paddingTop: 12, paddingBottom: 130 },
+  list: { padding: 18, paddingTop: 14, paddingBottom: 130 },
   listEmpty: { flex: 1 },
 
   row: {
     flexDirection: "row",
     backgroundColor: "white",
-    borderRadius: 18,
+    borderRadius: 22,
     overflow: "hidden",
-    shadowColor: "#0B3C5D",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    elevation: 4,
   },
   strip: { width: 5 },
-  rowBody: { flex: 1, padding: 16, gap: 10 },
+  rowBody: { flex: 1, padding: 18, gap: 12 },
 
   rowTop: {
     flexDirection: "row",
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10, fontFamily: "Inter_700Bold" },
 
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  city: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  city: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A" },
   routeConnector: { flex: 1, flexDirection: "row", alignItems: "center", gap: 3 },
   routeDash: { flex: 1, height: 1.5, backgroundColor: "#E2E8F0" },
 
