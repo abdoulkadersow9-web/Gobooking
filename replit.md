@@ -52,7 +52,7 @@ I want iterative development. I want to be asked before making major changes. I 
     - **Reporting**: System for agents to submit various types of reports (incidents, problems, suggestions).
 - **Company Management**: Dashboards for company administrators to manage buses, routes, agents, and view analytics.
 - **Super Admin**: Global platform oversight, managing companies, users, cities, and financial analytics including a commission and invoicing system.
-- **Notifications**: In-app notification system with filtering.
+- **Notifications**: In-app notification system with filtering. Module 6 adds real-time polling alerts: pre-departure alerts (≤5 min before departure, pushed by scheduler every minute) and validation_complete notifications, displayed via `AlertBanner` in `home.tsx`, `tickets.tsx`, and `departure-validation.tsx`. Live trip stats (boarding, baggage, parcels, expenses) refresh every 30s in the Impression tab via `useTripLive`. New endpoints: `GET /agent/realtime/alerts`, `GET /agent/realtime/trip/:tripId`.
 - **Payment & Currency**: Supports various mobile money (Orange Money, MTN MoMo, Wave) and card payments (Visa/Mastercard) in FCFA.
 
 ### Project Structure

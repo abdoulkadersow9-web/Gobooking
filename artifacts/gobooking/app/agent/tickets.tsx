@@ -10,6 +10,8 @@ import { router } from "expo-router";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useAuth } from "@/context/AuthContext";
+import AlertBanner from "@/components/AlertBanner";
+import { useRealtime, useTripLive } from "@/hooks/useRealtime";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -214,6 +216,9 @@ export default function TicketsScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
 
+  /* ── Module 6 — Temps réel ── */
+  const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
+
   /* ── Tab ── */
   const [activeTab, setActiveTab] = useState<"vente" | "depart" | "impression">("vente");
 
@@ -250,6 +255,8 @@ export default function TicketsScreen() {
   const [impLoading, setImpLoading]       = useState(false);
   const [impRefreshing, setImpRefr]       = useState(false);
   const [impSelTrip, setImpSelTrip]       = useState<TripSummary | null>(null);
+  // Polling live stats pour le trajet sélectionné (Impression tab)
+  const liveStats = useTripLive(impSelTrip?.id, token, activeTab === "impression" && !!impSelTrip);
   const [bordereau, setBordereau]         = useState<BordereauFull | null>(null);
   const [bordeLoading, setBordeLoading]   = useState(false);
   // expense modal
@@ -612,6 +619,17 @@ export default function TicketsScreen() {
           <Text style={[S.tabTxt, activeTab === "impression" && S.tabTxtActive]}>Impression</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Alertes temps réel — Module 6 */}
+      <AlertBanner
+        preDepartureAlerts={preDepartureAlerts}
+        validationAlerts={validationAlerts}
+        agentRole={realtimeRole}
+        onAction={(_tripId, type) => {
+          if (type === "pre_departure") setActiveTab("depart");
+          else setActiveTab("impression");
+        }}
+      />
 
       {/* ══════════════ TAB: VENTE ══════════════ */}
       {activeTab === "vente" && (
@@ -1081,16 +1099,16 @@ export default function TicketsScreen() {
                 </TouchableOpacity>
               ) : (
                 <>
-                  {/* Stats */}
+                  {/* Stats — préférer liveStats (polling 30s) sur bordereau.summary */}
                   <View style={{ flexDirection: "row", gap: 8 }}>
                     {[
-                      { label: "Embarqués", val: bordereau.summary.boardedCount, color: "#059669" },
-                      { label: "Absents",   val: bordereau.summary.absentCount,  color: G },
-                      { label: "Bagages",   val: bordereau.summary.bagageCount,  color: G_DARK },
-                      { label: "Colis",     val: bordereau.summary.colisCount,   color: "#4338CA" },
+                      { label: "Embarqués", val: liveStats.boardedCount  ?? bordereau.summary.boardedCount, color: "#059669" },
+                      { label: "Absents",   val: liveStats.absentCount   ?? bordereau.summary.absentCount,  color: G },
+                      { label: "Bagages",   val: liveStats.bagageCount   ?? bordereau.summary.bagageCount,  color: G_DARK },
+                      { label: "Colis",     val: liveStats.colisCount    ?? bordereau.summary.colisCount,   color: "#4338CA" },
                     ].map(s => (
                       <View key={s.label} style={[S.card, { flex: 1, alignItems: "center", padding: 10, borderTopWidth: 3, borderTopColor: s.color }]}>
-                        <Text style={{ fontSize: 20, fontWeight: "900", color: s.color }}>{s.val}</Text>
+                        <Text style={{ fontSize: 20, fontWeight: "900", color: s.color }}>{s.val ?? 0}</Text>
                         <Text style={{ fontSize: 10, fontWeight: "600", color: "#6B7280", marginTop: 2 }}>{s.label}</Text>
                       </View>
                     ))}

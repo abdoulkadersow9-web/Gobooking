@@ -63,10 +63,11 @@ async function pushAndStore(
 
 // ─── In-memory dédup (évite les doublons de notifications) ───────────────────
 
-const sentLowSeat     = new Set<string>(); // tripId
-const sentDeparture   = new Set<string>(); // tripId
-const sentParcelAlert = new Set<string>(); // parcelId
-const sentNoShow      = new Set<string>(); // bookingId
+const sentLowSeat         = new Set<string>(); // tripId
+const sentDeparture       = new Set<string>(); // tripId
+const sentParcelAlert     = new Set<string>(); // parcelId
+const sentNoShow          = new Set<string>(); // bookingId
+const sentAgentPreDepart  = new Set<string>(); // `${tripId}_${userId}`
 
 // ─── 1. Alertes places restantes < 5 ─────────────────────────────────────────
 
@@ -404,6 +405,65 @@ async function checkPendingExpiry() {
   }
 }
 
+// ─── 8. Alertes pré-départ pour les agents (≤ 5 min avant départ) ────────────
+//
+//  Agents concernés : agent_ticket | bagage | agent_colis | agent_embarquement | validation_depart
+//  Message : "Agent, veuillez valider votre départ" ou "L'agent de validation attend…"
+//  Envoyé 1 seule fois par agent/trajet (dédup mémoire sentAgentPreDepart).
+
+const PRE_DEPART_ROLES = [
+  "agent_ticket", "bagage", "agent_colis",
+  "agent_embarquement", "validation_depart",
+];
+
+async function checkPreDepartureAgentAlerts() {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const trips = await db
+    .select()
+    .from(tripsTable)
+    .where(and(eq(tripsTable.date, today), eq(tripsTable.status, "scheduled")));
+
+  for (const trip of trips) {
+    if (!trip.companyId) continue;
+    const minsLeft = minutesUntil(tripDepartureDate(trip));
+
+    // Fenêtre : entre 0 et 5 min avant le départ
+    if (minsLeft > 5 || minsLeft < -1) continue;
+
+    const companyAgents = await db
+      .select({ userId: agentsTable.userId, agentRole: agentsTable.agentRole })
+      .from(agentsTable)
+      .where(and(
+        eq(agentsTable.companyId, trip.companyId),
+        inArray(agentsTable.agentRole, PRE_DEPART_ROLES),
+      ));
+
+    for (const agent of companyAgents) {
+      const dedupKey = `${trip.id}_${agent.userId}`;
+      if (sentAgentPreDepart.has(dedupKey)) continue;
+      sentAgentPreDepart.add(dedupKey);
+
+      const [userRow] = await db
+        .select({ pushToken: usersTable.pushToken })
+        .from(usersTable)
+        .where(eq(usersTable.id, agent.userId))
+        .limit(1);
+
+      const minsLabel = Math.max(0, Math.round(minsLeft));
+      const isValidation = agent.agentRole === "validation_depart";
+
+      const title   = `🚨 Départ dans ${minsLabel} min — ${trip.from} → ${trip.to}`;
+      const message = isValidation
+        ? `L'agent de validation attend validation pour le départ de ${trip.from} → ${trip.to} à ${trip.departureTime}.`
+        : `Agent, veuillez valider votre départ ${trip.from} → ${trip.to} prévu à ${trip.departureTime}.`;
+
+      await pushAndStore(agent.userId, userRow?.pushToken, "pre_departure_alert", title, message, trip.id, "trip");
+      console.log(`[Scheduler] 🚨 Alerte pré-départ → ${agent.agentRole} (${agent.userId}) | trajet ${trip.id}`);
+    }
+  }
+}
+
 // ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 export function startScheduler(intervalMs = 30_000) {
@@ -421,6 +481,7 @@ export function startScheduler(intervalMs = 30_000) {
         autoConfirmBookings(),
         checkPendingExpiry(),
         checkBusAnomalies(),
+        checkPreDepartureAgentAlerts(),
       ]);
     } catch (err) {
       console.error("[Scheduler] Erreur générale:", err);

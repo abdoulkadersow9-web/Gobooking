@@ -27,6 +27,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import AlertBanner from "@/components/AlertBanner";
+import { useRealtime } from "@/hooks/useRealtime";
 import {
   generateBordereauEntreprise,
   generateBordereauRoute,
@@ -100,6 +102,7 @@ const EXPENSE_TYPES = [
 export default function AgentDepartureValidation() {
   const { user } = useAuth();
   const token = (user as any)?.token ?? "";
+  const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
 
   const [tab, setTab] = useState<"departs" | "bordereau">("departs");
 
@@ -793,6 +796,17 @@ export default function AgentDepartureValidation() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Alertes temps réel — Module 6 */}
+      <AlertBanner
+        preDepartureAlerts={preDepartureAlerts}
+        validationAlerts={validationAlerts}
+        agentRole={realtimeRole}
+        onAction={(tripId, type) => {
+          if (type === "pre_departure") setTab("departs");
+          else setTab("bordereau");
+        }}
+      />
 
       <View style={{ flex: 1 }}>
         {tab === "departs" ? renderDeparts() : renderBordereau()}

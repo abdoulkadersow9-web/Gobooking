@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth, hasRole } from "@/context/AuthContext";
+import AlertBanner from "@/components/AlertBanner";
+import { useRealtime } from "@/hooks/useRealtime";
 
 const GREEN   = "#166534";
 const AMBER   = "#D97706";
@@ -147,6 +149,8 @@ function useLiveClock() {
 
 export default function AgentHome() {
   const { user, logout } = useAuth();
+  const token = (user as any)?.token ?? "";
+  const { preDepartureAlerts, validationAlerts, agentRole } = useRealtime(token);
   const clock = useLiveClock();
 
   const roleLabel = () => {
@@ -207,6 +211,17 @@ export default function AgentHome() {
           </View>
         </View>
       </LinearGradient>
+
+      {/* Alertes temps réel — Module 6 */}
+      <AlertBanner
+        preDepartureAlerts={preDepartureAlerts}
+        validationAlerts={validationAlerts}
+        agentRole={agentRole}
+        onAction={(tripId, type) => {
+          if (type === "pre_departure") router.push("/agent/departure-validation");
+          else router.push("/agent/tickets");
+        }}
+      />
 
       {/* Intro */}
       <View style={S.intro}>

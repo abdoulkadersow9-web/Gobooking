@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable } from "@workspace/db";
+import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable, notificationsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -3967,6 +3967,31 @@ router.post("/validation-depart/validate/:tripId", async (req, res) => {
       ).catch(() => {});
     }
 
+    /* 6b. Notify agent_ticket agents of the company → "Impression prête" */
+    if (trip.companyId) {
+      const ticketAgents = await db
+        .select({ userId: agentsTable.userId })
+        .from(agentsTable)
+        .where(and(
+          eq(agentsTable.companyId, trip.companyId),
+          inArray(agentsTable.agentRole, ["agent_ticket", "guichet", "vente"]),
+        ));
+      for (const ta of ticketAgents) {
+        const [taUser] = await db.select({ pushToken: usersTable.pushToken })
+          .from(usersTable).where(eq(usersTable.id, ta.userId)).limit(1);
+        const nid = Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
+        await db.insert(notificationsTable).values({
+          id: nid, userId: ta.userId,
+          type: "validation_complete",
+          title: `✅ Départ validé — Impression prête`,
+          message: `${trip.from} → ${trip.to} (${trip.departureTime}) validé. Feuille de route disponible dans l'onglet Impression.`,
+          refId: tripId, refType: "trip",
+        }).catch(() => {});
+        sendExpoPush(taUser?.pushToken, `✅ Départ validé — Impression prête`,
+          `${trip.from} → ${trip.to} est en route. Imprimez la feuille de route.`).catch(() => {});
+      }
+    }
+
     /* 7. Audit */
     auditLog(
       { userId: user.id, userRole: user.role, userName: user.name, req },
@@ -4000,6 +4025,107 @@ router.post("/validation-depart/validate/:tripId", async (req, res) => {
   } catch (err) {
     console.error("[validation-depart/validate]", err);
     res.status(500).json({ error: "Erreur lors de la validation" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Module 6 — Temps réel & Alertes
+   GET  /agent/realtime/alerts         — alertes actives pour l'agent courant
+   GET  /agent/realtime/trip/:tripId   — données live d'un trajet (polling 30s)
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── GET /agent/realtime/alerts ─── */
+router.get("/realtime/alerts", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agentRows = await db.select({ companyId: agentsTable.companyId, agentRole: agentsTable.agentRole })
+      .from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentInfo = agentRows[0];
+
+    // 1. Départs imminent (≤ 10 min) de la compagnie de l'agent
+    const today = new Date().toISOString().slice(0, 10);
+    const upcomingTrips = await db.select({
+      id: tripsTable.id, from: tripsTable.from, to: tripsTable.to,
+      date: tripsTable.date, departureTime: tripsTable.departureTime, status: tripsTable.status,
+    })
+    .from(tripsTable)
+    .where(and(
+      eq(tripsTable.date, today),
+      inArray(tripsTable.status, ["scheduled"]),
+      agentInfo?.companyId ? eq(tripsTable.companyId, agentInfo.companyId) : sql`true`,
+    ));
+
+    const preDepartureAlerts = upcomingTrips
+      .map(t => {
+        const dep = new Date(`${t.date}T${t.departureTime}:00`);
+        const minsLeft = (dep.getTime() - Date.now()) / 60_000;
+        return { ...t, minutesLeft: Math.round(minsLeft) };
+      })
+      .filter(t => t.minutesLeft >= -2 && t.minutesLeft <= 10)
+      .sort((a, b) => a.minutesLeft - b.minutesLeft);
+
+    // 2. Notifications récentes non lues (type: pre_departure_alert | validation_complete)
+    const recentNotifs = await db.select()
+      .from(notificationsTable)
+      .where(and(
+        eq(notificationsTable.userId, user.id),
+        inArray(notificationsTable.type, ["pre_departure_alert", "validation_complete"]),
+      ))
+      .orderBy(desc(notificationsTable.createdAt))
+      .limit(10);
+
+    res.json({ preDepartureAlerts, recentNotifs, agentRole: agentInfo?.agentRole ?? null });
+  } catch (err) {
+    console.error("[realtime/alerts]", err);
+    res.status(500).json({ error: "Erreur" });
+  }
+});
+
+/* ─── GET /agent/realtime/trip/:tripId ─── */
+router.get("/realtime/trip/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+
+    const [trip] = await db.select({
+      id: tripsTable.id, from: tripsTable.from, to: tripsTable.to,
+      date: tripsTable.date, departureTime: tripsTable.departureTime, status: tripsTable.status,
+    }).from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    const bookings = await db.select({ status: bookingsTable.status }).from(bookingsTable)
+      .where(eq(bookingsTable.tripId, tripId));
+    const bagages  = await db.select({ id: bagageItemsTable.id }).from(bagageItemsTable)
+      .where(eq(bagageItemsTable.tripId, tripId));
+    const colis    = await db.select({ id: parcelsTable.id }).from(parcelsTable)
+      .where(eq(parcelsTable.tripId, tripId));
+    const expenses = await db.select({ amount: tripExpensesTable.amount }).from(tripExpensesTable)
+      .where(eq(tripExpensesTable.tripId, tripId));
+
+    const boardedCount = bookings.filter(b => ["boarded","validated"].includes(b.status ?? "")).length;
+    const absentCount  = bookings.filter(b => b.status === "absent").length;
+    const totalExpenses = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+    res.json({
+      tripId,
+      from: trip.from, to: trip.to,
+      date: trip.date, departureTime: trip.departureTime, status: trip.status,
+      boardedCount,
+      absentCount,
+      bagageCount:  bagages.length,
+      colisCount:   colis.length,
+      expenseCount: expenses.length,
+      totalExpenses,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[realtime/trip]", err);
+    res.status(500).json({ error: "Erreur" });
   }
 });
 
