@@ -336,3 +336,46 @@ export function useCreateCompanyAgence() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["company-agences"] }),
   });
 }
+
+export function useTripDelayHistory(tripId: string | null) {
+  return useQuery({
+    queryKey: ["trip-delays", tripId],
+    queryFn: () => apiFetch<any>(`/company/trips/${tripId}/delays`),
+    enabled: !!tripId,
+    refetchInterval: 15000,
+  });
+}
+
+export function useRecordTripDelay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tripId, data }: { tripId: string; data: { minutes: number; reason: string; detail?: string } }) =>
+      apiFetch(`/company/trips/${tripId}/delay`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["trip-delays", vars.tripId] });
+    },
+  });
+}
+
+export function useTripTransfers(tripId: string | null) {
+  return useQuery({
+    queryKey: ["trip-transfers", tripId],
+    queryFn: () => apiFetch<any>(`/company/trips/${tripId}/transfers`),
+    enabled: !!tripId,
+    refetchInterval: 15000,
+  });
+}
+
+export function useTransferBus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tripId, data }: { tripId: string; data: { newBusId: string; reason: string; detail?: string; location?: string; newAgentIds?: string[] } }) =>
+      apiFetch(`/company/trips/${tripId}/transfer-bus`, { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: (_res, vars) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["trip-transfers", vars.tripId] });
+      qc.invalidateQueries({ queryKey: ["buses"] });
+    },
+  });
+}

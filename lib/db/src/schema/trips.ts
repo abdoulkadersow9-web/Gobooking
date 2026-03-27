@@ -28,6 +28,10 @@ export const tripsTable = pgTable("trips", {
   status: varchar("status", { length: 30 }).notNull().default("scheduled"),
   startedAt: timestamp("started_at"),
   arrivedAt: timestamp("arrived_at"),
+  delayMinutes: integer("delay_minutes").default(0),
+  delayReason: text("delay_reason"),
+  estimatedDeparture: text("estimated_departure"),
+  delayHistory: json("delay_history").$type<{ at: string; minutes: number; reason: string; detail?: string }[]>().default([]),
 });
 
 export const insertTripSchema = createInsertSchema(tripsTable).omit({});

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence, useTripWaypoints, useTripSegmentSeats } from "@/hooks/use-company";
+import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence, useTripWaypoints, useTripSegmentSeats, useRecordTripDelay, useTripDelayHistory, useTransferBus, useTripTransfers } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X, MapPin } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X, MapPin, AlertCircle, ArrowRightLeft, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -35,6 +35,16 @@ export default function Trips() {
   const { data: agencePerf, isLoading: perfLoading } = useAgencePerformance();
   const [agenceFilter, setAgenceFilter] = useState<{ id: string; name: string } | null>(null);
   const { data: filteredTrips, isLoading: filteredLoading } = useTripsByAgence(agenceFilter?.id ?? null);
+
+  const [delayTripId, setDelayTripId] = useState<string | null>(null);
+  const [delayForm, setDelayForm] = useState({ minutes: 15, reason: "Retard au départ", detail: "" });
+  const { data: delayHistoryData } = useTripDelayHistory(delayTripId);
+  const { mutate: recordDelay, isPending: delayPending } = useRecordTripDelay();
+
+  const [transferTripId, setTransferTripId] = useState<string | null>(null);
+  const [transferForm, setTransferForm] = useState({ newBusId: "", reason: "Panne mécanique", detail: "", location: "" });
+  const { data: transferHistoryData } = useTripTransfers(transferTripId);
+  const { mutate: transferBus, isPending: transferPending } = useTransferBus();
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -227,6 +237,16 @@ export default function Trips() {
                 <Button variant="outline" size="sm" onClick={() => setSegmentsTripId(trip.id)} className="flex items-center gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
                   <MapPin size={15} /> Escales
                 </Button>
+                {!isCompany && (trip.status === "scheduled" || trip.status === "en_route") && (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => { setDelayTripId(trip.id); setDelayForm({ minutes: 15, reason: "Retard au départ", detail: "" }); }} className="flex items-center gap-2 text-orange-700 border-orange-300 hover:bg-orange-50">
+                      <AlertCircle size={15} /> Retard
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => { setTransferTripId(trip.id); setTransferForm({ newBusId: "", reason: "Panne mécanique", detail: "", location: "" }); }} className="flex items-center gap-2 text-red-700 border-red-300 hover:bg-red-50">
+                      <ArrowRightLeft size={15} /> Transfert
+                    </Button>
+                  </>
+                )}
               </div>
 
             </div>
@@ -769,6 +789,231 @@ export default function Trips() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPerf(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog : Signaler un retard ── */}
+      <Dialog open={!!delayTripId} onOpenChange={(v) => { if (!v) setDelayTripId(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle size={18} className="text-orange-500" />
+              Signaler un retard
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Historique des retards */}
+            {delayHistoryData && (delayHistoryData.delayMinutes ?? 0) > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <History size={14} className="text-orange-600" />
+                  <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Retard cumulé actuel</p>
+                </div>
+                <p className="text-lg font-bold text-orange-700">
+                  +{delayHistoryData.delayMinutes} min
+                  {delayHistoryData.estimatedDeparture && (
+                    <span className="text-sm font-normal ml-2 text-orange-600">— départ estimé : {delayHistoryData.estimatedDeparture}</span>
+                  )}
+                </p>
+                {(delayHistoryData.history ?? []).length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {(delayHistoryData.history as any[]).map((h: any, i: number) => (
+                      <p key={i} className="text-xs text-orange-600">
+                        {new Date(h.at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" })} — +{h.minutes}min : {h.reason}
+                        {h.detail && <span className="text-orange-400"> ({h.detail})</span>}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Durée du retard supplémentaire (minutes) *</label>
+              <input
+                type="number" min="1" max="480"
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={delayForm.minutes}
+                onChange={(e) => setDelayForm(f => ({ ...f, minutes: Number(e.target.value) }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Motif *</label>
+              <select
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={delayForm.reason}
+                onChange={(e) => setDelayForm(f => ({ ...f, reason: e.target.value }))}
+              >
+                <option>Retard au départ</option>
+                <option>Ralentissement sur route</option>
+                <option>Arrêt prolongé en escale</option>
+                <option>Incident opérationnel</option>
+                <option>Contrôle de gendarmerie</option>
+                <option>Travaux / déviation</option>
+                <option>Problème technique mineur</option>
+                <option>Attente passager</option>
+                <option>Autre</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Détail complémentaire</label>
+              <textarea
+                rows={2}
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                placeholder="Informations supplémentaires (optionnel)…"
+                value={delayForm.detail}
+                onChange={(e) => setDelayForm(f => ({ ...f, detail: e.target.value }))}
+              />
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+              Un SMS sera automatiquement envoyé à tous les passagers confirmés de ce trajet.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDelayTripId(null)}>Annuler</Button>
+            <Button
+              disabled={delayPending || !delayForm.minutes || !delayForm.reason}
+              style={{ backgroundColor: "#EA580C", color: "white" }}
+              onClick={() => {
+                if (!delayTripId) return;
+                recordDelay(
+                  { tripId: delayTripId, data: { minutes: delayForm.minutes, reason: delayForm.reason, detail: delayForm.detail } },
+                  {
+                    onSuccess: (res: any) => {
+                      toast({ title: "Retard enregistré", description: `+${delayForm.minutes} min — départ estimé : ${res.estimatedDeparture}. ${res.passengersSmsCount} SMS envoyés.` });
+                      setDelayTripId(null);
+                    },
+                    onError: (err: any) => toast({ variant: "destructive", title: "Erreur", description: err.message }),
+                  }
+                );
+              }}
+            >
+              {delayPending ? "Envoi…" : "Confirmer le retard"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog : Transfert de car à car ── */}
+      <Dialog open={!!transferTripId} onOpenChange={(v) => { if (!v) setTransferTripId(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft size={18} className="text-red-500" />
+              Transfert de car à car
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Historique des transferts */}
+            {(transferHistoryData?.transfers ?? []).length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <History size={14} className="text-red-600" />
+                  <p className="text-xs font-semibold text-red-700 uppercase tracking-wide">Transferts précédents</p>
+                </div>
+                {(transferHistoryData!.transfers as any[]).map((t: any, i: number) => (
+                  <div key={i} className="text-xs text-red-600 mb-1 pb-1 border-b border-red-100 last:border-0">
+                    <span className="font-semibold">{t.old_bus_name ?? "—"}</span> → <span className="font-semibold">{t.new_bus_name ?? "—"}</span>
+                    <span className="ml-2 text-red-400">({t.reason})</span>
+                    {t.transfer_location && <span className="ml-1">@ {t.transfer_location}</span>}
+                    <span className="ml-2 text-red-400">{new Date(t.transferred_at).toLocaleString("fr-CI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className="ml-2">{t.passengers_count} pax</span>
+                    {t.created_by_name && <span className="ml-2 text-red-400">par {t.created_by_name}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Nouveau car de remplacement *</label>
+              <select
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={transferForm.newBusId}
+                onChange={(e) => setTransferForm(f => ({ ...f, newBusId: e.target.value }))}
+              >
+                <option value="">— Sélectionner un car disponible —</option>
+                {buses.filter((b: any) => !b.currentTripId).map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.busName} — {b.plateNumber} ({b.busType})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Motif du transfert *</label>
+              <select
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                value={transferForm.reason}
+                onChange={(e) => setTransferForm(f => ({ ...f, reason: e.target.value }))}
+              >
+                <option>Panne mécanique</option>
+                <option>Accident de circulation</option>
+                <option>Force majeure</option>
+                <option>Panne de climatisation</option>
+                <option>Pneu éclaté</option>
+                <option>Problème moteur</option>
+                <option>Incendie / sécurité</option>
+                <option>Autre</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Lieu du transfert</label>
+              <input
+                type="text"
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                placeholder="Ex : Km 47 route de Yamoussoukro, Escale de Toumodi…"
+                value={transferForm.location}
+                onChange={(e) => setTransferForm(f => ({ ...f, location: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Détail de l'incident</label>
+              <textarea
+                rows={2}
+                className="w-full border border-input rounded-xl px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                placeholder="Description de l'incident (optionnel)…"
+                value={transferForm.detail}
+                onChange={(e) => setTransferForm(f => ({ ...f, detail: e.target.value }))}
+              />
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700">
+              <strong>Important :</strong> Toutes les réservations, sièges et bagages seront automatiquement transférés vers le nouveau car. Un SMS sera envoyé à chaque passager. L'ancien car sera marqué hors service.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferTripId(null)}>Annuler</Button>
+            <Button
+              disabled={transferPending || !transferForm.newBusId || !transferForm.reason}
+              style={{ backgroundColor: "#DC2626", color: "white" }}
+              onClick={() => {
+                if (!transferTripId) return;
+                transferBus(
+                  {
+                    tripId: transferTripId,
+                    data: { newBusId: transferForm.newBusId, reason: transferForm.reason, detail: transferForm.detail, location: transferForm.location },
+                  },
+                  {
+                    onSuccess: (res: any) => {
+                      toast({ title: "Transfert effectué", description: `Nouveau car : ${res.newBus?.name ?? ""}. ${res.passengersSmsCount} passagers notifiés.` });
+                      setTransferTripId(null);
+                    },
+                    onError: (err: any) => toast({ variant: "destructive", title: "Erreur", description: err.message }),
+                  }
+                );
+              }}
+            >
+              {transferPending ? "Transfert en cours…" : "Confirmer le transfert"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -8,8 +8,8 @@
  *  5. Colis arrivé      — statut "arrivé" non encore notifié → push destinataire
  */
 
-import { db, bookingsTable, tripsTable, usersTable, parcelsTable, notificationsTable, marketingLogsTable } from "@workspace/db";
-import { eq, and, inArray, lt, gte, isNotNull, ne } from "drizzle-orm";
+import { db, bookingsTable, tripsTable, usersTable, parcelsTable, notificationsTable, marketingLogsTable, agentsTable } from "@workspace/db";
+import { eq, and, inArray, lt, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { sendExpoPush } from "./pushService";
 import { sendSMS } from "./lib/smsService";
 
@@ -43,7 +43,20 @@ const sentReengagement   = new Set<string>(); // userId — resets daily on rest
 const sentPostTrip       = new Set<string>(); // bookingId
 const sentLowOccupancy   = new Set<string>(); // tripId
 const sentBirthday       = new Set<string>(); // userId-YYYY-MM-DD
+const sentStaffBirthday  = new Set<string>(); // agentId-YYYY-MM-DD
+const sentHoliday        = new Set<string>(); // holiday-YYYY-MM-DD
 const sentParcelArrived  = new Set<string>(); // parcelId
+
+/* ─── Calendrier fêtes nationales Côte d'Ivoire (fixes) ──────── */
+const IVOIRIAN_HOLIDAYS: { month: number; day: number; name: string; emoji: string }[] = [
+  { month: 1,  day: 1,  name: "Bonne Année",                  emoji: "🎆" },
+  { month: 5,  day: 1,  name: "Fête du Travail",              emoji: "👷" },
+  { month: 8,  day: 7,  name: "Fête de l'Indépendance",       emoji: "🇨🇮" },
+  { month: 8,  day: 15, name: "Fête de l'Assomption",         emoji: "✝️"  },
+  { month: 11, day: 1,  name: "Toussaint",                    emoji: "🕯️" },
+  { month: 11, day: 15, name: "Fête Nationale de la Paix",    emoji: "☮️" },
+  { month: 12, day: 25, name: "Joyeux Noël",                  emoji: "🎄" },
+];
 
 /* ─── 1. Re-engagement — inactifs > 7 jours ─────────────────── */
 async function checkReengagement() {
@@ -277,13 +290,118 @@ async function checkParcelArrived() {
   if (count > 0) console.log(`[Marketing] 📦 Colis arrivés : ${count} destinataire(s) notifié(s)`);
 }
 
+/* ─── 6. Anniversaires du personnel (agents) ─────────────────── */
+async function checkStaffBirthdays() {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const staffResult = await db.execute(
+    sql`
+      SELECT a.id as agent_id, u.id as user_id, u.name, u.phone, u.push_token, u.birthdate
+      FROM agents a
+      JOIN users u ON u.id = a.user_id
+      WHERE u.birthdate IS NOT NULL
+        AND TO_CHAR(u.birthdate, 'MM-DD') = ${`${mm}-${dd}`}
+        AND u.status = 'active'
+    `
+  );
+
+  let count = 0;
+  for (const staff of (staffResult.rows as any[])) {
+    const key = `${staff.agent_id}-${todayStr}`;
+    if (sentStaffBirthday.has(key)) continue;
+    sentStaffBirthday.add(key);
+
+    const firstName = staff.name.split(" ")[0];
+    const msg = `GoBooking 🎂 Toute l'équipe vous souhaite un joyeux anniversaire, ${firstName} ! Merci pour votre engagement et votre dévouement. Bonne fête !`;
+
+    if (staff.phone) {
+      const smsResult = await sendSMS(staff.phone, msg).catch(() => ({ success: false }));
+      await logMarketing("staff_birthday", "sms", staff.user_id, staff.phone, msg,
+        smsResult.success ? "sent" : "failed");
+    }
+
+    if (staff.push_token) {
+      sendExpoPush(staff.push_token, `🎂 Joyeux anniversaire ${firstName} !`, msg).catch(() => {});
+      await storePush(staff.user_id, "staff_birthday", `🎂 Joyeux anniversaire !`, msg);
+    }
+    count++;
+  }
+  if (count > 0) console.log(`[Marketing] 🎂 Anniversaires personnel : ${count} agent(s) souhaité(s)`);
+}
+
+/* ─── 7. Fêtes nationales ivoiriennes ───────────────────────── */
+async function checkIvoirianHolidays() {
+  const today = new Date();
+  const monthDay = today.getMonth() + 1; // 1-12
+  const dayOfMonth = today.getDate();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const holiday = IVOIRIAN_HOLIDAYS.find(h => h.month === monthDay && h.day === dayOfMonth);
+  if (!holiday) return;
+
+  const key = `${holiday.name}-${todayStr}`;
+  if (sentHoliday.has(key)) return;
+  sentHoliday.add(key);
+
+  const holidayMsg = `${holiday.emoji} GoBooking vous souhaite une belle fête de la ${holiday.name} ! Nos équipes sont à votre service toute la journée. Bon voyage !`;
+
+  // Envoyer aux clients actifs ayant voyagé au cours des 60 derniers jours
+  const since60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const recentUsers = await db.execute(
+    sql`
+      SELECT DISTINCT u.id, u.name, u.phone, u.push_token
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.created_at >= ${since60.toISOString()}
+        AND b.status IN ('confirmed','boarded','validated','completed')
+        AND u.status = 'active'
+      LIMIT 200
+    `
+  );
+
+  let count = 0;
+  for (const u of (recentUsers.rows as any[])) {
+    if (u.phone) {
+      sendSMS(u.phone, holidayMsg).catch(() => {});
+      await logMarketing("holiday", "sms", u.id, u.phone, holidayMsg, "sent");
+    }
+    if (u.push_token) {
+      sendExpoPush(u.push_token, `${holiday.emoji} ${holiday.name}`, holidayMsg).catch(() => {});
+      await storePush(u.id, "holiday", `${holiday.emoji} ${holiday.name}`, holidayMsg);
+    }
+    count++;
+  }
+
+  // Notifier aussi les agents
+  const staffUsers = await db.execute(
+    sql`
+      SELECT DISTINCT u.id, u.name, u.phone, u.push_token
+      FROM agents a JOIN users u ON u.id = a.user_id
+      WHERE u.status = 'active'
+    `
+  );
+  const staffMsg = `${holiday.emoji} Bonne fête de la ${holiday.name} à toute l'équipe GoBooking ! Continuez à faire la fierté du transport ivoirien. 🚌`;
+  for (const s of (staffUsers.rows as any[])) {
+    if (s.push_token) sendExpoPush(s.push_token, `${holiday.emoji} ${holiday.name}`, staffMsg).catch(() => {});
+    await storePush(s.id, "holiday_staff", `${holiday.emoji} ${holiday.name}`, staffMsg);
+    count++;
+  }
+
+  console.log(`[Marketing] ${holiday.emoji} Fête nationale "${holiday.name}" — ${count} personnes notifiées`);
+}
+
 /* ─── Orchestrateur principal ────────────────────────────────── */
 async function runMarketing() {
-  try { await checkReengagement(); } catch (err) { console.error("[Marketing] ❌ Re-engagement:", err); }
-  try { await checkPostTrip();     } catch (err) { console.error("[Marketing] ❌ Post-voyage:", err); }
-  try { await checkLowOccupancy(); } catch (err) { console.error("[Marketing] ❌ Occupancy:", err); }
-  try { await checkBirthdays();    } catch (err) { console.error("[Marketing] ❌ Anniversaires:", err); }
-  try { await checkParcelArrived();} catch (err) { console.error("[Marketing] ❌ Colis arrivés:", err); }
+  try { await checkReengagement();       } catch (err) { console.error("[Marketing] ❌ Re-engagement:", err); }
+  try { await checkPostTrip();           } catch (err) { console.error("[Marketing] ❌ Post-voyage:", err); }
+  try { await checkLowOccupancy();       } catch (err) { console.error("[Marketing] ❌ Occupancy:", err); }
+  try { await checkBirthdays();          } catch (err) { console.error("[Marketing] ❌ Anniversaires clients:", err); }
+  try { await checkStaffBirthdays();     } catch (err) { console.error("[Marketing] ❌ Anniversaires personnel:", err); }
+  try { await checkIvoirianHolidays();   } catch (err) { console.error("[Marketing] ❌ Fêtes nationales CI:", err); }
+  try { await checkParcelArrived();      } catch (err) { console.error("[Marketing] ❌ Colis arrivés:", err); }
 }
 
 /* ─── Export ─────────────────────────────────────────────────── */

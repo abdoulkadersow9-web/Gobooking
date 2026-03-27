@@ -3305,4 +3305,270 @@ router.get("/trips/:tripId/segment-seats", async (req, res) => {
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════
+   GESTION DES RETARDS — POST /company/trips/:tripId/delay
+   ═══════════════════════════════════════════════════════════════ */
+router.post("/trips/:tripId/delay", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: "Non autorisé" });
+
+    const { tripId } = req.params;
+    const { minutes, reason, detail } = req.body as { minutes: number; reason: string; detail?: string };
+
+    if (!minutes || minutes <= 0) return res.status(400).json({ error: "Durée du retard requise (minutes > 0)" });
+    if (!reason) return res.status(400).json({ error: "Motif requis" });
+
+    // Vérifier que le trajet appartient à l'entreprise
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trip) return res.status(404).json({ error: "Trajet introuvable" });
+
+    const companies = await db.select().from(companiesTable).where(eq(companiesTable.userId, user.id)).limit(1);
+    if (!companies.length || trip.companyId !== companies[0].id)
+      return res.status(403).json({ error: "Accès refusé" });
+
+    // Calculer la nouvelle heure estimée de départ
+    function addMinutesToTime(timeStr: string, mins: number): string {
+      const [h, m] = timeStr.split(":").map(Number);
+      const totalMin = h * 60 + m + mins;
+      return `${String(Math.floor(totalMin / 60) % 24).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+    }
+    const baseDep = (trip as any).estimatedDeparture ?? trip.departureTime;
+    const newEstimated = addMinutesToTime(baseDep, minutes);
+    const totalDelayMins = ((trip as any).delayMinutes ?? 0) + minutes;
+
+    const historyEntry = { at: new Date().toISOString(), minutes, reason, detail: detail ?? "" };
+    const prevHistory: any[] = ((trip as any).delayHistory as any[]) ?? [];
+    const newHistory = [...prevHistory, historyEntry];
+
+    // Mettre à jour le trajet
+    await db.execute(sql`
+      UPDATE trips SET
+        delay_minutes      = ${totalDelayMins},
+        delay_reason       = ${reason},
+        estimated_departure= ${newEstimated},
+        delay_history      = ${JSON.stringify(newHistory)}::jsonb
+      WHERE id = ${tripId}
+    `);
+
+    // Récupérer tous les passagers confirmés pour les notifier
+    const passengers = await db.execute(sql`
+      SELECT DISTINCT u.phone, u.name, u.push_token, b.id as booking_id, b.seat_number
+      FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.trip_id = ${tripId}
+        AND b.status IN ('confirmed','boarded','validated','payé')
+    `);
+
+    const smsMsg = `GoBooking ⚠️ Retard signalé sur votre trajet ${trip.from} → ${trip.to} du ${trip.date}. Nouveau départ estimé : ${newEstimated}. Motif : ${reason}. Merci de votre compréhension.`;
+
+    let smsCount = 0;
+    for (const p of (passengers.rows as any[])) {
+      if (p.phone) {
+        try {
+          const { sendSMS } = await import("../lib/smsService");
+          await sendSMS(p.phone, smsMsg);
+          smsCount++;
+        } catch { /* non bloquant */ }
+      }
+    }
+
+    console.log(`[Retard] Trajet ${tripId} — +${minutes}min → ${newEstimated} | ${smsCount} SMS envoyés`);
+    res.json({
+      success: true,
+      tripId,
+      delayMinutes: totalDelayMins,
+      estimatedDeparture: newEstimated,
+      passengersSmsCount: smsCount,
+    });
+  } catch (err) {
+    console.error("[company/delay]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORIQUE DES RETARDS — GET /company/trips/:tripId/delays
+   ═══════════════════════════════════════════════════════════════ */
+router.get("/trips/:tripId/delays", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: "Non autorisé" });
+
+    const { tripId } = req.params;
+    const result = await db.execute(sql`
+      SELECT delay_minutes, delay_reason, estimated_departure, delay_history
+      FROM trips WHERE id = ${tripId} LIMIT 1
+    `);
+    if (!result.rows.length) return res.status(404).json({ error: "Trajet introuvable" });
+    const row = result.rows[0] as any;
+    res.json({
+      delayMinutes: row.delay_minutes ?? 0,
+      delayReason: row.delay_reason,
+      estimatedDeparture: row.estimated_departure,
+      history: row.delay_history ?? [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   TRANSFERT DE CAR — POST /company/trips/:tripId/transfer-bus
+   ═══════════════════════════════════════════════════════════════ */
+router.post("/trips/:tripId/transfer-bus", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: "Non autorisé" });
+
+    const { tripId } = req.params;
+    const { newBusId, reason, detail, location, newAgentIds } = req.body as {
+      newBusId: string; reason: string; detail?: string;
+      location?: string; newAgentIds?: string[];
+    };
+
+    if (!newBusId) return res.status(400).json({ error: "Nouveau car requis" });
+    if (!reason)  return res.status(400).json({ error: "Motif requis" });
+
+    // Vérifier trajet
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trip) return res.status(404).json({ error: "Trajet introuvable" });
+
+    const companies = await db.select().from(companiesTable).where(eq(companiesTable.userId, user.id)).limit(1);
+    if (!companies.length || trip.companyId !== companies[0].id)
+      return res.status(403).json({ error: "Accès refusé" });
+
+    // Vérifier nouveau car
+    const [newBus] = await db.select().from(busesTable).where(eq(busesTable.id, newBusId)).limit(1);
+    if (!newBus) return res.status(404).json({ error: "Nouveau car introuvable" });
+
+    // Infos ancien car
+    let oldBusPlate = trip.busName ?? "—";
+    let oldBusName  = trip.busName ?? "—";
+    if (trip.busId) {
+      const [oldBus] = await db.select().from(busesTable).where(eq(busesTable.id, trip.busId)).limit(1);
+      if (oldBus) { oldBusPlate = oldBus.plateNumber; oldBusName = oldBus.busName; }
+    }
+
+    // Récupérer les agents actuels du trajet
+    const currentAgents = await db.execute(sql`
+      SELECT a.id, u.name FROM agents a
+      JOIN users u ON u.id = a.user_id
+      WHERE a.trip_id = ${tripId}
+    `);
+    const oldAgentIds = (currentAgents.rows as any[]).map(a => a.id);
+
+    // Compter passagers concernés
+    const paxResult = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM bookings
+      WHERE trip_id = ${tripId} AND status IN ('confirmed','boarded','validated','payé')
+    `);
+    const passengersCount = Number((paxResult.rows[0] as any)?.cnt ?? 0);
+
+    // Créer l'enregistrement de transfert
+    const transferId = "trf-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    await db.execute(sql`
+      INSERT INTO trip_transfers (id, trip_id, old_bus_id, old_bus_plate, old_bus_name,
+        new_bus_id, new_bus_plate, new_bus_name, reason, detail, transfer_location,
+        transferred_at, old_agent_ids, new_agent_ids, passengers_count, created_by)
+      VALUES (
+        ${transferId}, ${tripId}, ${trip.busId ?? null}, ${oldBusPlate}, ${oldBusName},
+        ${newBusId}, ${newBus.plateNumber}, ${newBus.busName}, ${reason},
+        ${detail ?? null}, ${location ?? null}, NOW(),
+        ${JSON.stringify(oldAgentIds)}::jsonb, ${JSON.stringify(newAgentIds ?? [])}::jsonb,
+        ${passengersCount}, ${user.id}
+      )
+    `);
+
+    // Mettre à jour le trajet avec le nouveau car
+    await db.execute(sql`
+      UPDATE trips SET bus_id = ${newBusId}, bus_name = ${newBus.busName}, bus_type = ${newBus.busType}
+      WHERE id = ${tripId}
+    `);
+
+    // Marquer l'ancien car comme libéré (si différent)
+    if (trip.busId && trip.busId !== newBusId) {
+      await db.execute(sql`
+        UPDATE buses SET current_trip_id = NULL, logistic_status = 'en_panne'
+        WHERE id = ${trip.busId}
+      `);
+    }
+
+    // Affecter le nouveau car au trajet
+    await db.execute(sql`
+      UPDATE buses SET current_trip_id = ${tripId}, logistic_status = 'en_service'
+      WHERE id = ${newBusId}
+    `);
+
+    // Réaffecter les nouveaux agents si fournis
+    if (newAgentIds && newAgentIds.length > 0) {
+      for (const agentId of newAgentIds) {
+        await db.execute(sql`
+          UPDATE agents SET trip_id = ${tripId}, bus_id = ${newBusId}
+          WHERE id = ${agentId}
+        `);
+      }
+    }
+
+    // Notifier les passagers par SMS
+    const passengers = await db.execute(sql`
+      SELECT DISTINCT u.phone, u.name FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.trip_id = ${tripId}
+        AND b.status IN ('confirmed','boarded','validated','payé')
+    `);
+
+    const smsMsg = `GoBooking 🚌 Changement de véhicule sur votre trajet ${trip.from} → ${trip.to} du ${trip.date}. Nouveau car : ${newBus.busName} (${newBus.plateNumber}). Motif : ${reason}. Votre réservation reste valide.`;
+
+    let smsCount = 0;
+    for (const p of (passengers.rows as any[])) {
+      if (p.phone) {
+        try {
+          const { sendSMS } = await import("../lib/smsService");
+          await sendSMS(p.phone, smsMsg);
+          smsCount++;
+        } catch { /* non bloquant */ }
+      }
+    }
+
+    console.log(`[Transfert] ${tripId} : ${oldBusName} → ${newBus.busName} | ${passengersCount} pax | ${smsCount} SMS`);
+    res.json({
+      success: true,
+      transferId,
+      tripId,
+      oldBus: { id: trip.busId, plate: oldBusPlate, name: oldBusName },
+      newBus: { id: newBusId, plate: newBus.plateNumber, name: newBus.busName },
+      passengersCount,
+      passengersSmsCount: smsCount,
+    });
+  } catch (err) {
+    console.error("[company/transfer-bus]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORIQUE DES TRANSFERTS — GET /company/trips/:tripId/transfers
+   ═══════════════════════════════════════════════════════════════ */
+router.get("/trips/:tripId/transfers", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: "Non autorisé" });
+
+    const { tripId } = req.params;
+    const result = await db.execute(sql`
+      SELECT t.*, u.name AS created_by_name
+      FROM trip_transfers t
+      LEFT JOIN users u ON u.id = t.created_by
+      WHERE t.trip_id = ${tripId}
+      ORDER BY t.transferred_at ASC
+    `);
+    res.json({ transfers: result.rows });
+  } catch (err) {
+    console.error("[company/transfers]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
+

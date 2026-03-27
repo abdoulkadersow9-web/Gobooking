@@ -1,0 +1,111 @@
+Ajoute aussi ces améliorations importantes, tout en restant dans la même logique métier de GoBooking :
+
+### 1. Application entièrement intelligente et proactive
+L’application doit être conçue comme une plateforme intelligente, innovante, propre, moderne, claire, fluide, rapide et hautement professionnelle.
+
+Elle ne doit pas seulement enregistrer les données, mais aussi anticiper, notifier, recalculer et tracer automatiquement les changements importants liés aux trajets, aux clients et au personnel.
+
+### 2. Gestion intelligente des retards et recalcul automatique du trajet
+Quand un départ est programmé, l’heure prévue s’affiche sur les tickets et les réservations.  
+Mais en cas de retard ou d’imprévu pendant l’exploitation :
+
+- le trajet doit pouvoir être recalculé automatiquement
+- l’heure estimée mise à jour doit être visible dans le système
+- des notifications automatiques doivent être envoyées aux passagers concernés
+- les agents et la compagnie doivent voir le nouvel état du départ en temps réel
+- l’historique du changement doit être conservé
+
+Exemples :
+- retard au départ
+- ralentissement sur route
+- arrêt prolongé
+- incident opérationnel
+- changement d’heure estimée d’arrivée
+
+L’objectif est que les passagers ne soient jamais laissés sans information.
+
+### 3. Messages automatiques intelligents aux clients et au personnel
+Ajouter un module de messagerie automatique intelligente pour les événements importants, par exemple :
+
+- message automatique d’anniversaire pour les clients
+- message automatique d’anniversaire pour le personnel
+- messages automatiques pour les fêtes du calendrier
+- messages de souhaits selon le mois en cours ou l’événement en cours
+- possibilité d’envoyer ces messages par notification, SMS ou WhatsApp selon les moyens disponibles
+
+Le système doit être capable de détecter automatiquement :
+- la date d’anniversaire
+- les fêtes programmées dans le calendrier
+- les événements récurrents à souhaiter
+
+### 4. Transfert de car à car en cas de panne ou force majeure
+Ajouter une fonctionnalité très importante de transfert de départ / transfert de car à car.
+
+Cas métier :
+un car est en circulation mais tombe en panne ou devient immobilisé sur route.  
+La compagnie peut envoyer un autre car pour récupérer les passagers et continuer le départ.
+
+Le système doit permettre :
+
+- de déclarer qu’un car initial est immobilisé
+- d’indiquer le motif du transfert (panne, accident, force majeure, autre)
+- de renseigner le nouveau car de remplacement avec son numéro matricule
+- de renseigner les nouveaux personnels qui prennent la relève
+- de transférer automatiquement les passagers, réservations, sièges, bagages et informations du départ vers le nouveau car
+- de conserver la traçabilité complète de l’ancien car et du nouveau car
+- de montrer clairement qu’un agent ou un équipage a commencé le départ mais ne l’a pas terminé
+- de garder l’historique du changement pour audit et contrôle
+
+### 5. Traçabilité complète du transfert
+Quand un transfert de car est effectué, toutes les informations doivent remonter automatiquement dans le système :
+
+- ancien car
+- nouveau car
+- ancien personnel
+- nouveau personnel
+- heure du transfert
+- lieu ou escale du transfert
+- motif du transfert
+- passagers concernés
+- état des sièges
+- bagages ou colis liés
+- historique de l’opération
+
+Ainsi, en cas de contrôle ou de problème, on peut savoir précisément :
+- qui a commencé le trajet
+- qui l’a poursuivi
+- avec quel véhicule
+- à quel moment le transfert a eu lieu
+- et pourquoi il a eu lieu
+
+### 6. Mise à jour automatique dans tous les espaces
+Après un transfert ou un recalcul du trajet, les données doivent être mises à jour automatiquement partout :
+
+- espace admin
+- espace compagnie
+- espace agent
+- espace embarquement
+- espace guichet
+- espace colis si concerné
+- espace client
+- tickets
+- réservations
+- historique
+- notifications
+
+Aucune page ne doit rester avec des anciennes informations.
+
+### 7. Objectif général
+Le but est que GoBooking fonctionne comme une vraie plateforme de transport moderne et intelligente, capable de gérer automatiquement :
+
+- les départs normaux
+- les retards
+- les escales
+- les libérations de places
+- les notifications
+- les souhaits automatiques
+- les incidents
+- les transferts de car à car
+- la continuité du service sans perte d’information
+
+Merci d’intégrer cela proprement dans la logique actuelle, sans casser ce qui fonctionne déjà, avec une architecture claire, stable et évolutive.
