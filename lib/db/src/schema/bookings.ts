@@ -1,4 +1,4 @@
-import { json, pgTable, real, text, timestamp, varchar } from "drizzle-orm/pg-core";
+import { integer, json, pgTable, real, text, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -52,6 +52,10 @@ export const bookingsTable = pgTable("bookings", {
   bookingSource: varchar("booking_source", { length: 20 }).default("guichet"),
   boardingCity:  text("boarding_city"),
   alightingCity: text("alighting_city"),
+  baggageCount:       integer("baggage_count").default(0),
+  baggageType:        varchar("baggage_type",        { length: 50 }),
+  baggageDescription: text("baggage_description"),
+  passengerStatus:    text("passenger_status").default("booked"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

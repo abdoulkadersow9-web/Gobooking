@@ -14,7 +14,7 @@ Iterative development. Detailed explanations. Mobile icons: Ionicons or Feather 
 - **State Management**: Uses `@tanstack/react-query` for data fetching and caching.
 - **Authentication**: Token-based authentication with `AsyncStorage` for persistence.
 - **UI/UX Design**:
-    - **Theme**: Primarily blue (`#1A56DB`, `#0F3BA0`, `#EEF2FF`) with accent colors for different dashboards (amber for company, green for agent, purple for super admin).
+    - **Theme**: Vibrant royal blue (`#1650D0`, `#0F3DB8`, `#EEF4FF`) primary, orange accent (`#F97316`). 3-stop gradient headers, blue-tinted card shadows, orange gradient search buttons. Agent Role colors: amber for company, teal for agent, purple for super admin.
     - **Typography**: Inter font family.
     - **Components**: Clean, card-based UI inspired by Airbnb/Coinbase, utilizing `expo-linear-gradient`, `expo-haptics`, `expo-blur` for enhanced user experience.
     - **Navigation**: Full-screen modals for agent en-route actions, replacing a previous fullscreen system.
