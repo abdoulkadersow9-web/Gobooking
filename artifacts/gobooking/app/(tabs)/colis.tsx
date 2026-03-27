@@ -46,7 +46,7 @@ const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string; l
   refuse:                { color: "#DC2626", bg: "#FEE2E2", strip: "#EF4444", label: "Refusé" },
   en_attente_ramassage:  { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "Ramassage" },
   ramassage_en_cours:    { color: "#EA580C", bg: "#FFF7ED", strip: "#FB923C", label: "En cours ramassage" },
-  confirme:              { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Confirmé" },
+  confirme:              { color: "#1650D0", bg: "#EEF4FF", strip: "#1650D0", label: "Confirmé" },
   en_cours_ramassage:    { color: "#7C3AED", bg: "#F5F3FF", strip: "#8B5CF6", label: "Ramassage" },
   arrive_gare_depart:    { color: "#0E7490", bg: "#ECFEFF", strip: "#06B6D4", label: "Gare départ" },
   pris_en_charge:        { color: "#1D4ED8", bg: "#EFF6FF", strip: "#3B82F6", label: "Pris en charge" },
@@ -212,7 +212,8 @@ export default function ColisScreen() {
     <View style={[styles.container, { paddingTop: topPad }]}>
       {/* Header */}
       <LinearGradient
-        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <View style={styles.headerLeft}>

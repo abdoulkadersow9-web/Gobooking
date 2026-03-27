@@ -3,9 +3,10 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Platform,
   Pressable,
   ScrollView,
@@ -37,6 +38,30 @@ export default function ProfileScreen() {
 
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const avatarScale = useRef(new Animated.Value(0.7)).current;
+  const avatarOpacity = useRef(new Animated.Value(0)).current;
+  const statsSlide = useRef(new Animated.Value(30)).current;
+  const statsOpacity = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(avatarScale, { toValue: 1, tension: 60, friction: 7, useNativeDriver: true }),
+      Animated.timing(avatarOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+    Animated.sequence([
+      Animated.delay(180),
+      Animated.parallel([
+        Animated.spring(statsSlide, { toValue: 0, tension: 70, friction: 8, useNativeDriver: true }),
+        Animated.timing(statsOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]),
+    ]).start();
+    Animated.sequence([
+      Animated.delay(300),
+      Animated.timing(contentOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -123,28 +148,31 @@ export default function ProfileScreen() {
     >
       {/* Profile header */}
       <LinearGradient
-        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={styles.profileHeader}
       >
-        <View style={styles.avatarRing}>
-          <LinearGradient colors={["rgba(255,255,255,0.35)", "rgba(255,255,255,0.15)"]} style={styles.avatar}>
+        <Animated.View style={[styles.avatarRing, { transform: [{ scale: avatarScale }], opacity: avatarOpacity }]}>
+          <LinearGradient colors={["rgba(255,255,255,0.40)", "rgba(255,255,255,0.12)"]} style={styles.avatar}>
             <Text style={styles.avatarText}>
               {user?.name?.charAt(0)?.toUpperCase() || "U"}
             </Text>
           </LinearGradient>
-        </View>
-        <Text style={styles.userName}>{user?.name}</Text>
-        <Text style={styles.userEmail}>{user?.email}</Text>
-        {isAdmin && (
-          <View style={styles.adminTag}>
-            <Feather name="shield" size={12} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.adminTagText}>Administrator</Text>
-          </View>
-        )}
+        </Animated.View>
+        <Animated.View style={{ alignItems: "center", opacity: avatarOpacity }}>
+          <Text style={styles.userName}>{user?.name}</Text>
+          <Text style={styles.userEmail}>{user?.email}</Text>
+          {isAdmin && (
+            <View style={styles.adminTag}>
+              <Feather name="shield" size={12} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.adminTagText}>Administrator</Text>
+            </View>
+          )}
+        </Animated.View>
       </LinearGradient>
 
       {/* Stats row — real data */}
-      <View style={styles.statsRow}>
+      <Animated.View style={[styles.statsRow, { transform: [{ translateY: statsSlide }], opacity: statsOpacity }]}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{loyaltyTrips}</Text>
           <Text style={styles.statLabel}>Voyages</Text>
@@ -161,12 +189,13 @@ export default function ProfileScreen() {
           <Text style={[styles.statValue, { color: loyaltyColor }]}>{loyaltyLevel}</Text>
           <Text style={styles.statLabel}>Fidélité</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Wallet card */}
+      <Animated.View style={{ opacity: contentOpacity }}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mon portefeuille</Text>
-        <LinearGradient colors={["#059669", "#047857"]} style={styles.walletCard}>
+        <LinearGradient colors={["#059669", "#047857", "#065F46"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.walletCard}>
           <View style={styles.walletTop}>
             <View>
               <Text style={styles.walletLabel}>Solde disponible</Text>
@@ -316,6 +345,7 @@ export default function ProfileScreen() {
           <MenuItem icon="log-out" label={t.deconnexion} onPress={handleLogout} danger />
         </View>
       </View>
+      </Animated.View>
     </ScrollView>
   );
 }
@@ -477,9 +507,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     gap: 12,
-    shadowColor: "#0B3C5D",
+    shadowColor: "#1650D0",
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
+    shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 3,
   },
@@ -609,9 +639,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.card,
     borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#0B3C5D",
+    shadowColor: "#1650D0",
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
     borderWidth: 1,

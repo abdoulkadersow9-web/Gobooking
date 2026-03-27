@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Linking,
   RefreshControl,
   ScrollView,
@@ -92,6 +93,21 @@ export default function AgentReservation() {
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (bookings.filter(b => b.status === "pending").length > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.15, duration: 700, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.stopAnimation();
+      pulseAnim.setValue(1);
+    }
+  }, [bookings.length]);
 
   /* Cancel modal state */
   const [cancelModal, setCancelModal] = useState<OnlineBooking | null>(null);
@@ -201,7 +217,7 @@ export default function AgentReservation() {
     <SafeAreaView style={S.root} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor="#164E63" />
       {/* Header */}
-      <LinearGradient colors={["#164E63", "#0E7490"]} style={S.header}>
+      <LinearGradient colors={["#164E63", "#0E7490", "#0891B2"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={S.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
@@ -221,7 +237,9 @@ export default function AgentReservation() {
       {/* Stats bar */}
       <View style={S.statsBar}>
         <View style={S.statItem}>
-          <Text style={[S.statNum, { color: "#D97706" }]}>{pendingCount}</Text>
+          <Animated.Text style={[S.statNum, { color: "#D97706", transform: [{ scale: pulseAnim }] }]}>
+            {pendingCount}
+          </Animated.Text>
           <Text style={S.statLabel}>En attente</Text>
         </View>
         <View style={S.statDivider} />

@@ -6,12 +6,15 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -64,8 +67,8 @@ function computeState(b: Booking): DisplayState {
 }
 
 const STATE_CONFIG: Record<DisplayState, { color: string; bg: string; label: string; icon: string }> = {
-  en_attente: { color: "#B45309", bg: "#FFFBEB",  label: "En attente",  icon: "clock"         },
-  confirmé:   { color: "#0B3C5D", bg: "#E0F2FE",  label: "Confirmé",    icon: "check"         },
+  en_attente: { color: "#D97706", bg: "#FFFBEB",  label: "En attente",  icon: "clock"         },
+  confirmé:   { color: "#1650D0", bg: "#EEF4FF",  label: "Confirmé",    icon: "check"         },
   payé:       { color: "#047857", bg: "#ECFDF5",  label: "Payé ✓",      icon: "check-circle"  },
   embarqué:   { color: "#6D28D9", bg: "#F5F3FF",  label: "Embarqué",    icon: "user-check"    },
   expiré:     { color: "#DC2626", bg: "#FEF2F2",  label: "Expiré",      icon: "alert-octagon" },
@@ -403,6 +406,29 @@ function BookingCard({
   );
 }
 
+// ─── Animated booking card with entrance effect ───────────────────────────────
+function AnimatedBookingCard({ item, index, reviewed, token, onVoucherRequest }: {
+  item: Booking; index: number; reviewed: Set<string>; token: string | null;
+  onVoucherRequest: (id: string) => void;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1, duration: 360, delay: Math.min(index * 55, 300), useNativeDriver: true,
+    }).start();
+  }, []);
+  return (
+    <Animated.View style={{
+      opacity: anim,
+      transform: [{ translateY: anim.interpolate({ inputRange: [0,1], outputRange: [24, 0] }) }],
+    }}>
+      <BookingCard item={item} reviewed={reviewed} token={token} onVoucherRequest={onVoucherRequest} />
+    </Animated.View>
+  );
+}
+
+type FilterKey = "tous" | "en_cours" | "terminés";
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
@@ -411,6 +437,7 @@ export default function BookingsScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [reviewed,   setReviewed]   = useState<Set<string>>(new Set());
+  const [filter,     setFilter]     = useState<FilterKey>("tous");
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = useCallback(async (silent = false) => {
@@ -462,22 +489,36 @@ export default function BookingsScreen() {
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 100 : insets.bottom + 100;
 
+  const FILTER_TABS: { key: FilterKey; label: string }[] = [
+    { key: "tous",    label: `Tous${bookings.length ? ` (${bookings.length})` : ""}` },
+    { key: "en_cours", label: `En cours (${bookings.filter(b => ["en_attente","confirmé"].includes(computeState(b))).length})` },
+    { key: "terminés", label: `Terminés (${bookings.filter(b => ["embarqué","bon_emis","payé"].includes(computeState(b))).length})` },
+  ];
+
+  const filteredBookings = bookings.filter(b => {
+    const st = computeState(b);
+    if (filter === "en_cours") return ["en_attente", "confirmé"].includes(st);
+    if (filter === "terminés") return ["payé", "embarqué", "bon_emis", "expiré", "annulé"].includes(st);
+    return true;
+  });
+
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
       <LinearGradient
-        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <View>
           <Text style={styles.headerTitle}>Mes Réservations</Text>
           {bookings.length > 0 && (
-            <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""}</Text>
+            <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""} au total</Text>
           )}
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
           <Pressable style={styles.historyBtn} onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}>
             <Feather name="gift" size={15} color="white" />
-            <Text style={styles.historyBtnText}>Mes bons</Text>
+            <Text style={styles.historyBtnText}>Bons</Text>
           </Pressable>
           <Pressable style={styles.historyBtn} onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}>
             <Feather name="clock" size={15} color="white" />
@@ -486,17 +527,38 @@ export default function BookingsScreen() {
         </View>
       </LinearGradient>
 
+      {/* Filter tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filterBarContent}
+      >
+        {FILTER_TABS.map(tab => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.filterTab, filter === tab.key && styles.filterTabActive]}
+            onPress={() => { Haptics.selectionAsync(); setFilter(tab.key); }}
+          >
+            <Text style={[styles.filterTabText, filter === tab.key && styles.filterTabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
         </View>
       ) : (
         <FlatList
-          data={bookings}
+          data={filteredBookings}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <BookingCard
+          renderItem={({ item, index }) => (
+            <AnimatedBookingCard
               item={item}
+              index={index}
               reviewed={reviewed}
               token={token}
               onVoucherRequest={handleVoucherRequest}
@@ -545,7 +607,14 @@ const styles = StyleSheet.create({
   historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  card:         { backgroundColor: Colors.light.card, borderRadius: 20, padding: 18, marginBottom: 14, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
+  filterBar:         { backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, maxHeight: 56 },
+  filterBarContent:  { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row", alignItems: "center" },
+  filterTab:         { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "transparent" },
+  filterTabActive:   { backgroundColor: "#EEF4FF", borderColor: "#1650D0" },
+  filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
+  filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
+
+  card:         { backgroundColor: Colors.light.card, borderRadius: 20, padding: 18, marginBottom: 14, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
   cardPressed:  { transform: [{ scale: 0.985 }] },
   cardExpired:  { borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
   cardCancelled:{ borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
