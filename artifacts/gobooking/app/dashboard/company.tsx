@@ -235,8 +235,8 @@ function CityPicker({ label, value, onChange }: { label: string; value: string; 
     <View style={{ marginBottom: 10 }}>
       <TextInput style={S.modalInput} placeholder={label} value={value} onChangeText={onChange} placeholderTextColor="#94A3B8" />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginTop: 6 }}>
-        {CI_CITIES.map(city => (
-          <Pressable key={city} onPress={() => onChange(city)} style={[S.cityChip, value === city && S.cityChipActive]}>
+        {CI_CITIES.map((city, i) => (
+          <Pressable key={`city-${i}-${city}`} onPress={() => onChange(city)} style={[S.cityChip, value === city && S.cityChipActive]}>
             <Text style={[S.cityChipText, value === city && S.cityChipTextActive]}>{city}</Text>
           </Pressable>
         ))}

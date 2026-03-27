@@ -258,9 +258,9 @@ export default function ParcelSendScreen() {
                 </Pressable>
                 {showFromCities && (
                   <View style={styles.cityDropdown}>
-                    {CITIES.filter((c) => c !== toCity).map((city) => (
+                    {CITIES.filter((c) => c !== toCity).map((city, i) => (
                       <Pressable
-                        key={city}
+                        key={`from-${i}-${city}`}
                         style={[styles.cityOption, fromCity === city && styles.cityOptionActive]}
                         onPress={() => { setFromCity(city); setShowFromCities(false); }}
                       >
@@ -284,9 +284,9 @@ export default function ParcelSendScreen() {
                 </Pressable>
                 {showToCities && (
                   <View style={styles.cityDropdown}>
-                    {CITIES.filter((c) => c !== fromCity).map((city) => (
+                    {CITIES.filter((c) => c !== fromCity).map((city, i) => (
                       <Pressable
-                        key={city}
+                        key={`to-${i}-${city}`}
                         style={[styles.cityOption, toCity === city && styles.cityOptionActive]}
                         onPress={() => { setToCity(city); setShowToCities(false); }}
                       >

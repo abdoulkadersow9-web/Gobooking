@@ -884,8 +884,8 @@ export default function TicketsScreen() {
 
                 <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>Villes fréquentes :</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                  {CITIES.map(city => (
-                    <TouchableOpacity key={city}
+                  {CITIES.map((city, i) => (
+                    <TouchableOpacity key={`city-${i}-${city}`}
                       style={{ backgroundColor: "#F3F4F6", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
                       onPress={() => {
                         if (!dFrom) setDFrom(city);

@@ -909,11 +909,11 @@ export default function ChefTrips() {
                 <View style={s.pickerWrap}>
                   <Feather name="map-pin" size={16} color="#166534" style={{ marginRight: 8 }} />
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {cityOptions.map(city => {
+                    {cityOptions.map((city, i) => {
                       const sel = waypointCity === city;
                       const alreadyPassed = waypointTrip?.waypoints_passed?.includes(city);
                       return (
-                        <Pressable key={city}
+                        <Pressable key={`waypoint-${i}-${city}`}
                           style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 6,
                             backgroundColor: sel ? "#166534" : alreadyPassed ? "#F0FDF4" : "#F3F4F6",
                             borderWidth: sel ? 0 : 1, borderColor: alreadyPassed ? "#86EFAC" : "#E5E7EB",
@@ -1096,8 +1096,8 @@ export default function ChefTrips() {
                 {Object.keys(seatsData.byAlighting).length > 0 && (
                   <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, marginBottom: 16 }}>
                     <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534", marginBottom: 8 }}>Descentes prévues</Text>
-                    {Object.entries(seatsData.byAlighting).map(([city, info]: [string, any]) => (
-                      <View key={city} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                    {Object.entries(seatsData.byAlighting).map(([city, info]: [string, any], i) => (
+                      <View key={`alight-${i}-${city}`} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
                         <Text style={{ fontSize: 12, color: "#166534" }}>📍 {city}</Text>
                         <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>{info.count} pax · Sièges {info.seats.join(", ")}</Text>
                       </View>
@@ -1259,8 +1259,8 @@ export default function ChefTrips() {
                 </View>
 
                 {/* Passagers groupés par ville de descente */}
-                {Object.entries(passengersData.grouped).map(([city, paxList]: [string, any]) => (
-                  <View key={city} style={{ marginBottom: 16 }}>
+                {Object.entries(passengersData.grouped).map(([city, paxList]: [string, any], i) => (
+                  <View key={`pax-${i}-${city}`} style={{ marginBottom: 16 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
                       <Feather name="map-pin" size={13} color="#D97706" />
                       <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>Descend à {city}</Text>

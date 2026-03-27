@@ -403,9 +403,9 @@ export default function HomeScreen() {
             </View>
             {/* ── Villes populaires ── */}
             <View style={styles.citiesRow}>
-              {["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man"].map((city) => (
+              {["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man"].map((city, i) => (
                 <Pressable
-                  key={city}
+                  key={`city-${i}-${city}`}
                   style={({ pressed }) => [styles.cityChip, pressed && { opacity: 0.7 }]}
                   onPress={() => {
                     if (!from) { setFrom(city); }

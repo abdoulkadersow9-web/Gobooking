@@ -322,9 +322,9 @@ export default function VenteScreen() {
                 <Text style={s.label}>Ville de montée</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    {cityList.slice(0, -1).map(city => (
+                    {cityList.slice(0, -1).map((city, i) => (
                       <Pressable
-                        key={city}
+                        key={`boarding-${i}-${city}`}
                         style={[s.cityChip, boardingCity === city && s.cityChipActive]}
                         onPress={() => {
                           setBoardingCity(city);
@@ -344,13 +344,13 @@ export default function VenteScreen() {
                 <Text style={s.label}>Ville de descente</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    {cityList.slice(1).map(city => {
+                    {cityList.slice(1).map((city, i) => {
                       const bIdx = cityList.indexOf(boardingCity);
                       const cIdx = cityList.indexOf(city);
                       const disabled = cIdx <= bIdx;
                       return (
                         <Pressable
-                          key={city}
+                          key={`alighting-${i}-${city}`}
                           style={[s.cityChip, alightingCity === city && s.cityChipActiveRed, disabled && s.cityChipDisabled]}
                           onPress={() => !disabled && setAlightingCity(city)}
                         >

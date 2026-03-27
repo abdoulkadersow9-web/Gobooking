@@ -41,7 +41,7 @@ interface Trip {
   isFallback?: boolean;
 }
 
-const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man", "Divo", "Gagnoa", "Soubré", "Daloa", "Abengourou"];
+const CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man", "Divo", "Gagnoa", "Soubré", "Abengourou"];
 
 /* ── Grille tarifaire client — prix Standard réels Côte d'Ivoire ───────────
    Utilisée pour afficher les prix même sans connexion / sans résultats API  */
@@ -362,9 +362,9 @@ export default function ResultatsScreen() {
 
           {/* City chips */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={{ gap: 6 }}>
-            {CITIES.map((city) => (
+            {CITIES.map((city, i) => (
               <Pressable
-                key={city}
+                key={`city-${i}-${city}`}
                 style={s.cityChip}
                 onPress={() => {
                   if (!from) { setFrom(city); }
