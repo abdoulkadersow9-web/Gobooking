@@ -15,7 +15,8 @@ import { registerForPushNotifications } from "@/utils/notifications";
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
   | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique" | "suivi"
-  | "agent_reservation" | "chef_agence";
+  | "agent_reservation" | "chef_agence"
+  | "agent_bagage" | "agent_route" | "validation_depart";
 
 export interface User {
   id: string;
@@ -43,15 +44,16 @@ export function hasRole(user: User | null, role: string): boolean {
 }
 
 export function getAgentPath(agentRole?: AgentRole | null): string {
-  if (agentRole === "chef_agence")       return "/agent/chef-home";
-  if (agentRole === "agent_ticket"       || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
-  if (agentRole === "agent_embarquement" || agentRole === "embarquement")    return "/agent/embarquement";
-  if (agentRole === "agent_colis"        || agentRole === "reception_colis") return "/agent/colis";
-  if (agentRole === "validation")        return "/agent/validation";
-  if (agentRole === "route")             return "/agent/route";
-  if (agentRole === "logistique")        return "/agent/logistique";
-  if (agentRole === "suivi")             return "/agent/suivi";
-  if (agentRole === "agent_reservation") return "/agent/reservation";
+  if (agentRole === "chef_agence")                                             return "/agent/chef-home";
+  if (agentRole === "agent_ticket" || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
+  if (agentRole === "agent_embarquement" || agentRole === "embarquement")      return "/agent/embarquement";
+  if (agentRole === "agent_colis"  || agentRole === "reception_colis")         return "/agent/colis";
+  if (agentRole === "agent_bagage")                                            return "/agent/bagage";
+  if (agentRole === "validation"   || agentRole === "validation_depart")       return "/agent/departure-validation";
+  if (agentRole === "route"        || agentRole === "agent_route")             return "/agent/route";
+  if (agentRole === "logistique")                                              return "/agent/logistique";
+  if (agentRole === "suivi")                                                   return "/agent/suivi";
+  if (agentRole === "agent_reservation")                                       return "/agent/reservation";
   return "/agent/home";
 }
 
@@ -61,11 +63,14 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   agent_guichet:      "Agent Guichet",
   agent_embarquement: "Agent Embarquement",
   agent_colis:        "Agent Colis",
+  agent_bagage:       "Agent Bagages",
   embarquement:       "Agent Embarquement",
   reception_colis:    "Agent Colis",
   vente:              "Agent Guichet",
-  validation:         "Agent Validation",
+  validation:         "Agent Validation Départ",
+  validation_depart:  "Agent Validation Départ",
   route:              "Agent En Route",
+  agent_route:        "Agent En Route",
   logistique:         "Agent Logistique",
   suivi:              "Agent Suivi",
   agent_reservation:  "Agent Réservation",
@@ -77,11 +82,14 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
   agent_guichet:      { bg: "#FEF3C7", text: "#D97706" },
   agent_embarquement: { bg: "#DCFCE7", text: "#166534" },
   agent_colis:        { bg: "#EDE9FE", text: "#7C3AED" },
+  agent_bagage:       { bg: "#FEF9C3", text: "#854D0E" },
   embarquement:       { bg: "#DCFCE7", text: "#166534" },
   reception_colis:    { bg: "#EDE9FE", text: "#7C3AED" },
   vente:              { bg: "#FEF3C7", text: "#D97706" },
   validation:         { bg: "#F3E8FF", text: "#6B21A8" },
+  validation_depart:  { bg: "#F3E8FF", text: "#6B21A8" },
   route:              { bg: "#FFE4CC", text: "#9A3412" },
+  agent_route:        { bg: "#FFE4CC", text: "#9A3412" },
   logistique:         { bg: "#E0F2FE", text: "#0369A1" },
   suivi:              { bg: "#FFF1F2", text: "#BE123C" },
   agent_reservation:  { bg: "#ECFEFF", text: "#0E7490" },
