@@ -285,7 +285,8 @@ router.get("/demo-roles", async (_req, res) => {
       "admin@gobooking.com":            "admin123",
       "compagnie@test.com":             "test123",
       "chef.test@gobooking.ci":         "chef1234",
-      "agent@test.com":                 "test123",
+      "agent@test.com":                 "test123",       /* guichet */
+      "reservation@test.com":           "test123",       /* réservation en ligne */
       "embarquement@test.com":          "test123",
       "colis@test.com":                 "test123",
       "validepart@test.com":            "test123",
