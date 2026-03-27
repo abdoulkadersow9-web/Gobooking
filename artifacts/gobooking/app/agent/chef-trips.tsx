@@ -103,7 +103,7 @@ function busAvailLabel(b: Bus): { label: string; color: string; bg: string; sele
 }
 
 export default function ChefTrips() {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const authToken = token ?? "";
 
   /* ── État global ── */
@@ -221,12 +221,17 @@ export default function ChefTrips() {
       setAgenceCity(b.agenceCity ?? "");
       setAuditLogs(a.logs ?? []);
     } catch (e: any) {
+      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+        logout();
+        router.replace("/(auth)/login" as never);
+        return;
+      }
       console.error("[chef-trips]", e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authToken]);
+  }, [authToken, logout]);
 
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);

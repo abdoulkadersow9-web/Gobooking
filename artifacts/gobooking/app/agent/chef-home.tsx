@@ -73,7 +73,7 @@ export default function ChefHome() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authToken]);
+  }, [authToken, logout]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -139,7 +139,7 @@ export default function ChefHome() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={INDIGO2} />}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 130 }}
       >
         {/* ── Header ── */}
         <LinearGradient colors={[INDIGO, INDIGO2, "#6366F1"]} style={s.header}>
@@ -189,12 +189,12 @@ export default function ChefHome() {
           <Text style={s.sectionTitle}>Actions rapides</Text>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Pressable style={[s.actionBtn, { backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
-              <Feather name="plus-circle" size={18} color="white" />
-              <Text style={[s.actionBtnText, { color: "white" }]}>Programmer un départ</Text>
+              <Feather name="plus-circle" size={16} color="white" />
+              <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Nouveau départ</Text>
             </Pressable>
             <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
-              <Feather name="list" size={18} color={INDIGO2} />
-              <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Gérer les trajets</Text>
+              <Feather name="list" size={16} color={INDIGO2} />
+              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Trajets</Text>
             </Pressable>
           </View>
         </View>
@@ -358,12 +358,12 @@ const s = StyleSheet.create({
 
   statsGrid: {
     flexDirection: "row", flexWrap: "wrap", gap: 12,
-    paddingHorizontal: 16, marginTop: -12,
+    paddingHorizontal: 16, marginTop: -16, paddingTop: 0,
   },
   statCard: {
     flex: 1, minWidth: "44%", borderRadius: 16, padding: 14,
-    shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6,
-    elevation: 2,
+    shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8,
+    elevation: 3,
   },
   statIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center", marginBottom: 8 },
   statValue: { fontSize: 26, fontWeight: "800" },

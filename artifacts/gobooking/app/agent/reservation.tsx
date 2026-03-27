@@ -240,17 +240,22 @@ export default function AgentReservation() {
       {/* Filter chips */}
       <View style={S.filterRow}>
         {([
-          { key: "pending",   label: `En attente${pendingCount > 0 ? ` (${pendingCount})` : ""}`, icon: "time-outline" as const },
-          { key: "confirmed", label: "Confirmées",  icon: "checkmark-circle-outline" as const },
-          { key: "all",       label: "Toutes",      icon: "list-outline" as const },
+          { key: "pending",   label: "En attente", badge: pendingCount > 0 ? String(pendingCount) : null, icon: "time-outline" as const },
+          { key: "confirmed", label: "Confirmées",  badge: null, icon: "checkmark-circle-outline" as const },
+          { key: "all",       label: "Toutes",      badge: String(bookings.length), icon: "list-outline" as const },
         ] as const).map(f => (
           <TouchableOpacity
             key={f.key}
             style={[S.chip, filter === f.key && S.chipActive]}
             onPress={() => setFilter(f.key)}
           >
-            <Ionicons name={f.icon} size={13} color={filter === f.key ? TEAL : "#6B7280"} />
-            <Text style={[S.chipTxt, filter === f.key && S.chipTxtActive]}>{f.label}</Text>
+            <Ionicons name={f.icon} size={13} color={filter === f.key ? "#fff" : "#6B7280"} />
+            <Text style={[S.chipTxt, filter === f.key && S.chipTxtActive]} numberOfLines={1}>{f.label}</Text>
+            {f.badge !== null && (
+              <View style={{ backgroundColor: filter === f.key ? "rgba(255,255,255,0.3)" : "#E5E7EB", borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 }}>
+                <Text style={{ fontSize: 10, fontWeight: "800", color: filter === f.key ? "#fff" : "#374151" }}>{f.badge}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </View>

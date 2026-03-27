@@ -616,16 +616,16 @@ export default function TicketsScreen() {
       {/* ── Tab bar ── */}
       <View style={S.tabBar}>
         <TouchableOpacity style={[S.tab, activeTab === "vente" && S.tabActive]} onPress={() => setActiveTab("vente")}>
-          <Ionicons name="ticket-outline" size={16} color={activeTab === "vente" ? G_DARK : "#9CA3AF"} />
-          <Text style={[S.tabTxt, activeTab === "vente" && S.tabTxtActive]}>Vente</Text>
+          <Ionicons name="ticket-outline" size={15} color={activeTab === "vente" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "vente" && S.tabTxtActive]} numberOfLines={1}>Vente</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[S.tab, activeTab === "depart" && S.tabActive]} onPress={() => setActiveTab("depart")}>
-          <Ionicons name="bus-outline" size={16} color={activeTab === "depart" ? G_DARK : "#9CA3AF"} />
-          <Text style={[S.tabTxt, activeTab === "depart" && S.tabTxtActive]}>Créer départ</Text>
+          <Ionicons name="bus-outline" size={15} color={activeTab === "depart" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "depart" && S.tabTxtActive]} numberOfLines={1}>Départ</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[S.tab, activeTab === "impression" && S.tabActive]} onPress={() => setActiveTab("impression")}>
-          <Feather name="printer" size={15} color={activeTab === "impression" ? G_DARK : "#9CA3AF"} />
-          <Text style={[S.tabTxt, activeTab === "impression" && S.tabTxtActive]}>Impression</Text>
+          <Feather name="printer" size={14} color={activeTab === "impression" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "impression" && S.tabTxtActive]} numberOfLines={1}>Impression</Text>
         </TouchableOpacity>
       </View>
 
@@ -1370,10 +1370,10 @@ const S = StyleSheet.create({
   headerSub: { color: "#FDE68A", fontSize: 12, marginTop: 1 },
   logoutBtn: { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
-  tabBar:     { flexDirection: "row", backgroundColor: G_DARK, paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
-  tab:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)" },
+  tabBar:     { flexDirection: "row", backgroundColor: G_DARK, paddingHorizontal: 12, paddingBottom: 10, paddingTop: 4, gap: 8 },
+  tab:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.1)" },
   tabActive:  { backgroundColor: "#fff" },
-  tabTxt:     { fontSize: 13, fontWeight: "700", color: "#9CA3AF" },
+  tabTxt:     { fontSize: 12, fontWeight: "700", color: "#9CA3AF", flexShrink: 1 },
   tabTxtActive: { color: G_DARK },
 
   content:   { padding: 16, gap: 14, paddingBottom: 32 },
