@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { getDashboardPath, useAuth } from "@/context/AuthContext";
+import { AgentRole, UserRole, getDashboardPath, useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 interface AuthResponse {
@@ -30,17 +30,29 @@ interface AuthResponse {
     name: string;
     email: string;
     phone: string;
-    role: "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
-    agentRole?: "embarquement" | "reception_colis" | "vente" | "validation" | "route" | null;
+    role: UserRole;
+    agentRole?: AgentRole | null;
+    extraRoles?: string[];
+    busId?: string | null;
+    tripId?: string | null;
+    companyId?: string | null;
+    photoUrl?: string | null;
+    referralCode?: string;
+    walletBalance?: number;
+    totalTrips?: number;
     createdAt: string;
   };
 }
 
 const DEMO_ACCOUNTS = [
-  { label: "Entreprise", email: "compagnie@test.com", password: "test123", color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase" as const },
-  { label: "Agent",      email: "agent@test.com",     password: "test123", color: "#059669", bg: "#ECFDF5", icon: "user"      as const },
-  { label: "Admin",      email: "admin@test.com",      password: "test123", color: "#7C3AED", bg: "#F5F3FF", icon: "shield"    as const },
-  { label: "Client",     email: "user@test.com",       password: "test123", color: "#0891B2", bg: "#ECFEFF", icon: "home"      as const },
+  { label: "Admin",        email: "admin@test.com",         password: "test123",  color: "#7C3AED", bg: "#F5F3FF", icon: "shield"   as const },
+  { label: "Compagnie",    email: "compagnie@test.com",     password: "test123",  color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"as const },
+  { label: "Chef Agence",  email: "chef.test@gobooking.ci", password: "chef1234", color: "#3730A3", bg: "#EEF2FF", icon: "star"     as const },
+  { label: "Guichet",      email: "agent@test.com",         password: "test123",  color: "#D97706", bg: "#FEF3C7", icon: "tag"      as const },
+  { label: "Embarquement", email: "embarquement@test.com",  password: "test123",  color: "#166534", bg: "#DCFCE7", icon: "check-circle" as const },
+  { label: "Bagages",      email: "bagage@test.com",        password: "test123",  color: "#854D0E", bg: "#FEF9C3", icon: "box"      as const },
+  { label: "Colis",        email: "colis@test.com",         password: "test123",  color: "#7C3AED", bg: "#EDE9FE", icon: "package"  as const },
+  { label: "Client",       email: "user@test.com",          password: "test123",  color: "#0891B2", bg: "#ECFEFF", icon: "home"     as const },
 ];
 
 export default function LoginScreen() {
@@ -145,13 +157,13 @@ export default function LoginScreen() {
           <View style={styles.demoBox}>
             <View style={styles.demoHeader}>
               <Feather name="zap" size={14} color="#D97706" />
-              <Text style={styles.demoTitle}>Accès rapide (démo)</Text>
+              <Text style={styles.demoTitle}>Accès rapide démo</Text>
             </View>
-            <View style={styles.demoGrid}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.demoScroll}>
               {DEMO_ACCOUNTS.map((acc) => (
                 <TouchableOpacity
                   key={acc.label}
-                  style={[styles.demoBtn, { backgroundColor: acc.bg, borderColor: acc.color + "33" }]}
+                  style={[styles.demoBtn, { backgroundColor: acc.bg, borderColor: acc.color + "44" }]}
                   onPress={() => handleDemoLogin(acc)}
                   activeOpacity={0.75}
                   disabled={demoLoading !== null || loading}
@@ -159,12 +171,12 @@ export default function LoginScreen() {
                   {demoLoading === acc.label ? (
                     <ActivityIndicator size="small" color={acc.color} />
                   ) : (
-                    <Feather name={acc.icon} size={16} color={acc.color} />
+                    <Feather name={acc.icon} size={15} color={acc.color} />
                   )}
                   <Text style={[styles.demoBtnText, { color: acc.color }]}>{acc.label}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
 
           <View style={styles.divider}>
@@ -323,25 +335,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#92400E",
   },
-  demoGrid: {
+  demoScroll: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
   },
   demoBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    minWidth: "45%",
-    flex: 1,
+    marginRight: 8,
     justifyContent: "center",
   },
   demoBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
 

@@ -16,7 +16,7 @@ export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agen
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
   | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique" | "suivi"
   | "agent_reservation" | "chef_agence"
-  | "agent_bagage" | "agent_route" | "validation_depart";
+  | "agent_bagage" | "agent_route" | "validation_depart" | "bagage";
 
 export interface User {
   id: string;
@@ -64,6 +64,7 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   agent_embarquement: "Agent Embarquement",
   agent_colis:        "Agent Colis",
   agent_bagage:       "Agent Bagages",
+  bagage:             "Agent Bagages",
   embarquement:       "Agent Embarquement",
   reception_colis:    "Agent Colis",
   vente:              "Agent Guichet",
@@ -83,6 +84,7 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
   agent_embarquement: { bg: "#DCFCE7", text: "#166534" },
   agent_colis:        { bg: "#EDE9FE", text: "#7C3AED" },
   agent_bagage:       { bg: "#FEF9C3", text: "#854D0E" },
+  bagage:             { bg: "#FEF9C3", text: "#854D0E" },
   embarquement:       { bg: "#DCFCE7", text: "#166534" },
   reception_colis:    { bg: "#EDE9FE", text: "#7C3AED" },
   vente:              { bg: "#FEF3C7", text: "#D97706" },
