@@ -23,7 +23,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { AgentRole, UserRole, getDashboardPath, useAuth } from "@/context/AuthContext";
+import { AgentRole, UserRole, useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -136,9 +136,12 @@ export default function LoginScreen() {
       method: "POST",
       body: JSON.stringify({ email: em.trim(), password: pw }),
     });
-    await login(res.token, res.user);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.replace(getDashboardPath(res.user.role, res.user.agentRole) as never);
+    /* login() updates the auth state; the AuthGuard in _layout.tsx then
+       navigates to the correct dashboard automatically.
+       Do NOT call router.replace() here — it would conflict with the AuthGuard
+       and cause a race condition / redirect loop. */
+    await login(res.token, res.user);
   };
 
   const handleLogin = async () => {

@@ -81,9 +81,9 @@ export default function RegisterScreen() {
           ...(referralCode.trim() ? { referralCode: referralCode.trim().toUpperCase() } : {}),
         }),
       });
-      await login(res.token, res.user);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
+      /* login() updates auth state; AuthGuard in _layout.tsx handles navigation */
+      await login(res.token, res.user);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Inscription échouée. Veuillez réessayer.";
       setServerError(msg);

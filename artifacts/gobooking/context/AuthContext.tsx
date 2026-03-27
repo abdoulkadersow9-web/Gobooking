@@ -48,7 +48,7 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
   if (agentRole === "agent_ticket" || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
   if (agentRole === "agent_embarquement" || agentRole === "embarquement")      return "/agent/embarquement";
   if (agentRole === "agent_colis"  || agentRole === "reception_colis")         return "/agent/colis";
-  if (agentRole === "agent_bagage")                                            return "/agent/bagage";
+  if (agentRole === "agent_bagage" || agentRole === "bagage")                  return "/agent/bagage";
   if (agentRole === "validation"   || agentRole === "validation_depart")       return "/agent/departure-validation";
   if (agentRole === "route"        || agentRole === "agent_route")             return "/agent/route";
   if (agentRole === "logistique")                                              return "/agent/logistique";
@@ -127,6 +127,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentPath = usePathname();
   const currentPathRef = useRef(currentPath);
 
+  /**
+   * activeSessionToken: tracks the CURRENT valid token at any point in time.
+   * Used to prevent the background validation from overwriting a newer session.
+   *
+   * Example race condition it prevents:
+   *   T=0  App starts, restores old session (token_A) from cache
+   *   T=0  Background validation starts for token_A
+   *   T=1  User clicks quick-access → login(token_B, userB)
+   *        → activeSessionToken = token_B
+   *   T=2  Background validation for token_A returns 403
+   *        → sees activeSessionToken !== token_A → does NOT clear session ✓
+   */
+  const activeSessionToken = useRef<string | null>(null);
+
   useEffect(() => {
     currentPathRef.current = currentPath;
   }, [currentPath]);
@@ -134,19 +148,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        /* ── Step 1: Read both token + cached user in parallel — very fast (~5ms) ── */
+        /* ── Step 1: Read both token + cached user in parallel (~5ms) ── */
         const [storedToken, storedUserJson] = await Promise.all([
           AsyncStorage.getItem("auth_token"),
           AsyncStorage.getItem("auth_user"),
         ]);
 
         if (!storedToken) {
-          /* No session stored — show login */
           setIsLoading(false);
           return;
         }
 
-        /* ── Step 2: If we have a cached user, restore it instantly ── */
+        /* Track this as the active session token */
+        activeSessionToken.current = storedToken;
+
+        /* ── Step 2: Restore cached user instantly if available ── */
         if (storedUserJson) {
           try {
             const cachedUser = JSON.parse(storedUserJson) as User;
@@ -156,48 +172,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(cachedUser);
               setIsLoading(false);
 
-              /* ── Step 3: Validate token in background — update user silently ── */
+              /* ── Step 3: Validate token in background ── */
               try {
                 const freshUser = await apiFetch<User>("/auth/me", {
                   token: storedToken,
                   timeoutMs: 10_000,
                 });
+
+                /* ── RACE GUARD: only act if this session is still the active one ── */
+                if (activeSessionToken.current !== storedToken) return;
+
                 if (freshUser?.role) {
                   await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
                   setUser(freshUser);
-
-                  /* Navigate to correct dashboard if we're on a wrong screen */
-                  const dashPath = getDashboardPath(freshUser.role, freshUser.agentRole);
-                  const cur = currentPathRef.current;
-                  const isClient = freshUser.role === "client" || freshUser.role === "user";
-                  const alreadyThere =
-                    cur === dashPath ||
-                    cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") ||
-                    (isClient && (cur.startsWith("/client/") || cur.startsWith("/(tabs)")));
-                  if (!alreadyThere) {
-                    router.replace(dashPath as never);
-                  }
                 } else {
                   /* Server returned unexpected data — clear session */
                   await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+                  activeSessionToken.current = null;
                   setToken(null);
                   setUser(null);
                 }
               } catch (e: any) {
-                /* Network error: keep cached session (offline-friendly) */
-                /* Auth error (401/403): token is invalid, clear session */
+                /* ── RACE GUARD ── */
+                if (activeSessionToken.current !== storedToken) return;
+
+                /* 401/403 = token genuinely invalid — clear session */
                 if (e?.httpStatus === 401 || e?.httpStatus === 403) {
                   await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+                  activeSessionToken.current = null;
                   setToken(null);
                   setUser(null);
                   router.replace("/(auth)/login");
                 }
-                /* For any other error (timeout, network down): silently keep session */
+                /* Network error / timeout → keep cached session (offline-friendly) */
               }
               return;
             }
           } catch {
-            /* Corrupt cache — ignore, fall through to server validation */
+            /* Corrupt cache — fall through to server validation */
           }
         }
 
@@ -207,24 +219,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             token: storedToken,
             timeoutMs: 10_000,
           });
+
+          if (activeSessionToken.current !== storedToken) return;
+
           if (!freshUser?.role) throw new Error("invalid user");
 
           await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
           setToken(storedToken);
           setUser(freshUser);
-
-          const dashPath = getDashboardPath(freshUser.role, freshUser.agentRole);
-          const cur = currentPathRef.current;
-          const isClient = freshUser.role === "client" || freshUser.role === "user";
-          const alreadyThere =
-            cur === dashPath ||
-            cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") ||
-            (isClient && (cur.startsWith("/client/") || cur.startsWith("/(tabs)")));
-          if (!alreadyThere) {
-            router.replace(dashPath as never);
-          }
         } catch {
+          if (activeSessionToken.current !== storedToken) return;
           await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+          activeSessionToken.current = null;
         }
       } catch {
         /* Storage error — ignore */
@@ -236,6 +242,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // Run once on mount
 
   const login = useCallback(async (newToken: string, newUser: User) => {
+    /* Mark this as the new active session BEFORE any async work */
+    activeSessionToken.current = newToken;
+
     await AsyncStorage.setItem("auth_token", newToken);
     await AsyncStorage.setItem("auth_user", JSON.stringify(newUser));
     setToken(newToken);
@@ -256,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    activeSessionToken.current = null;
     await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
     setToken(null);
     setUser(null);
