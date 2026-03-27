@@ -674,6 +674,185 @@ async function releaseWaypointSeats() {
   }
 }
 
+// ─── Notifications intelligentes ──────────────────────────────────────────────
+
+/** Garde la mémoire des alertes envoyées pour éviter les doublons */
+const sentPreAlighting = new Map<string, number>();  // `${tripId}|${bookingId}|${city}` → timestamp
+const sentDelayAlert   = new Map<string, number>();  // `${tripId}|${delayMinutes}` → timestamp
+const lastDelayPerTrip = new Map<string, number>();  // tripId → dernier délai connu
+
+/**
+ * sendPreAlightingNotifications — alerte passagers ~30 min avant leur descente
+ * Basé sur l'ETA calculée depuis departure_time + fraction du trajet par escale
+ */
+async function sendPreAlightingNotifications() {
+  const activeTrips = await db.execute(sql`
+    SELECT t.id, t.from_city, t.to_city, t.date, t.departure_time, t.arrival_time,
+           t.estimated_arrival_time, t.stops, t.delay_minutes, t.waypoints_passed
+    FROM trips t
+    WHERE t.status IN ('en_route', 'in_progress', 'boarding')
+  `);
+
+  for (const trip of activeTrips.rows as any[]) {
+    let stops: any[] = [];
+    try { stops = typeof trip.stops === "string" ? JSON.parse(trip.stops) : (trip.stops ?? []); } catch {}
+    if (!stops.length) continue;
+
+    let waypoints: string[] = [];
+    try { waypoints = typeof trip.waypoints_passed === "string" ? JSON.parse(trip.waypoints_passed) : (trip.waypoints_passed ?? []); } catch {}
+
+    // Calculer le temps total du trajet en minutes
+    const [dh, dm] = trip.departure_time.split(":").map(Number);
+    const [ah, am] = (trip.estimated_arrival_time ?? trip.arrival_time).split(":").map(Number);
+    const totalTripMin = ((ah * 60 + am) - (dh * 60 + dm) + 1440) % 1440;
+    if (totalTripMin <= 0) continue;
+
+    const delay = Number(trip.delay_minutes) || 0;
+    const baseDate = new Date(`${trip.date}T${trip.departure_time}:00`);
+
+    for (let i = 0; i < stops.length; i++) {
+      const stop = stops[i];
+      const cityName = stop.city ?? stop.name ?? stop.location ?? "";
+      if (!cityName) continue;
+
+      // Fraction du trajet : arrêt i sur N arrêts
+      const fraction = (i + 1) / (stops.length + 1);
+      const etaAtStopMin = Math.round(totalTripMin * fraction) + delay;
+      const etaAtStop = new Date(baseDate.getTime() + etaAtStopMin * 60_000);
+      const minsUntilStop = (etaAtStop.getTime() - Date.now()) / 60_000;
+
+      // Seulement si dans 15–45 min ET pas encore passée
+      if (minsUntilStop < 15 || minsUntilStop > 45) continue;
+      if (waypoints.includes(cityName)) continue; // déjà passée
+
+      // Trouver les passagers qui descendent à cette escale
+      const passengers = await db.execute(sql`
+        SELECT b.id, b.user_id, b.booking_ref, b.contact_phone
+        FROM bookings b
+        WHERE b.trip_id = ${trip.id}
+          AND LOWER(b.alighting_city) = LOWER(${cityName})
+          AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
+          AND (b.passenger_status IS NULL OR b.passenger_status = 'booked')
+      `);
+
+      for (const b of passengers.rows as any[]) {
+        const key = `${trip.id}|${b.id}|${cityName}`;
+        const lastSent = sentPreAlighting.get(key) ?? 0;
+        if (Date.now() - lastSent < 30 * 60_000) continue; // cooldown 30 min
+
+        const [u] = await db.select({ pushToken: usersTable.pushToken })
+          .from(usersTable).where(eq(usersTable.id, b.user_id)).limit(1);
+
+        const etaStr = `${String(etaAtStop.getHours()).padStart(2,"0")}:${String(etaAtStop.getMinutes()).padStart(2,"0")}`;
+        await pushAndStore(b.user_id, u?.pushToken, "pre_alighting_alert",
+          `🛑 Arrivée à ${cityName} dans ~${Math.round(minsUntilStop)} min`,
+          `Votre trajet ${trip.from_city} → ${trip.to_city} arrive à ${cityName} vers ${etaStr}. Préparez-vous à descendre !`,
+          b.id, "booking");
+
+        sentPreAlighting.set(key, Date.now());
+        console.log(`[Scheduler] 📍 Alerte descente : ${b.booking_ref} → ${cityName} dans ~${Math.round(minsUntilStop)} min`);
+      }
+    }
+  }
+}
+
+/**
+ * sendDelayNotifications — notifie tous les passagers d'un trajet si le délai augmente
+ */
+async function sendDelayNotifications() {
+  const delayedTrips = await db.execute(sql`
+    SELECT t.id, t.from_city, t.to_city, t.date, t.departure_time, t.delay_minutes, t.delay_reason
+    FROM trips t
+    WHERE t.status IN ('scheduled','boarding','en_route','in_progress')
+      AND t.delay_minutes > 0
+  `);
+
+  for (const trip of delayedTrips.rows as any[]) {
+    const delay = Number(trip.delay_minutes);
+    const lastDelay = lastDelayPerTrip.get(trip.id) ?? 0;
+
+    // Notifier seulement si le délai a augmenté d'au moins 10 min
+    if (delay <= lastDelay || delay - lastDelay < 10) {
+      lastDelayPerTrip.set(trip.id, delay);
+      continue;
+    }
+
+    const key = `${trip.id}|${delay}`;
+    if (sentDelayAlert.has(key)) { lastDelayPerTrip.set(trip.id, delay); continue; }
+
+    // Récupérer tous les passagers actifs du trajet
+    const passengers = await db.execute(sql`
+      SELECT DISTINCT b.user_id, b.booking_ref
+      FROM bookings b
+      WHERE b.trip_id = ${trip.id}
+        AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
+        AND (b.passenger_status IS NULL OR b.passenger_status != 'alighted')
+    `);
+
+    for (const p of passengers.rows as any[]) {
+      const [u] = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, p.user_id)).limit(1);
+      await pushAndStore(p.user_id, u?.pushToken, "trip_delay",
+        `⏱️ Retard sur votre trajet`,
+        `Votre bus ${trip.from_city} → ${trip.to_city} du ${trip.date} accuse un retard de ${delay} minutes.${trip.delay_reason ? " Motif : " + trip.delay_reason : ""} Merci de votre patience.`,
+        trip.id, "trip");
+    }
+
+    sentDelayAlert.set(key, Date.now());
+    lastDelayPerTrip.set(trip.id, delay);
+    if (passengers.rows.length > 0)
+      console.log(`[Scheduler] ⏱️  Alerte retard +${delay} min → trajet ${trip.id} (${passengers.rows.length} pax notifiés)`);
+  }
+}
+
+/**
+ * updateTripPositionIntelligence — met à jour le champ `intelligence` avec position actuelle + prochaine escale
+ */
+async function updateTripPositionIntelligence() {
+  const activeTrips = await db.execute(sql`
+    SELECT t.id, t.from_city, t.to_city, t.date, t.departure_time, t.arrival_time,
+           t.estimated_arrival_time, t.stops, t.delay_minutes, t.waypoints_passed,
+           t.status
+    FROM trips t
+    WHERE t.status IN ('en_route', 'in_progress', 'boarding')
+  `);
+
+  for (const trip of activeTrips.rows as any[]) {
+    let stops: any[] = [];
+    try { stops = typeof trip.stops === "string" ? JSON.parse(trip.stops) : (trip.stops ?? []); } catch {}
+
+    let waypoints: string[] = [];
+    try { waypoints = typeof trip.waypoints_passed === "string" ? JSON.parse(trip.waypoints_passed) : (trip.waypoints_passed ?? []); } catch {}
+
+    // Dernière ville passée = position actuelle
+    const currentCity = waypoints.length > 0
+      ? waypoints[waypoints.length - 1]
+      : trip.from_city;
+
+    // Prochaine escale = premier arrêt pas encore passé
+    const stopCities = stops.map((s: any) => s.city ?? s.name ?? s.location ?? "").filter(Boolean);
+    const nextStop = stopCities.find((c: string) => !waypoints.includes(c)) ?? trip.to_city;
+
+    // Progression : nombre d'étapes passées / total
+    const totalSteps = stopCities.length + 2; // from + stops + to
+    const passedSteps = waypoints.length + 1; // +1 pour from_city
+    const progressPct = Math.min(99, Math.round((passedSteps / totalSteps) * 100));
+
+    const intelligence = {
+      currentCity,
+      nextStop,
+      progressPct,
+      waypointsPassed: waypoints,
+      allStops: [trip.from_city, ...stopCities, trip.to_city],
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.execute(sql`
+      UPDATE trips SET intelligence = ${JSON.stringify(intelligence)}::jsonb
+      WHERE id = ${trip.id}
+    `).catch(() => {});
+  }
+}
+
 // ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 export function startScheduler(intervalMs = 30_000) {
@@ -694,6 +873,9 @@ export function startScheduler(intervalMs = 30_000) {
         checkPreDepartureAgentAlerts(),
         updateCapacityStatus(),
         releaseWaypointSeats(),
+        sendPreAlightingNotifications(),
+        sendDelayNotifications(),
+        updateTripPositionIntelligence(),
       ]);
     } catch (err) {
       console.error("[Scheduler] Erreur générale:", err);

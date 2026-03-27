@@ -130,6 +130,52 @@ export default function ChefTrips() {
     newBusId: "", location: "", detail: "",
   });
 
+  /* ── Modal Carte des sièges ── */
+  const [showSeats, setShowSeats]         = useState(false);
+  const [seatsTrip, setSeatsTrip]         = useState<Trip | null>(null);
+  const [seatsData, setSeatsData]         = useState<any | null>(null);
+  const [seatsLoading, setSeatsLoading]   = useState(false);
+  const [selectedSeat, setSelectedSeat]   = useState<any | null>(null);
+
+  /* ── Modal Passagers ── */
+  const [showPassengers, setShowPassengers]     = useState(false);
+  const [passengersTrip, setPassengersTrip]     = useState<Trip | null>(null);
+  const [passengersData, setPassengersData]     = useState<any | null>(null);
+  const [passengersLoading, setPassengersLoading] = useState(false);
+
+  async function openSeatMap(trip: Trip) {
+    setSeatsTrip(trip);
+    setSeatsData(null);
+    setSelectedSeat(null);
+    setShowSeats(true);
+    setSeatsLoading(true);
+    try {
+      const data = await apiFetch<any>(`/agent/chef/trips/${trip.id}/seats`, { token: authToken });
+      setSeatsData(data);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? "Impossible de charger les sièges");
+      setShowSeats(false);
+    } finally {
+      setSeatsLoading(false);
+    }
+  }
+
+  async function openPassengers(trip: Trip) {
+    setPassengersTrip(trip);
+    setPassengersData(null);
+    setShowPassengers(true);
+    setPassengersLoading(true);
+    try {
+      const data = await apiFetch<any>(`/agent/chef/trips/${trip.id}/passengers`, { token: authToken });
+      setPassengersData(data);
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? "Impossible de charger les passagers");
+      setShowPassengers(false);
+    } finally {
+      setPassengersLoading(false);
+    }
+  }
+
   /* ── Modal Escale (Waypoint) ── */
   const [showWaypoint, setShowWaypoint]   = useState(false);
   const [waypointTrip, setWaypointTrip]   = useState<Trip | null>(null);
@@ -484,6 +530,66 @@ export default function ChefTrips() {
                             </View>
                           )}
 
+                          {/* Suivi position temps réel */}
+                          {canWaypoint && trip.intel && (() => {
+                            let intel: any = null;
+                            try { intel = typeof trip.intel === "string" ? JSON.parse(trip.intel) : trip.intel; } catch {}
+                            if (!intel) return null;
+                            const allStops: string[] = intel.allStops ?? [trip.from_city, trip.to_city];
+                            const pct = intel.progressPct ?? 0;
+                            return (
+                              <View style={{ marginTop: 10, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10 }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Feather name="navigation" size={11} color="#166534" />
+                                    <Text style={{ fontSize: 11, color: "#166534", fontWeight: "700" }}>
+                                      Position actuelle : {intel.currentCity}
+                                    </Text>
+                                  </View>
+                                  <Text style={{ fontSize: 11, color: "#166534", fontWeight: "700" }}>{pct}%</Text>
+                                </View>
+                                {/* Barre progression */}
+                                <View style={{ height: 4, backgroundColor: "#D1FAE5", borderRadius: 4, overflow: "hidden" }}>
+                                  <View style={{ height: 4, width: `${pct}%`, backgroundColor: "#166534", borderRadius: 4 }} />
+                                </View>
+                                {/* Prochaine escale */}
+                                {intel.nextStop && intel.nextStop !== trip.to_city && (
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 5 }}>
+                                    <Feather name="arrow-right" size={10} color="#D97706" />
+                                    <Text style={{ fontSize: 10, color: "#D97706" }}>Prochaine escale : {intel.nextStop}</Text>
+                                  </View>
+                                )}
+                                {/* Ligne des étapes */}
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    {allStops.map((city: string, i: number) => {
+                                      const passed = (intel.waypointsPassed ?? []).includes(city) || city === trip.from_city;
+                                      const isCurrent = city === intel.currentCity;
+                                      const isLast = i === allStops.length - 1;
+                                      return (
+                                        <React.Fragment key={i}>
+                                          <View style={{ alignItems: "center" }}>
+                                            <View style={{
+                                              width: 18, height: 18, borderRadius: 9,
+                                              backgroundColor: isCurrent ? "#166534" : passed ? "#BBF7D0" : "#F3F4F6",
+                                              justifyContent: "center", alignItems: "center",
+                                              borderWidth: isCurrent ? 2 : 1,
+                                              borderColor: isCurrent ? "#14532D" : passed ? "#86EFAC" : "#E5E7EB",
+                                            }}>
+                                              {passed && <Feather name="check" size={9} color={isCurrent ? "white" : "#166534"} />}
+                                            </View>
+                                            <Text style={{ fontSize: 8, color: isCurrent ? "#166534" : "#9CA3AF", marginTop: 2, fontWeight: isCurrent ? "700" : "400", maxWidth: 40, textAlign: "center" }}>{city}</Text>
+                                          </View>
+                                          {!isLast && <View style={{ width: 20, height: 1, backgroundColor: passed ? "#86EFAC" : "#E5E7EB", marginBottom: 10 }} />}
+                                        </React.Fragment>
+                                      );
+                                    })}
+                                  </View>
+                                </ScrollView>
+                              </View>
+                            );
+                          })()}
+
                           {/* Actions */}
                           <View style={s.tripActions}>
                             {canEdit && (
@@ -492,6 +598,14 @@ export default function ChefTrips() {
                                 <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Modifier</Text>
                               </Pressable>
                             )}
+                            <Pressable style={[s.actionBtn, { backgroundColor: "#F3F4F6", borderColor: "#6B7280" }]} onPress={() => openSeatMap(trip)}>
+                              <Feather name="grid" size={13} color="#374151" />
+                              <Text style={[s.actionBtnText, { color: "#374151" }]}>Sièges</Text>
+                            </Pressable>
+                            <Pressable style={[s.actionBtn, { backgroundColor: "#EEF2FF", borderColor: INDIGO2 }]} onPress={() => openPassengers(trip)}>
+                              <Feather name="users" size={13} color={INDIGO2} />
+                              <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Pax</Text>
+                            </Pressable>
                             {canWaypoint && (
                               <Pressable style={[s.actionBtn, { backgroundColor: "#DCFCE7", borderColor: "#166534" }]}
                                 onPress={() => openWaypoint(trip)}>
@@ -896,6 +1010,289 @@ export default function ChefTrips() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════
+           MODAL : Carte des sièges en temps réel
+         ═══════════════════════════════════════════════════════════ */}
+      <Modal visible={showSeats} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFF" }} edges={["top"]}>
+          <LinearGradient colors={[INDIGO, INDIGO2]} style={s.modalHeader}>
+            <Pressable onPress={() => setShowSeats(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color="white" />
+            </Pressable>
+            <Text style={s.modalTitle}>🪑 Carte des sièges</Text>
+            <View style={{ width: 30 }} />
+          </LinearGradient>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {seatsTrip && (
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12 }}>
+                {seatsTrip.from_city} → {seatsTrip.to_city} · {seatsTrip.departure_time}
+              </Text>
+            )}
+
+            {/* Légende */}
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+              {[
+                { color: "#DCFCE7", border: "#86EFAC", label: "Libre" },
+                { color: "#FEE2E2", border: "#FCA5A5", label: "Occupé" },
+                { color: "#FEF3C7", border: "#FCD34D", label: "Réservé" },
+                { color: "#EDE9FE", border: "#C4B5FD", label: "Descendu" },
+              ].map((item, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: item.color, borderWidth: 1.5, borderColor: item.border }} />
+                  <Text style={{ fontSize: 11, color: "#374151" }}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {seatsLoading ? (
+              <View style={{ alignItems: "center", padding: 40 }}>
+                <ActivityIndicator size="large" color={INDIGO2} />
+                <Text style={{ color: "#6B7280", marginTop: 10 }}>Chargement des sièges…</Text>
+              </View>
+            ) : seatsData ? (
+              <>
+                {/* Stats */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                  {[
+                    { label: "Total",     value: seatsData.stats.total,    color: "#374151", bg: "#F3F4F6" },
+                    { label: "Libres",    value: seatsData.stats.free,     color: "#166534", bg: "#DCFCE7" },
+                    { label: "Occupés",   value: seatsData.stats.occupied, color: "#DC2626", bg: "#FEE2E2" },
+                    { label: "Descendus", value: seatsData.stats.released, color: "#7C3AED", bg: "#EDE9FE" },
+                  ].map((item, i) => (
+                    <View key={i} style={{ backgroundColor: item.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center", minWidth: 70 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "800", color: item.color }}>{item.value}</Text>
+                      <Text style={{ fontSize: 10, color: item.color }}>{item.label}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Passagers par ville de descente */}
+                {Object.keys(seatsData.byAlighting).length > 0 && (
+                  <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534", marginBottom: 8 }}>Descentes prévues</Text>
+                    {Object.entries(seatsData.byAlighting).map(([city, info]: [string, any]) => (
+                      <View key={city} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={{ fontSize: 12, color: "#166534" }}>📍 {city}</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#166534" }}>{info.count} pax · Sièges {info.seats.join(", ")}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Grille des sièges */}
+                {(() => {
+                  const seats: any[] = seatsData.seats;
+                  if (!seats.length) return <Text style={{ color: "#9CA3AF", textAlign: "center", padding: 20 }}>Aucun siège trouvé pour ce trajet</Text>;
+
+                  // Grouper par rangée
+                  const rows = new Map<number, any[]>();
+                  for (const seat of seats) {
+                    if (!rows.has(seat.row)) rows.set(seat.row, []);
+                    rows.get(seat.row)!.push(seat);
+                  }
+
+                  const seatColors = {
+                    free:     { bg: "#DCFCE7", border: "#86EFAC", text: "#166534" },
+                    occupied: { bg: "#FEE2E2", border: "#FCA5A5", text: "#DC2626" },
+                    reserved: { bg: "#FEF3C7", border: "#FCD34D", text: "#D97706" },
+                    released: { bg: "#EDE9FE", border: "#C4B5FD", text: "#7C3AED" },
+                  };
+
+                  return (
+                    <View style={{ alignItems: "center" }}>
+                      {/* Avant du bus */}
+                      <View style={{ backgroundColor: "#E0E7FF", borderRadius: 8, paddingHorizontal: 20, paddingVertical: 6, marginBottom: 10 }}>
+                        <Text style={{ fontSize: 11, color: INDIGO, fontWeight: "700" }}>🚌 CONDUCTEUR</Text>
+                      </View>
+
+                      {Array.from(rows.entries()).sort(([a], [b]) => a - b).map(([rowNum, rowSeats]) => (
+                        <View key={rowNum} style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 4 }}>
+                          <Text style={{ fontSize: 10, color: "#9CA3AF", width: 18, textAlign: "center" }}>{rowNum}</Text>
+                          {rowSeats.sort((a, b) => a.col - b.col).map((seat: any) => {
+                            const colors = seatColors[seat.status as keyof typeof seatColors] ?? seatColors.free;
+                            const isSelected = selectedSeat?.id === seat.id;
+                            const hasAisle = seat.col === 3; // aisle before col 3
+                            return (
+                              <React.Fragment key={seat.id}>
+                                {hasAisle && <View style={{ width: 10 }} />}
+                                <Pressable
+                                  style={{
+                                    width: 38, height: 42, borderRadius: 8, borderWidth: isSelected ? 3 : 1.5,
+                                    backgroundColor: colors.bg, borderColor: isSelected ? "#111827" : colors.border,
+                                    justifyContent: "center", alignItems: "center",
+                                  }}
+                                  onPress={() => setSelectedSeat(isSelected ? null : seat)}>
+                                  <Text style={{ fontSize: 10, fontWeight: "700", color: colors.text }}>{seat.number}</Text>
+                                  {seat.status === "released" && <Text style={{ fontSize: 7, color: "#7C3AED" }}>↓off</Text>}
+                                </Pressable>
+                              </React.Fragment>
+                            );
+                          })}
+                        </View>
+                      ))}
+
+                      {/* Arrière du bus */}
+                      <View style={{ backgroundColor: "#F3F4F6", borderRadius: 8, paddingHorizontal: 20, paddingVertical: 6, marginTop: 6 }}>
+                        <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "700" }}>ARRIÈRE</Text>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* Détail siège sélectionné */}
+                {selectedSeat && (
+                  <View style={{ backgroundColor: "white", borderRadius: 14, padding: 16, marginTop: 16, borderWidth: 2,
+                    borderColor: selectedSeat.status === "occupied" ? "#FCA5A5" : selectedSeat.status === "released" ? "#C4B5FD" : "#86EFAC" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 8 }}>
+                      Siège {selectedSeat.number}
+                    </Text>
+                    {selectedSeat.booking ? (
+                      <>
+                        <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+                          <Feather name="user" size={13} color="#6B7280" />
+                          <Text style={{ fontSize: 12, color: "#374151" }}>Réservation : {selectedSeat.booking.ref}</Text>
+                        </View>
+                        {selectedSeat.booking.boardingCity && (
+                          <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+                            <Feather name="log-in" size={13} color="#166534" />
+                            <Text style={{ fontSize: 12, color: "#166534" }}>Monte à : {selectedSeat.booking.boardingCity}</Text>
+                          </View>
+                        )}
+                        {selectedSeat.booking.alightingCity && (
+                          <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
+                            <Feather name="log-out" size={13} color={selectedSeat.status === "released" ? "#7C3AED" : "#DC2626"} />
+                            <Text style={{ fontSize: 12, color: selectedSeat.status === "released" ? "#7C3AED" : "#DC2626" }}>
+                              {selectedSeat.status === "released" ? "Descendu à" : "Descend à"} : {selectedSeat.booking.alightingCity}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ marginTop: 6, backgroundColor: selectedSeat.status === "released" ? "#EDE9FE" : "#FEE2E2",
+                          paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, alignSelf: "flex-start" }}>
+                          <Text style={{ fontSize: 11, fontWeight: "700", color: selectedSeat.status === "released" ? "#7C3AED" : "#DC2626" }}>
+                            {selectedSeat.status === "released" ? "✓ Libéré" : "● Occupé"}
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Feather name="check-circle" size={14} color="#166534" />
+                        <Text style={{ fontSize: 12, color: "#166534" }}>Siège disponible</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={{ alignItems: "center", padding: 40 }}>
+                <Feather name="grid" size={36} color="#9CA3AF" />
+                <Text style={{ color: "#9CA3AF", marginTop: 8 }}>Aucune donnée de sièges</Text>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════
+           MODAL : Liste des passagers
+         ═══════════════════════════════════════════════════════════ */}
+      <Modal visible={showPassengers} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFF" }} edges={["top"]}>
+          <LinearGradient colors={[INDIGO, INDIGO2]} style={s.modalHeader}>
+            <Pressable onPress={() => setShowPassengers(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color="white" />
+            </Pressable>
+            <Text style={s.modalTitle}>👥 Passagers</Text>
+            <View style={{ width: 30 }} />
+          </LinearGradient>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            {passengersTrip && (
+              <Text style={{ fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 12 }}>
+                {passengersTrip.from_city} → {passengersTrip.to_city} · {passengersTrip.departure_time}
+              </Text>
+            )}
+
+            {passengersLoading ? (
+              <View style={{ alignItems: "center", padding: 40 }}>
+                <ActivityIndicator size="large" color={INDIGO2} />
+              </View>
+            ) : passengersData ? (
+              <>
+                {/* Résumé */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: "À bord",     value: passengersData.summary.onBoard,  color: "#166534", bg: "#DCFCE7" },
+                    { label: "Descendus",  value: passengersData.summary.alighted, color: "#7C3AED", bg: "#EDE9FE" },
+                    { label: "Total",      value: passengersData.summary.total,    color: "#374151", bg: "#F3F4F6" },
+                  ].map((item, i) => (
+                    <View key={i} style={{ flex: 1, backgroundColor: item.bg, borderRadius: 12, padding: 10, alignItems: "center" }}>
+                      <Text style={{ fontSize: 20, fontWeight: "800", color: item.color }}>{item.value}</Text>
+                      <Text style={{ fontSize: 10, color: item.color }}>{item.label}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Passagers groupés par ville de descente */}
+                {Object.entries(passengersData.grouped).map(([city, paxList]: [string, any]) => (
+                  <View key={city} style={{ marginBottom: 16 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <Feather name="map-pin" size={13} color="#D97706" />
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>Descend à {city}</Text>
+                      <View style={{ backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 11, color: "#D97706", fontWeight: "700" }}>{paxList.length} pax</Text>
+                      </View>
+                    </View>
+                    {(paxList as any[]).map((pax: any, i: number) => (
+                      <View key={i} style={{
+                        backgroundColor: pax.passengerStatus === "alighted" ? "#F5F3FF" : "white",
+                        borderRadius: 12, padding: 12, marginBottom: 6,
+                        borderWidth: 1, borderColor: pax.passengerStatus === "alighted" ? "#C4B5FD" : "#E5E7EB",
+                        flexDirection: "row", gap: 10, alignItems: "center",
+                      }}>
+                        <View style={{
+                          width: 36, height: 36, borderRadius: 18,
+                          backgroundColor: pax.passengerStatus === "alighted" ? "#EDE9FE" : "#EEF2FF",
+                          justifyContent: "center", alignItems: "center",
+                        }}>
+                          <Feather name="user" size={16} color={pax.passengerStatus === "alighted" ? "#7C3AED" : INDIGO2} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827" }}>{pax.name}</Text>
+                          <View style={{ flexDirection: "row", gap: 10, marginTop: 2 }}>
+                            <Text style={{ fontSize: 11, color: "#6B7280" }}>Siège {pax.seatNumber}</Text>
+                            {pax.boardingCity && <Text style={{ fontSize: 11, color: "#166534" }}>↑ {pax.boardingCity}</Text>}
+                            <Text style={{ fontSize: 11, color: "#DC2626" }}>↓ {pax.alightingCity}</Text>
+                          </View>
+                          {pax.idNumber && <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 1 }}>CNI : {pax.idNumber}</Text>}
+                        </View>
+                        {pax.passengerStatus === "alighted" ? (
+                          <View style={{ backgroundColor: "#EDE9FE", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                            <Text style={{ fontSize: 10, color: "#7C3AED", fontWeight: "700" }}>Descendu</Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 }}>
+                            <Text style={{ fontSize: 10, color: "#166534", fontWeight: "700" }}>À bord</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+
+                {passengersData.passengers.length === 0 && (
+                  <View style={{ alignItems: "center", padding: 40 }}>
+                    <Feather name="users" size={36} color="#9CA3AF" />
+                    <Text style={{ color: "#9CA3AF", marginTop: 8 }}>Aucun passager enregistré</Text>
+                  </View>
+                )}
+              </>
+            ) : null}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 }

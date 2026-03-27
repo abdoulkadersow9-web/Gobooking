@@ -5267,6 +5267,185 @@ router.get("/chef/trips/:tripId/intelligence", async (req, res) => {
   }
 });
 
+/* ─── GET /agent/chef/trips/:tripId/seats — carte des sièges ─── */
+router.get("/chef/trips/:tripId/seats", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+
+    // Vérif accès compagnie
+    const tripRows = await db.execute(sql`
+      SELECT id, bus_id, from_city, to_city, total_seats, status, stops, waypoints_passed, company_id
+      FROM trips WHERE id = ${tripId} LIMIT 1
+    `);
+    if (!tripRows.rows.length) return res.status(404).json({ error: "Trajet introuvable" });
+    const trip = tripRows.rows[0] as any;
+    if (trip.company_id !== agent.companyId) return res.status(403).json({ error: "Accès refusé" });
+
+    // Tous les sièges du trajet
+    const seats = await db.execute(sql`
+      SELECT id, number, "row", "column", type, status, boarding_city, alighting_city
+      FROM seats WHERE trip_id = ${tripId} ORDER BY "row", "column"
+    `);
+
+    // Toutes les réservations actives du trajet avec leur statut passager
+    const bookings = await db.execute(sql`
+      SELECT b.id, b.booking_ref, b.seat_ids, b.seat_numbers, b.passengers,
+             b.boarding_city, b.alighting_city, b.passenger_status, b.contact_phone,
+             b.total_amount, b.status as booking_status
+      FROM bookings b
+      WHERE b.trip_id = ${tripId}
+        AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
+      ORDER BY b.created_at
+    `);
+
+    // Construire un index seatId → {bookingRef, passengerStatus, alightingCity}
+    const seatIndex = new Map<string, {
+      bookingId: string; bookingRef: string; bookingStatus: string;
+      passengerStatus: string; alightingCity: string; boardingCity: string;
+    }>();
+    for (const b of bookings.rows as any[]) {
+      let seatIds: string[] = [];
+      try { seatIds = Array.isArray(b.seat_ids) ? b.seat_ids : JSON.parse(b.seat_ids ?? "[]"); } catch {}
+      for (const sid of seatIds) {
+        seatIndex.set(sid, {
+          bookingId: b.id, bookingRef: b.booking_ref, bookingStatus: b.booking_status,
+          passengerStatus: b.passenger_status ?? "booked",
+          alightingCity: b.alighting_city ?? "", boardingCity: b.boarding_city ?? "",
+        });
+      }
+    }
+
+    // Enrichir chaque siège avec son statut effectif
+    const enrichedSeats = (seats.rows as any[]).map(seat => {
+      const booking = seatIndex.get(seat.id);
+      let effectiveStatus: "free" | "occupied" | "released" | "reserved" = "free";
+      if (booking) {
+        if (booking.passengerStatus === "alighted") effectiveStatus = "released";
+        else effectiveStatus = "occupied";
+      } else if (seat.status === "reserved") {
+        effectiveStatus = "reserved";
+      }
+      return {
+        id: seat.id, number: seat.number, row: seat.row, col: seat.column, type: seat.type,
+        status: effectiveStatus,
+        booking: booking ? {
+          ref: booking.bookingRef,
+          alightingCity: booking.alightingCity, boardingCity: booking.boardingCity,
+          passengerStatus: booking.passengerStatus,
+        } : null,
+      };
+    });
+
+    // Stats globales
+    const stats = {
+      total: enrichedSeats.length,
+      free:     enrichedSeats.filter(s => s.status === "free").length,
+      occupied: enrichedSeats.filter(s => s.status === "occupied").length,
+      released: enrichedSeats.filter(s => s.status === "released").length,
+      reserved: enrichedSeats.filter(s => s.status === "reserved").length,
+    };
+
+    // Passagers par escale de descente
+    const byAlighting: Record<string, { count: number; seats: string[] }> = {};
+    for (const s of enrichedSeats.filter(s => s.booking?.alightingCity)) {
+      const city = s.booking!.alightingCity;
+      if (!byAlighting[city]) byAlighting[city] = { count: 0, seats: [] };
+      byAlighting[city].count++;
+      byAlighting[city].seats.push(s.number);
+    }
+
+    res.json({ tripId, seats: enrichedSeats, stats, byAlighting });
+  } catch (err) {
+    console.error("[chef/seats]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/chef/trips/:tripId/passengers ── liste passagers ─ */
+router.get("/chef/trips/:tripId/passengers", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+
+    // Vérif accès
+    const tripPassRows = await db.execute(sql`
+      SELECT id, from_city, to_city, status, company_id FROM trips WHERE id = ${tripId} LIMIT 1
+    `);
+    if (!tripPassRows.rows.length) return res.status(404).json({ error: "Trajet introuvable" });
+    const trip = tripPassRows.rows[0] as any;
+
+    const rows = await db.execute(sql`
+      SELECT b.id, b.booking_ref, b.contact_phone, b.seat_numbers, b.passengers,
+             b.boarding_city, b.alighting_city, b.passenger_status, b.total_amount,
+             b.status as booking_status, b.created_at
+      FROM bookings b
+      WHERE b.trip_id = ${tripId}
+        AND b.status NOT IN ('cancelled','refunded')
+      ORDER BY b.alighting_city, b.created_at
+    `);
+
+    // Parser les passagers individuels
+    const passengers: any[] = [];
+    for (const b of rows.rows as any[]) {
+      let paxList: any[] = [];
+      let seatNums: string[] = [];
+      try { paxList = typeof b.passengers === "string" ? JSON.parse(b.passengers) : (b.passengers ?? []); } catch {}
+      try { seatNums = typeof b.seat_numbers === "string" ? JSON.parse(b.seat_numbers) : (b.seat_numbers ?? []); } catch {}
+
+      if (paxList.length === 0) {
+        // Réservation sans passagers individuels → une entrée par siège
+        passengers.push({
+          bookingRef: b.booking_ref, bookingId: b.id,
+          name: "Passager", phone: b.contact_phone,
+          seatNumber: seatNums[0] ?? "?",
+          boardingCity: b.boarding_city ?? trip.fromCity,
+          alightingCity: b.alighting_city ?? trip.toCity,
+          passengerStatus: b.passenger_status ?? "booked",
+          bookingStatus: b.booking_status,
+        });
+      } else {
+        paxList.forEach((pax: any, i: number) => {
+          passengers.push({
+            bookingRef: b.booking_ref, bookingId: b.id,
+            name: pax.nom ?? pax.name ?? `Passager ${i + 1}`,
+            phone: pax.telephone ?? pax.phone ?? b.contact_phone,
+            idNumber: pax.cni ?? pax.id_number ?? null,
+            seatNumber: seatNums[i] ?? "?",
+            boardingCity: b.boarding_city ?? trip.fromCity,
+            alightingCity: b.alighting_city ?? trip.toCity,
+            passengerStatus: b.passenger_status ?? "booked",
+            bookingStatus: b.booking_status,
+          });
+        });
+      }
+    }
+
+    // Grouper par ville de descente
+    const grouped: Record<string, any[]> = {};
+    for (const p of passengers) {
+      const city = p.alightingCity || trip.to_city;
+      if (!grouped[city]) grouped[city] = [];
+      grouped[city].push(p);
+    }
+
+    const summary = {
+      total: passengers.length,
+      onBoard:  passengers.filter(p => p.passengerStatus !== "alighted").length,
+      alighted: passengers.filter(p => p.passengerStatus === "alighted").length,
+    };
+
+    res.json({ tripId, passengers, grouped, summary });
+  } catch (err) {
+    console.error("[chef/passengers]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── GET /agent/chef/audit-log — historique des actions chef ── */
 router.get("/chef/audit-log", async (req, res) => {
   try {
