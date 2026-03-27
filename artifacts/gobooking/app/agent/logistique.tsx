@@ -93,6 +93,7 @@ export default function LogistiqueScreen() {
   const isAgent = user?.role === "agent";
 
   const load = useCallback(async (silent = false) => {
+    if (!token) { setLoading(false); return; }
     if (!silent) setLoading(true);
     try {
       const [overviewRes, depsRes] = await Promise.all([

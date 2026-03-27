@@ -87,6 +87,7 @@ export default function SuiviScreen() {
   }, [hasAlerts]);
 
   const load = useCallback(async (silent = false) => {
+    if (!token) { setLoading(false); return; }
     if (!silent) setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/agent/suivi/overview`, {

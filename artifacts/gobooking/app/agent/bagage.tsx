@@ -84,8 +84,8 @@ const STATUS_COLORS: Record<string, string> = {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function AgentBagage() {
-  const { user } = useAuth();
-  const token = (user as any)?.token ?? "";
+  const { user, token: rawToken } = useAuth();
+  const token = rawToken ?? "";
 
   const [tab, setTab] = useState<"ajouter" | "liste">("ajouter");
 
@@ -125,6 +125,7 @@ export default function AgentBagage() {
 
   /* ─ Fetch trips ─ */
   const loadTrips = useCallback(async () => {
+    if (!token) { setTL(false); return; }
     setTL(true);
     try {
       const r = await fetch(`${API}/agent/bagage/trips`, {

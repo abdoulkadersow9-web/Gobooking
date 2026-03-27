@@ -385,7 +385,7 @@ export default function TicketsScreen() {
     } finally { setPrintingRoute(false); }
   };
 
-  useEffect(() => { fetchTrips(); }, []);
+  useEffect(() => { if (token) fetchTrips(); }, [token]);
   useEffect(() => {
     if (activeTab === "depart" && fleetBuses.length === 0) fetchFleetBuses();
     if (activeTab === "impression") fetchImpTrips();

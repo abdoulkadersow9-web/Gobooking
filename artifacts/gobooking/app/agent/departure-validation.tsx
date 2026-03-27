@@ -139,6 +139,7 @@ export default function AgentDepartureValidation() {
 
   /* ─ Load trips ─ */
   const loadTrips = useCallback(async () => {
+    if (!token) { setTL(false); return; }
     setTL(true);
     try {
       const r = await fetch(`${API}/agent/validation-depart/trips`, {

@@ -250,10 +250,10 @@ export default function EmbarquementScreen() {
     );
   };
 
-  /* Load trips on mount */
+  /* Load trips on mount — attendre le token */
   useEffect(() => {
-    loadTodayTrips();
-  }, []);
+    if (token) loadTodayTrips();
+  }, [token]);
 
   /* ── Fetch active trip for agent's bus ────────────── */
   const fetchActiveTripId = async () => {
