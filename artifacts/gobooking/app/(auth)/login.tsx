@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +17,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -81,9 +84,12 @@ function getRoleStyle(userRole: string, agentRole: string | null): RoleStyle {
 }
 
 /* ── Composant principal ────────────────────────────────────────── */
+const VISIBLE = 3; /* nombre de cartes visibles simultanément */
+
 export default function LoginScreen() {
-  const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const insets        = useSafeAreaInsets();
+  const { login }     = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
 
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
@@ -92,10 +98,20 @@ export default function LoginScreen() {
   const [demoLoading, setDemoLoading]   = useState<string | null>(null);
   const [fieldError, setFieldError]     = useState("");
   const [serverError, setServerError]   = useState("");
+  const [carouselPage, setCarouselPage] = useState(0);
 
   /* Rôles démo chargés dynamiquement depuis la DB via API */
-  const [demoRoles, setDemoRoles]           = useState<DemoRole[]>([]);
-  const [demoRolesLoading, setDRLoading]    = useState(true);
+  const [demoRoles, setDemoRoles]        = useState<DemoRole[]>([]);
+  const [demoRolesLoading, setDRLoading] = useState(true);
+
+  /* Largeur d'une carte = (zone utile) / VISIBLE
+     Zone utile = largeur écran − padding formCard (24×2) − gaps internes */
+  const FORM_PADDING  = 24;
+  const CARD_GAP      = 8;
+  const ZONE_WIDTH    = screenWidth - FORM_PADDING * 2;
+  const CARD_WIDTH    = (ZONE_WIDTH - CARD_GAP * (VISIBLE - 1)) / VISIBLE;
+  const PAGE_SIZE     = CARD_WIDTH + CARD_GAP; /* distance de snap par carte */
+  const totalPages    = Math.ceil(demoRoles.length / VISIBLE);
 
   useEffect(() => {
     apiFetch<DemoRole[]>("/auth/demo-roles")
@@ -195,38 +211,76 @@ export default function LoginScreen() {
             ) : demoRoles.length === 0 ? (
               <Text style={styles.demoEmptyText}>Aucun rôle démo disponible</Text>
             ) : (
-              <View style={styles.demoGrid}>
-                {demoRoles.map((acc) => {
-                  const key   = acc.agentRole ?? acc.userRole;
-                  const style = getRoleStyle(acc.userRole, acc.agentRole);
-                  const busy  = demoLoading === key;
-                  const anyBusy = demoLoading !== null || loading;
+              <>
+                {/* ── Carousel horizontal — 3 cartes visibles ── */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={PAGE_SIZE * VISIBLE}
+                  decelerationRate="fast"
+                  contentContainerStyle={{ gap: CARD_GAP }}
+                  scrollEventThrottle={16}
+                  onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                    const x    = e.nativeEvent.contentOffset.x;
+                    const page = Math.round(x / (PAGE_SIZE * VISIBLE));
+                    setCarouselPage(page);
+                  }}
+                >
+                  {demoRoles.map((acc) => {
+                    const key     = acc.agentRole ?? acc.userRole;
+                    const rs      = getRoleStyle(acc.userRole, acc.agentRole);
+                    const busy    = demoLoading === key;
+                    const anyBusy = demoLoading !== null || loading;
 
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[
-                        styles.demoCard,
-                        { borderColor: style.color + "30", backgroundColor: style.bg },
-                        busy && styles.demoBusy,
-                      ]}
-                      onPress={() => handleDemoLogin(acc)}
-                      activeOpacity={0.75}
-                      disabled={anyBusy}
-                    >
-                      <View style={[styles.demoIconWrap, { backgroundColor: style.color + "18" }]}>
-                        {busy
-                          ? <ActivityIndicator size="small" color={style.color} />
-                          : <Feather name={style.icon} size={16} color={style.color} />
-                        }
-                      </View>
-                      <Text style={[styles.demoCardLabel, { color: style.color }]} numberOfLines={1}>
-                        {style.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                    return (
+                      <TouchableOpacity
+                        key={key}
+                        style={[
+                          styles.demoCard,
+                          { width: CARD_WIDTH, borderColor: rs.color + "35", backgroundColor: rs.bg },
+                          busy && styles.demoBusy,
+                        ]}
+                        onPress={() => handleDemoLogin(acc)}
+                        activeOpacity={0.72}
+                        disabled={anyBusy}
+                      >
+                        <View style={[styles.demoIconWrap, { backgroundColor: rs.color + "1A" }]}>
+                          {busy
+                            ? <ActivityIndicator size="small" color={rs.color} />
+                            : <Feather name={rs.icon} size={17} color={rs.color} />
+                          }
+                        </View>
+                        <Text style={[styles.demoCardLabel, { color: rs.color }]} numberOfLines={2}>
+                          {rs.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* ── Points de pagination ── */}
+                {totalPages > 1 && (
+                  <View style={styles.dotRow}>
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.dot,
+                          i === carouselPage && styles.dotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
+
+                {/* ── Hint swipe (disparaît après le 1er scroll) ── */}
+                {carouselPage === 0 && demoRoles.length > VISIBLE && (
+                  <View style={styles.swipeHint}>
+                    <Feather name="chevrons-right" size={12} color="#B45309" />
+                    <Text style={styles.swipeHintText}>Glisser pour voir plus</Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
 
@@ -401,29 +455,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  /* ── Grille 3 colonnes ─────────────────────────────────────── */
-  demoGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  /* ── Carousel ──────────────────────────────────────────────── */
   demoCard: {
-    width: "31%",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 6,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1.5,
-    gap: 6,
+    gap: 7,
+    /* hauteur fixe pour uniformité */
+    minHeight: 80,
   },
   demoBusy: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   demoIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -432,6 +482,41 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textAlign: "center",
     letterSpacing: 0.2,
+    lineHeight: 13,
+  },
+
+  /* ── Dots de pagination ─────────────────────────────────────── */
+  dotRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FDE68A",
+  },
+  dotActive: {
+    width: 18,
+    backgroundColor: "#B45309",
+    borderRadius: 3,
+  },
+
+  /* ── Hint swipe ─────────────────────────────────────────────── */
+  swipeHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: 6,
+    opacity: 0.7,
+  },
+  swipeHintText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#B45309",
   },
 
   /* ── Divider ───────────────────────────────────────────────── */
