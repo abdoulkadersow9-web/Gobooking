@@ -189,7 +189,7 @@ export default function LoginScreen() {
       >
         {/* ── Logo / titre ── */}
         <LinearGradient
-          colors={[Colors.light.primary, Colors.light.primaryDark]}
+          colors={["#1650D0", "#1030B4", "#0A1C84"]}
           style={styles.headerGradient}
         >
           <Image
@@ -412,12 +412,17 @@ const styles = StyleSheet.create({
   },
   formCard: {
     backgroundColor: Colors.light.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -20,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -24,
     flex: 1,
     padding: 24,
-    paddingTop: 28,
+    paddingTop: 30,
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
 
   /* ── Démo box ──────────────────────────────────────────────── */
@@ -467,11 +472,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 6,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
     gap: 7,
-    /* hauteur fixe pour uniformité */
-    minHeight: 80,
+    minHeight: 82,
   },
   demoBusy: {
     opacity: 0.65,
@@ -598,10 +602,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.light.background,
-    borderRadius: 12,
+    backgroundColor: "#F8FAFF",
+    borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: "#DBEAFE",
     paddingHorizontal: 14,
   },
   inputError: {
@@ -628,15 +632,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: Colors.light.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    marginTop: 8,
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
+    backgroundColor: "#1650D0",
+    borderRadius: 18,
+    paddingVertical: 17,
+    marginTop: 10,
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    elevation: 6,
   },
   loginButtonPressed: {
     opacity: 0.9,

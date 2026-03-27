@@ -144,15 +144,15 @@ export default function HomeScreen() {
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const firstName = user?.name?.split(" ")[0] || "";
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(18)).current;
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: false,
-    }).start();
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 640, useNativeDriver: false }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 640, useNativeDriver: false }),
+    ]).start();
   }, []);
 
   const [mode, setMode] = useState<Mode>("trajet");
@@ -301,7 +301,7 @@ export default function HomeScreen() {
   const parcelStatus = latestParcel ? (PARCEL_STATUS_STYLE[latestParcel.status] ?? PARCEL_STATUS_STYLE.en_attente) : null;
 
   return (
-    <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
     <ScrollView
       ref={scrollRef}
       style={styles.container}
@@ -310,7 +310,7 @@ export default function HomeScreen() {
     >
       {/* ── Header ── */}
       <LinearGradient
-        colors={[Colors.light.primary, Colors.light.primaryDark]}
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
         style={[styles.header, { paddingTop: topPad + 16 }]}
       >
         <View style={styles.headerRow}>
@@ -440,11 +440,18 @@ export default function HomeScreen() {
               </View>
             </View>
             <Pressable
-              style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+              style={({ pressed }) => [styles.searchBtnWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
               onPress={search}
             >
-              <Feather name="search" size={17} color="white" />
-              <Text style={styles.searchBtnText}>Rechercher des bus</Text>
+              <LinearGradient
+                colors={["#F97316", "#E05500"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.searchBtn}
+              >
+                <Feather name="search" size={17} color="white" />
+                <Text style={styles.searchBtnText}>Rechercher des bus</Text>
+              </LinearGradient>
             </Pressable>
           </View>
         ) : (
@@ -458,11 +465,18 @@ export default function HomeScreen() {
                 Expédiez vos colis partout en Côte d'Ivoire en toute sécurité
               </Text>
               <Pressable
-                style={({ pressed }) => [styles.searchBtn, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
+                style={({ pressed }) => [styles.searchBtnWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
                 onPress={() => router.push("/parcel/send")}
               >
-                <Feather name="arrow-right" size={17} color="white" />
-                <Text style={styles.searchBtnText}>Envoyer un colis</Text>
+                <LinearGradient
+                  colors={["#F97316", "#E05500"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.searchBtn}
+                >
+                  <Feather name="arrow-right" size={17} color="white" />
+                  <Text style={styles.searchBtnText}>Envoyer un colis</Text>
+                </LinearGradient>
               </Pressable>
             </View>
           </View>
@@ -1097,7 +1111,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  container: { flex: 1, backgroundColor: "#EDF2FF" },
 
   // Header
   header: { paddingHorizontal: 16, paddingBottom: 28 },
@@ -1116,25 +1130,26 @@ const styles = StyleSheet.create({
   modeBtnTextActive: { color: Colors.light.primary },
 
   // Search card
-  searchCard: { backgroundColor: "white", borderRadius: 22, padding: 16, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.1, shadowRadius: 14, elevation: 5 },
+  searchCard: { backgroundColor: "white", borderRadius: 24, padding: 18, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 22, elevation: 8 },
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   routeInputWrap: { flex: 1 },
   routeLabel: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   routeLabelText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: Colors.light.textSecondary, letterSpacing: 0.5 },
-  routeInput: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#0F172A", borderBottomWidth: 1.5, borderBottomColor: "#E2E8F0", paddingBottom: 6 },
-  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.light.primaryLight, justifyContent: "center", alignItems: "center", marginTop: 12 },
+  routeInput: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#0F172A", borderBottomWidth: 1.5, borderBottomColor: "#C7D2FE", paddingBottom: 6 },
+  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: "#BFCFFF" },
   bottomRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
   dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
   dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#0F172A" },
   paxWrap: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
   paxBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   paxCount: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A", minWidth: 16, textAlign: "center" },
-  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.accent, borderRadius: 12, paddingVertical: 14, shadowColor: Colors.light.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  searchBtnWrap: { shadowColor: "#F97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
+  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 15 },
   searchBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
   citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12, marginTop: 4 },
-  cityChip: { backgroundColor: "#EEF2FF", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#C7D2FE" },
-  cityChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
+  cityChip: { backgroundColor: "#EEF4FF", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: "#BFD0FF" },
+  cityChipText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#1650D0" },
   colisHero: { alignItems: "center", gap: 10, paddingVertical: 8 },
   colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   colisTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
@@ -1148,15 +1163,15 @@ const styles = StyleSheet.create({
     gap: 14,
     borderRadius: 18,
     padding: 16,
-    shadowColor: "#0B3C5D",
+    shadowColor: "#1650D0",
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
   },
-  ctaBtnPrimary: { backgroundColor: Colors.light.primaryLight, borderWidth: 1.5, borderColor: "#B3CBE0" },
-  ctaBtnGreen:   { backgroundColor: "#F0FDF4", borderWidth: 1.5, borderColor: "#BBF7D0" },
-  ctaIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#C7DCE9", justifyContent: "center", alignItems: "center" },
+  ctaBtnPrimary: { backgroundColor: "#EEF4FF", borderWidth: 1.5, borderColor: "#BFD0FF" },
+  ctaBtnGreen:   { backgroundColor: "#EDFAF5", borderWidth: 1.5, borderColor: "#BAECD8" },
+  ctaIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center" },
   ctaText: { flex: 1 },
   ctaTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primaryDark },
   ctaSub:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
@@ -1185,16 +1200,16 @@ const styles = StyleSheet.create({
   activityCard: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 14,
     gap: 6,
-    shadowColor: "#0B3C5D",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#EEF4FF",
     overflow: "hidden",
   },
   activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
@@ -1220,13 +1235,13 @@ const styles = StyleSheet.create({
 
   // Quick actions grid
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 12, padding: 16, paddingTop: 20 },
-  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 18, padding: 16, gap: 8, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
+  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 20, padding: 16, gap: 8, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: "#EEF4FF" },
   quickIcon: { width: 48, height: 48, borderRadius: 15, justifyContent: "center", alignItems: "center" },
   quickLabel: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" },
   quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, lineHeight: 16 },
 
   // Dashboard shortcut cards
-  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 18, padding: 16, marginBottom: 10, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
+  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 18, padding: 16, marginBottom: 10, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#EEF4FF" },
   dashCardIcon: { width: 46, height: 46, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   dashCardText: { flex: 1 },
   dashCardTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
@@ -1235,7 +1250,7 @@ const styles = StyleSheet.create({
   dashCardBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
 
   // Popular routes
-  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 18, padding: 16, marginBottom: 10, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: "#F1F5F9" },
+  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 18, padding: 16, paddingLeft: 14, marginBottom: 10, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#EEF4FF", borderLeftWidth: 3, borderLeftColor: "#1650D0" },
   routeCardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   routeCardIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
