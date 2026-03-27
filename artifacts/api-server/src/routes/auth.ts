@@ -281,24 +281,26 @@ router.get("/demo-roles", async (_req, res) => {
   try {
     /* Comptes démo connus avec leurs mots de passe */
     const DEMO_CREDS: Record<string, string> = {
-      "admin@test.com":           "test123",
-      "admin@gobooking.com":      "test123",
-      "compagnie@test.com":       "test123",
-      "chef.test@gobooking.ci":   "chef1234",
-      "agent@test.com":           "test123",
-      "embarquement@test.com":    "test123",
-      "bagage@test.com":          "test123",
-      "colis@test.com":           "test123",
-      "validepart@test.com":      "test123",
-      "logistique@test.com":      "test123",
-      "suivi@test.com":           "test123",
-      "reservation@test.com":     "test123",
-      "user@test.com":            "test123",
+      "admin@test.com":                 "test123",
+      "admin@gobooking.com":            "admin123",
+      "compagnie@test.com":             "test123",
+      "chef.test@gobooking.ci":         "chef1234",
+      "agent@test.com":                 "test123",
+      "embarquement@test.com":          "test123",
+      "bagage@test.com":                "test123",
+      "colis@test.com":                 "test123",
+      "validepart@test.com":            "test123",
+      "logistique@test.com":            "test123",
+      "suivi@test.com":                 "test123",
+      "reservation@test.com":           "test123",
+      "user@test.com":                  "test123",
+      "kone.ibrahim.plateau@test.ci":   "test123",
     };
 
     const demoEmailsList = Object.keys(DEMO_CREDS);
 
-    /* Requête DB via Drizzle querybuilder (inArray → bon type PostgreSQL) */
+    /* Requête DB via Drizzle querybuilder
+       — on trie pour préférer les @test.com/@gobooking.ci aux autres */
     const rows = await db
       .select({
         email:     usersTable.email,
@@ -308,7 +310,13 @@ router.get("/demo-roles", async (_req, res) => {
       .from(usersTable)
       .leftJoin(agentsTable, eq(agentsTable.userId, usersTable.id))
       .where(inArray(usersTable.email, demoEmailsList))
-      .orderBy(usersTable.role, sql`${agentsTable.agentRole} NULLS LAST`, usersTable.email);
+      .orderBy(
+        usersTable.role,
+        sql`${agentsTable.agentRole} NULLS LAST`,
+        /* @test.com et @gobooking.ci en premier pour la déduplication */
+        sql`CASE WHEN ${usersTable.email} LIKE '%@test.com' OR ${usersTable.email} LIKE '%@gobooking.ci' THEN 0 ELSE 1 END`,
+        usersTable.email,
+      );
 
     /* Déduplique par rôle (agent_role ?? user_role) — un seul compte par rôle */
     const seen = new Set<string>();
