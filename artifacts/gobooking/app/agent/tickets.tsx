@@ -278,7 +278,12 @@ export default function TicketsScreen() {
     try {
       const res = await apiFetch("/agent/trips", { token: token ?? undefined });
       setTrips(Array.isArray(res) ? res : []);
-    } catch {
+    } catch (e: any) {
+      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+        logout();
+        router.replace("/(auth)/login" as never);
+        return;
+      }
       setTrips([]);
     } finally {
       setLoadingTrips(false);

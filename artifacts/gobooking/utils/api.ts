@@ -58,6 +58,8 @@ export async function apiFetch<T>(
     const err = new Error(body.error || `HTTP ${res.status}`) as Error & Record<string, unknown>;
     /* Preserve all server fields (code, bookingRef, passenger, …) on the error object */
     Object.assign(err, body);
+    /* Always expose the HTTP status for auth-error detection */
+    err.httpStatus = res.status;
     throw err;
   }
 

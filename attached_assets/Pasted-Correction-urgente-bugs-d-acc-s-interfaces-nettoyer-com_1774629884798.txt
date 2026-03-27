@@ -1,0 +1,76 @@
+Correction urgente – bugs d’accès + interfaces à nettoyer complètement
+
+Bonjour,
+
+Après vérification complète des dernières captures, il reste encore plusieurs problèmes importants à corriger immédiatement. Merci de rester strictement dans la logique métier GoBooking et de ne rien casser dans le fonctionnement actuel.
+
+1. ERREURS ROUGES / ACCÈS REFUSÉ
+Dans l’espace Chef d’Agence, des erreurs console s’affichent encore :
+
+- [chef-home] Error: Accès refusé
+- [chef-home] Error: Accès refusé — rôle Chef d’Agence requis
+
+Cela signifie qu’il y a encore un problème de permissions, de contrôle de rôle ou de récupération des données sur chef-home.
+
+Merci de :
+- corriger définitivement les permissions du rôle Chef d’Agence
+- vérifier la récupération des trajets / données côté chef-home
+- supprimer les erreurs console visibles en test
+- faire en sorte qu’aucune erreur rouge ne s’affiche pendant la navigation
+
+2. INTERFACES PAS PROPRES / PAS FLUIDES
+Les captures montrent encore plusieurs problèmes visuels :
+
+- icônes mal disposées ou mélangées
+- alignements incohérents
+- boutons mal dimensionnés
+- textes coupés
+- panneaux/cartes pas bien équilibrés
+- certains éléments se chevauchent
+- le rendu global n’est pas encore propre ni fluide
+
+Merci de vérifier et nettoyer complètement :
+- toutes les interfaces
+- tous les panneaux
+- toutes les cartes
+- toutes les icônes
+- tous les boutons
+- tous les espacements
+- tous les alignements
+
+3. PROBLÈMES VISUELS PRÉCIS À CORRIGER
+Merci de corriger précisément les points suivants :
+
+- le bouton flottant ne doit pas recouvrir les cartes ou les contenus
+- les boutons d’actions rapides doivent être bien dimensionnés
+- aucun texte ne doit être coupé
+- les onglets de l’espace ticketing doivent être mieux alignés
+- les blocs statistiques et cartes doivent être propres et homogènes
+- les icônes doivent être cohérentes et bien placées
+- les marges, paddings et espacements doivent être uniformes
+- toute l’interface doit être fluide et lisible sur mobile
+
+4. LOGIQUE À RESPECTER
+Merci de respecter strictement la logique GoBooking :
+- ne rien casser
+- ne pas mélanger les rôles
+- ne pas modifier la logique métier existante
+- uniquement corriger les bugs, les erreurs d’accès et nettoyer l’interface
+
+5. VÉRIFICATION GLOBALE DEMANDÉE
+Merci de faire une vérification complète de toute l’application :
+- espaces agents
+- espace chef d’agence
+- espace ticketing
+- navigation
+- panneaux
+- cartes
+- boutons
+- icônes
+- permissions
+- erreurs console
+
+Objectif :
+obtenir une application propre, fluide, sans bug visuel, sans erreur rouge, et prête pour les tests sérieux.
+
+Merci de corriger tout cela rapidement et de confirmer une fois terminé.

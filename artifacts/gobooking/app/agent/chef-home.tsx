@@ -42,7 +42,7 @@ type Trip = {
 };
 
 export default function ChefHome() {
-  const { user, token } = useAuth();
+  const { user, token, logout } = useAuth();
   const authToken = token ?? "";
 
   const [dash, setDash] = useState<DashData | null>(null);
@@ -63,6 +63,11 @@ export default function ChefHome() {
       setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
     } catch (e: any) {
+      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+        logout();
+        router.replace("/(auth)/login" as never);
+        return;
+      }
       console.error("[chef-home]", e);
     } finally {
       setLoading(false);
