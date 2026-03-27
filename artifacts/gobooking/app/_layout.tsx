@@ -27,7 +27,14 @@ import { useNetworkStatus } from "@/utils/offline";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
 /* ─── Rôles autorisés par groupe de routes ───────────────── */
 const ROUTE_ROLES: Record<string, string[]> = {
@@ -158,13 +165,8 @@ function RootLayoutNav() {
       <GlobalNetworkMonitor />
       <AuthGuard />
       <Stack screenOptions={{ headerShown: false }}>
-        {/* Splash */}
         <Stack.Screen name="index" />
-
-        {/* Auth */}
         <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
-
-        {/* Toutes les autres routes sont auto-découvertes par Expo Router depuis le filesystem */}
       </Stack>
     </View>
   );
@@ -180,25 +182,21 @@ export default function RootLayout() {
     ...Feather.font,
   });
 
+  /* Hide splash as soon as possible — fonts OR error (don't block on font success) */
   useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
+  /* Notification listeners — non-blocking */
   useEffect(() => {
     const cleanup = setupNotificationListeners(
-      (notification) => {
-        console.log("[GoBooking] Notification reçue:", notification.request.content.title);
-      },
-      (response) => {
-        console.log("[GoBooking] Notification tapée:", response.notification.request.content.title);
-      }
+      (_notification) => {},
+      (_response) => {},
     );
     return cleanup;
   }, []);
-
-  if (!fontsLoaded && !fontError) return null;
 
   return (
     <SafeAreaProvider>

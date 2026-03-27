@@ -101,7 +101,7 @@ export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): 
   if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
   if (role === "agent")                                 return getAgentPath(agentRole);
   if (role === "admin"   || role === "super_admin")     return "/admin/dashboard";
-  return "/client/home"; // client / user
+  return "/client/home";
 }
 
 interface AuthContextType {
@@ -128,17 +128,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const currentPathRef = useRef(currentPath);
 
   useEffect(() => {
+    currentPathRef.current = currentPath;
+  }, [currentPath]);
+
+  useEffect(() => {
     const load = async () => {
       try {
-        const storedToken = await AsyncStorage.getItem("auth_token");
-        if (!storedToken) return;
+        /* ── Step 1: Read both token + cached user in parallel — very fast (~5ms) ── */
+        const [storedToken, storedUserJson] = await Promise.all([
+          AsyncStorage.getItem("auth_token"),
+          AsyncStorage.getItem("auth_user"),
+        ]);
 
-        // Verify the token is still valid with the server
+        if (!storedToken) {
+          /* No session stored — show login */
+          setIsLoading(false);
+          return;
+        }
+
+        /* ── Step 2: If we have a cached user, restore it instantly ── */
+        if (storedUserJson) {
+          try {
+            const cachedUser = JSON.parse(storedUserJson) as User;
+            if (cachedUser?.role) {
+              /* Show the app immediately with cached data — no network wait */
+              setToken(storedToken);
+              setUser(cachedUser);
+              setIsLoading(false);
+
+              /* ── Step 3: Validate token in background — update user silently ── */
+              try {
+                const freshUser = await apiFetch<User>("/auth/me", {
+                  token: storedToken,
+                  timeoutMs: 10_000,
+                });
+                if (freshUser?.role) {
+                  await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
+                  setUser(freshUser);
+
+                  /* Navigate to correct dashboard if we're on a wrong screen */
+                  const dashPath = getDashboardPath(freshUser.role, freshUser.agentRole);
+                  const cur = currentPathRef.current;
+                  const isClient = freshUser.role === "client" || freshUser.role === "user";
+                  const alreadyThere =
+                    cur === dashPath ||
+                    cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") ||
+                    (isClient && (cur.startsWith("/client/") || cur.startsWith("/(tabs)")));
+                  if (!alreadyThere) {
+                    router.replace(dashPath as never);
+                  }
+                } else {
+                  /* Server returned unexpected data — clear session */
+                  await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+                  setToken(null);
+                  setUser(null);
+                }
+              } catch (e: any) {
+                /* Network error: keep cached session (offline-friendly) */
+                /* Auth error (401/403): token is invalid, clear session */
+                if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+                  await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+                  setToken(null);
+                  setUser(null);
+                  router.replace("/(auth)/login");
+                }
+                /* For any other error (timeout, network down): silently keep session */
+              }
+              return;
+            }
+          } catch {
+            /* Corrupt cache — ignore, fall through to server validation */
+          }
+        }
+
+        /* ── Fallback: no usable cache — validate with server ── */
         try {
-          const freshUser = await apiFetch<User>("/auth/me", { token: storedToken });
-          if (!freshUser || !freshUser.role) return;
+          const freshUser = await apiFetch<User>("/auth/me", {
+            token: storedToken,
+            timeoutMs: 10_000,
+          });
+          if (!freshUser?.role) throw new Error("invalid user");
 
-          // Refresh stored user with server data
           await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
           setToken(storedToken);
           setUser(freshUser);
@@ -148,18 +218,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isClient = freshUser.role === "client" || freshUser.role === "user";
           const alreadyThere =
             cur === dashPath ||
-            cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") || // same section
+            cur.startsWith(dashPath.replace(/\/[^/]+$/, "") + "/") ||
             (isClient && (cur.startsWith("/client/") || cur.startsWith("/(tabs)")));
           if (!alreadyThere) {
             router.replace(dashPath as never);
           }
         } catch {
-          // Token is invalid (server restart or expired) — clear stored auth
-          await AsyncStorage.removeItem("auth_token");
-          await AsyncStorage.removeItem("auth_user");
+          await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
         }
       } catch {
-        // ignore storage errors
+        /* Storage error — ignore */
       } finally {
         setIsLoading(false);
       }
@@ -173,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(newToken);
     setUser(newUser);
 
-    /* ── Enregistrement push token ── */
+    /* Push token registration — fire and forget */
     registerForPushNotifications().then(async (pushToken) => {
       if (!pushToken) return;
       try {
@@ -188,8 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.removeItem("auth_token");
-    await AsyncStorage.removeItem("auth_user");
+    await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
     setToken(null);
     setUser(null);
     router.replace("/(auth)/login");
