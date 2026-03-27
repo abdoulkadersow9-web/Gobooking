@@ -20,7 +20,7 @@ import {
   agentsTable,
   busPositionsTable,
 } from "@workspace/db";
-import { eq, and, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
 import { sendExpoPush } from "./pushService";
 import { locationStore } from "./locationStore";
 
@@ -289,28 +289,135 @@ async function checkUnloadedParcels() {
   }
 }
 
-// ─── 5. Mise à jour automatique statut trajet ─────────────────────────────────
+// ─── 5. Moteur d'état complet des trajets ────────────────────────────────────
+//
+//  scheduled → boarding   (30 min avant départ, même jour)
+//  boarding  → en_route   (à l'heure de départ)
+//  en_route  → arrived    (à l'heure d'arrivée estimée)
+//  arrived   → completed  (2 h après arrived_at)
+//
+//  Chaque transition met à jour les timestamps et notifie les passagers.
+
+const sentBoardingAlert = new Set<string>(); // tripId
 
 async function autoUpdateTripStatuses() {
-  const now = new Date();
+  const now   = new Date();
   const today = now.toISOString().slice(0, 10);
 
-  // Trajet "scheduled" dont le départ est passé depuis > 2 min → en_route
-  const scheduled = await db
+  /* ── scheduled → boarding  (fenêtre 30 min avant départ) ── */
+  const scheduledTrips = await db
     .select()
     .from(tripsTable)
     .where(and(eq(tripsTable.date, today), eq(tripsTable.status, "scheduled")));
 
-  for (const trip of scheduled) {
-    const minsOver = -minutesUntil(tripDepartureDate(trip)); // positif = passé
-    if (minsOver > 2) {
-      await db
-        .update(tripsTable)
-        .set({ status: "en_route", startedAt: now } as any)
-        .where(eq(tripsTable.id, trip.id));
-      console.log(`[Scheduler] 🟢 Trajet ${trip.id} → en_route (auto)`);
+  for (const trip of scheduledTrips) {
+    const minsUntil = minutesUntil(tripDepartureDate(trip));
+    if (minsUntil <= 30 && minsUntil > -2) {
+      await db.update(tripsTable).set({ status: "boarding" } as any).where(eq(tripsTable.id, trip.id));
+      console.log(`[Scheduler] 🚪 Trajet ${trip.id} (${trip.from}→${trip.to}) → BOARDING`);
+
+      if (!sentBoardingAlert.has(trip.id)) {
+        sentBoardingAlert.add(trip.id);
+        // Notifier les passagers confirmés
+        const bookings = await db.select({ id: bookingsTable.id, userId: bookingsTable.userId })
+          .from(bookingsTable)
+          .where(and(eq(bookingsTable.tripId, trip.id), inArray(bookingsTable.status, ["confirmed", "payé"])));
+        for (const b of bookings) {
+          const [u] = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+          await pushAndStore(b.userId, u?.pushToken, "boarding_started",
+            "🚪 Embarquement ouvert !",
+            `L'embarquement du bus ${trip.from} → ${trip.to} est ouvert. Départ dans ${Math.round(minsUntil)} min.`,
+            trip.id, "trip");
+        }
+      }
     }
   }
+
+  /* ── boarding → en_route  (heure de départ atteinte ou dépassée) ── */
+  const boardingTrips = await db
+    .select()
+    .from(tripsTable)
+    .where(and(eq(tripsTable.date, today), eq(tripsTable.status, "boarding")));
+
+  for (const trip of boardingTrips) {
+    const minsOver = -minutesUntil(tripDepartureDate(trip)); // positif = passé
+    if (minsOver >= 0) {
+      const delayMins = Math.max(0, Math.round(minsOver));
+      const etaStr = computeETA(trip.departureTime, trip.arrivalTime, delayMins);
+      await db.execute(sql`
+        UPDATE trips SET
+          status = 'en_route',
+          started_at = ${now.toISOString()},
+          actual_departure_time = ${now.toTimeString().slice(0,5)},
+          estimated_arrival_time = ${etaStr},
+          delay_minutes = ${delayMins}
+        WHERE id = ${trip.id}
+      `);
+      console.log(`[Scheduler] 🟢 Trajet ${trip.id} (${trip.from}→${trip.to}) → EN_ROUTE | retard ${delayMins} min | ETA ${etaStr}`);
+    }
+  }
+
+  /* ── en_route → arrived  (ETA ou heure d'arrivée atteinte) ── */
+  const enRouteRows = await db.execute(sql`
+    SELECT id, from_city, to_city, date, departure_time, arrival_time,
+           estimated_arrival_time, arrived_at, bus_id, status
+    FROM trips
+    WHERE date = ${today} AND status IN ('en_route', 'in_progress')
+  `);
+
+  for (const row of enRouteRows.rows as any[]) {
+    const eta = row.estimated_arrival_time ?? row.arrival_time;
+    if (!eta) continue;
+    const etaMs = new Date(today + "T" + eta + ":00").getTime();
+    if (now.getTime() >= etaMs) {
+      await db.execute(sql`
+        UPDATE trips SET status = 'arrived', arrived_at = ${now.toISOString()} WHERE id = ${row.id}
+      `);
+      console.log(`[Scheduler] 🏁 Trajet ${row.id} (${row.from_city}→${row.to_city}) → ARRIVED`);
+
+      // Notifier les passagers
+      const bookings = await db.select({ id: bookingsTable.id, userId: bookingsTable.userId })
+        .from(bookingsTable)
+        .where(and(eq(bookingsTable.tripId, row.id), inArray(bookingsTable.status, ["confirmed","embarqué","boarded","validated"])));
+      for (const b of bookings) {
+        const [u] = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+        await pushAndStore(b.userId, u?.pushToken, "trip_arrived",
+          "🏁 Vous êtes arrivé !",
+          `Votre bus ${row.from_city} → ${row.to_city} est arrivé à destination. Bon séjour !`,
+          row.id, "trip");
+      }
+
+      // Libérer le bus
+      if (row.bus_id) {
+        await db.execute(sql`UPDATE buses SET logistic_status = 'en_attente', current_trip_id = NULL WHERE id = ${row.bus_id}`).catch(() => {});
+      }
+    }
+  }
+
+  /* ── arrived → completed  (2 h après arrived_at) ── */
+  const arrivedRows = await db.execute(sql`
+    SELECT id, arrived_at FROM trips WHERE status = 'arrived' AND arrived_at IS NOT NULL
+  `);
+  for (const row of arrivedRows.rows as any[]) {
+    const arrivedAt = new Date(row.arrived_at);
+    const twoHoursAfter = new Date(arrivedAt.getTime() + 2 * 60 * 60 * 1000);
+    if (now >= twoHoursAfter) {
+      await db.execute(sql`UPDATE trips SET status = 'completed' WHERE id = ${row.id}`);
+      console.log(`[Scheduler] ✅ Trajet ${row.id} → COMPLETED`);
+    }
+  }
+}
+
+/* ─── Helper ETA ──────────────────────────────────────────────── */
+function computeETA(departureTime: string, arrivalTime: string, delayMins: number): string {
+  const [dh, dm] = departureTime.split(":").map(Number);
+  const [ah, am] = arrivalTime.split(":").map(Number);
+  const durationMins = (ah * 60 + am) - (dh * 60 + dm);
+  const nowMins      = new Date().getHours() * 60 + new Date().getMinutes();
+  const etaMins      = nowMins + Math.max(0, durationMins) + delayMins;
+  const h = Math.floor(etaMins / 60) % 24;
+  const m = etaMins % 60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
 }
 
 // ─── 6. Auto-confirmation réservations en_attente (payées) ──────────────────
@@ -464,6 +571,109 @@ async function checkPreDepartureAgentAlerts() {
   }
 }
 
+// ─── 9. Mise à jour indicateurs de capacité ──────────────────────────────────
+//  Met à jour `capacity_status` pour tous les trajets actifs :
+//  normal (0-69%) | almost_full (70-89%) | full (90-99%) | overloaded (100%+)
+
+async function updateCapacityStatus() {
+  const rows = await db.execute(sql`
+    SELECT t.id, t.total_seats,
+           COUNT(b.id) FILTER (WHERE b.status NOT IN ('cancelled','refunded','annulé','expiré')) AS booked,
+           COUNT(b.id) FILTER (WHERE b.passenger_status = 'alighted') AS alighted
+    FROM trips t
+    LEFT JOIN bookings b ON b.trip_id = t.id
+    WHERE t.status IN ('scheduled', 'boarding', 'en_route', 'in_progress', 'arrived')
+    GROUP BY t.id, t.total_seats
+  `);
+
+  for (const row of rows.rows as any[]) {
+    const total    = Number(row.total_seats) || 0;
+    const booked   = Number(row.booked) || 0;
+    const alighted = Number(row.alighted) || 0;
+    const active   = booked - alighted; // passagers actuellement à bord
+    const pct      = total > 0 ? (active / total) * 100 : 0;
+
+    const status = pct >= 100 ? "overloaded"
+                 : pct >= 90  ? "full"
+                 : pct >= 70  ? "almost_full"
+                 : "normal";
+
+    const delayRisk = total > 0 && pct >= 70; // bus chargé → risque retard au départ
+    const intel = JSON.stringify({
+      booked, alighted, active, pct: Math.round(pct),
+      delay_risk: delayRisk,
+      overloaded: pct >= 100,
+    });
+
+    await db.execute(sql`
+      UPDATE trips SET capacity_status = ${status}, intelligence = ${intel}::jsonb WHERE id = ${row.id}
+    `).catch(() => {});
+  }
+}
+
+// ─── 10. Libération automatique des places aux escales ────────────────────────
+//  Quand un trajet passe une escale (waypoints_passed contient la ville)
+//  → les passagers avec alighting_city = cette_ville sont marqués "alighted"
+//  → leurs sièges deviennent disponibles pour les passagers suivants
+
+async function releaseWaypointSeats() {
+  const activeTrips = await db.execute(sql`
+    SELECT id, from_city, to_city, waypoints_passed
+    FROM trips
+    WHERE status IN ('en_route', 'in_progress', 'boarding')
+      AND waypoints_passed IS NOT NULL
+      AND jsonb_array_length(waypoints_passed) > 0
+  `);
+
+  for (const trip of activeTrips.rows as any[]) {
+    let waypoints: string[] = [];
+    try { waypoints = JSON.parse(typeof trip.waypoints_passed === "string" ? trip.waypoints_passed : JSON.stringify(trip.waypoints_passed)); }
+    catch { continue; }
+    if (!waypoints.length) continue;
+
+    for (const city of waypoints) {
+      // Trouver les passagers qui descendent à cette escale et ne sont pas encore marqués alighted
+      const passengerRows = await db.execute(sql`
+        SELECT b.id, b.seat_ids, b.seat_numbers, b.user_id, b.booking_ref
+        FROM bookings b
+        WHERE b.trip_id = ${trip.id}
+          AND LOWER(b.alighting_city) = LOWER(${city})
+          AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
+          AND (b.passenger_status IS NULL OR b.passenger_status != 'alighted')
+      `);
+
+      for (const b of passengerRows.rows as any[]) {
+        // Marquer passager comme descendu
+        await db.execute(sql`
+          UPDATE bookings SET passenger_status = 'alighted' WHERE id = ${b.id}
+        `);
+
+        // Libérer les sièges dans la table seats
+        let seatIds: string[] = [];
+        try { seatIds = Array.isArray(b.seat_ids) ? b.seat_ids : JSON.parse(b.seat_ids ?? "[]"); }
+        catch {}
+        if (seatIds.length > 0) {
+          await db.execute(sql`
+            UPDATE seats SET status = 'available' WHERE id = ANY(${seatIds}::text[])
+          `).catch(() => {});
+        }
+
+        console.log(`[Scheduler] 🪑 Escale ${city} — siège libéré pour réservation ${b.booking_ref} (trajet ${trip.id})`);
+
+        // Notifier le passager descendu
+        const [u] = await db.select({ pushToken: usersTable.pushToken, id: usersTable.id })
+          .from(usersTable).where(eq(usersTable.id, b.user_id)).limit(1);
+        if (u) {
+          await pushAndStore(u.id, u.pushToken, "alighted_at_stop",
+            "🛑 Fin de votre trajet",
+            `Votre descente à ${city} a été enregistrée. Votre siège a été libéré. Bon séjour !`,
+            b.id, "booking");
+        }
+      }
+    }
+  }
+}
+
 // ─── Point d'entrée ───────────────────────────────────────────────────────────
 
 export function startScheduler(intervalMs = 30_000) {
@@ -482,6 +692,8 @@ export function startScheduler(intervalMs = 30_000) {
         checkPendingExpiry(),
         checkBusAnomalies(),
         checkPreDepartureAgentAlerts(),
+        updateCapacityStatus(),
+        releaseWaypointSeats(),
       ]);
     } catch (err) {
       console.error("[Scheduler] Erreur générale:", err);

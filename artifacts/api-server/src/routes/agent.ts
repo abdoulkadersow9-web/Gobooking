@@ -4735,8 +4735,11 @@ router.get("/chef/trips", async (req, res) => {
     const trips = await db.execute(sql`
       SELECT t.*,
         COUNT(b.id) FILTER (WHERE b.status IN ('confirmed','boarded','validated','payé')) as passenger_count,
+        COUNT(b.id) FILTER (WHERE b.passenger_status = 'alighted') as alighted_count,
         COUNT(p.id) FILTER (WHERE p.status NOT IN ('cancelled')) as parcel_count,
-        a.agence_id as agent_agence_id
+        a.agence_id as agent_agence_id,
+        COALESCE(t.estimated_arrival_time, t.arrival_time) as eta,
+        COALESCE(t.intelligence, '{}'::jsonb)               as intel
       FROM trips t
       LEFT JOIN bookings b ON b.trip_id = t.id
       LEFT JOIN parcels p ON p.trip_id = t.id
@@ -5128,6 +5131,138 @@ router.get("/chef/trips/:tripId/transfers", async (req, res) => {
     res.json({ tripId, transfers: transfers.rows });
   } catch (err) {
     console.error("[chef/trips/transfers GET]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/chef/trips/:tripId/waypoint ──────────────────
+   Marquer une escale comme passée → libère les sièges automatiquement
+   via le scheduler (releaseWaypointSeats) au prochain tick
+   ─────────────────────────────────────────────────────────────── */
+router.post("/chef/trips/:tripId/waypoint", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { user, agent } = ctx;
+    const { tripId } = req.params;
+    const { city } = req.body as { city: string };
+    if (!city) return res.status(400).json({ error: "city requis" });
+
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trip) return res.status(404).json({ error: "Trajet introuvable" });
+    if (trip.companyId !== agent.companyId) return res.status(403).json({ error: "Accès refusé" });
+    if (!["en_route","in_progress","boarding"].includes(trip.status))
+      return res.status(400).json({ error: `Impossible de marquer une escale sur un trajet '${trip.status}'` });
+
+    // Ajouter la ville aux waypoints_passed (sans dupliquer)
+    await db.execute(sql`
+      UPDATE trips
+      SET waypoints_passed = COALESCE(waypoints_passed, '[]'::jsonb) || to_jsonb(${city}::text)
+      WHERE id = ${tripId}
+        AND NOT (waypoints_passed @> to_jsonb(${city}::text))
+    `);
+
+    // Libération immédiate des sièges (n'attend pas le scheduler)
+    const passengerRows = await db.execute(sql`
+      SELECT b.id, b.seat_ids, b.user_id, b.booking_ref
+      FROM bookings b
+      WHERE b.trip_id = ${tripId}
+        AND LOWER(b.alighting_city) = LOWER(${city})
+        AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
+        AND (b.passenger_status IS NULL OR b.passenger_status != 'alighted')
+    `);
+
+    let seatsReleased = 0;
+    for (const b of passengerRows.rows as any[]) {
+      await db.execute(sql`UPDATE bookings SET passenger_status = 'alighted' WHERE id = ${b.id}`);
+      let seatIds: string[] = [];
+      try { seatIds = Array.isArray(b.seat_ids) ? b.seat_ids : JSON.parse(b.seat_ids ?? "[]"); } catch {}
+      if (seatIds.length > 0) {
+        await db.execute(sql`UPDATE seats SET status = 'available' WHERE id = ANY(${seatIds}::text[])`).catch(() => {});
+        seatsReleased += seatIds.length;
+      }
+    }
+
+    // Audit
+    await chefAudit({
+      userId: user.id, userName: user.name, agenceId: agent.agenceId!,
+      action: "chef_mark_waypoint", targetId: tripId, targetType: "trip",
+      newData: { city, passengersAlighted: passengerRows.rows.length, seatsReleased },
+    });
+
+    console.log(`[Chef Waypoint] ${user.name} → escale "${city}" sur trajet ${tripId} | ${passengerRows.rows.length} passagers descendus | ${seatsReleased} sièges libérés`);
+    res.json({
+      success: true, tripId, city,
+      passengersAlighted: passengerRows.rows.length,
+      seatsReleased,
+    });
+  } catch (err) {
+    console.error("[chef/waypoint]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/chef/trips/:tripId/intelligence ─── prévisions ─ */
+router.get("/chef/trips/:tripId/intelligence", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+
+    const rows = await db.execute(sql`
+      SELECT t.id, t.from_city, t.to_city, t.date, t.departure_time, t.arrival_time,
+             t.estimated_arrival_time, t.actual_departure_time, t.delay_minutes,
+             t.status, t.capacity_status, t.total_seats, t.waypoints_passed,
+             t.intelligence, t.bus_name, t.stops,
+             COUNT(b.id) FILTER (WHERE b.status NOT IN ('cancelled','refunded','annulé','expiré')) as booked,
+             COUNT(b.id) FILTER (WHERE b.passenger_status = 'alighted') as alighted,
+             COUNT(b.id) FILTER (WHERE b.alighting_city IS NOT NULL AND b.alighting_city != '') as segmented
+      FROM trips t
+      LEFT JOIN bookings b ON b.trip_id = t.id
+      WHERE t.id = ${tripId} AND t.company_id = ${agent.companyId}
+      GROUP BY t.id
+    `);
+    if (!rows.rows.length) return res.status(404).json({ error: "Trajet introuvable" });
+    const t = rows.rows[0] as any;
+
+    const booked   = Number(t.booked)   || 0;
+    const alighted = Number(t.alighted) || 0;
+    const total    = Number(t.total_seats) || 1;
+    const active   = booked - alighted;
+    const pct      = Math.round((active / total) * 100);
+    const delay    = Number(t.delay_minutes) || 0;
+
+    let delayRisk: "none" | "low" | "medium" | "high" = "none";
+    if (delay > 60) delayRisk = "high";
+    else if (delay > 30) delayRisk = "medium";
+    else if (delay > 0 || pct >= 90) delayRisk = "low";
+
+    // Verrouillage
+    const locks = {
+      canEdit:     t.status === "scheduled",
+      canCancel:   t.status === "scheduled",
+      canTransfer: ["en_route","in_progress","boarding","scheduled"].includes(t.status),
+      canWaypoint: ["en_route","in_progress","boarding"].includes(t.status),
+      reason: t.status === "en_route" ? "Trajet en cours — modifications bloquées"
+            : t.status === "arrived"  ? "Trajet arrivé — actions terminées"
+            : t.status === "completed"? "Trajet terminé"
+            : null,
+    };
+
+    res.json({
+      tripId, status: t.status,
+      eta: t.estimated_arrival_time ?? t.arrival_time,
+      actualDeparture: t.actual_departure_time,
+      delayMinutes: delay, delayRisk,
+      capacityStatus: t.capacity_status ?? "normal",
+      pct, active, booked, alighted, total,
+      segmented: Number(t.segmented) || 0,
+      waypointsPassed: (() => { try { return JSON.parse(typeof t.waypoints_passed === "string" ? t.waypoints_passed : JSON.stringify(t.waypoints_passed ?? "[]")); } catch { return []; } })(),
+      locks,
+    });
+  } catch (err) {
+    console.error("[chef/intelligence]", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

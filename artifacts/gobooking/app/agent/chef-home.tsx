@@ -36,6 +36,9 @@ type Trip = {
   id: string; from_city: string; to_city: string; date: string;
   departure_time: string; arrival_time: string; status: string;
   bus_name: string; total_seats: number; passenger_count: number;
+  capacity_status?: string; delay_minutes?: number;
+  estimated_arrival_time?: string; actual_departure_time?: string;
+  intel?: any;
 };
 
 export default function ChefHome() {
@@ -93,11 +96,25 @@ export default function ChefHome() {
   }
 
   function tripStatusLabel(s: string) {
-    if (s === "scheduled") return { label: "Programmé", color: "#D97706", bg: "#FEF3C7" };
-    if (s === "en_route")  return { label: "En route",  color: "#166534", bg: "#DCFCE7" };
-    if (s === "completed") return { label: "Arrivé",    color: "#6B7280", bg: "#F3F4F6" };
-    if (s === "cancelled") return { label: "Annulé",    color: "#DC2626", bg: "#FEE2E2" };
-    return { label: s, color: "#6B7280", bg: "#F3F4F6" };
+    if (s === "scheduled")   return { label: "Programmé",   icon: "calendar",      color: "#D97706", bg: "#FEF3C7" };
+    if (s === "boarding")    return { label: "Embarquement", icon: "user-check",    color: "#7C3AED", bg: "#EDE9FE" };
+    if (s === "en_route")    return { label: "En route",     icon: "navigation",    color: "#166534", bg: "#DCFCE7" };
+    if (s === "in_progress") return { label: "En route",     icon: "navigation",    color: "#166534", bg: "#DCFCE7" };
+    if (s === "arrived")     return { label: "Arrivé",       icon: "check-circle",  color: "#0369A1", bg: "#E0F2FE" };
+    if (s === "completed")   return { label: "Terminé",      icon: "check-square",  color: "#6B7280", bg: "#F3F4F6" };
+    if (s === "cancelled")   return { label: "Annulé",       icon: "x-circle",      color: "#DC2626", bg: "#FEE2E2" };
+    return { label: s, icon: "circle", color: "#6B7280", bg: "#F3F4F6" };
+  }
+
+  function capacityBadge(c?: string): { label: string; color: string; bg: string } | null {
+    if (c === "overloaded")  return { label: "Surcharge !", color: "#DC2626", bg: "#FEE2E2" };
+    if (c === "full")        return { label: "Complet",     color: "#DC2626", bg: "#FEE2E2" };
+    if (c === "almost_full") return { label: "Presque plein", color: "#D97706", bg: "#FEF3C7" };
+    return null;
+  }
+
+  function isLocked(status: string) {
+    return ["en_route","in_progress","boarding","arrived","completed"].includes(status);
   }
 
   if (loading) {
@@ -227,29 +244,58 @@ export default function ChefHome() {
             </View>
           ) : (
             tripsToday.map((trip) => {
-              const st = tripStatusLabel(trip.status);
-              const pct = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
+              const st      = tripStatusLabel(trip.status);
+              const cap     = capacityBadge(trip.capacity_status);
+              const locked  = isLocked(trip.status);
+              const pct     = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
+              const delay   = Number(trip.delay_minutes) || 0;
+              const eta     = trip.estimated_arrival_time ?? trip.arrival_time;
+              const isLive  = ["en_route","in_progress","boarding"].includes(trip.status);
+
               return (
-                <View key={trip.id} style={s.tripCard}>
+                <Pressable key={trip.id} style={[s.tripCard, isLive && { borderColor: "#BBF7D0", borderWidth: 2 }]}
+                  onPress={() => router.push("/agent/chef-trips" as never)}>
                   <View style={s.tripCardTop}>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
-                      <Text style={s.tripMeta}>
-                        <Feather name="clock" size={12} /> {trip.departure_time}
-                        {"  "}
-                        <Feather name="truck" size={12} /> {trip.bus_name}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
+                        {locked && <Feather name="lock" size={12} color="#9CA3AF" />}
+                      </View>
+                      <View style={{ flexDirection: "row", gap: 10, marginTop: 3, alignItems: "center" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                          <Feather name="clock" size={11} color="#6B7280" />
+                          <Text style={s.tripMeta}>{trip.departure_time}</Text>
+                        </View>
+                        {isLive && eta && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                            <Feather name="map-pin" size={11} color="#166534" />
+                            <Text style={[s.tripMeta, { color: "#166534" }]}>ETA {eta}</Text>
+                          </View>
+                        )}
+                        {delay > 0 && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF3C7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            <Feather name="alert-circle" size={10} color="#D97706" />
+                            <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>+{delay} min</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     <View style={[s.tripBadge, { backgroundColor: st.bg }]}>
                       <Text style={[s.tripBadgeText, { color: st.color }]}>{st.label}</Text>
                     </View>
                   </View>
-                  {/* Barre de remplissage */}
+                  {/* Indicateur capacité */}
+                  {cap && (
+                    <View style={[s.capBadge, { backgroundColor: cap.bg }]}>
+                      <Feather name="alert-triangle" size={10} color={cap.color} />
+                      <Text style={[s.capText, { color: cap.color }]}>{cap.label}</Text>
+                    </View>
+                  )}
                   <View style={s.fillBarBg}>
-                    <View style={[s.fillBar, { width: `${Math.min(100, pct)}%`, backgroundColor: pct >= 90 ? "#DC2626" : pct >= 70 ? "#D97706" : "#166534" }]} />
+                    <View style={[s.fillBar, { width: `${Math.min(100, pct)}%`, backgroundColor: pct >= 100 ? "#DC2626" : pct >= 90 ? "#DC2626" : pct >= 70 ? "#D97706" : "#166534" }]} />
                   </View>
-                  <Text style={s.fillLabel}>{trip.passenger_count} / {trip.total_seats} passagers</Text>
-                </View>
+                  <Text style={s.fillLabel}>{trip.passenger_count} / {trip.total_seats} passagers ({Math.round(pct)}%)</Text>
+                </Pressable>
               );
             })
           )}
@@ -362,6 +408,8 @@ const s = StyleSheet.create({
   fillBarBg: { height: 5, backgroundColor: "#F3F4F6", borderRadius: 4, marginTop: 10, overflow: "hidden" },
   fillBar: { height: 5, borderRadius: 4 },
   fillLabel: { fontSize: 11, color: "#9CA3AF", marginTop: 4 },
+  capBadge: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 8 },
+  capText: { fontSize: 11, fontWeight: "700" },
 
   fab: {
     position: "absolute", bottom: 28, right: 20,

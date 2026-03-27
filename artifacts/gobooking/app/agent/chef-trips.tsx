@@ -36,6 +36,9 @@ type Trip = {
   departure_time: string; arrival_time: string; status: string; price: number;
   bus_name: string; bus_id: string | null; total_seats: number;
   passenger_count: number; parcel_count: number;
+  capacity_status?: string; delay_minutes?: number;
+  estimated_arrival_time?: string; actual_departure_time?: string;
+  waypoints_passed?: string[]; stops?: any[]; alighted_count?: number;
 };
 
 type Bus = {
@@ -62,15 +65,26 @@ function actionLabel(action: string): { label: string; icon: string; color: stri
   if (action === "chef_modify_trip")       return { label: "Modification de trajet",   icon: "edit-2",       color: "#D97706" };
   if (action === "chef_cancel_trip")       return { label: "Annulation de trajet",     icon: "x-circle",     color: RED };
   if (action === "chef_emergency_transfer") return { label: "Transfert d'urgence",     icon: "alert-triangle", color: "#DC2626" };
+  if (action === "chef_mark_waypoint")      return { label: "Escale marquée",           icon: "map-pin",        color: "#166534" };
   return { label: action, icon: "activity", color: "#6B7280" };
 }
 
 function tripStatusInfo(s: string) {
-  if (s === "scheduled") return { label: "Programmé", color: "#D97706", bg: "#FEF3C7" };
-  if (s === "en_route")  return { label: "En route",  color: "#166534", bg: "#DCFCE7" };
-  if (s === "completed") return { label: "Arrivé",    color: "#6B7280", bg: "#F3F4F6" };
-  if (s === "cancelled") return { label: "Annulé",    color: RED,       bg: "#FEE2E2" };
-  return { label: s,   color: "#6B7280", bg: "#F3F4F6" };
+  if (s === "scheduled")   return { label: "Programmé",    color: "#D97706", bg: "#FEF3C7", live: false };
+  if (s === "boarding")    return { label: "Embarquement", color: "#7C3AED", bg: "#EDE9FE", live: true  };
+  if (s === "en_route")    return { label: "En route",     color: "#166534", bg: "#DCFCE7", live: true  };
+  if (s === "in_progress") return { label: "En route",     color: "#166534", bg: "#DCFCE7", live: true  };
+  if (s === "arrived")     return { label: "Arrivé",       color: "#0369A1", bg: "#E0F2FE", live: false };
+  if (s === "completed")   return { label: "Terminé",      color: "#6B7280", bg: "#F3F4F6", live: false };
+  if (s === "cancelled")   return { label: "Annulé",       color: RED,       bg: "#FEE2E2", live: false };
+  return { label: s, color: "#6B7280", bg: "#F3F4F6", live: false };
+}
+
+function capacityBadge(c?: string): { label: string; color: string; bg: string } | null {
+  if (c === "overloaded")  return { label: "⚠️ Surcharge",   color: RED,      bg: "#FEE2E2" };
+  if (c === "full")        return { label: "🔴 Complet",      color: RED,      bg: "#FEE2E2" };
+  if (c === "almost_full") return { label: "🟡 Presque plein", color: "#D97706", bg: "#FEF3C7" };
+  return null;
 }
 
 function busAvailLabel(b: Bus): { label: string; color: string; bg: string; selectable: boolean } {
@@ -115,6 +129,36 @@ export default function ChefTrips() {
   const [xferForm, setXferForm] = useState({
     newBusId: "", location: "", detail: "",
   });
+
+  /* ── Modal Escale (Waypoint) ── */
+  const [showWaypoint, setShowWaypoint]   = useState(false);
+  const [waypointTrip, setWaypointTrip]   = useState<Trip | null>(null);
+  const [waypointCity, setWaypointCity]   = useState("");
+
+  function openWaypoint(trip: Trip) {
+    setWaypointTrip(trip);
+    setWaypointCity("");
+    setShowWaypoint(true);
+  }
+
+  async function saveWaypoint() {
+    if (!waypointCity || !waypointTrip) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/agent/chef/trips/${waypointTrip.id}/waypoint`, {
+        method: "POST", token: authToken,
+        body: JSON.stringify({ city: waypointCity }),
+      });
+      Alert.alert("Escale enregistrée",
+        `L'escale "${waypointCity}" a été marquée. Les sièges des passagers qui y descendent sont maintenant libérés.`);
+      setShowWaypoint(false);
+      load();
+    } catch (e: any) {
+      Alert.alert("Erreur", e.message ?? "Impossible d'enregistrer l'escale");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   /* ── Chargement données ── */
   const load = useCallback(async () => {
@@ -337,28 +381,61 @@ export default function ChefTrips() {
                     <Text style={s.dateHeader}>{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</Text>
 
                     {grouped[dateKey].map(trip => {
-                      const st  = tripStatusInfo(trip.status);
-                      const pct = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
+                      const st          = tripStatusInfo(trip.status);
+                      const cap         = capacityBadge(trip.capacity_status);
+                      const pct         = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
+                      const delay       = Number(trip.delay_minutes) || 0;
+                      const eta         = trip.estimated_arrival_time ?? trip.arrival_time;
                       const canEdit     = trip.status === "scheduled";
                       const canCancel   = trip.status === "scheduled";
-                      const canTransfer = trip.status === "en_route" || trip.status === "scheduled";
+                      const canTransfer = ["en_route","in_progress","boarding","scheduled"].includes(trip.status);
+                      const canWaypoint = ["en_route","in_progress","boarding"].includes(trip.status);
 
                       return (
-                        <View key={trip.id} style={s.tripCard}>
+                        <View key={trip.id} style={[s.tripCard, st.live && { borderColor: "#BBF7D0", borderWidth: 2 }]}>
                           <View style={s.tripTop}>
                             <View style={{ flex: 1 }}>
-                              <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
+                                {!canEdit && !st.live && (
+                                  <Feather name="lock" size={12} color="#9CA3AF" />
+                                )}
+                                {st.live && (
+                                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#4ADE80" }} />
+                                )}
+                              </View>
                               <View style={s.tripMeta}>
                                 <Feather name="clock" size={12} color="#6B7280" />
                                 <Text style={s.tripMetaText}>{trip.departure_time}</Text>
                                 <Feather name="truck" size={12} color="#6B7280" />
                                 <Text style={s.tripMetaText}>{trip.bus_name}</Text>
                               </View>
+                              {canWaypoint && eta && (
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+                                  <Feather name="map-pin" size={11} color="#166534" />
+                                  <Text style={{ fontSize: 11, color: "#166534", fontWeight: "600" }}>ETA {eta}</Text>
+                                  {delay > 0 && (
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF3C7", paddingHorizontal: 5, paddingVertical: 1, borderRadius: 8 }}>
+                                      <Feather name="alert-circle" size={9} color="#D97706" />
+                                      <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>+{delay} min</Text>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
                             </View>
                             <View style={[s.statusBadge, { backgroundColor: st.bg }]}>
                               <Text style={[s.statusText, { color: st.color }]}>{st.label}</Text>
                             </View>
                           </View>
+
+                          {/* Badge capacité */}
+                          {cap && (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5,
+                              backgroundColor: cap.bg, alignSelf: "flex-start",
+                              paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 8 }}>
+                              <Text style={{ fontSize: 11, color: cap.color, fontWeight: "700" }}>{cap.label}</Text>
+                            </View>
+                          )}
 
                           {/* Stats */}
                           <View style={s.tripStats}>
@@ -367,6 +444,13 @@ export default function ChefTrips() {
                               <Text style={s.tripStatVal}>{trip.passenger_count}</Text>
                               <Text style={s.tripStatLabel}>pax</Text>
                             </View>
+                            {(trip.alighted_count ?? 0) > 0 && (
+                              <View style={s.tripStatItem}>
+                                <Feather name="log-out" size={14} color="#7C3AED" />
+                                <Text style={s.tripStatVal}>{trip.alighted_count}</Text>
+                                <Text style={s.tripStatLabel}>descendus</Text>
+                              </View>
+                            )}
                             <View style={s.tripStatItem}>
                               <Feather name="package" size={14} color="#7C3AED" />
                               <Text style={s.tripStatVal}>{trip.parcel_count}</Text>
@@ -374,7 +458,7 @@ export default function ChefTrips() {
                             </View>
                             <View style={s.tripStatItem}>
                               <Feather name="bar-chart-2" size={14} color="#166534" />
-                              <Text style={s.tripStatVal}>{trip.total_seats - trip.passenger_count}</Text>
+                              <Text style={s.tripStatVal}>{Math.max(0, trip.total_seats - trip.passenger_count + (trip.alighted_count ?? 0))}</Text>
                               <Text style={s.tripStatLabel}>libres</Text>
                             </View>
                           </View>
@@ -383,10 +467,22 @@ export default function ChefTrips() {
                           <View style={s.fillBg}>
                             <View style={[s.fillBar, {
                               width: `${Math.min(100, pct)}%`,
-                              backgroundColor: pct >= 90 ? RED : pct >= 60 ? "#D97706" : "#166534",
+                              backgroundColor: pct >= 100 ? RED : pct >= 90 ? RED : pct >= 60 ? "#D97706" : "#166534",
                             }]} />
                           </View>
                           <Text style={s.fillLabel}>{Math.round(pct)}% rempli</Text>
+
+                          {/* Escales passées */}
+                          {(trip.waypoints_passed?.length ?? 0) > 0 && (
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                              <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Escales : </Text>
+                              {trip.waypoints_passed!.map((wp, i) => (
+                                <View key={i} style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                                  <Text style={{ fontSize: 10, color: "#166534", fontWeight: "600" }}>✓ {wp}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
 
                           {/* Actions */}
                           <View style={s.tripActions}>
@@ -394,6 +490,13 @@ export default function ChefTrips() {
                               <Pressable style={[s.actionBtn, { backgroundColor: LIGHT, borderColor: INDIGO2 }]} onPress={() => openEdit(trip)}>
                                 <Feather name="edit-2" size={13} color={INDIGO2} />
                                 <Text style={[s.actionBtnText, { color: INDIGO2 }]}>Modifier</Text>
+                              </Pressable>
+                            )}
+                            {canWaypoint && (
+                              <Pressable style={[s.actionBtn, { backgroundColor: "#DCFCE7", borderColor: "#166534" }]}
+                                onPress={() => openWaypoint(trip)}>
+                                <Feather name="map-pin" size={13} color="#166534" />
+                                <Text style={[s.actionBtnText, { color: "#166534" }]}>Escale</Text>
                               </Pressable>
                             )}
                             {canTransfer && (
@@ -625,6 +728,86 @@ export default function ChefTrips() {
       </Modal>
 
       {/* ═══════════════════════════════════════════════════════════
+           MODAL : Marquer une escale (libération de sièges)
+         ═══════════════════════════════════════════════════════════ */}
+      <Modal visible={showWaypoint} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F0FDF4" }} edges={["top"]}>
+          <LinearGradient colors={["#14532D", "#166534"]} style={s.modalHeader}>
+            <Pressable onPress={() => setShowWaypoint(false)} style={{ padding: 4 }}>
+              <Feather name="x" size={22} color="white" />
+            </Pressable>
+            <Text style={s.modalTitle}>📍 Marquer une escale</Text>
+            <View style={{ width: 30 }} />
+          </LinearGradient>
+
+          <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+            {waypointTrip && (
+              <View style={{ backgroundColor: "#DCFCE7", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: "#14532D" }}>
+                  {waypointTrip.from_city} → {waypointTrip.to_city}
+                </Text>
+                <Text style={{ fontSize: 13, color: "#166534", marginTop: 4 }}>
+                  Départ : {waypointTrip.departure_time}  ·  {waypointTrip.bus_name}
+                </Text>
+                {(waypointTrip.waypoints_passed?.length ?? 0) > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, color: "#166534" }}>Déjà passées : </Text>
+                    {waypointTrip.waypoints_passed!.map((wp, i) => (
+                      <View key={i} style={{ backgroundColor: "#BBF7D0", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 11, color: "#14532D", fontWeight: "700" }}>✓ {wp}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={{ backgroundColor: "#FFF", borderRadius: 14, padding: 16, marginBottom: 20,
+              borderWidth: 1, borderColor: "#D1FAE5" }}>
+              <Feather name="info" size={16} color="#166534" />
+              <Text style={{ fontSize: 13, color: "#166534", marginTop: 6, lineHeight: 20 }}>
+                Marquer une escale libère immédiatement les sièges des passagers dont c'est la ville de descente,
+                permettant à de nouveaux passagers d'embarquer à la prochaine étape.
+              </Text>
+            </View>
+
+            <Text style={s.label}>Ville de l'escale *</Text>
+            <View style={s.pickerWrap}>
+              <Feather name="map-pin" size={16} color="#166534" style={{ marginRight: 8 }} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {CITIES.map(city => {
+                  const sel = waypointCity === city;
+                  return (
+                    <Pressable key={city}
+                      style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 6,
+                        backgroundColor: sel ? "#166534" : "#F3F4F6",
+                        borderWidth: sel ? 0 : 1, borderColor: "#E5E7EB" }]}
+                      onPress={() => setWaypointCity(city)}>
+                      <Text style={{ fontSize: 13, color: sel ? "white" : "#374151", fontWeight: sel ? "700" : "400" }}>
+                        {city}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <Pressable
+              style={[s.saveBtn, { backgroundColor: waypointCity ? "#166534" : "#9CA3AF", marginTop: 28 }]}
+              onPress={saveWaypoint}
+              disabled={saving || !waypointCity}>
+              {saving ? <ActivityIndicator color="white" /> : (
+                <>
+                  <Feather name="check-circle" size={18} color="white" />
+                  <Text style={s.saveBtnText}>Valider l'escale à {waypointCity || "…"}</Text>
+                </>
+              )}
+            </Pressable>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════
            MODAL : Transfert d'urgence (panne)
          ═══════════════════════════════════════════════════════════ */}
       <Modal visible={showTransfer} animationType="slide" presentationStyle="pageSheet">
@@ -789,6 +972,7 @@ const s = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB" },
   chipActive: { backgroundColor: INDIGO2, borderColor: INDIGO2 },
   chipText: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  pickerWrap: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   chipActiveText: { color: "white" },
   timeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: "white", borderWidth: 1.5, borderColor: "#E5E7EB" },
   timeChipActive: { backgroundColor: INDIGO2, borderColor: INDIGO2 },
