@@ -295,6 +295,8 @@ router.get("/demo-roles", async (_req, res) => {
       "reservation@test.com":           "test123",
       "user@test.com":                  "test123",
       "kone.ibrahim.plateau@test.ci":   "test123",
+      "route@test.com":                 "test123",
+      "konan.yves@sotral.ci":           "test123",
     };
 
     const demoEmailsList = Object.keys(DEMO_CREDS);

@@ -65,9 +65,10 @@ const ROLE_STYLES: Record<string, RoleStyle> = {
   agent_reservation:  { label: "Réservation",    icon: "calendar",     color: "#0369A1", bg: "#E0F2FE", order: 7  },
   agent_ticket:       { label: "Ticket",         icon: "credit-card",  color: "#065F46", bg: "#D1FAE5", order: 8  },
   validation_depart:  { label: "Validation",     icon: "check-square", color: "#0E7490", bg: "#ECFEFF", order: 9  },
-  logistique:         { label: "Logistique",     icon: "truck",        color: "#166534", bg: "#D1FAE5", order: 10 },
-  suivi:              { label: "Suivi",          icon: "map-pin",      color: "#9A3412", bg: "#FEF3C7", order: 11 },
-  vente:              { label: "Vente",          icon: "shopping-cart", color: "#0369A1", bg: "#E0F2FE", order: 12 },
+  agent_route:        { label: "Agent Route",    icon: "navigation",   color: "#B45309", bg: "#FEF3C7", order: 10 },
+  logistique:         { label: "Logistique",     icon: "truck",        color: "#166534", bg: "#D1FAE5", order: 11 },
+  suivi:              { label: "Suivi",          icon: "map-pin",      color: "#9A3412", bg: "#FEF3C7", order: 12 },
+  vente:              { label: "Vente",          icon: "shopping-cart", color: "#0369A1", bg: "#E0F2FE", order: 13 },
   client:             { label: "Client",         icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 13 },
   user:               { label: "Client",         icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 13 },
 };
