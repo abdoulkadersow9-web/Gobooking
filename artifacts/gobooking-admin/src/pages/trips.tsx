@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid } from "@/hooks/use-company";
+import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -24,6 +24,8 @@ export default function Trips() {
   const { isCompany } = useAuth();
 
   const [open, setOpen] = useState(false);
+  const [agentsTripId, setAgentsTripId] = useState<string | null>(null);
+  const { data: tripAgents, isLoading: agentsLoading } = useTripAgents(agentsTripId);
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -142,24 +144,21 @@ export default function Trips() {
                 </div>
               </div>
 
-              {!isCompany && (
-                <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-border">
-                  {trip.status === "scheduled" && (
-                    <Button variant="accent" onClick={() => handleAction(trip.id, "start")} disabled={actionPending} className="w-full md:w-auto">
-                      <PlayCircle size={16} className="mr-2" /> Démarrer
-                    </Button>
-                  )}
-                  {trip.status === "en_route" && (
-                    <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 w-full md:w-auto" onClick={() => handleAction(trip.id, "end")} disabled={actionPending}>
-                      <CheckSquare size={16} className="mr-2" /> Marquer Arrivé
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon">
-                    <span className="sr-only">Details</span>
-                    &middot;&middot;&middot;
+              <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-border">
+                {!isCompany && trip.status === "scheduled" && (
+                  <Button variant="accent" onClick={() => handleAction(trip.id, "start")} disabled={actionPending} className="w-full md:w-auto">
+                    <PlayCircle size={16} className="mr-2" /> Démarrer
                   </Button>
-                </div>
-              )}
+                )}
+                {!isCompany && trip.status === "en_route" && (
+                  <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 w-full md:w-auto" onClick={() => handleAction(trip.id, "end")} disabled={actionPending}>
+                    <CheckSquare size={16} className="mr-2" /> Marquer Arrivé
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setAgentsTripId(trip.id)} className="flex items-center gap-2 text-violet-600 border-violet-300 hover:bg-violet-50">
+                  <Users size={15} /> Équipe
+                </Button>
+              </div>
 
             </div>
           ))
@@ -289,6 +288,54 @@ export default function Trips() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Annuler</Button>
             <Button onClick={handleSubmit} isLoading={creating}>Créer le trajet</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog : Équipe en service ── */}
+      <Dialog open={!!agentsTripId} onOpenChange={(v) => { if (!v) setAgentsTripId(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users size={18} className="text-violet-600" />
+              Équipe en service
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {agentsLoading ? (
+              <p className="text-center py-6 text-muted-foreground text-sm">Chargement…</p>
+            ) : !tripAgents || tripAgents.length === 0 ? (
+              <p className="text-center py-6 text-muted-foreground text-sm">Aucun agent enregistré sur ce trajet.</p>
+            ) : (
+              <div className="space-y-2">
+                {(tripAgents as any[]).map((a: any, i: number) => (
+                  <div key={a.user_id} className="flex items-center justify-between rounded-xl bg-muted/40 border border-border px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center">{i + 1}</div>
+                      <div>
+                        <p className="font-semibold text-foreground text-sm">{a.name}</p>
+                        {a.contact && <p className="text-xs text-muted-foreground">{a.contact}</p>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-violet-100 text-violet-700">
+                        {a.agent_role.replace(/_/g, " ")}
+                      </span>
+                      {a.recorded_at && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAgentsTripId(null)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

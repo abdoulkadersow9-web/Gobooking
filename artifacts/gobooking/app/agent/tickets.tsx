@@ -68,6 +68,7 @@ interface BordereauFull {
   trip: { id: string; from: string; to: string; date: string; departureTime: string; busName: string; status: string };
   passengers: any[]; boarded: any[]; absents: any[];
   bagages: any[]; colis: any[]; expenses: Expense[];
+  agents?: Array<{ user_id: number; agent_role: string; name: string; contact: string; recorded_at: string }>;
   summary: {
     totalPassengers: number; boardedCount: number; absentCount: number;
     bagageCount: number; colisCount: number;
@@ -359,6 +360,7 @@ export default function TicketsScreen() {
         bagages: bordereau.bagages,
         colis: bordereau.colis,
         expenses: bordereau.expenses,
+        agents: bordereau.agents ?? [],
         summary: bordereau.summary,
         validatedBy: (user as any)?.name ?? "Agent Guichet",
         validatedAt: new Date().toISOString(),

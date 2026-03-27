@@ -969,6 +969,31 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ── GET /company/trips/:id/agents — agents en service sur un départ ─── */
+router.get("/trips/:id/agents", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.id;
+    // Vérifier que le trajet appartient à cette compagnie
+    const [trip] = await db.select({ id: tripsTable.id }).from(tripsTable)
+      .where(and(eq(tripsTable.id, tripId), eq(tripsTable.companyId, ctx.companyId))).limit(1);
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    const result = await db.execute(sql`
+      SELECT user_id, agent_role, name, contact, recorded_at
+      FROM trip_agents
+      WHERE trip_id = ${tripId}
+      ORDER BY recorded_at ASC
+    `);
+    res.json((result as any).rows ?? []);
+  } catch (err) {
+    console.error("[company/trips/:id/agents]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 router.get("/bookings", async (req, res) => {
   try {
     const ctx = await requireCompanyWithCompanyId(req.headers.authorization);

@@ -81,6 +81,7 @@ interface BordereauData {
   trip: { id: string; from: string; to: string; date: string; departureTime: string; busName: string; status: string };
   passengers: Passenger[]; boarded: Passenger[]; absents: Passenger[];
   bagages: BagageItem[]; colis: Colis[]; expenses: Expense[];
+  agents?: Array<{ user_id: number; agent_role: string; name: string; contact: string; recorded_at: string }>;
   summary: {
     totalPassengers: number; boardedCount: number; absentCount: number;
     bagageCount: number; colisCount: number;
@@ -228,6 +229,7 @@ export default function AgentDepartureValidation() {
         bagages:   bordereau.bagages,
         colis:     bordereau.colis,
         expenses:  bordereau.expenses,
+        agents:    bordereau.agents ?? [],
         summary:   bordereau.summary,
         validatedBy: (user as any)?.name ?? "Agent",
         validatedAt: new Date().toISOString(),

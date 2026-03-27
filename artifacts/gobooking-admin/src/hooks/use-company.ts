@@ -66,6 +66,14 @@ export function useTrips() {
   });
 }
 
+export function useTripAgents(tripId: string | null) {
+  return useQuery({
+    queryKey: ["trip-agents", tripId],
+    queryFn: () => apiFetch<any[]>(`/company/trips/${tripId}/agents`),
+    enabled: !!tripId,
+  });
+}
+
 export function useBuses() {
   return useQuery({
     queryKey: ["buses"],

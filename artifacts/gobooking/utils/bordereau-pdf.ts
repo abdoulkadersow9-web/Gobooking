@@ -48,6 +48,14 @@ export interface PdfExpense {
   description: string | null;
 }
 
+export interface PdfAgent {
+  user_id: number;
+  agent_role: string;
+  name: string;
+  contact: string;
+  recorded_at: string;
+}
+
 export interface PdfTrip {
   from: string;
   to: string;
@@ -78,6 +86,7 @@ export interface BordereauData {
   colis: PdfColis[];
   expenses: PdfExpense[];
   summary: PdfSummary;
+  agents?: PdfAgent[];
   validatedBy?: string;
   validatedAt?: string;
 }
@@ -193,8 +202,43 @@ const colisRow = (c: PdfColis, showPrice: boolean) => `
 /* ═══════════════════════════════════════════════════════
    VERSION ENTREPRISE — avec tous les montants
 ═══════════════════════════════════════════════════════ */
+/* ── Helper : bloc agents en service ── */
+const ROLE_LABELS: Record<string, string> = {
+  agent_ticket:          "Agent Ticket",
+  bagage:                "Agent Bagage",
+  agent_colis:           "Agent Colis",
+  agent_embarquement:    "Agent Embarquement",
+  validation_depart:     "Agent Validation",
+  guichet:               "Guichet",
+  vente:                 "Vente",
+};
+function agentsSection(agents: PdfAgent[] | undefined, accentColor: string): string {
+  if (!agents || agents.length === 0) return "";
+  return `
+  <div class="section">
+    <div class="section-header" style="border-color:${accentColor};">
+      <div class="section-icon" style="background:${accentColor}22;">👷</div>
+      <span class="section-title" style="color:${accentColor}">Équipe en service (${agents.length})</span>
+    </div>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Nom</th><th>Rôle</th><th>Contact</th><th>Enregistré à</th></tr>
+      </thead>
+      <tbody>${agents.map((a, i) => `
+        <tr>
+          <td style="color:#94A3B8;font-size:9px">${i + 1}</td>
+          <td style="font-weight:700">${a.name}</td>
+          <td><span style="background:${accentColor}18;color:${accentColor};padding:2px 7px;border-radius:8px;font-size:9px;font-weight:700">${ROLE_LABELS[a.agent_role] ?? a.agent_role}</span></td>
+          <td style="color:#475569">${a.contact || "—"}</td>
+          <td style="color:#94A3B8;font-size:9px">${a.recorded_at ? new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 export function generateBordereauEntreprise(data: BordereauData): string {
-  const { trip, boarded, absents, bagages, colis, expenses, summary, validatedBy, validatedAt } = data;
+  const { trip, boarded, absents, bagages, colis, expenses, summary, agents, validatedBy, validatedAt } = data;
   const s = summary;
 
   return `<!DOCTYPE html>
@@ -391,6 +435,8 @@ export function generateBordereauEntreprise(data: BordereauData): string {
     </div>
   </div>
 
+  ${agentsSection(agents, "#4338CA")}
+
   <!-- Signatures -->
   <div class="signature-box">
     <div class="sig-line">
@@ -424,7 +470,7 @@ export function generateBordereauEntreprise(data: BordereauData): string {
    VERSION AGENT ROUTE — sans aucun montant
 ═══════════════════════════════════════════════════════ */
 export function generateBordereauRoute(data: BordereauData): string {
-  const { trip, boarded, absents, bagages, colis, summary: s, validatedBy } = data;
+  const { trip, boarded, absents, bagages, colis, summary: s, agents, validatedBy } = data;
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -545,6 +591,8 @@ export function generateBordereauRoute(data: BordereauData): string {
       <tbody>${colis.map(c => colisRow(c, false)).join("")}</tbody>
     </table>`}
   </div>
+
+  ${agentsSection(agents, "#059669")}
 
   <!-- Signatures -->
   <div class="signature-box">

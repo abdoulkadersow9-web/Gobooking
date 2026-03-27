@@ -57,6 +57,44 @@ async function logColisAction(opts: {
   }
 }
 
+/* ── recordTripAgent — enregistre l'agent en service sur un départ ──────────
+   Upsert dans trip_agents : si l'agent a déjà été enregistré sur ce trajet,
+   met à jour rôle/contact (car un agent peut changer de poste en cours de journée).
+   Appelé silencieusement (.catch(() => {})) → ne bloque jamais la réponse principale.
+─────────────────────────────────────────────────────────────────────────── */
+async function recordTripAgent(
+  tripId: string | null | undefined,
+  userId: number | string | null | undefined,
+) {
+  if (!tripId || !userId) return;
+  try {
+    const uid = Number(userId);
+    const [agentRow] = await db.select({ agentRole: agentsTable.agentRole })
+      .from(agentsTable).where(eq(agentsTable.userId, uid)).limit(1);
+    const agentRole = agentRow?.agentRole ?? "agent";
+
+    const [userRow] = await db.select({ name: usersTable.name, phone: usersTable.phone, email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+    const name    = userRow?.name  ?? "Inconnu";
+    const contact = (userRow?.phone && userRow.phone.trim()) ? userRow.phone.trim()
+                  : (userRow?.email && userRow.email.trim()) ? userRow.email.trim()
+                  : "";
+
+    await db.execute(sql`
+      INSERT INTO trip_agents (trip_id, user_id, agent_role, name, contact)
+      VALUES (${tripId}, ${uid}, ${agentRole}, ${name}, ${contact})
+      ON CONFLICT (trip_id, user_id)
+      DO UPDATE SET
+        agent_role  = EXCLUDED.agent_role,
+        name        = EXCLUDED.name,
+        contact     = EXCLUDED.contact,
+        recorded_at = NOW()
+    `);
+  } catch (e) {
+    console.error("[recordTripAgent]", e);
+  }
+}
+
 async function requireAgent(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.replace("Bearer ", "");
@@ -128,6 +166,9 @@ router.post("/boarding/:bookingId/validate", async (req, res) => {
 
     const bookingId = req.params.bookingId;
     await db.update(bookingsTable).set({ status: "validated" }).where(eq(bookingsTable.id, bookingId));
+    // Récupérer le tripId de la réservation pour enregistrer l'agent embarquement
+    const bRows = await db.select({ tripId: bookingsTable.tripId }).from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    recordTripAgent(bRows[0]?.tripId, user.id).catch(() => {});
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req }, ACTIONS.BOOKING_BOARD, bookingId, "booking").catch(() => {});
     res.json({ success: true });
   } catch (err) {
@@ -386,6 +427,7 @@ router.post("/parcels/:parcelId/charge-bus", async (req, res) => {
     logColisAction({ colisId: parcel.id, trackingRef: parcel.trackingRef, action: "chargé_bus",
       agentId: user.id, agentName: user.name, companyId: agentRecord?.companyId,
       notes: locCharge }).catch(() => {});
+    if (effectiveTripId) recordTripAgent(effectiveTripId, user.id).catch(() => {});
     res.json({ success: true, status: "chargé_bus", busId: effectiveBusId, tripId: effectiveTripId });
   } catch (err) {
     res.status(500).json({ error: "Failed" });
@@ -643,6 +685,7 @@ router.post("/reservations", async (req, res) => {
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.BOOKING_CREATE, booking.id, "booking",
       { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod, source: "guichet" }).catch(() => {});
+    recordTripAgent(tripId, user.id).catch(() => {});
 
     res.status(201).json({
       id: booking.id, bookingRef: booking.bookingRef, tripId: booking.tripId,
@@ -3709,6 +3752,7 @@ router.post("/bagage/items", async (req, res) => {
       UPDATE bookings SET bagage_status = 'accepté', bagage_price = ${price ?? 0}
       WHERE id = ${bookingId}
     `);
+    recordTripAgent(tripId, user.id).catch(() => {});
 
     res.json({ success: true, id, trackingRef, photoUrl });
   } catch (err) {
@@ -3842,6 +3886,15 @@ router.get("/validation-depart/trip/:tripId", async (req, res) => {
     ));
     const expenses = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.tripId, tripId));
 
+    // Agents en service sur ce départ
+    const agentsResult = await db.execute(sql`
+      SELECT user_id, agent_role, name, contact, recorded_at
+      FROM trip_agents
+      WHERE trip_id = ${tripId}
+      ORDER BY recorded_at ASC
+    `);
+    const tripAgents = (agentsResult as any).rows ?? [];
+
     const boarded  = passengerDetails.filter(p => ["boarded","validated"].includes(p.status ?? ""));
     const absents  = passengerDetails.filter(p => ["confirmed","payé","absent"].includes(p.status ?? ""));
     const totalBagageRevenue = bagages.reduce((s, b) => s + (b.price ?? 0), 0);
@@ -3861,6 +3914,7 @@ router.get("/validation-depart/trip/:tripId", async (req, res) => {
       bagages,
       colis,
       expenses,
+      agents: tripAgents,
       summary: {
         totalPassengers:       passengerDetails.length,
         boardedCount:          boarded.length,
@@ -3900,6 +3954,7 @@ router.post("/validation-depart/expenses", async (req, res) => {
       amount:      parseInt(amount),
       description: description ?? null,
     } as any);
+    recordTripAgent(tripId, user.id).catch(() => {});
 
     res.json({ success: true, id });
   } catch (err) {
@@ -3922,6 +3977,9 @@ router.post("/validation-depart/validate/:tripId", async (req, res) => {
     if (trip.status === "en_route") {
       res.status(400).json({ error: "Ce départ est déjà validé" }); return;
     }
+
+    /* 0. Enregistrer l'agent validation départ */
+    recordTripAgent(tripId, user.id).catch(() => {});
 
     /* 1. Set trip en_route */
     await db.execute(sql`UPDATE trips SET status = 'en_route', started_at = NOW() WHERE id = ${tripId}`);
