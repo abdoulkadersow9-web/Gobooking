@@ -77,7 +77,7 @@ export default function SecuriteScreen() {
       const data = await apiFetch<AlertRecord[]>("/agent/alerts", { token: token ?? undefined });
       setHistory(data ?? []);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(token ?? ""); return;
       }
     } finally {

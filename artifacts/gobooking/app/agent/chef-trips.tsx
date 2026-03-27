@@ -103,7 +103,7 @@ function busAvailLabel(b: Bus): { label: string; color: string; bg: string; sele
 }
 
 export default function ChefTrips() {
-  const { token, logoutIfActiveToken } = useAuth();
+  const { token, user, logoutIfActiveToken } = useAuth();
   const authToken = token ?? "";
 
   /* ── État global ── */
@@ -209,7 +209,8 @@ export default function ChefTrips() {
 
   /* ── Chargement données ── */
   const load = useCallback(async () => {
-    if (!authToken) { setLoading(false); return; } // Token pas encore chargé
+    /* Guard: skip fetch during role transitions (screen still mounted while navigating away) */
+    if (!authToken || user?.agentRole !== "chef_agence") { setLoading(false); return; }
     try {
       const [t, b, a] = await Promise.all([
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
@@ -221,7 +222,8 @@ export default function ChefTrips() {
       setAgenceCity(b.agenceCity ?? "");
       setAuditLogs(a.logs ?? []);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      /* 401 = token truly invalid → logout.  403 = RBAC (wrong role) → never logout */
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(authToken);
         return;
       }
@@ -230,7 +232,7 @@ export default function ChefTrips() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authToken, logoutIfActiveToken]);
+  }, [authToken, user, logoutIfActiveToken]);
 
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);

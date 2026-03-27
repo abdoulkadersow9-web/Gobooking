@@ -184,7 +184,7 @@ export default function AgentScan() {
       });
       triggerPulse();
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(token ?? ""); return;
       }
       const id = generateOfflineId();

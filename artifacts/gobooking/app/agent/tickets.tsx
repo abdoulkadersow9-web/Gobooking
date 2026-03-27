@@ -279,7 +279,7 @@ export default function TicketsScreen() {
       const res = await apiFetch("/agent/trips", { token: token ?? undefined });
       setTrips(Array.isArray(res) ? res : []);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(token ?? "");
         return;
       }

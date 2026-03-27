@@ -112,23 +112,25 @@ interface AuthContextType {
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
   /**
-   * logoutIfActiveToken — safe logout for 403 handlers in screens.
+   * logoutIfActiveToken — safe logout for 401 handlers in screens.
    *
-   * Problem: when a screen's API call returns 403 and calls logout(),
-   * a NEW login may have already been established while the request was
-   * in-flight. Calling logout() would wipe the new valid session.
+   * Why not on 403:
+   *   401 = token is invalid / expired → the user must re-authenticate.
+   *   403 = token is valid, but the user's role was denied for THIS endpoint.
+   *         This can happen during navigation transitions when the previous
+   *         screen is still mounted and fires an API call with the NEW user's
+   *         token against an endpoint the new user's role cannot access.
+   *         Logging out on 403 would immediately disconnect the new user.
    *
-   * This function only logs out if `failedToken` is still the current
-   * active session token. If the user already re-authenticated, it's a
-   * no-op — the 403 was from the old stale session.
+   * Race-condition guard:
+   *   If a new login was established while this request was in-flight,
+   *   `failedToken` will no longer match `activeSessionToken.current` and
+   *   this function becomes a no-op — protecting the new session.
    *
    * Usage in screens:
-   *   const { token: authToken, logoutIfActiveToken } = useAuth();
-   *   const token = authToken ?? "";
-   *   ...
    *   catch (e: any) {
-   *     if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-   *       logoutIfActiveToken(token);
+   *     if (e?.httpStatus === 401) {   // ← 401 ONLY, never 403
+   *       logoutIfActiveToken(authToken);
    *       return;
    *     }
    *   }

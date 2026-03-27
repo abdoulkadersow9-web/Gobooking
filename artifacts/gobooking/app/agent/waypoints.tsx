@@ -65,7 +65,8 @@ export default function WaypointsScreen() {
         fetch(`${API}/agent/trips/${tripId}/waypoints`,      { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/agent/trips/${tripId}/segment-seats`,  { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      if (wpRes.status === 401 || wpRes.status === 403) {
+      /* 401 = token invalide → logout.  403 = RBAC (mauvais rôle) → ne jamais déconnecter */
+      if (wpRes.status === 401) {
         logoutIfActiveToken(token); return;
       }
       if (wpRes.ok)  setWaypointsData(await wpRes.json());

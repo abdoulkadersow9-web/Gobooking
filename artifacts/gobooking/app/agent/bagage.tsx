@@ -131,7 +131,7 @@ export default function AgentBagage() {
       const r = await fetch(`${API}/agent/bagage/trips`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (r.status === 401 || r.status === 403) {
+      if (r.status === 401) {
         logoutIfActiveToken(token); return;
       }
       const data = await r.json();

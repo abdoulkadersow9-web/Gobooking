@@ -52,7 +52,8 @@ export default function ChefHome() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    if (!authToken) { setLoading(false); return; } // Token pas encore chargé
+    /* Guard: skip fetch during role transitions (screen still mounted while navigating away) */
+    if (!authToken || user?.agentRole !== "chef_agence") { setLoading(false); return; }
     try {
       const [d, b, t] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
@@ -63,7 +64,8 @@ export default function ChefHome() {
       setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      /* 401 = token truly invalid → logout.  403 = RBAC (wrong role) → never logout */
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(authToken);
         return;
       }
@@ -72,7 +74,7 @@ export default function ChefHome() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authToken, logoutIfActiveToken]);
+  }, [authToken, user, logoutIfActiveToken]);
 
   useEffect(() => { load(); }, [load]);
 

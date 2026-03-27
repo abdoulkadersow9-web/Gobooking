@@ -52,7 +52,7 @@ export default function AgentGains() {
       const res = await apiFetch<EarningsData>("/agent/earnings", { token: token ?? undefined });
       setData(res);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(token ?? ""); return;
       }
     } finally {

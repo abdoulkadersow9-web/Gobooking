@@ -61,7 +61,7 @@ export default function RapportScreen() {
       const data = await apiFetch<Report[]>("/agent/reports", { token });
       setReports(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+      if (e?.httpStatus === 401) {
         logoutIfActiveToken(token ?? ""); return;
       }
       setReports([]);
