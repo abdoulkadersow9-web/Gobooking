@@ -45,14 +45,17 @@ interface AuthResponse {
 }
 
 const DEMO_ACCOUNTS = [
-  { label: "Admin",        email: "admin@test.com",         password: "test123",  color: "#7C3AED", bg: "#F5F3FF", icon: "shield"   as const },
-  { label: "Compagnie",    email: "compagnie@test.com",     password: "test123",  color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"as const },
-  { label: "Chef Agence",  email: "chef.test@gobooking.ci", password: "chef1234", color: "#3730A3", bg: "#EEF2FF", icon: "star"     as const },
-  { label: "Guichet",      email: "agent@test.com",         password: "test123",  color: "#D97706", bg: "#FEF3C7", icon: "tag"      as const },
-  { label: "Embarquement", email: "embarquement@test.com",  password: "test123",  color: "#166534", bg: "#DCFCE7", icon: "check-circle" as const },
-  { label: "Bagages",      email: "bagage@test.com",        password: "test123",  color: "#854D0E", bg: "#FEF9C3", icon: "box"      as const },
-  { label: "Colis",        email: "colis@test.com",         password: "test123",  color: "#7C3AED", bg: "#EDE9FE", icon: "package"  as const },
-  { label: "Client",       email: "user@test.com",          password: "test123",  color: "#0891B2", bg: "#ECFEFF", icon: "home"     as const },
+  { label: "Super Admin",   email: "admin@test.com",         password: "test123",  color: "#7C3AED", bg: "#F5F3FF", icon: "shield"      as const },
+  { label: "Compagnie",     email: "compagnie@test.com",     password: "test123",  color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"   as const },
+  { label: "Chef Agence",   email: "chef.test@gobooking.ci", password: "chef1234", color: "#3730A3", bg: "#EEF2FF", icon: "star"        as const },
+  { label: "Guichet",       email: "agent@test.com",         password: "test123",  color: "#D97706", bg: "#FEF3C7", icon: "tag"         as const },
+  { label: "Embarquement",  email: "embarquement@test.com",  password: "test123",  color: "#166534", bg: "#DCFCE7", icon: "check-circle"as const },
+  { label: "Bagages",       email: "bagage@test.com",        password: "test123",  color: "#854D0E", bg: "#FEF9C3", icon: "box"         as const },
+  { label: "Colis",         email: "colis@test.com",         password: "test123",  color: "#6D28D9", bg: "#EDE9FE", icon: "package"     as const },
+  { label: "Validation",    email: "validepart@test.com",    password: "test123",  color: "#0E7490", bg: "#ECFEFF", icon: "check-square"as const },
+  { label: "Logistique",    email: "logistique@test.com",    password: "test123",  color: "#065F46", bg: "#D1FAE5", icon: "truck"       as const },
+  { label: "Suivi",         email: "suivi@test.com",         password: "test123",  color: "#92400E", bg: "#FEF3C7", icon: "map-pin"     as const },
+  { label: "Client",        email: "user@test.com",          password: "test123",  color: "#0891B2", bg: "#F0F9FF", icon: "home"        as const },
 ];
 
 export default function LoginScreen() {
@@ -156,10 +159,10 @@ export default function LoginScreen() {
           {/* ── Accès rapide démo ── */}
           <View style={styles.demoBox}>
             <View style={styles.demoHeader}>
-              <Feather name="zap" size={14} color="#D97706" />
-              <Text style={styles.demoTitle}>Accès rapide démo</Text>
+              <Feather name="zap" size={13} color="#D97706" />
+              <Text style={styles.demoTitle}>Accès rapide démo — sélectionner un rôle</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.demoScroll}>
+            <View style={styles.demoGrid}>
               {DEMO_ACCOUNTS.map((acc) => (
                 <TouchableOpacity
                   key={acc.label}
@@ -171,12 +174,12 @@ export default function LoginScreen() {
                   {demoLoading === acc.label ? (
                     <ActivityIndicator size="small" color={acc.color} />
                   ) : (
-                    <Feather name={acc.icon} size={15} color={acc.color} />
+                    <Feather name={acc.icon} size={13} color={acc.color} />
                   )}
-                  <Text style={[styles.demoBtnText, { color: acc.color }]}>{acc.label}</Text>
+                  <Text style={[styles.demoBtnText, { color: acc.color }]} numberOfLines={1}>{acc.label}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </View>
           </View>
 
           <View style={styles.divider}>
@@ -335,22 +338,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     color: "#92400E",
   },
-  demoScroll: {
+  demoGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
   demoBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 10,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
-    marginRight: 8,
+    width: "48%",
     justifyContent: "center",
   },
   demoBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
 

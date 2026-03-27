@@ -52,6 +52,7 @@ export default function ChefHome() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    if (!authToken) { setLoading(false); return; } // Token pas encore chargé
     try {
       const [d, b, t] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),

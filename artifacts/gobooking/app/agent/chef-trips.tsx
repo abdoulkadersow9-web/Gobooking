@@ -209,6 +209,7 @@ export default function ChefTrips() {
 
   /* ── Chargement données ── */
   const load = useCallback(async () => {
+    if (!authToken) { setLoading(false); return; } // Token pas encore chargé
     try {
       const [t, b, a] = await Promise.all([
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
