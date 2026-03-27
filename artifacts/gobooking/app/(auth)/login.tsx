@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -23,44 +23,71 @@ import Colors from "@/constants/colors";
 import { AgentRole, UserRole, getDashboardPath, useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
+/* ── Types ─────────────────────────────────────────────────────── */
 interface AuthResponse {
   token: string;
   user: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    role: UserRole;
-    agentRole?: AgentRole | null;
-    extraRoles?: string[];
-    busId?: string | null;
-    tripId?: string | null;
-    companyId?: string | null;
-    photoUrl?: string | null;
-    referralCode?: string;
-    walletBalance?: number;
-    totalTrips?: number;
+    id: string; name: string; email: string; phone: string;
+    role: UserRole; agentRole?: AgentRole | null;
+    extraRoles?: string[]; busId?: string | null; tripId?: string | null;
+    companyId?: string | null; photoUrl?: string | null;
+    referralCode?: string; walletBalance?: number; totalTrips?: number;
     createdAt: string;
   };
 }
 
-const DEMO_ACCOUNTS = [
-  { label: "Super Admin",   email: "admin@test.com",         password: "test123",  color: "#7C3AED", bg: "#F5F3FF", icon: "shield"      as const },
-  { label: "Compagnie",     email: "compagnie@test.com",     password: "test123",  color: "#1A56DB", bg: "#EEF2FF", icon: "briefcase"   as const },
-  { label: "Chef Agence",   email: "chef.test@gobooking.ci", password: "chef1234", color: "#3730A3", bg: "#EEF2FF", icon: "star"        as const },
-  { label: "Guichet",       email: "agent@test.com",         password: "test123",  color: "#D97706", bg: "#FEF3C7", icon: "tag"         as const },
-  { label: "Embarquement",  email: "embarquement@test.com",  password: "test123",  color: "#166534", bg: "#DCFCE7", icon: "check-circle"as const },
-  { label: "Bagages",       email: "bagage@test.com",        password: "test123",  color: "#854D0E", bg: "#FEF9C3", icon: "box"         as const },
-  { label: "Colis",         email: "colis@test.com",         password: "test123",  color: "#6D28D9", bg: "#EDE9FE", icon: "package"     as const },
-  { label: "Validation",    email: "validepart@test.com",    password: "test123",  color: "#0E7490", bg: "#ECFEFF", icon: "check-square"as const },
-  { label: "Logistique",    email: "logistique@test.com",    password: "test123",  color: "#065F46", bg: "#D1FAE5", icon: "truck"       as const },
-  { label: "Suivi",         email: "suivi@test.com",         password: "test123",  color: "#92400E", bg: "#FEF3C7", icon: "map-pin"     as const },
-  { label: "Client",        email: "user@test.com",          password: "test123",  color: "#0891B2", bg: "#F0F9FF", icon: "home"        as const },
-];
+interface DemoRole {
+  email: string; password: string;
+  userRole: string; agentRole: string | null;
+}
 
+/* ── Config visuelle des rôles (label + icône + couleur) ────────
+   Computed from userRole / agentRole — non codé en dur dans la liste.
+   ──────────────────────────────────────────────────────────────── */
+type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
+
+interface RoleStyle {
+  label: string;
+  icon: FeatherIconName;
+  color: string;
+  bg: string;
+  order: number;
+}
+
+const ROLE_STYLES: Record<string, RoleStyle> = {
+  admin:              { label: "Super Admin",    icon: "shield",       color: "#6D28D9", bg: "#F5F3FF", order: 0  },
+  compagnie:          { label: "Compagnie",      icon: "briefcase",    color: "#1D4ED8", bg: "#EEF2FF", order: 1  },
+  chef_agence:        { label: "Chef Agence",    icon: "star",         color: "#3730A3", bg: "#E0E7FF", order: 2  },
+  agent_guichet:      { label: "Guichet",        icon: "tag",          color: "#B45309", bg: "#FEF3C7", order: 3  },
+  agent_embarquement: { label: "Embarquement",   icon: "check-circle", color: "#15803D", bg: "#DCFCE7", order: 4  },
+  agent_bagage:       { label: "Bagages",        icon: "box",          color: "#92400E", bg: "#FEF9C3", order: 5  },
+  agent_colis:        { label: "Colis",          icon: "package",      color: "#5B21B6", bg: "#EDE9FE", order: 6  },
+  agent_reservation:  { label: "Réservation",    icon: "calendar",     color: "#0369A1", bg: "#E0F2FE", order: 7  },
+  agent_ticket:       { label: "Ticket",         icon: "credit-card",  color: "#065F46", bg: "#D1FAE5", order: 8  },
+  validation_depart:  { label: "Validation",     icon: "check-square", color: "#0E7490", bg: "#ECFEFF", order: 9  },
+  logistique:         { label: "Logistique",     icon: "truck",        color: "#166534", bg: "#D1FAE5", order: 10 },
+  suivi:              { label: "Suivi",          icon: "map-pin",      color: "#9A3412", bg: "#FEF3C7", order: 11 },
+  vente:              { label: "Vente",          icon: "shopping-cart", color: "#0369A1", bg: "#E0F2FE", order: 12 },
+  client:             { label: "Client",         icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 13 },
+  user:               { label: "Client",         icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 13 },
+};
+
+function getRoleStyle(userRole: string, agentRole: string | null): RoleStyle {
+  const key = agentRole ?? userRole;
+  return ROLE_STYLES[key] ?? {
+    label: key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+    icon: "user" as FeatherIconName,
+    color: "#6B7280",
+    bg: "#F3F4F6",
+    order: 99,
+  };
+}
+
+/* ── Composant principal ────────────────────────────────────────── */
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
+
   const [email, setEmail]               = useState("");
   const [password, setPassword]         = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -69,6 +96,25 @@ export default function LoginScreen() {
   const [fieldError, setFieldError]     = useState("");
   const [serverError, setServerError]   = useState("");
 
+  /* Rôles démo chargés dynamiquement depuis la DB via API */
+  const [demoRoles, setDemoRoles]           = useState<DemoRole[]>([]);
+  const [demoRolesLoading, setDRLoading]    = useState(true);
+
+  useEffect(() => {
+    apiFetch<DemoRole[]>("/auth/demo-roles")
+      .then(data => {
+        const sorted = [...data].sort((a, b) => {
+          const oA = getRoleStyle(a.userRole, a.agentRole).order;
+          const oB = getRoleStyle(b.userRole, b.agentRole).order;
+          return oA - oB;
+        });
+        setDemoRoles(sorted);
+      })
+      .catch(() => {/* silently ignore — user can still log in manually */})
+      .finally(() => setDRLoading(false));
+  }, []);
+
+  /* ── Connexion ─────────────────────────────────────────────── */
   const doLogin = async (em: string, pw: string) => {
     const res = await apiFetch<AuthResponse>("/auth/login", {
       method: "POST",
@@ -80,50 +126,31 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    setFieldError("");
-    setServerError("");
-
-    if (!email.trim() && !password.trim()) {
-      setFieldError("Veuillez remplir tous les champs.");
-      return;
-    }
-    if (!email.trim()) {
-      setFieldError("L'adresse email est requise.");
-      return;
-    }
-    if (!password.trim()) {
-      setFieldError("Le mot de passe est requis.");
-      return;
-    }
-
+    setFieldError(""); setServerError("");
+    if (!email.trim() && !password.trim()) { setFieldError("Veuillez remplir tous les champs."); return; }
+    if (!email.trim())    { setFieldError("L'adresse email est requise."); return; }
+    if (!password.trim()) { setFieldError("Le mot de passe est requis."); return; }
     setLoading(true);
-    try {
-      await doLogin(email, password);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Connexion échouée. Vérifiez vos identifiants.";
-      setServerError(msg);
-    } finally {
-      setLoading(false);
-    }
+    try { await doLogin(email, password); }
+    catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : "Connexion échouée. Vérifiez vos identifiants.");
+    } finally { setLoading(false); }
   };
 
-  const handleDemoLogin = async (account: typeof DEMO_ACCOUNTS[0]) => {
-    setFieldError("");
-    setServerError("");
-    setDemoLoading(account.label);
-    try {
-      await doLogin(account.email, account.password);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Impossible de se connecter avec ce compte démo.";
-      setServerError(msg);
-    } finally {
-      setDemoLoading(null);
-    }
+  const handleDemoLogin = async (acc: DemoRole) => {
+    setFieldError(""); setServerError("");
+    const key = acc.agentRole ?? acc.userRole;
+    setDemoLoading(key);
+    try { await doLogin(acc.email, acc.password); }
+    catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : "Impossible de se connecter avec ce compte démo.");
+    } finally { setDemoLoading(null); }
   };
 
   const errorMessage = fieldError || serverError;
-  const isServerErr = !!serverError && !fieldError;
+  const isServerErr  = !!serverError && !fieldError;
 
+  /* ── Render ─────────────────────────────────────────────────── */
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: Colors.light.primary }}
@@ -134,14 +161,14 @@ export default function LoginScreen() {
         contentContainerStyle={[
           styles.container,
           {
-            paddingTop: Platform.OS === "web" ? 67 : insets.top + 20,
+            paddingTop:    Platform.OS === "web" ? 67 : insets.top + 20,
             paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20,
           },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header gradient ── */}
+        {/* ── Logo / titre ── */}
         <LinearGradient
           colors={[Colors.light.primary, Colors.light.primaryDark]}
           style={styles.headerGradient}
@@ -156,49 +183,73 @@ export default function LoginScreen() {
         </LinearGradient>
 
         <View style={styles.formCard}>
-          {/* ── Accès rapide démo ── */}
+          {/* ══ Accès rapide — rôles dynamiques ══════════════════ */}
           <View style={styles.demoBox}>
             <View style={styles.demoHeader}>
-              <Feather name="zap" size={13} color="#D97706" />
-              <Text style={styles.demoTitle}>Accès rapide démo — sélectionner un rôle</Text>
+              <Feather name="zap" size={13} color="#B45309" />
+              <Text style={styles.demoTitle}>Accès rapide — choisir un rôle</Text>
             </View>
-            <View style={styles.demoGrid}>
-              {DEMO_ACCOUNTS.map((acc) => (
-                <TouchableOpacity
-                  key={acc.label}
-                  style={[styles.demoBtn, { backgroundColor: acc.bg, borderColor: acc.color + "44" }]}
-                  onPress={() => handleDemoLogin(acc)}
-                  activeOpacity={0.75}
-                  disabled={demoLoading !== null || loading}
-                >
-                  {demoLoading === acc.label ? (
-                    <ActivityIndicator size="small" color={acc.color} />
-                  ) : (
-                    <Feather name={acc.icon} size={13} color={acc.color} />
-                  )}
-                  <Text style={[styles.demoBtnText, { color: acc.color }]} numberOfLines={1}>{acc.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+
+            {demoRolesLoading ? (
+              <View style={styles.demoLoaderRow}>
+                <ActivityIndicator size="small" color="#B45309" />
+                <Text style={styles.demoLoaderText}>Chargement des rôles…</Text>
+              </View>
+            ) : demoRoles.length === 0 ? (
+              <Text style={styles.demoEmptyText}>Aucun rôle démo disponible</Text>
+            ) : (
+              <View style={styles.demoGrid}>
+                {demoRoles.map((acc) => {
+                  const key   = acc.agentRole ?? acc.userRole;
+                  const style = getRoleStyle(acc.userRole, acc.agentRole);
+                  const busy  = demoLoading === key;
+                  const anyBusy = demoLoading !== null || loading;
+
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.demoCard,
+                        { borderColor: style.color + "30", backgroundColor: style.bg },
+                        busy && styles.demoBusy,
+                      ]}
+                      onPress={() => handleDemoLogin(acc)}
+                      activeOpacity={0.75}
+                      disabled={anyBusy}
+                    >
+                      <View style={[styles.demoIconWrap, { backgroundColor: style.color + "18" }]}>
+                        {busy
+                          ? <ActivityIndicator size="small" color={style.color} />
+                          : <Feather name={style.icon} size={16} color={style.color} />
+                        }
+                      </View>
+                      <Text style={[styles.demoCardLabel, { color: style.color }]} numberOfLines={1}>
+                        {style.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
+          {/* ── Séparateur ── */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ou connexion manuelle</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* ── Titre ── */}
+          {/* ── Titre formulaire ── */}
           <Text style={styles.welcomeTitle}>Connexion</Text>
           <Text style={styles.welcomeSubtitle}>Entrez vos identifiants GoBooking</Text>
 
-          {/* ── Message d'erreur inline ── */}
+          {/* ── Erreur inline ── */}
           {!!errorMessage && (
             <View style={[styles.errorBanner, isServerErr && styles.errorBannerServer]}>
               <Feather
                 name={isServerErr ? "alert-circle" : "alert-triangle"}
-                size={15}
-                color={isServerErr ? "#B91C1C" : "#92400E"}
+                size={15} color={isServerErr ? "#B91C1C" : "#92400E"}
               />
               <Text style={[styles.errorText, isServerErr && styles.errorTextServer]}>
                 {errorMessage}
@@ -209,10 +260,7 @@ export default function LoginScreen() {
           {/* ── Email ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
-            <View style={[
-              styles.inputContainer,
-              fieldError && !email.trim() && styles.inputError,
-            ]}>
+            <View style={[styles.inputContainer, fieldError && !email.trim() && styles.inputError]}>
               <Feather name="mail" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
@@ -230,10 +278,7 @@ export default function LoginScreen() {
           {/* ── Mot de passe ── */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Mot de passe</Text>
-            <View style={[
-              styles.inputContainer,
-              fieldError && !password.trim() && styles.inputError,
-            ]}>
+            <View style={[styles.inputContainer, fieldError && !password.trim() && styles.inputError]}>
               <Feather name="lock" size={18} color={Colors.light.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
@@ -249,7 +294,7 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* ── Bouton Se connecter ── */}
+          {/* ── Bouton connexion ── */}
           <Pressable
             style={({ pressed }) => [
               styles.loginButton,
@@ -259,17 +304,16 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={loading || demoLoading !== null}
           >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Feather name="log-in" size={18} color="white" />
-                <Text style={styles.loginButtonText}>Se connecter</Text>
-              </>
-            )}
+            {loading
+              ? <ActivityIndicator color="white" />
+              : <>
+                  <Feather name="log-in" size={18} color="white" />
+                  <Text style={styles.loginButtonText}>Se connecter</Text>
+                </>
+            }
           </Pressable>
 
-          {/* ── Lien inscription ── */}
+          {/* ── Inscription ── */}
           <View style={styles.registerRow}>
             <Text style={styles.registerText}>Pas encore de compte ?</Text>
             <Pressable onPress={() => router.push("/(auth)/register")}>
@@ -282,6 +326,7 @@ export default function LoginScreen() {
   );
 }
 
+/* ── Styles ─────────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -318,11 +363,11 @@ const styles = StyleSheet.create({
     paddingTop: 28,
   },
 
-  /* Demo */
+  /* ── Démo box ──────────────────────────────────────────────── */
   demoBox: {
     backgroundColor: "#FFFBEB",
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: "#FDE68A",
     marginBottom: 4,
@@ -331,35 +376,68 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   demoTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     color: "#92400E",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
+  demoLoaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 12,
+  },
+  demoLoaderText: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#92400E",
+  },
+  demoEmptyText: {
+    textAlign: "center",
+    fontSize: 13,
+    color: "#9CA3AF",
+    paddingVertical: 8,
+  },
+
+  /* ── Grille 3 colonnes ─────────────────────────────────────── */
   demoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 8,
+  },
+  demoCard: {
+    width: "31%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    borderWidth: 1.5,
     gap: 6,
   },
-  demoBtn: {
-    flexDirection: "row",
+  demoBusy: {
+    opacity: 0.7,
+  },
+  demoIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    width: "48%",
     justifyContent: "center",
   },
-  demoBtnText: {
-    fontSize: 11,
+  demoCardLabel: {
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    letterSpacing: 0.2,
   },
 
-  /* Divider */
+  /* ── Divider ───────────────────────────────────────────────── */
   divider: {
     flexDirection: "row",
     alignItems: "center",
@@ -377,7 +455,7 @@ const styles = StyleSheet.create({
     color: Colors.light.textMuted,
   },
 
-  /* Title */
+  /* ── Titre ─────────────────────────────────────────────────── */
   welcomeTitle: {
     fontSize: 24,
     fontFamily: "Inter_700Bold",
@@ -392,7 +470,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  /* Error banner */
+  /* ── Erreur ────────────────────────────────────────────────── */
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -419,7 +497,7 @@ const styles = StyleSheet.create({
     color: "#B91C1C",
   },
 
-  /* Inputs */
+  /* ── Inputs ────────────────────────────────────────────────── */
   inputGroup: {
     marginBottom: 14,
   },
@@ -456,7 +534,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 
-  /* Button */
+  /* ── Bouton ────────────────────────────────────────────────── */
   loginButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -486,7 +564,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  /* Footer */
+  /* ── Footer ────────────────────────────────────────────────── */
   registerRow: {
     flexDirection: "row",
     justifyContent: "center",

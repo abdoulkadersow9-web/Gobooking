@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable, agentsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
 import { auditLog, ACTIONS } from "../audit";
@@ -269,6 +269,69 @@ router.post("/push-token", async (req, res) => {
     await db.update(usersTable).set({ pushToken }).where(eq(usersTable.id, userId));
     res.json({ success: true });
   } catch (err) {
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── GET /demo-roles ─────────────────────────────────────────────
+   Retourne dynamiquement depuis la DB tous les comptes démo
+   disponibles avec leurs rôles, pour l'accès rapide de la page login.
+   ──────────────────────────────────────────────────────────────── */
+router.get("/demo-roles", async (_req, res) => {
+  try {
+    /* Comptes démo connus avec leurs mots de passe */
+    const DEMO_CREDS: Record<string, string> = {
+      "admin@test.com":           "test123",
+      "admin@gobooking.com":      "test123",
+      "compagnie@test.com":       "test123",
+      "chef.test@gobooking.ci":   "chef1234",
+      "agent@test.com":           "test123",
+      "embarquement@test.com":    "test123",
+      "bagage@test.com":          "test123",
+      "colis@test.com":           "test123",
+      "validepart@test.com":      "test123",
+      "logistique@test.com":      "test123",
+      "suivi@test.com":           "test123",
+      "reservation@test.com":     "test123",
+      "user@test.com":            "test123",
+    };
+
+    const demoEmailsList = Object.keys(DEMO_CREDS);
+
+    /* Requête DB via Drizzle querybuilder (inArray → bon type PostgreSQL) */
+    const rows = await db
+      .select({
+        email:     usersTable.email,
+        userRole:  usersTable.role,
+        agentRole: agentsTable.agentRole,
+      })
+      .from(usersTable)
+      .leftJoin(agentsTable, eq(agentsTable.userId, usersTable.id))
+      .where(inArray(usersTable.email, demoEmailsList))
+      .orderBy(usersTable.role, sql`${agentsTable.agentRole} NULLS LAST`, usersTable.email);
+
+    /* Déduplique par rôle (agent_role ?? user_role) — un seul compte par rôle */
+    const seen = new Set<string>();
+    const result: Array<{
+      email: string; password: string;
+      userRole: string; agentRole: string | null;
+    }> = [];
+
+    for (const row of rows) {
+      const key = row.agentRole ?? row.userRole;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        email:     row.email,
+        password:  DEMO_CREDS[row.email] ?? "test123",
+        userRole:  row.userRole,
+        agentRole: row.agentRole ?? null,
+      });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error("[demo-roles]", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
