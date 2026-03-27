@@ -15,7 +15,7 @@ import { registerForPushNotifications } from "@/utils/notifications";
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
   | "embarquement" | "reception_colis" | "vente" | "validation" | "route" | "logistique" | "suivi"
-  | "agent_reservation";
+  | "agent_reservation" | "chef_agence";
 
 export interface User {
   id: string;
@@ -43,6 +43,7 @@ export function hasRole(user: User | null, role: string): boolean {
 }
 
 export function getAgentPath(agentRole?: AgentRole | null): string {
+  if (agentRole === "chef_agence")       return "/agent/chef-home";
   if (agentRole === "agent_ticket"       || agentRole === "vente" || agentRole === "agent_guichet") return "/agent/tickets";
   if (agentRole === "agent_embarquement" || agentRole === "embarquement")    return "/agent/embarquement";
   if (agentRole === "agent_colis"        || agentRole === "reception_colis") return "/agent/colis";
@@ -55,6 +56,7 @@ export function getAgentPath(agentRole?: AgentRole | null): string {
 }
 
 export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
+  chef_agence:        "Chef d'Agence",
   agent_ticket:       "Agent Guichet",
   agent_guichet:      "Agent Guichet",
   agent_embarquement: "Agent Embarquement",
@@ -70,6 +72,7 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
 };
 
 export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> = {
+  chef_agence:        { bg: "#EEF2FF", text: "#3730A3" },
   agent_ticket:       { bg: "#FEF3C7", text: "#D97706" },
   agent_guichet:      { bg: "#FEF3C7", text: "#D97706" },
   agent_embarquement: { bg: "#DCFCE7", text: "#166534" },
@@ -86,7 +89,7 @@ export const AGENT_ROLE_COLORS: Record<AgentRole, { bg: string; text: string }> 
 
 export function getDashboardPath(role: UserRole, agentRole?: AgentRole | null): string {
   if (role === "compagnie" || role === "company_admin") return "/entreprise/dashboard";
-  if (role === "agent")                                 return "/agent/home";
+  if (role === "agent")                                 return getAgentPath(agentRole);
   if (role === "admin"   || role === "super_admin")     return "/admin/dashboard";
   return "/client/home"; // client / user
 }

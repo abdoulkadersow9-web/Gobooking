@@ -4563,4 +4563,350 @@ router.get("/trips/:tripId/segment-seats", async (req, res) => {
   }
 });
 
+/* ═══════════════════════════════════════════════════════════════
+   CHEF D'AGENCE — middleware + endpoints
+   ═══════════════════════════════════════════════════════════════ */
+
+async function requireChefAgence(authHeader: string | undefined) {
+  const user = await requireAgent(authHeader);
+  if (!user) return null;
+  const agents = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+  if (!agents.length) return null;
+  const agent = agents[0];
+  if (agent.agentRole !== "chef_agence") return null;
+  if (!agent.agenceId) return null;
+  return { user, agent };
+}
+
+/* ─── GET /agent/chef/dashboard ──────────────────────────────── */
+router.get("/chef/dashboard", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé — rôle Chef d'Agence requis" });
+    const { agent } = ctx;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const [tripsToday, agentsInAgence, paxToday, busesAvail] = await Promise.all([
+      // Trajets prévus ou en route aujourd'hui pour cette agence
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM trips
+        WHERE company_id = ${agent.companyId}
+          AND date = ${todayStr}
+          AND status IN ('scheduled','en_route')
+      `),
+      // Agents dans cette agence
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM agents WHERE agence_id = ${agent.agenceId} AND status = 'active'
+      `),
+      // Passagers embarqués aujourd'hui pour les trajets de cette compagnie
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM bookings b
+        JOIN trips t ON t.id = b.trip_id
+        WHERE t.company_id = ${agent.companyId}
+          AND t.date = ${todayStr}
+          AND b.status IN ('boarded','validated','confirmed')
+      `),
+      // Cars disponibles (pas en service, status actif)
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM buses
+        WHERE company_id = ${agent.companyId}
+          AND status = 'active'
+          AND (logistic_status != 'en_service' OR logistic_status IS NULL)
+          AND (current_trip_id IS NULL)
+      `),
+    ]);
+
+    // Info agence
+    const agences = await db.execute(sql`
+      SELECT * FROM agences WHERE id = ${agent.agenceId} LIMIT 1
+    `);
+    const agenceInfo = agences.rows[0] ?? null;
+
+    res.json({
+      agence: agenceInfo,
+      stats: {
+        tripsToday:     Number((tripsToday.rows[0] as any)?.cnt ?? 0),
+        agentsActive:   Number((agentsInAgence.rows[0] as any)?.cnt ?? 0),
+        passengersToday: Number((paxToday.rows[0] as any)?.cnt ?? 0),
+        busesAvailable: Number((busesAvail.rows[0] as any)?.cnt ?? 0),
+      },
+    });
+  } catch (err) {
+    console.error("[chef/dashboard]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/chef/available-buses ────────────────────────── */
+router.get("/chef/available-buses", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+
+    const buses = await db.execute(sql`
+      SELECT b.*,
+        CASE
+          WHEN b.current_trip_id IS NOT NULL THEN 'en_service'
+          WHEN b.logistic_status = 'en_panne' THEN 'en_panne'
+          WHEN b.logistic_status = 'en_attente' THEN 'en_attente'
+          ELSE 'disponible'
+        END AS availability_status,
+        t.from_city, t.to_city, t.date, t.departure_time, t.status as trip_status
+      FROM buses b
+      LEFT JOIN trips t ON t.id = b.current_trip_id
+      WHERE b.company_id = ${agent.companyId}
+        AND b.status = 'active'
+      ORDER BY
+        CASE WHEN b.current_trip_id IS NULL AND b.logistic_status NOT IN ('en_panne') THEN 0 ELSE 1 END,
+        b.bus_name ASC
+    `);
+
+    res.json({ buses: buses.rows });
+  } catch (err) {
+    console.error("[chef/available-buses]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/chef/trips ──────────────────────────────────── */
+router.get("/chef/trips", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const threeDaysAhead = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const trips = await db.execute(sql`
+      SELECT t.*,
+        COUNT(b.id) FILTER (WHERE b.status IN ('confirmed','boarded','validated','payé')) as passenger_count,
+        COUNT(p.id) FILTER (WHERE p.status NOT IN ('cancelled')) as parcel_count,
+        a.agence_id as agent_agence_id
+      FROM trips t
+      LEFT JOIN bookings b ON b.trip_id = t.id
+      LEFT JOIN parcels p ON p.trip_id = t.id
+      LEFT JOIN agents a ON a.id::text = t.agent_id
+      WHERE t.company_id = ${agent.companyId}
+        AND t.date >= ${sevenDaysAgo}
+        AND t.date <= ${threeDaysAhead}
+      GROUP BY t.id, a.agence_id
+      ORDER BY t.date ASC, t.departure_time ASC
+      LIMIT 50
+    `);
+
+    res.json({ trips: trips.rows });
+  } catch (err) {
+    console.error("[chef/trips]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/chef/trips — créer un départ ───────────────── */
+router.post("/chef/trips", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { user, agent } = ctx;
+
+    const { from, to, date, departureTime, arrivalTime, price, busId } = req.body as {
+      from: string; to: string; date: string;
+      departureTime: string; arrivalTime: string;
+      price: number; busId?: string;
+    };
+
+    if (!from || !to || !date || !departureTime) {
+      return res.status(400).json({ error: "Champs obligatoires manquants" });
+    }
+
+    // Vérifier disponibilité du bus si fourni
+    if (busId) {
+      const [busCheck] = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+      if (!busCheck) return res.status(404).json({ error: "Car introuvable" });
+      if (busCheck.companyId !== agent.companyId) return res.status(403).json({ error: "Ce car n'appartient pas à votre compagnie" });
+      if (busCheck.currentTripId) return res.status(409).json({ error: `Ce car est déjà affecté au trajet ${busCheck.currentTripId}` });
+    }
+
+    const tripId = "trip-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+    let busName = "À définir";
+    let busType = "Standard";
+    let totalSeats = 44;
+
+    if (busId) {
+      const [bus] = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+      if (bus) { busName = bus.busName; busType = bus.busType; totalSeats = bus.capacity; }
+    }
+
+    await db.execute(sql`
+      INSERT INTO trips (id, company_id, agent_id, bus_id, from_city, to_city, date,
+        departure_time, arrival_time, price, bus_type, bus_name, total_seats,
+        guichet_seats, online_seats, duration, amenities, stops, policies, status)
+      VALUES (
+        ${tripId}, ${agent.companyId}, ${agent.id}, ${busId ?? null},
+        ${from}, ${to}, ${date}, ${departureTime}, ${arrivalTime ?? "—"},
+        ${price ?? 0}, ${busType}, ${busName}, ${totalSeats},
+        ${Math.floor(totalSeats * 0.7)}, ${Math.floor(totalSeats * 0.3)},
+        '?', '[]'::json, '[]'::json, '[]'::json, 'scheduled'
+      )
+    `);
+
+    // Marquer le bus comme affecté
+    if (busId) {
+      await db.execute(sql`
+        UPDATE buses SET current_trip_id = ${tripId}, logistic_status = 'affecté'
+        WHERE id = ${busId}
+      `);
+    }
+
+    // Notifier les agents de l'agence
+    const agenceAgents = await db.execute(sql`
+      SELECT u.push_token, u.id as user_id, u.name FROM agents a
+      JOIN users u ON u.id = a.user_id
+      WHERE a.agence_id = ${agent.agenceId}
+        AND a.agent_role != 'chef_agence'
+        AND u.status = 'active'
+    `);
+
+    const notifMsg = `Nouveau départ programmé : ${from} → ${to} le ${date} à ${departureTime}. Car : ${busName}.`;
+    for (const ag of (agenceAgents.rows as any[])) {
+      if (ag.push_token) {
+        const { sendExpoPush } = await import("../pushService");
+        sendExpoPush(ag.push_token, "🚌 Nouveau départ", notifMsg).catch(() => {});
+      }
+      await db.execute(sql`
+        INSERT INTO notifications (id, user_id, type, title, message, ref_id, ref_type)
+        VALUES (
+          ${"notif-" + Date.now().toString(36) + Math.random().toString(36).slice(2,6)},
+          ${ag.user_id}, 'new_trip', '🚌 Nouveau départ', ${notifMsg}, ${tripId}, 'trip'
+        )
+      `).catch(() => {});
+    }
+
+    console.log(`[Chef] Départ créé ${tripId} : ${from}→${to} ${date} ${departureTime} par chef ${user.name}`);
+    res.json({ success: true, tripId, from, to, date, departureTime, busName });
+  } catch (err) {
+    console.error("[chef/trips POST]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── PUT /agent/chef/trips/:tripId — modifier un départ ─────── */
+router.put("/chef/trips/:tripId", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trip) return res.status(404).json({ error: "Trajet introuvable" });
+    if (trip.companyId !== agent.companyId) return res.status(403).json({ error: "Accès refusé" });
+    if (trip.status !== "scheduled") return res.status(400).json({ error: "Seuls les trajets 'programmés' peuvent être modifiés" });
+
+    const { departureTime, arrivalTime, price, busId } = req.body as {
+      departureTime?: string; arrivalTime?: string; price?: number; busId?: string;
+    };
+
+    if (busId && busId !== trip.busId) {
+      const [busCheck] = await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1);
+      if (!busCheck) return res.status(404).json({ error: "Car introuvable" });
+      if (busCheck.currentTripId && busCheck.currentTripId !== tripId)
+        return res.status(409).json({ error: "Ce car est déjà affecté à un autre trajet" });
+
+      // Libérer l'ancien bus
+      if (trip.busId) {
+        await db.execute(sql`UPDATE buses SET current_trip_id = NULL, logistic_status = 'en_attente' WHERE id = ${trip.busId}`);
+      }
+      // Affecter le nouveau
+      await db.execute(sql`UPDATE buses SET current_trip_id = ${tripId}, logistic_status = 'affecté' WHERE id = ${busId}`);
+    }
+
+    await db.execute(sql`
+      UPDATE trips SET
+        departure_time = COALESCE(${departureTime ?? null}, departure_time),
+        arrival_time   = COALESCE(${arrivalTime   ?? null}, arrival_time),
+        price          = COALESCE(${price         ?? null}::real, price),
+        bus_id         = COALESCE(${busId         ?? null}, bus_id)
+      WHERE id = ${tripId}
+    `);
+
+    res.json({ success: true, tripId });
+  } catch (err) {
+    console.error("[chef/trips PUT]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── DELETE /agent/chef/trips/:tripId — annuler un départ ───── */
+router.delete("/chef/trips/:tripId", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+
+    const [trip] = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trip) return res.status(404).json({ error: "Trajet introuvable" });
+    if (trip.companyId !== agent.companyId) return res.status(403).json({ error: "Accès refusé" });
+    if (trip.status === "en_route" || trip.status === "completed")
+      return res.status(400).json({ error: "Impossible d'annuler un trajet en cours ou terminé" });
+
+    // Libérer le bus
+    if (trip.busId) {
+      await db.execute(sql`UPDATE buses SET current_trip_id = NULL, logistic_status = 'en_attente' WHERE id = ${trip.busId}`);
+    }
+
+    await db.execute(sql`UPDATE trips SET status = 'cancelled' WHERE id = ${tripId}`);
+
+    // Notifier les passagers qui ont déjà réservé
+    const passengers = await db.execute(sql`
+      SELECT DISTINCT u.phone, u.name, u.push_token, b.id as booking_id FROM bookings b
+      JOIN users u ON u.id = b.user_id
+      WHERE b.trip_id = ${tripId} AND b.status IN ('confirmed','en_attente')
+    `);
+    const cancelMsg = `GoBooking : Le départ ${trip.from} → ${trip.to} du ${trip.date} à ${trip.departureTime} a été annulé. Notre équipe vous contactera pour un remboursement.`;
+    for (const p of (passengers.rows as any[])) {
+      if (p.phone) {
+        const { sendSMS } = await import("../lib/smsService");
+        sendSMS(p.phone, cancelMsg).catch(() => {});
+      }
+    }
+
+    res.json({ success: true, tripId });
+  } catch (err) {
+    console.error("[chef/trips DELETE]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/chef/agents — agents de l'agence ────────────── */
+router.get("/chef/agents", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+
+    const agentsInAgence = await db.execute(sql`
+      SELECT a.id, a.agent_code, a.agent_role, a.status, a.trip_id, a.bus_id,
+        u.name, u.email, u.phone, u.push_token,
+        t.from_city, t.to_city, t.date, t.departure_time, t.status as trip_status
+      FROM agents a
+      JOIN users u ON u.id = a.user_id
+      LEFT JOIN trips t ON t.id = a.trip_id
+      WHERE a.agence_id = ${agent.agenceId}
+        AND u.status = 'active'
+      ORDER BY u.name ASC
+    `);
+
+    res.json({ agents: agentsInAgence.rows });
+  } catch (err) {
+    console.error("[chef/agents]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
+

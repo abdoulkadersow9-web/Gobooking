@@ -1,0 +1,156 @@
+### Rôle Chef d’Agence + Programmation intelligente des départs
+
+Ajouter un rôle spécifique Chef d’agence, tout en restant dans la logique actuelle de GoBooking.
+
+### 1. Définition du Chef d’agence
+Le chef d’agence est le responsable opérationnel local d’une agence (ex : Abidjan Adjamé).
+
+Il gère :
+- la programmation des départs
+- la supervision des agents
+- le suivi des opérations de son agence
+- les validations et bordereaux
+
+### 2. Programmation des départs
+Le chef d’agence doit pouvoir :
+
+- créer un départ
+- modifier un départ
+- supprimer un départ
+- définir plusieurs horaires dans la journée
+
+Exemple :
+- 7h
+- 10h
+- 15h
+- 18h
+
+Chaque chef d’agence ne gère que son agence.
+
+---
+
+### 3. Programmation intelligente basée sur les cars disponibles
+
+L’application doit être intelligente.
+
+Quand le chef d’agence veut programmer un départ :
+
+- il doit voir automatiquement les cars présents dans son agence
+- uniquement les cars réellement disponibles doivent apparaître
+
+Exemple :
+- Car 001 arrivé aujourd’hui
+- Car 002 disponible
+- Car 003 en attente
+
+Ces cars doivent être visibles et sélectionnables.
+
+---
+
+### 4. Statut des cars visibles par le chef d’agence
+
+Le chef d’agence doit voir :
+
+- cars présents dans l’agence
+- cars arrivés aujourd’hui
+- cars disponibles
+- cars déjà affectés
+- cars en panne
+- cars en attente
+- cars prêts pour départ
+
+Le système doit filtrer intelligemment.
+
+---
+
+### 5. Affectation intelligente des cars
+
+Lors de la création d’un départ :
+
+- le chef d’agence choisit un car disponible
+- le système vérifie automatiquement la disponibilité
+- aucun doublon d’affectation possible
+- un car déjà utilisé ne peut pas être sélectionné
+- le statut du car est mis à jour automatiquement
+
+---
+
+### 6. Diffusion automatique aux agents
+
+Dès qu’un départ est programmé :
+
+les informations sont envoyées automatiquement à :
+
+- agent guichet / ticket
+- agent embarquement
+- agent bagages
+- agent colis
+- autres agents concernés
+
+Chaque agent voit uniquement les départs liés à son agence.
+
+---
+
+### 7. Réception automatique des bordereaux
+
+Quand un bordereau est validé et envoyé à l’entreprise :
+
+le chef d’agence doit aussi le recevoir automatiquement.
+
+---
+
+### 8. Visibilité complète pour le chef d’agence
+
+Le chef d’agence doit voir :
+
+- nombre de passagers montés
+- nombre de bagages
+- nombre de colis
+- état du départ
+- heure réelle de départ
+- validations effectuées
+- bordereau final
+- historique
+
+---
+
+### 9. Supervision locale
+
+Le chef d’agence doit pouvoir :
+
+- suivre les départs
+- contrôler les agents
+- vérifier les opérations
+- suivre les anomalies
+- consulter les historiques
+
+---
+
+### 10. Mise à jour automatique globale
+
+Toutes les actions doivent être synchronisées automatiquement dans :
+
+- espace agence
+- espace agents
+- espace entreprise
+- bordereaux
+- historiques
+- départs
+
+Aucune saisie manuelle inutile.
+
+---
+
+### 11. Objectif
+
+Créer une structure professionnelle :
+
+Entreprise → Chef d’agence → Agents → Départs → Cars → Passagers
+
+Avec une logique intelligente, fluide et sans erreur :
+
+- programmation basée sur la réalité terrain
+- cars réellement disponibles
+- diffusion automatique
+- suivi complet
+- système moderne et intelligent

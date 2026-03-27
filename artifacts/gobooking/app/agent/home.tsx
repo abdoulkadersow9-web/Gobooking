@@ -134,6 +134,18 @@ const ALL_MODULES = [
     border: "#A5B4FC",
     roles: ["validation_depart", "agent_validation_depart"],
   },
+  {
+    id: "chef_agence",
+    label: "Chef d'Agence",
+    sub: "Tableau de bord agence",
+    desc: "Programmer les départs, gérer la flotte, suivre les agents et les passagers de l'agence",
+    icon: "settings" as const,
+    path: "/agent/chef-home",
+    color: "#3730A3",
+    gradient: ["#EEF2FF", "#E0E7FF"] as [string, string],
+    border: "#A5B4FC",
+    roles: ["chef_agence"],
+  },
 ];
 
 function useLiveClock() {
