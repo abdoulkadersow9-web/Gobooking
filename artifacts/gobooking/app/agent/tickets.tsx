@@ -216,7 +216,7 @@ function todayStr() {
 }
 
 export default function TicketsScreen() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logout, logoutIfActiveToken } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
 
   /* ── Module 6 — Temps réel ── */
@@ -280,8 +280,7 @@ export default function TicketsScreen() {
       setTrips(Array.isArray(res) ? res : []);
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout();
-        router.replace("/(auth)/login" as never);
+        logoutIfActiveToken(token ?? "");
         return;
       }
       setTrips([]);

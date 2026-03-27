@@ -103,7 +103,7 @@ const RESULT_CONFIG: Record<ResultStatus, {
    Component
 ═══════════════════════════════════════════════════════════════════ */
 export default function AgentScan() {
-  const { token, logout }           = useAuth();
+  const { token, logoutIfActiveToken } = useAuth();
   const insets                      = useSafeAreaInsets();
   const networkStatus               = useNetworkStatus(BASE_URL);
   const [permission, requestPerm]   = useCameraPermissions();
@@ -185,7 +185,7 @@ export default function AgentScan() {
       triggerPulse();
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout(); router.replace("/(auth)/login" as never); return;
+        logoutIfActiveToken(token ?? ""); return;
       }
       const id = generateOfflineId();
       await saveOffline({

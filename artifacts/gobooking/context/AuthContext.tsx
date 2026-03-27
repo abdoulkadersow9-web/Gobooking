@@ -110,6 +110,29 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * logoutIfActiveToken — safe logout for 403 handlers in screens.
+   *
+   * Problem: when a screen's API call returns 403 and calls logout(),
+   * a NEW login may have already been established while the request was
+   * in-flight. Calling logout() would wipe the new valid session.
+   *
+   * This function only logs out if `failedToken` is still the current
+   * active session token. If the user already re-authenticated, it's a
+   * no-op — the 403 was from the old stale session.
+   *
+   * Usage in screens:
+   *   const { token: authToken, logoutIfActiveToken } = useAuth();
+   *   const token = authToken ?? "";
+   *   ...
+   *   catch (e: any) {
+   *     if (e?.httpStatus === 401 || e?.httpStatus === 403) {
+   *       logoutIfActiveToken(token);
+   *       return;
+   *     }
+   *   }
+   */
+  logoutIfActiveToken: (failedToken: string) => Promise<void>;
   refreshUser: () => Promise<void>;
   isAdmin: boolean;
   isCompanyAdmin: boolean;
@@ -272,6 +295,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(auth)/login");
   }, []);
 
+  /**
+   * Safe logout for screen 403 handlers.
+   * Only clears the session if `failedToken` is still the active session token.
+   * If the user already re-authenticated since this request was sent, this is a no-op.
+   */
+  const logoutIfActiveToken = useCallback(async (failedToken: string) => {
+    if (!failedToken) return;
+    if (activeSessionToken.current !== failedToken) return; /* New session already active */
+    activeSessionToken.current = null;
+    await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+    setToken(null);
+    setUser(null);
+    router.replace("/(auth)/login");
+  }, []);
+
   const refreshUser = useCallback(async () => {
     try {
       const storedToken = await AsyncStorage.getItem("auth_token");
@@ -293,6 +331,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        logoutIfActiveToken,
         refreshUser,
         isAdmin: user?.role === "admin" || user?.role === "super_admin",
         isCompanyAdmin: user?.role === "compagnie" || user?.role === "company_admin",

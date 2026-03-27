@@ -83,7 +83,7 @@ function baggageTypeLabel(t: string | null) {
    MAIN SCREEN
 ───────────────────────────────────────────────────────────────────────── */
 export default function AgentReservation() {
-  const { user, token, logout } = useAuth();
+  const { user, token, logoutIfActiveToken } = useAuth();
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,8 +105,7 @@ export default function AgentReservation() {
       setLastSync(new Date());
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout();
-        router.replace("/(auth)/login" as never);
+        logoutIfActiveToken(token ?? "");
         return;
       }
       if (!silent) Alert.alert("Erreur", e?.message ?? "Impossible de charger les réservations");

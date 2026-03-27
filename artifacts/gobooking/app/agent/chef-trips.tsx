@@ -103,7 +103,7 @@ function busAvailLabel(b: Bus): { label: string; color: string; bg: string; sele
 }
 
 export default function ChefTrips() {
-  const { token, logout } = useAuth();
+  const { token, logoutIfActiveToken } = useAuth();
   const authToken = token ?? "";
 
   /* ── État global ── */
@@ -222,8 +222,7 @@ export default function ChefTrips() {
       setAuditLogs(a.logs ?? []);
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout();
-        router.replace("/(auth)/login" as never);
+        logoutIfActiveToken(authToken);
         return;
       }
       console.error("[chef-trips]", e);
@@ -231,7 +230,7 @@ export default function ChefTrips() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [authToken, logout]);
+  }, [authToken, logoutIfActiveToken]);
 
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);

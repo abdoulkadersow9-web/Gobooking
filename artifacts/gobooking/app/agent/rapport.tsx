@@ -41,7 +41,7 @@ const STATUT_STYLE: Record<string, { label: string; color: string; bg: string }>
 };
 
 export default function RapportScreen() {
-  const { token, logout } = useAuth();
+  const { token, logoutIfActiveToken } = useAuth();
   const [tab, setTab] = useState<"creer" | "historique">("creer");
 
   const [reportType, setReportType] = useState("");
@@ -62,11 +62,11 @@ export default function RapportScreen() {
       setReports(Array.isArray(data) ? data : []);
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout(); router.replace("/(auth)/login" as never); return;
+        logoutIfActiveToken(token ?? ""); return;
       }
       setReports([]);
     } finally { setLoadingReports(false); setRefreshing(false); }
-  }, [token, logout]);
+  }, [token, logoutIfActiveToken]);
 
   useEffect(() => {
     if (tab === "historique") { setLoadingReports(true); loadReports(); }

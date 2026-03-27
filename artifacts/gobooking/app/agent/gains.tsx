@@ -40,7 +40,7 @@ interface EarningsData {
 }
 
 export default function AgentGains() {
-  const { token, logout } = useAuth();
+  const { token, logoutIfActiveToken } = useAuth();
   const insets = useSafeAreaInsets();
   const [data, setData]       = useState<EarningsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,7 @@ export default function AgentGains() {
       setData(res);
     } catch (e: any) {
       if (e?.httpStatus === 401 || e?.httpStatus === 403) {
-        logout(); router.replace("/(auth)/login" as never); return;
+        logoutIfActiveToken(token ?? ""); return;
       }
     } finally {
       setLoading(false);
