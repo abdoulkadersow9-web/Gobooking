@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { Ionicons, Feather } from "@expo/vector-icons";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
@@ -18,6 +18,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import OfflineBanner from "@/components/OfflineBanner";
 import { AuthProvider, getDashboardPath, useAuth } from "@/context/AuthContext";
+import { queryClient } from "@/utils/queryClient";
 import { BookingProvider } from "@/context/BookingContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ParcelProvider } from "@/context/ParcelContext";
@@ -27,14 +28,6 @@ import { useNetworkStatus } from "@/utils/offline";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 30_000,
-    },
-  },
-});
 
 /* ─── Rôles autorisés par groupe de routes ───────────────── */
 const ROUTE_ROLES: Record<string, string[]> = {

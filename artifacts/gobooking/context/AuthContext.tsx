@@ -11,6 +11,7 @@ import React, {
 
 import { apiFetch } from "@/utils/api";
 import { registerForPushNotifications } from "@/utils/notifications";
+import { queryClient } from "@/utils/queryClient";
 
 export type UserRole = "client" | "user" | "compagnie" | "company_admin" | "agent" | "admin" | "super_admin";
 export type AgentRole = "agent_ticket" | "agent_embarquement" | "agent_colis" | "agent_guichet"
@@ -265,21 +266,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // Run once on mount
 
   const login = useCallback(async (newToken: string, newUser: User) => {
-    /* 1. Mark new session FIRST — prevents any race with background validation */
+    /* 1. If a previous session exists, invalidate it server-side before switching.
+          Fire-and-forget: do not block login on this. */
+    const prevToken = activeSessionToken.current;
+    if (prevToken && prevToken !== newToken) {
+      apiFetch("/auth/logout", { method: "POST", token: prevToken }).catch(() => {});
+    }
+
+    /* 2. Mark new session FIRST — prevents any race with background validation */
     activeSessionToken.current = newToken;
 
-    /* 2. Update React state IMMEDIATELY (no async gap) so AuthGuard and screens
-          react instantly without waiting for storage I/O */
+    /* 3. Wipe the React Query cache so the new user never sees stale data
+          from the previous session. Must happen BEFORE state update so screens
+          that mount after setUser() start with a clean cache. */
+    queryClient.clear();
+
+    /* 4. Update React state IMMEDIATELY so AuthGuard and screens react instantly */
     setToken(newToken);
     setUser(newUser);
 
-    /* 3. Persist to AsyncStorage in parallel (fast, fire-and-forget for UX) */
-    AsyncStorage.multiSet([
-      ["auth_token", newToken],
-      ["auth_user", JSON.stringify(newUser)],
-    ]).catch(() => {});
+    /* 5. Persist to AsyncStorage — awaited so storage is consistent before returning.
+          State was already updated (step 4), so this does not block the UI. */
+    try {
+      await AsyncStorage.multiSet([
+        ["auth_token", newToken],
+        ["auth_user", JSON.stringify(newUser)],
+      ]);
+    } catch {
+      /* Storage failure is non-fatal — session is already active in memory */
+    }
 
-    /* 4. Push token registration — fire and forget */
+    /* 6. Push token registration — fire and forget */
     registerForPushNotifications().then(async (pushToken) => {
       if (!pushToken) return;
       try {
@@ -298,14 +315,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /* 1. Mark session as cleared immediately */
     activeSessionToken.current = null;
 
-    /* 2. Clear local state immediately so AuthGuard navigates to login */
+    /* 2. Wipe React Query cache — prevent old session data from leaking */
+    queryClient.clear();
+
+    /* 3. Clear local state immediately so AuthGuard navigates to login */
     setToken(null);
     setUser(null);
 
-    /* 3. Clear AsyncStorage (fire and forget is OK — UI is already updating) */
+    /* 4. Clear AsyncStorage (fire and forget is OK — UI is already updating) */
     AsyncStorage.multiRemove(["auth_token", "auth_user"]).catch(() => {});
 
-    /* 4. Invalidate token on server so the session is truly gone (fire and forget) */
+    /* 5. Invalidate token on server so the session is truly gone (fire and forget) */
     if (currentToken) {
       apiFetch("/auth/logout", {
         method: "POST",
@@ -313,7 +333,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {});
     }
 
-    /* 5. Navigate to login — belt-and-suspenders alongside AuthGuard */
+    /* 6. Navigate to login — belt-and-suspenders alongside AuthGuard */
     router.replace("/(auth)/login");
   }, []);
 
@@ -326,6 +346,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!failedToken) return;
     if (activeSessionToken.current !== failedToken) return; /* New session already active — no-op */
     activeSessionToken.current = null;
+
+    /* Wipe React Query cache — prevent old session data from leaking */
+    queryClient.clear();
 
     /* Clear state immediately */
     setToken(null);
@@ -368,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isCompanyAdmin: user?.role === "compagnie" || user?.role === "company_admin",
         isAgent: user?.role === "agent",
         isSuperAdmin: user?.role === "admin" || user?.role === "super_admin",
-        dashboardPath: user ? getDashboardPath(user.role) : null,
+        dashboardPath: user ? getDashboardPath(user.role, user.agentRole) : null,
       }}
     >
       {children}

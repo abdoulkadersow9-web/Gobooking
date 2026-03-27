@@ -84,7 +84,7 @@ const STATUS_COLORS: Record<string, string> = {
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function AgentBagage() {
-  const { user, token: rawToken, logout } = useAuth();
+  const { user, token: rawToken, logoutIfActiveToken } = useAuth();
   const token = rawToken ?? "";
 
   const [tab, setTab] = useState<"ajouter" | "liste">("ajouter");
@@ -132,13 +132,13 @@ export default function AgentBagage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (r.status === 401 || r.status === 403) {
-        logout(); router.replace("/(auth)/login" as never); return;
+        logoutIfActiveToken(token); return;
       }
       const data = await r.json();
       setTrips(Array.isArray(data) ? data : []);
     } catch { setTrips([]); }
     finally { setTL(false); }
-  }, [token, logout]);
+  }, [token, logoutIfActiveToken]);
 
   useEffect(() => { loadTrips(); }, [loadTrips]);
 

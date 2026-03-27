@@ -47,7 +47,7 @@ interface SegmentData {
 /* ─── Component ─────────────────────────────────────────────── */
 export default function WaypointsScreen() {
   const router = useRouter();
-  const { token: authToken, logout } = useAuth();
+  const { token: authToken, logoutIfActiveToken } = useAuth();
   const token = authToken ?? "";
   const { tripId, tripName } = useLocalSearchParams<{ tripId: string; tripName?: string }>();
 
@@ -66,7 +66,7 @@ export default function WaypointsScreen() {
         fetch(`${API}/agent/trips/${tripId}/segment-seats`,  { headers: { Authorization: `Bearer ${token}` } }),
       ]);
       if (wpRes.status === 401 || wpRes.status === 403) {
-        logout(); router.replace("/(auth)/login" as never); return;
+        logoutIfActiveToken(token); return;
       }
       if (wpRes.ok)  setWaypointsData(await wpRes.json());
       if (segRes.ok) setSegmentData(await segRes.json());
@@ -76,7 +76,7 @@ export default function WaypointsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [tripId, token, logout]);
+  }, [tripId, token, logoutIfActiveToken]);
 
   useEffect(() => {
     load();
