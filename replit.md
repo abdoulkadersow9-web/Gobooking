@@ -45,6 +45,7 @@ I want iterative development. I want to be asked before making major changes. I 
     - **Roles**: `agent_ticket` (sales), `agent_embarquement` (boarding), `agent_colis` (parcel handling), `logistique`, `route`, `suivi`, `agent_reservation`, `bagage` (Module 2), `validation_depart` (Module 3).
     - **Module 2 — Agent Bagage**: `bagage_items` table; 5 API endpoints `/agent/bagage/*`; 4-step flow (departures → passenger lookup → form → QR ticket); color `#92400E`.
     - **Module 3 — Agent Validation Départ**: `departure-validation.tsx`; 4 API endpoints `/agent/validation-depart/*`; full bordereau (passengers, absents, bagages + photos, colis + photos, expenses); VALIDATE button → trips.status='en_route', colis→en_transit, push notifications; color `#4338CA` indigo.
+    - **Module 4 — Bordereau Auto PDF**: `utils/bordereau-pdf.ts`; 2 HTML templates; `generateBordereauEntreprise` (full amounts) + `generateBordereauRoute` (no amounts); expo-print.printToFileAsync → expo-sharing.shareAsync; integrated into departure-validation.tsx; 2 PDF buttons appear after validation.
     - **Demo accounts** (password `test123`): `agent@test.com`, `embarquement@test.com`, `reservation@test.com`, `colis@test.com`, `logistique@test.com`, `suivi@test.com`, `compagnie@test.com`, `admin@test.com`, `bagage@test.com`, `validepart@test.com`.
     - **Dashboards**: Role-specific dashboards with dedicated functionalities and UI themes.
     - **Reporting**: System for agents to submit various types of reports (incidents, problems, suggestions).

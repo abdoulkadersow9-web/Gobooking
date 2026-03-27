@@ -1,13 +1,15 @@
 /**
- * Agent Validation Départ — Module 3
- * Validation centralisée des départs
+ * Agent Validation Départ — Module 3 + 4
+ * Validation centralisée des départs + Bordereau PDF automatique
  * - Synthèse: passagers, absents, bagages, colis, dépenses
  * - Ajout de dépenses (péage, ration, autre)
  * - Bouton VALIDER → départ déclaré en route, notifications envoyées
- * - Bordereau complet (entreprise) + bordereau guichet (sans montants)
+ * - Génération PDF après validation: Version Entreprise (montants) + Version Route (sans montants)
  */
 import { Feather, Ionicons } from "@expo/vector-icons";
+import * as Print from "expo-print";
 import { router } from "expo-router";
+import * as Sharing from "expo-sharing";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +27,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import {
+  generateBordereauEntreprise,
+  generateBordereauRoute,
+  type BordereauData as PdfBordereauData,
+} from "@/utils/bordereau-pdf";
 
 const P       = "#4338CA";   // Indigo-700 — Agent Validation
 const P_LIGHT = "#EEF2FF";
@@ -117,6 +124,9 @@ export default function AgentDepartureValidation() {
   const [validating, setValidating] = useState(false);
   const [validated, setValidated]   = useState(false);
 
+  // PDF generation
+  const [pdfLoading, setPdfLoading] = useState<"entreprise" | "route" | null>(null);
+
   /* ─ Load trips ─ */
   const loadTrips = useCallback(async () => {
     setTL(true);
@@ -201,6 +211,50 @@ export default function AgentDepartureValidation() {
         },
       ]
     );
+  };
+
+  /* ─ Generate PDF ─ */
+  const handleGeneratePDF = async (version: "entreprise" | "route") => {
+    if (!bordereau || !selectedTrip) return;
+    setPdfLoading(version);
+    try {
+      const pdfData: PdfBordereauData = {
+        trip:      bordereau.trip,
+        boarded:   bordereau.boarded,
+        absents:   bordereau.absents,
+        bagages:   bordereau.bagages,
+        colis:     bordereau.colis,
+        expenses:  bordereau.expenses,
+        summary:   bordereau.summary,
+        validatedBy: (user as any)?.name ?? "Agent",
+        validatedAt: new Date().toISOString(),
+      };
+
+      const html = version === "entreprise"
+        ? generateBordereauEntreprise(pdfData)
+        : generateBordereauRoute(pdfData);
+
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        const filename = version === "entreprise"
+          ? `Bordereau_Entreprise_${selectedTrip.from}_${selectedTrip.to}_${selectedTrip.date}.pdf`
+          : `FeuilldeRoute_${selectedTrip.from}_${selectedTrip.to}_${selectedTrip.date}.pdf`;
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: `Bordereau ${version === "entreprise" ? "Entreprise" : "Agent Route"}`,
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("PDF généré", `Fichier disponible à : ${uri}`);
+      }
+    } catch (err) {
+      console.error("PDF error:", err);
+      Alert.alert("Erreur PDF", "Impossible de générer le PDF. Réessayez.");
+    } finally {
+      setPdfLoading(null);
+    }
   };
 
   /* ══════════════════ RENDERS ══════════════════ */
@@ -579,15 +633,68 @@ export default function AgentDepartureValidation() {
                 </>}
           </TouchableOpacity>
         ) : (
-          <View style={SL.validatedBox}>
-            <Feather name="check-circle" size={28} color={GREEN} />
-            <View>
-              <Text style={SL.validatedTitle}>Départ validé — En route</Text>
-              <Text style={SL.validatedSub}>
-                Passagers notifiés · Colis en transit · Bordereau envoyé
-              </Text>
+          <>
+            {/* Validated confirmation box */}
+            <View style={SL.validatedBox}>
+              <Feather name="check-circle" size={28} color={GREEN} />
+              <View style={{ flex: 1 }}>
+                <Text style={SL.validatedTitle}>Départ validé — En route</Text>
+                <Text style={SL.validatedSub}>
+                  Passagers notifiés · Colis en transit · Bordereau prêt
+                </Text>
+              </View>
             </View>
-          </View>
+
+            {/* PDF generation section */}
+            <View style={SL.pdfSection}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 }}>
+                <Feather name="file-text" size={16} color="#4338CA" />
+                <Text style={SL.pdfSectionTitle}>Générer le bordereau PDF</Text>
+              </View>
+
+              {/* Entreprise version */}
+              <TouchableOpacity
+                style={[SL.pdfBtn, SL.pdfBtnEntreprise, pdfLoading === "entreprise" && { opacity: 0.6 }]}
+                onPress={() => handleGeneratePDF("entreprise")}
+                disabled={pdfLoading !== null}>
+                {pdfLoading === "entreprise" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <View style={SL.pdfBtnIcon}>
+                      <Feather name="briefcase" size={18} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={SL.pdfBtnLabel}>Version Entreprise</Text>
+                      <Text style={SL.pdfBtnSub}>Avec tous les montants · Usage interne</Text>
+                    </View>
+                    <Feather name="download" size={16} color="rgba(255,255,255,0.8)" />
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Route version */}
+              <TouchableOpacity
+                style={[SL.pdfBtn, SL.pdfBtnRoute, pdfLoading === "route" && { opacity: 0.6 }]}
+                onPress={() => handleGeneratePDF("route")}
+                disabled={pdfLoading !== null}>
+                {pdfLoading === "route" ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <View style={SL.pdfBtnIcon}>
+                      <Feather name="navigation" size={18} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={SL.pdfBtnLabel}>Feuille de Route</Text>
+                      <Text style={SL.pdfBtnSub}>Sans montants · Chauffeur &amp; Agent Route</Text>
+                    </View>
+                    <Feather name="download" size={16} color="rgba(255,255,255,0.8)" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
         )}
 
         <View style={{ height: 30 }} />
@@ -772,4 +879,14 @@ const SL = StyleSheet.create({
   modalInput: { backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: "#0F172A" },
   expChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: "#E2E8F0", backgroundColor: "#fff" },
   expChipText: { fontSize: 13, fontWeight: "700", color: GRAY },
+
+  /* PDF section */
+  pdfSection: { backgroundColor: "#fff", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#E0E7FF", shadowColor: P, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
+  pdfSectionTitle: { fontSize: 14, fontWeight: "800", color: P },
+  pdfBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 14, padding: 14, marginBottom: 10 },
+  pdfBtnEntreprise: { backgroundColor: P, shadowColor: P, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  pdfBtnRoute: { backgroundColor: GREEN, shadowColor: GREEN, shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5 },
+  pdfBtnIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
+  pdfBtnLabel: { fontSize: 14, fontWeight: "800", color: "#fff" },
+  pdfBtnSub: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 },
 });
