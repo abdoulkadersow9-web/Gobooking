@@ -1,16 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
+  Modal, RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
+import {
+  generateBordereauRoute,
+  type BordereauData as PdfBordereauData,
+} from "@/utils/bordereau-pdf";
 
 const G       = "#D97706";
 const G_DARK  = "#92400E";
@@ -46,6 +52,34 @@ interface Confirmed {
   trip: Trip;
   paymentLabel: string;
 }
+
+/* ── Impression Départ interfaces ── */
+interface TripSummary {
+  id: string; from: string; to: string; date: string;
+  departureTime: string; busName: string; status: string;
+  totalPassengers: number; boardedCount: number; absentCount: number;
+  bagageCount: number; colisCount: number; expenseTotal: number;
+  isValidated: boolean;
+}
+interface Expense { id: string; type: string; amount: number; description: string | null; }
+interface BordereauFull {
+  trip: { id: string; from: string; to: string; date: string; departureTime: string; busName: string; status: string };
+  passengers: any[]; boarded: any[]; absents: any[];
+  bagages: any[]; colis: any[]; expenses: Expense[];
+  summary: {
+    totalPassengers: number; boardedCount: number; absentCount: number;
+    bagageCount: number; colisCount: number;
+    totalPassengerRevenue: number; totalBagageRevenue: number;
+    totalColisRevenue: number; totalExpenses: number; netRevenue: number;
+  };
+}
+const IMP_EXPENSE_TYPES = [
+  { key: "péage",     label: "Péage",          icon: "map-pin"        as const },
+  { key: "ration",    label: "Ration équipage", icon: "coffee"         as const },
+  { key: "carburant", label: "Carburant",       icon: "droplet"        as const },
+  { key: "entretien", label: "Entretien",       icon: "tool"           as const },
+  { key: "autre",     label: "Autre",           icon: "more-horizontal" as const },
+];
 
 const PAYMENT_METHODS = [
   { id: "cash",   label: "Espèces",      icon: "cash-outline" as const },
@@ -181,7 +215,7 @@ export default function TicketsScreen() {
   const networkStatus = useNetworkStatus(BASE_URL);
 
   /* ── Tab ── */
-  const [activeTab, setActiveTab] = useState<"vente" | "depart">("vente");
+  const [activeTab, setActiveTab] = useState<"vente" | "depart" | "impression">("vente");
 
   /* ── Vente state ── */
   const [trips, setTrips]           = useState<Trip[]>([]);
@@ -211,6 +245,22 @@ export default function TicketsScreen() {
   const [creatingDep, setCreatingDep]     = useState(false);
   const [depSuccess, setDepSuccess]       = useState<string | null>(null);
 
+  /* ── Impression Départ state ── */
+  const [impTrips, setImpTrips]           = useState<TripSummary[]>([]);
+  const [impLoading, setImpLoading]       = useState(false);
+  const [impRefreshing, setImpRefr]       = useState(false);
+  const [impSelTrip, setImpSelTrip]       = useState<TripSummary | null>(null);
+  const [bordereau, setBordereau]         = useState<BordereauFull | null>(null);
+  const [bordeLoading, setBordeLoading]   = useState(false);
+  // expense modal
+  const [showExpModal, setShowExpModal]   = useState(false);
+  const [expType, setExpType]             = useState("péage");
+  const [expAmount, setExpAmount]         = useState("");
+  const [expDesc, setExpDesc]             = useState("");
+  const [savingExp, setSavingExp]         = useState(false);
+  // print
+  const [printingRoute, setPrintingRoute] = useState(false);
+
   const isAgent = user?.role === "agent";
 
   const fetchTrips = async () => {
@@ -237,9 +287,97 @@ export default function TicketsScreen() {
     }
   };
 
+  /* ── Impression Départ functions ── */
+  const fetchImpTrips = useCallback(async () => {
+    setImpLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/validation-depart/trips`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setImpTrips(Array.isArray(data) ? data : []);
+    } catch { setImpTrips([]); }
+    finally { setImpLoading(false); setImpRefr(false); }
+  }, [token]);
+
+  const fetchImpDetail = useCallback(async (tripId: string) => {
+    setBordeLoading(true); setBordereau(null);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/validation-depart/trip/${tripId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setBordereau(await res.json());
+    } catch {}
+    finally { setBordeLoading(false); }
+  }, [token]);
+
+  const selectImpTrip = (t: TripSummary) => {
+    setImpSelTrip(t);
+    fetchImpDetail(t.id);
+  };
+
+  const handleAddExpense = async () => {
+    if (!impSelTrip || !expAmount.trim()) { Alert.alert("Erreur", "Montant requis."); return; }
+    setSavingExp(true);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/validation-depart/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          tripId: impSelTrip.id,
+          type: expType,
+          amount: parseInt(expAmount),
+          description: expDesc.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setShowExpModal(false); setExpAmount(""); setExpDesc(""); setExpType("péage");
+        fetchImpDetail(impSelTrip.id);
+      } else {
+        const d = await res.json();
+        Alert.alert("Erreur", d.error ?? "Impossible d'ajouter la dépense.");
+      }
+    } catch { Alert.alert("Erreur réseau", "Vérifiez votre connexion."); }
+    finally { setSavingExp(false); }
+  };
+
+  const handlePrintRoute = async () => {
+    if (!bordereau || !impSelTrip) return;
+    setPrintingRoute(true);
+    try {
+      const pdfData: PdfBordereauData = {
+        trip: bordereau.trip,
+        boarded: bordereau.boarded,
+        absents: bordereau.absents,
+        bagages: bordereau.bagages,
+        colis: bordereau.colis,
+        expenses: bordereau.expenses,
+        summary: bordereau.summary,
+        validatedBy: (user as any)?.name ?? "Agent Guichet",
+        validatedAt: new Date().toISOString(),
+      };
+      const html    = generateBordereauRoute(pdfData);
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "Feuille de Route",
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        Alert.alert("PDF généré", `Fichier : ${uri}`);
+      }
+    } catch (e) {
+      console.error("printRoute error:", e);
+      Alert.alert("Erreur", "Impossible de générer la feuille de route.");
+    } finally { setPrintingRoute(false); }
+  };
+
   useEffect(() => { fetchTrips(); }, []);
   useEffect(() => {
     if (activeTab === "depart" && fleetBuses.length === 0) fetchFleetBuses();
+    if (activeTab === "impression") fetchImpTrips();
   }, [activeTab]);
 
   if (!isAgent) {
@@ -468,6 +606,10 @@ export default function TicketsScreen() {
         <TouchableOpacity style={[S.tab, activeTab === "depart" && S.tabActive]} onPress={() => setActiveTab("depart")}>
           <Ionicons name="bus-outline" size={16} color={activeTab === "depart" ? G_DARK : "#9CA3AF"} />
           <Text style={[S.tabTxt, activeTab === "depart" && S.tabTxtActive]}>Créer départ</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[S.tab, activeTab === "impression" && S.tabActive]} onPress={() => setActiveTab("impression")}>
+          <Feather name="printer" size={15} color={activeTab === "impression" ? G_DARK : "#9CA3AF"} />
+          <Text style={[S.tabTxt, activeTab === "impression" && S.tabTxtActive]}>Impression</Text>
         </TouchableOpacity>
       </View>
 
@@ -823,6 +965,315 @@ export default function TicketsScreen() {
           )}
         </ScrollView>
       )}
+
+      {/* ══════════════ TAB: IMPRESSION DÉPART ══════════════ */}
+      {activeTab === "impression" && (
+        <>
+          {/* Trip list */}
+          {!impSelTrip ? (
+            <ScrollView style={{ flex: 1, backgroundColor: "#FFFBEB" }}
+              contentContainerStyle={{ padding: 16, gap: 12 }}
+              refreshControl={
+                <RefreshControl refreshing={impRefreshing || impLoading}
+                  onRefresh={() => { setImpRefr(true); fetchImpTrips(); }} tintColor={G} />
+              }>
+
+              <View style={S.impInfoBox}>
+                <Feather name="info" size={13} color={G_DARK} />
+                <Text style={S.impInfoTxt}>
+                  Sélectionnez un départ pour ajouter des dépenses (péage, ration...) et imprimer la feuille de route sans montants.
+                </Text>
+              </View>
+
+              <View style={S.impSectionRow}>
+                <Feather name="calendar" size={16} color={G_DARK} />
+                <Text style={S.impSectionTitle}>Départs du jour</Text>
+                <View style={S.impBadge}><Text style={S.impBadgeTxt}>{impTrips.length}</Text></View>
+                <TouchableOpacity onPress={fetchImpTrips} style={{ marginLeft: "auto" }}>
+                  <Feather name="refresh-cw" size={14} color={G} />
+                </TouchableOpacity>
+              </View>
+
+              {impLoading ? (
+                <ActivityIndicator color={G} size="large" style={{ marginTop: 32 }} />
+              ) : impTrips.length === 0 ? (
+                <View style={{ alignItems: "center", paddingVertical: 48, gap: 8 }}>
+                  <Feather name="calendar" size={44} color="#CBD5E1" />
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: "#334155" }}>Aucun départ aujourd'hui</Text>
+                </View>
+              ) : (
+                impTrips.map(t => {
+                  const validated = t.isValidated;
+                  const ready = t.boardedCount > 0 || t.bagageCount > 0;
+                  const accent = validated ? "#059669" : ready ? G : "#94A3B8";
+                  const label  = validated ? "En route" : ready ? "Prêt" : "En attente";
+                  return (
+                    <TouchableOpacity key={t.id} style={[S.impTripCard, validated && { opacity: 0.8 }]}
+                      onPress={() => selectImpTrip(t)}>
+                      <View style={[S.impTripAccent, { backgroundColor: accent }]} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                          <Text style={S.impTripRoute}>{t.from} → {t.to}</Text>
+                          <View style={[S.impBadge, { backgroundColor: accent + "18" }]}>
+                            <Text style={[S.impBadgeTxt, { color: accent }]}>{t.departureTime}</Text>
+                          </View>
+                        </View>
+                        <Text style={S.impTripMeta}>{t.busName} · {t.date}</Text>
+                        <View style={{ flexDirection: "row", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                          <View style={S.impChip}>
+                            <Feather name="users" size={10} color="#059669" />
+                            <Text style={[S.impChipTxt, { color: "#059669" }]}>{t.boardedCount} pax</Text>
+                          </View>
+                          {t.bagageCount > 0 && (
+                            <View style={S.impChip}>
+                              <Feather name="briefcase" size={10} color={G_DARK} />
+                              <Text style={[S.impChipTxt, { color: G_DARK }]}>{t.bagageCount} bag.</Text>
+                            </View>
+                          )}
+                          {t.expenseTotal > 0 && (
+                            <View style={S.impChip}>
+                              <Feather name="minus-circle" size={10} color="#DC2626" />
+                              <Text style={[S.impChipTxt, { color: "#DC2626" }]}>{t.expenseTotal.toLocaleString()} FCFA</Text>
+                            </View>
+                          )}
+                          <View style={[S.impBadge, { backgroundColor: accent + "15" }]}>
+                            <Text style={[S.impBadgeTxt, { color: accent }]}>{label}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <Feather name="chevron-right" size={18} color={G} />
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          ) : (
+            /* ── Detail view ── */
+            <ScrollView style={{ flex: 1, backgroundColor: "#FFFBEB" }} contentContainerStyle={{ padding: 16, gap: 14 }}>
+              {/* Back */}
+              <TouchableOpacity style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                onPress={() => { setImpSelTrip(null); setBordereau(null); }}>
+                <Feather name="arrow-left" size={16} color={G_DARK} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>Retour aux départs</Text>
+              </TouchableOpacity>
+
+              {/* Trip banner */}
+              <View style={[S.card, { borderLeftWidth: 4, borderLeftColor: G }]}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: G_DARK }}>
+                  {impSelTrip.from} → {impSelTrip.to}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                  {impSelTrip.departureTime} · {impSelTrip.busName} · {impSelTrip.date}
+                </Text>
+                {impSelTrip.isValidated && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Feather name="check-circle" size={13} color="#059669" />
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#059669" }}>Départ validé · En route</Text>
+                  </View>
+                )}
+              </View>
+
+              {bordeLoading ? (
+                <ActivityIndicator color={G} size="large" style={{ marginTop: 20 }} />
+              ) : !bordereau ? (
+                <TouchableOpacity style={S.submitBtn} onPress={() => fetchImpDetail(impSelTrip.id)}>
+                  <Text style={S.submitTxt}>Réessayer le chargement</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  {/* Stats */}
+                  <View style={{ flexDirection: "row", gap: 8 }}>
+                    {[
+                      { label: "Embarqués", val: bordereau.summary.boardedCount, color: "#059669" },
+                      { label: "Absents",   val: bordereau.summary.absentCount,  color: G },
+                      { label: "Bagages",   val: bordereau.summary.bagageCount,  color: G_DARK },
+                      { label: "Colis",     val: bordereau.summary.colisCount,   color: "#4338CA" },
+                    ].map(s => (
+                      <View key={s.label} style={[S.card, { flex: 1, alignItems: "center", padding: 10, borderTopWidth: 3, borderTopColor: s.color }]}>
+                        <Text style={{ fontSize: 20, fontWeight: "900", color: s.color }}>{s.val}</Text>
+                        <Text style={{ fontSize: 10, fontWeight: "600", color: "#6B7280", marginTop: 2 }}>{s.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* ── DÉPENSES ── */}
+                  <View style={S.card}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <Feather name="minus-circle" size={16} color="#DC2626" />
+                      <Text style={[S.cardTitle, { color: "#DC2626", flex: 1 }]}>
+                        Dépenses ({bordereau.expenses.length})
+                      </Text>
+                      {!impSelTrip.isValidated && (
+                        <TouchableOpacity
+                          style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEE2E2", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                          onPress={() => setShowExpModal(true)}>
+                          <Feather name="plus" size={12} color="#DC2626" />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: "#DC2626" }}>Ajouter</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {bordereau.expenses.length === 0 ? (
+                      <View style={{ gap: 8 }}>
+                        <Text style={{ fontSize: 12, color: "#9CA3AF", fontStyle: "italic" }}>Aucune dépense enregistrée.</Text>
+                        {!impSelTrip.isValidated && (
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                            {["Péage", "Ration équipage", "Carburant"].map(label => (
+                              <TouchableOpacity key={label}
+                                style={{ backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+                                onPress={() => { setExpType(label.toLowerCase().split(" ")[0]); setShowExpModal(true); }}>
+                                <Text style={{ fontSize: 12, fontWeight: "700", color: G_DARK }}>+ {label}</Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      <View style={{ gap: 8 }}>
+                        {bordereau.expenses.map(e => (
+                          <View key={e.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: "#FEE2E2" }}>
+                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center" }}>
+                              <Feather name="arrow-down-left" size={12} color="#DC2626" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827", textTransform: "capitalize" }}>{e.type}</Text>
+                              {e.description && <Text style={{ fontSize: 11, color: "#6B7280" }}>{e.description}</Text>}
+                            </View>
+                            <Text style={{ fontSize: 13, fontWeight: "800", color: "#DC2626" }}>
+                              − {(e.amount ?? 0).toLocaleString()} FCFA
+                            </Text>
+                          </View>
+                        ))}
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", paddingTop: 6 }}>
+                          <Text style={{ fontSize: 13, fontWeight: "700", color: "#6B7280" }}>Total</Text>
+                          <Text style={{ fontSize: 14, fontWeight: "900", color: "#DC2626" }}>
+                            − {(bordereau.summary.totalExpenses ?? 0).toLocaleString()} FCFA
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── INFO SYNC ── */}
+                  <View style={{ backgroundColor: "#EEF2FF", borderRadius: 12, padding: 12, flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                    <Feather name="info" size={13} color="#4338CA" />
+                    <Text style={{ flex: 1, fontSize: 11, color: "#4338CA", lineHeight: 16 }}>
+                      Les dépenses ajoutées ici apparaissent automatiquement sur le bordereau de l'agent de validation. La feuille imprimée ne contient <Text style={{ fontWeight: "800" }}>aucun montant</Text>.
+                    </Text>
+                  </View>
+
+                  {/* ── PASSAGERS résumé ── */}
+                  <View style={S.card}>
+                    <View style={S.cardHeader}>
+                      <Feather name="users" size={16} color="#059669" />
+                      <Text style={[S.cardTitle, { color: "#059669" }]}>Passagers embarqués ({bordereau.summary.boardedCount})</Text>
+                    </View>
+                    {bordereau.boarded.length === 0 ? (
+                      <Text style={{ fontSize: 12, color: "#9CA3AF", fontStyle: "italic" }}>Aucun passager embarqué pour l'instant.</Text>
+                    ) : (
+                      <View style={{ gap: 6 }}>
+                        {bordereau.boarded.slice(0, 5).map((p: any) => (
+                          <View key={p.bookingId} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <Feather name="check-circle" size={13} color="#059669" />
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: "#111827" }}>{p.name}</Text>
+                              <Text style={{ fontSize: 11, color: "#6B7280" }}>{p.bookingRef}</Text>
+                            </View>
+                          </View>
+                        ))}
+                        {bordereau.boarded.length > 5 && (
+                          <Text style={{ fontSize: 12, color: "#059669", fontWeight: "700" }}>
+                            + {bordereau.boarded.length - 5} autres passagers
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── PRINT BUTTON ── */}
+                  <TouchableOpacity
+                    style={[S.submitBtn, { backgroundColor: G_DARK, flexDirection: "row", gap: 12 }, printingRoute && { opacity: 0.6 }]}
+                    onPress={handlePrintRoute}
+                    disabled={printingRoute}>
+                    {printingRoute ? <ActivityIndicator color="#fff" /> : (
+                      <>
+                        <Feather name="printer" size={20} color="#fff" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={S.submitTxt}>Imprimer la Feuille de Route</Text>
+                          <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11, marginTop: 1 }}>
+                            Chauffeur · Agent Route · Sans montants
+                          </Text>
+                        </View>
+                        <Feather name="download" size={15} color="rgba(255,255,255,0.6)" />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+              <View style={{ height: 30 }} />
+            </ScrollView>
+          )}
+
+          {/* ── Expense modal ── */}
+          <Modal visible={showExpModal} animationType="slide" transparent>
+            <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+              <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontSize: 17, fontWeight: "800", color: "#111827" }}>Ajouter une dépense</Text>
+                  <TouchableOpacity onPress={() => setShowExpModal(false)} hitSlop={8}>
+                    <Feather name="x" size={22} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+
+                {impSelTrip && (
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, alignSelf: "flex-start" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: G_DARK }}>
+                      {impSelTrip.from} → {impSelTrip.to} · {impSelTrip.departureTime}
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={S.label}>Type</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {IMP_EXPENSE_TYPES.map(et => (
+                    <TouchableOpacity key={et.key}
+                      style={[
+                        { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, borderColor: "#E5E7EB" },
+                        expType === et.key && { backgroundColor: "#DC2626", borderColor: "#DC2626" },
+                      ]}
+                      onPress={() => setExpType(et.key)}>
+                      <Feather name={et.icon} size={13} color={expType === et.key ? "#fff" : "#6B7280"} />
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: expType === et.key ? "#fff" : "#6B7280" }}>
+                        {et.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={S.label}>Montant (FCFA) *</Text>
+                <TextInput style={S.input} placeholder="ex: 5000" placeholderTextColor="#9CA3AF"
+                  value={expAmount} onChangeText={setExpAmount} keyboardType="numeric" />
+
+                <Text style={S.label}>Description (optionnel)</Text>
+                <TextInput style={S.input} placeholder="ex: Péage autoroute, Déjeuner équipage..."
+                  placeholderTextColor="#9CA3AF" value={expDesc} onChangeText={setExpDesc} />
+
+                <Text style={{ fontSize: 11, color: "#059669", fontWeight: "600" }}>
+                  ✓ Automatiquement visible sur le bordereau de validation
+                </Text>
+
+                <TouchableOpacity
+                  style={[S.submitBtn, { backgroundColor: "#DC2626" }, savingExp && { opacity: 0.6 }]}
+                  onPress={handleAddExpense} disabled={savingExp}>
+                  {savingExp
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={S.submitTxt}>Enregistrer la dépense</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -902,4 +1353,18 @@ const S = StyleSheet.create({
   printBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "700" },
   newSaleBtn:    { marginTop: 10, backgroundColor: G, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, width: "100%", justifyContent: "center" },
   newSaleBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  /* ── Impression tab ── */
+  impInfoBox:     { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FFFBEB", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#FDE68A" },
+  impInfoTxt:     { flex: 1, fontSize: 12, fontWeight: "600", color: G_DARK, lineHeight: 18 },
+  impSectionRow:  { flexDirection: "row", alignItems: "center", gap: 8 },
+  impSectionTitle:{ fontSize: 14, fontWeight: "800", color: G_DARK, flex: 1 },
+  impBadge:       { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: G_LIGHT, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  impBadgeTxt:    { fontSize: 11, fontWeight: "700", color: G_DARK },
+  impTripCard:    { backgroundColor: "#fff", borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#0B3C5D", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2, overflow: "hidden" },
+  impTripAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 14, borderBottomLeftRadius: 14 },
+  impTripRoute:   { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  impTripMeta:    { fontSize: 11, color: "#6B7280", marginTop: 1 },
+  impChip:        { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#F8FAFC", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  impChipTxt:     { fontSize: 11, fontWeight: "600", color: "#64748B" },
 });
