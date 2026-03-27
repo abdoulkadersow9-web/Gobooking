@@ -1204,15 +1204,27 @@ export default function TicketsScreen() {
                             <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{lbl}</Text>
                           </View>
                         </View>
-                        <View style={{ padding: 10, gap: 5 }}>
+                        <View style={{ padding: 10, gap: 8 }}>
                           {(audit.items as AuditItem[]).map((item, i) => {
-                            const ic = item.level === "error" ? "#DC2626" : item.level === "warning" ? G : "#059669";
+                            const ic      = item.level === "error" ? "#DC2626" : item.level === "warning" ? G : "#059669";
+                            const prioBg  = item.priority === "critique" ? "#FEE2E2" : item.priority === "moyen" ? "#FEF3C7" : "#F1F5F9";
+                            const prioFg  = item.priority === "critique" ? "#B91C1C" : item.priority === "moyen" ? "#92400E" : "#64748B";
+                            const prioLbl = item.priority === "critique" ? "CRITIQUE" : item.priority === "moyen" ? "MOYEN" : "INFO";
                             return (
                               <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 7 }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ic, marginTop: 5 }} />
-                                <View style={{ flex: 1 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ic, marginTop: 6 }} />
+                                <View style={{ flex: 1, gap: 2 }}>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                                    <View style={{ backgroundColor: prioBg, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                                      <Text style={{ fontSize: 8, fontWeight: "800", color: prioFg, letterSpacing: 0.4 }}>{prioLbl}</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 9, color: "#94A3B8", textTransform: "uppercase", fontWeight: "700" }}>{item.category}</Text>
+                                  </View>
                                   <Text style={{ fontSize: 11, fontWeight: "700", color: "#0F172A" }}>{item.label}</Text>
                                   <Text style={{ fontSize: 10, color: "#64748B" }}>{item.detail}</Text>
+                                  {!!item.recommendation && (
+                                    <Text style={{ fontSize: 9, color: prioFg, fontStyle: "italic" }}>→ {item.recommendation}</Text>
+                                  )}
                                 </View>
                               </View>
                             );

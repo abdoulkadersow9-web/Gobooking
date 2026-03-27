@@ -96,22 +96,25 @@ export interface BordereauData {
 ═══════════════════════════════════════════════════════ */
 
 export interface AuditItem {
-  level: "error" | "warning" | "ok";
-  category: string;
-  label: string;
-  detail: string;
+  level:          "error" | "warning" | "ok";
+  priority:       "critique" | "moyen" | "info";
+  category:       string;
+  label:          string;
+  detail:         string;
+  recommendation: string;
 }
 
 export interface AuditReport {
-  items: AuditItem[];
-  hasErrors: boolean;
-  hasWarnings: boolean;
+  items:        AuditItem[];
+  hasErrors:    boolean;
+  hasWarnings:  boolean;
+  hasCritique:  boolean;
   totalRevenue: number;
-  netBalance: number;
+  netBalance:   number;
 }
 
 export function computeAudit(data: BordereauData): AuditReport {
-  const { summary: s, boarded, absents, bagages, colis } = data;
+  const { summary: s, bagages, colis } = data;
   const items: AuditItem[] = [];
 
   const totalRevenue = (s.totalPassengerRevenue ?? 0) + (s.totalBagageRevenue ?? 0) + (s.totalColisRevenue ?? 0);
@@ -120,17 +123,21 @@ export function computeAudit(data: BordereauData): AuditReport {
   /* ── 1. Passagers embarqués vs tickets ── */
   if (s.absentCount > 0) {
     items.push({
-      level:    "warning",
-      category: "Passagers",
-      label:    `${s.absentCount} absent(s) sur ${s.totalPassengers}`,
-      detail:   `${s.boardedCount}/${s.totalPassengers} embarqués — ${s.absentCount} siège(s) non occupé(s)`,
+      level:          "warning",
+      priority:       "moyen",
+      category:       "Passagers",
+      label:          `${s.absentCount} absent(s) sur ${s.totalPassengers}`,
+      detail:         `${s.boardedCount}/${s.totalPassengers} embarqués — ${s.absentCount} siège(s) non occupé(s)`,
+      recommendation: "Contacter les passagers absents et vérifier les réservations. Libérer les sièges si nécessaire.",
     });
   } else if (s.totalPassengers > 0) {
     items.push({
-      level:    "ok",
-      category: "Passagers",
-      label:    "Tous les passagers embarqués",
-      detail:   `${s.boardedCount}/${s.totalPassengers} à bord`,
+      level:          "ok",
+      priority:       "info",
+      category:       "Passagers",
+      label:          "Tous les passagers embarqués",
+      detail:         `${s.boardedCount}/${s.totalPassengers} à bord`,
+      recommendation: "",
     });
   }
 
@@ -138,17 +145,21 @@ export function computeAudit(data: BordereauData): AuditReport {
   const unlinked = bagages.filter(b => !b.passengerName || b.passengerName.trim() === "" || b.passengerName === "—");
   if (unlinked.length > 0) {
     items.push({
-      level:    "warning",
-      category: "Bagages",
-      label:    `${unlinked.length} bagage(s) sans passager rattaché`,
-      detail:   "Vérifier la saisie des bagages hors-billet",
+      level:          "warning",
+      priority:       "moyen",
+      category:       "Bagages",
+      label:          `${unlinked.length} bagage(s) sans passager rattaché`,
+      detail:         "Des bagages enregistrés ne sont pas liés à un passager identifié",
+      recommendation: "Rattacher chaque bagage à son passager dans le système avant le départ.",
     });
   } else if (bagages.length > 0) {
     items.push({
-      level:    "ok",
-      category: "Bagages",
-      label:    `${bagages.length} bagage(s) rattachés`,
-      detail:   "Tous les bagages ont un passager associé",
+      level:          "ok",
+      priority:       "info",
+      category:       "Bagages",
+      label:          `${bagages.length} bagage(s) correctement rattachés`,
+      detail:         "Tous les bagages ont un passager associé",
+      recommendation: "",
     });
   }
 
@@ -159,51 +170,62 @@ export function computeAudit(data: BordereauData): AuditReport {
   });
   if (notLoaded.length > 0) {
     items.push({
-      level:    "error",
-      category: "Colis",
-      label:    `${notLoaded.length} colis non embarqué(s)`,
-      detail:   notLoaded.map(c => c.trackingRef).join(", "),
+      level:          "error",
+      priority:       "critique",
+      category:       "Colis",
+      label:          `${notLoaded.length} colis non embarqué(s)`,
+      detail:         `Référence(s) : ${notLoaded.map(c => c.trackingRef).join(", ")}`,
+      recommendation: "Vérifier immédiatement que tous les colis sont physiquement chargés. Ne pas valider le départ sans confirmation.",
     });
   } else if (colis.length > 0) {
     items.push({
-      level:    "ok",
-      category: "Colis",
-      label:    `${colis.length} colis chargés`,
-      detail:   "Tous les colis sont confirmés embarqués",
+      level:          "ok",
+      priority:       "info",
+      category:       "Colis",
+      label:          `${colis.length} colis chargés et confirmés`,
+      detail:         "Tous les colis sont embarqués",
+      recommendation: "",
     });
   }
 
   /* ── 4. Recettes passagers manquantes ── */
   if (s.boardedCount > 0 && (s.totalPassengerRevenue ?? 0) === 0) {
     items.push({
-      level:    "error",
-      category: "Finances",
-      label:    "Recettes passagers absentes",
-      detail:   `${s.boardedCount} passager(s) embarqué(s) mais 0 FCFA enregistré`,
+      level:          "error",
+      priority:       "critique",
+      category:       "Finances",
+      label:          "Recettes passagers absentes",
+      detail:         `${s.boardedCount} passager(s) embarqué(s) mais 0 FCFA enregistré`,
+      recommendation: "Contrôler les paiements de chaque passager — risque de fraude ou d'oubli de saisie détecté.",
     });
   }
 
   /* ── 5. Dépenses vs recettes ── */
   if (totalRevenue > 0 && (s.totalExpenses ?? 0) > totalRevenue) {
     items.push({
-      level:    "error",
-      category: "Finances",
-      label:    "Dépenses supérieures aux recettes",
-      detail:   `Recettes ${totalRevenue.toLocaleString("fr-CI")} FCFA · Dépenses ${(s.totalExpenses ?? 0).toLocaleString("fr-CI")} FCFA`,
+      level:          "error",
+      priority:       "critique",
+      category:       "Finances",
+      label:          "Dépenses supérieures aux recettes",
+      detail:         `Recettes ${totalRevenue.toLocaleString("fr-CI")} FCFA · Dépenses ${(s.totalExpenses ?? 0).toLocaleString("fr-CI")} FCFA`,
+      recommendation: "Revoir les dépenses enregistrées et exiger des justificatifs. Signaler à la direction.",
     });
   } else if (totalRevenue > 0) {
     items.push({
-      level:    "ok",
-      category: "Finances",
-      label:    "Équilibre financier confirmé",
-      detail:   `Net ${netBalance.toLocaleString("fr-CI")} FCFA`,
+      level:          "ok",
+      priority:       "info",
+      category:       "Finances",
+      label:          "Équilibre financier confirmé",
+      detail:         `Net ${netBalance.toLocaleString("fr-CI")} FCFA`,
+      recommendation: "",
     });
   }
 
   const hasErrors   = items.some(i => i.level === "error");
   const hasWarnings = !hasErrors && items.some(i => i.level === "warning");
+  const hasCritique = items.some(i => i.priority === "critique");
 
-  return { items, hasErrors, hasWarnings, totalRevenue, netBalance };
+  return { items, hasErrors, hasWarnings, hasCritique, totalRevenue, netBalance };
 }
 
 /* ─── helpers ─── */
@@ -384,10 +406,13 @@ function auditSection(data: BordereauData): string {
   const { items, hasErrors, hasWarnings, totalRevenue, netBalance } = report;
   const s = data.summary;
 
-  const boxCls  = hasErrors ? "audit-box-err" : hasWarnings ? "audit-box-warn" : "audit-box-ok";
+  const boxCls   = hasErrors ? "audit-box-err" : hasWarnings ? "audit-box-warn" : "audit-box-ok";
   const badgeCls = hasErrors ? "audit-badge-err" : hasWarnings ? "audit-badge-warn" : "audit-badge-ok";
-  const badgeTxt = hasErrors ? "⚠ Anomalie(s) détectée(s)" : hasWarnings ? "⚑ Avertissement(s)" : "✓ Contrôle OK";
+  const badgeTxt = hasErrors ? "⛔ Anomalie(s) critique(s)" : hasWarnings ? "⚑ Avertissement(s)" : "✓ Contrôle OK";
   const dotCls   = (lv: string) => lv === "error" ? "audit-dot-err" : lv === "warning" ? "audit-dot-warn" : "audit-dot-ok";
+  const prioBg   = (p: string) => p === "critique" ? "#FEE2E2" : p === "moyen" ? "#FEF3C7" : "#F1F5F9";
+  const prioFg   = (p: string) => p === "critique" ? "#B91C1C" : p === "moyen" ? "#92400E" : "#64748B";
+  const prioLbl  = (p: string) => p === "critique" ? "CRITIQUE" : p === "moyen" ? "MOYEN" : "INFO";
 
   return `
   <div class="audit-box ${boxCls}">
@@ -427,9 +452,13 @@ function auditSection(data: BordereauData): string {
     ${items.map(it => `
     <div class="audit-item">
       <div class="audit-dot ${dotCls(it.level)}"></div>
-      <div>
-        <div><span class="audit-item-cat">${it.category}</span> — <span class="audit-item-lbl">${it.label}</span></div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span style="background:${prioBg(it.priority)};color:${prioFg(it.priority)};padding:1px 6px;border-radius:6px;font-size:8px;font-weight:800;letter-spacing:0.5px">${prioLbl(it.priority)}</span>
+          <span class="audit-item-cat">${it.category}</span> — <span class="audit-item-lbl">${it.label}</span>
+        </div>
         <div class="audit-item-det">${it.detail}</div>
+        ${it.recommendation ? `<div style="margin-top:3px;font-size:9px;color:${prioFg(it.priority)};font-style:italic">→ ${it.recommendation}</div>` : ""}
       </div>
     </div>`).join("")}
   </div>`;

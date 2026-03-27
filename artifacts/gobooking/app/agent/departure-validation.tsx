@@ -187,36 +187,88 @@ export default function AgentDepartureValidation() {
     finally { setSavingExp(false); }
   };
 
-  /* ─ VALIDATE departure ─ */
-  const handleValidate = async () => {
+  /* ─ Save audit log ─ */
+  const saveAuditLog = async (tripId: string, overrideConfirmed: boolean) => {
+    if (!bordereau) return;
+    const report = computeAudit({
+      trip: bordereau.trip, boarded: bordereau.boarded, absents: bordereau.absents,
+      bagages: bordereau.bagages, colis: bordereau.colis, expenses: bordereau.expenses,
+      agents: bordereau.agents, summary: bordereau.summary,
+    } as PdfBordereauData);
+    try {
+      await fetch(`${API}/agent/trips/${tripId}/audit-log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          has_errors:         report.hasErrors,
+          has_warnings:       report.hasWarnings,
+          has_critique:       report.hasCritique,
+          override_confirmed: overrideConfirmed,
+          items:              report.items,
+          total_revenue:      report.totalRevenue,
+          net_balance:        report.netBalance,
+          validated_by:       (user as any)?.name ?? "Agent",
+        }),
+      });
+    } catch { /* non-blocking */ }
+  };
+
+  /* ─ Perform validated API call ─ */
+  const performValidate = async (overrideConfirmed: boolean) => {
     if (!selectedTrip) return;
-    Alert.alert(
-      "Valider le départ",
-      `Confirmer le départ ${selectedTrip.from} → ${selectedTrip.to} à ${selectedTrip.departureTime} ?\n\nCette action est irréversible. Le bus sera déclaré en route.`,
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Valider le départ",
-          style: "destructive",
-          onPress: async () => {
-            setValidating(true);
-            try {
-              const r = await fetch(`${API}/agent/validation-depart/validate/${selectedTrip.id}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              });
-              const data = await r.json();
-              if (r.ok) {
-                setValidated(true);
-                loadBordereau(selectedTrip.id);
-                loadTrips();
-              } else Alert.alert("Erreur", data.error ?? "Validation échouée");
-            } catch { Alert.alert("Erreur réseau"); }
-            finally { setValidating(false); }
+    setValidating(true);
+    try {
+      const r = await fetch(`${API}/agent/validation-depart/validate/${selectedTrip.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json();
+      if (r.ok) {
+        await saveAuditLog(selectedTrip.id, overrideConfirmed);
+        setValidated(true);
+        loadBordereau(selectedTrip.id);
+        loadTrips();
+      } else Alert.alert("Erreur", data.error ?? "Validation échouée");
+    } catch { Alert.alert("Erreur réseau"); }
+    finally { setValidating(false); }
+  };
+
+  /* ─ VALIDATE departure ─ */
+  const handleValidate = () => {
+    if (!selectedTrip || !bordereau) return;
+
+    const report    = computeAudit({
+      trip: bordereau.trip, boarded: bordereau.boarded, absents: bordereau.absents,
+      bagages: bordereau.bagages, colis: bordereau.colis, expenses: bordereau.expenses,
+      agents: bordereau.agents, summary: bordereau.summary,
+    } as PdfBordereauData);
+    const critiques = report.items.filter(i => i.priority === "critique");
+
+    if (critiques.length > 0) {
+      /* Anomalies critiques → confirmation spéciale requise */
+      const list = critiques.map(c => `• ${c.label}`).join("\n");
+      Alert.alert(
+        "⛔ Anomalies critiques détectées",
+        `Les anomalies suivantes ont été identifiées :\n\n${list}\n\nValider quand même le départ implique votre responsabilité. Continuer ?`,
+        [
+          { text: "Annuler — Corriger d'abord", style: "cancel" },
+          {
+            text: "Confirmer malgré les anomalies",
+            style: "destructive",
+            onPress: () => performValidate(true),
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        "Valider le départ",
+        `Confirmer le départ ${selectedTrip.from} → ${selectedTrip.to} à ${selectedTrip.departureTime} ?\n\nLe bus sera déclaré en route.`,
+        [
+          { text: "Annuler", style: "cancel" },
+          { text: "Valider le départ", style: "destructive", onPress: () => performValidate(false) },
+        ]
+      );
+    }
   };
 
   /* ─ Generate PDF ─ */
@@ -671,18 +723,30 @@ export default function AgentDepartureValidation() {
               </View>
 
               {/* Audit items */}
-              <View style={{ padding: 10, gap: 6 }}>
+              <View style={{ padding: 10, gap: 8 }}>
                 {(audit.items as AuditItem[]).map((item, i) => {
-                  const ic = item.level === "error" ? RED : item.level === "warning" ? AMBER : GREEN;
+                  const ic      = item.level === "error" ? RED : item.level === "warning" ? AMBER : GREEN;
+                  const prioBg  = item.priority === "critique" ? "#FEE2E2" : item.priority === "moyen" ? "#FEF3C7" : "#F1F5F9";
+                  const prioFg  = item.priority === "critique" ? "#B91C1C" : item.priority === "moyen" ? "#92400E" : "#64748B";
+                  const prioLbl = item.priority === "critique" ? "CRITIQUE" : item.priority === "moyen" ? "MOYEN" : "INFO";
                   return (
-                    <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, paddingBottom: i < audit.items.length - 1 ? 8 : 0, borderBottomWidth: i < audit.items.length - 1 ? 1 : 0, borderBottomColor: boxColor + "15" }}>
                       <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ic, marginTop: 5 }} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#0F172A" }}>
-                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#64748B", textTransform: "uppercase" }}>{item.category} — </Text>
-                          {item.label}
-                        </Text>
-                        <Text style={{ fontSize: 10, color: "#64748B", marginTop: 1 }}>{item.detail}</Text>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+                          <View style={{ backgroundColor: prioBg, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
+                            <Text style={{ fontSize: 8, fontWeight: "800", color: prioFg, letterSpacing: 0.4 }}>{prioLbl}</Text>
+                          </View>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#64748B", textTransform: "uppercase" }}>{item.category}</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#0F172A" }}>{item.label}</Text>
+                        <Text style={{ fontSize: 10, color: "#64748B" }}>{item.detail}</Text>
+                        {!!item.recommendation && (
+                          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 4, marginTop: 2 }}>
+                            <Text style={{ fontSize: 9, color: prioFg }}>→</Text>
+                            <Text style={{ fontSize: 9, color: prioFg, fontStyle: "italic", flex: 1 }}>{item.recommendation}</Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   );

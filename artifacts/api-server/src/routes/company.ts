@@ -969,6 +969,31 @@ router.get("/trips", async (req, res) => {
   }
 });
 
+/* ── GET /company/trips/:id/audit-log — historique des contrôles ─── */
+router.get("/trips/:id/audit-log", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.id;
+    const [trip] = await db.select({ id: tripsTable.id }).from(tripsTable)
+      .where(and(eq(tripsTable.id, tripId), eq(tripsTable.companyId, ctx.companyId))).limit(1);
+    if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    const result = await db.execute(sql`
+      SELECT id, validated_by, validated_at, has_errors, has_warnings, has_critique,
+             override_confirmed, items, total_revenue, net_balance
+      FROM trip_audit_logs
+      WHERE trip_id = ${tripId}
+      ORDER BY validated_at DESC
+    `);
+    res.json((result as any).rows ?? []);
+  } catch (err) {
+    console.error("[company/trips/:id/audit-log]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ── GET /company/trips/:id/agents — agents en service sur un départ ─── */
 router.get("/trips/:id/agents", async (req, res) => {
   try {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents } from "@/hooks/use-company";
+import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -26,6 +26,8 @@ export default function Trips() {
   const [open, setOpen] = useState(false);
   const [agentsTripId, setAgentsTripId] = useState<string | null>(null);
   const { data: tripAgents, isLoading: agentsLoading } = useTripAgents(agentsTripId);
+  const [auditTripId, setAuditTripId] = useState<string | null>(null);
+  const { data: auditHistory, isLoading: auditLoading } = useTripAuditHistory(auditTripId);
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -157,6 +159,9 @@ export default function Trips() {
                 )}
                 <Button variant="outline" size="sm" onClick={() => setAgentsTripId(trip.id)} className="flex items-center gap-2 text-violet-600 border-violet-300 hover:bg-violet-50">
                   <Users size={15} /> Équipe
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setAuditTripId(trip.id)} className="flex items-center gap-2 text-amber-700 border-amber-300 hover:bg-amber-50">
+                  <ClipboardCheck size={15} /> Contrôles
                 </Button>
               </div>
 
@@ -336,6 +341,103 @@ export default function Trips() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAgentsTripId(null)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ── Dialog : Historique des contrôles ── */}
+      <Dialog open={!!auditTripId} onOpenChange={(v) => { if (!v) setAuditTripId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardCheck size={18} className="text-amber-600" />
+              Historique des contrôles de départ
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {auditLoading ? (
+              <p className="text-center py-6 text-muted-foreground text-sm">Chargement…</p>
+            ) : !auditHistory || auditHistory.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Aucun contrôle enregistré pour ce trajet.</p>
+            ) : (
+              <div className="space-y-4">
+                {(auditHistory as any[]).map((log: any, idx: number) => {
+                  const hasCritique = log.has_critique;
+                  const hasWarnings = log.has_warnings;
+                  const isOk        = !hasCritique && !hasWarnings;
+                  const borderColor = hasCritique ? "#EF4444" : hasWarnings ? "#F59E0B" : "#22C55E";
+                  const bgColor     = hasCritique ? "#FEF2F2" : hasWarnings ? "#FFFBEB" : "#F0FDF4";
+                  const StatusIcon  = hasCritique ? AlertOctagon : hasWarnings ? AlertTriangle : CheckCircle2;
+                  const statusColor = hasCritique ? "text-red-600" : hasWarnings ? "text-amber-600" : "text-emerald-600";
+                  const statusText  = hasCritique ? "Anomalies critiques" : hasWarnings ? "Avertissements" : "Contrôle OK";
+                  const items: any[] = log.items ?? [];
+                  return (
+                    <div key={log.id} style={{ border: `1.5px solid ${borderColor}`, backgroundColor: bgColor, borderRadius: 12 }} className="p-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <StatusIcon size={16} className={statusColor} />
+                          <span className={`text-sm font-bold ${statusColor}`}>{statusText}</span>
+                          {log.override_confirmed && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 ml-1">
+                              Départ forcé
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-right text-muted-foreground">
+                          <p className="font-medium">{log.validated_by}</p>
+                          <p>{log.validated_at ? new Date(log.validated_at).toLocaleString("fr-CI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}</p>
+                        </div>
+                      </div>
+
+                      {/* Résumé financier */}
+                      <div className="flex gap-4 mb-3 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">Recettes : </span>
+                          <span className="font-semibold text-emerald-700">{(log.total_revenue ?? 0).toLocaleString()} FCFA</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Net : </span>
+                          <span className={`font-semibold ${(log.net_balance ?? 0) < 0 ? "text-red-600" : "text-foreground"}`}>{(log.net_balance ?? 0).toLocaleString()} FCFA</span>
+                        </div>
+                      </div>
+
+                      {/* Items */}
+                      {items.length > 0 ? (
+                        <div className="space-y-2">
+                          {items.map((item: any, j: number) => {
+                            const iBg  = item.priority === "critique" ? "#FEE2E2" : item.priority === "moyen" ? "#FEF3C7" : "#F1F5F9";
+                            const iFg  = item.priority === "critique" ? "#B91C1C" : item.priority === "moyen" ? "#92400E" : "#64748B";
+                            const iLbl = item.priority === "critique" ? "CRITIQUE" : item.priority === "moyen" ? "MOYEN" : "INFO";
+                            const dotColor = item.level === "error" ? "#EF4444" : item.level === "warning" ? "#F59E0B" : "#22C55E";
+                            return (
+                              <div key={j} className="flex gap-3 items-start rounded-lg bg-white/70 px-3 py-2">
+                                <div style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: dotColor, flexShrink: 0, marginTop: 5 }} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <span style={{ background: iBg, color: iFg }} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide">{iLbl}</span>
+                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{item.category}</span>
+                                  </div>
+                                  <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                  <p className="text-[11px] text-muted-foreground">{item.detail}</p>
+                                  {item.recommendation && <p className="text-[11px] mt-0.5 italic" style={{ color: iFg }}>→ {item.recommendation}</p>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic">Aucune anomalie relevée lors de ce contrôle.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAuditTripId(null)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

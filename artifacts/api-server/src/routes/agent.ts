@@ -4187,4 +4187,40 @@ router.get("/realtime/trip/:tripId", async (req, res) => {
   }
 });
 
+/* ── POST /agent/trips/:tripId/audit-log — save audit report at validation ── */
+router.post("/trips/:tripId/audit-log", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) { res.status(403).json({ error: "Unauthorized" }); return; }
+    const [agent] = await db.select({ id: users.id, name: users.name })
+      .from(users).where(eq(users.sessionToken, token)).limit(1);
+    if (!agent) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const {
+      has_errors, has_warnings, has_critique, override_confirmed,
+      items, total_revenue, net_balance, validated_by,
+    } = req.body;
+
+    await db.execute(sql`
+      INSERT INTO trip_audit_logs (trip_id, validated_by, has_errors, has_warnings, has_critique, override_confirmed, items, total_revenue, net_balance)
+      VALUES (
+        ${tripId},
+        ${validated_by ?? agent.name ?? "Agent"},
+        ${has_errors ?? false},
+        ${has_warnings ?? false},
+        ${has_critique ?? false},
+        ${override_confirmed ?? false},
+        ${JSON.stringify(items ?? [])}::jsonb,
+        ${total_revenue ?? 0},
+        ${net_balance ?? 0}
+      )
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("[agent/audit-log]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
