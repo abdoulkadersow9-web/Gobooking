@@ -248,6 +248,7 @@ function BookingCard({
     <Pressable
       style={({ pressed }) => [
         styles.card,
+        { borderLeftColor: cfg.color },
         pressed && styles.cardPressed,
         isExpired && styles.cardExpired,
         isCancelled && styles.cardCancelled,
@@ -319,19 +320,25 @@ function BookingCard({
             </View>
           )}
         </View>
-        <Text style={[styles.amountText, {
-          color: isExpired || isCancelled ? "#9CA3AF"
-               : isPaid ? Colors.light.primary
-               : "#D97706"
+        <View style={[styles.amountBadge, {
+          backgroundColor: isExpired || isCancelled ? "#F1F5F9"
+                         : isPaid ? "#EEF4FF"
+                         : "#FFFBEB"
         }]}>
-          {(item.totalAmount ?? 0).toLocaleString()} FCFA
-        </Text>
+          <Text style={[styles.amountText, {
+            color: isExpired || isCancelled ? "#9CA3AF"
+                 : isPaid ? Colors.light.primary
+                 : "#D97706"
+          }]}>
+            {(item.totalAmount ?? 0).toLocaleString()} F
+          </Text>
+        </View>
       </View>
 
       {/* CTA: Payer maintenant */}
       {needsPay && minsLeft !== null && minsLeft > 0 && (
         <Pressable
-          style={[styles.ctaBtn, { backgroundColor: "#059669" }]}
+          style={({ pressed }) => [styles.ctaBtn, { overflow: "hidden" }, pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }]}
           onPress={(e) => {
             e.stopPropagation?.();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -341,8 +348,13 @@ function BookingCard({
             });
           }}
         >
-          <Feather name="credit-card" size={13} color="white" />
-          <Text style={styles.ctaText}>Payer maintenant</Text>
+          <LinearGradient
+            colors={["#059669", "#047857"]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
+          />
+          <Feather name="credit-card" size={15} color="white" />
+          <Text style={[styles.ctaText, { fontSize: 15 }]}>Payer maintenant</Text>
         </Pressable>
       )}
 
@@ -614,34 +626,39 @@ const styles = StyleSheet.create({
   filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
-  card:         { backgroundColor: Colors.light.card, borderRadius: 22, padding: 20, marginBottom: 16, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.09, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: "#F1F5F9" },
-  cardPressed:  { transform: [{ scale: 0.985 }] },
-  cardExpired:  { borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
-  cardCancelled:{ borderWidth: 1, borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
+  card:         {
+    backgroundColor: Colors.light.card, borderRadius: 22, padding: 20, marginBottom: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 22, elevation: 7,
+    borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5,
+  },
+  cardPressed:  { transform: [{ scale: 0.982 }], opacity: 0.95 },
+  cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
+  cardCancelled:{ borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
   cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  refText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.text },
+  refText:      { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.2 },
   dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
   statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   statusText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
 
   routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
   cityBlock:    { flex: 1 },
-  timeText:     { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.5 },
-  cityText:     { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 4 },
+  timeText:     { fontSize: 26, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -1 },
+  cityText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary, marginTop: 4 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
-  routeLine:    { width: 28, height: 1.5, backgroundColor: Colors.light.border },
+  routeLine:    { width: 30, height: 1.5, backgroundColor: Colors.light.border },
 
-  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 5, backgroundColor: "#EFF6FF", borderRadius: 8, padding: 8, marginTop: 6, borderWidth: 1, borderColor: "#BFDBFE" },
-  rule45Text:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1 },
+  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 5, backgroundColor: "#EFF6FF", borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: "#BFDBFE" },
+  rule45Text:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1, lineHeight: 16 },
 
-  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  methodRow:    { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  methodRow:    { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
   methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textMuted },
   seatRow:      { flexDirection: "row", alignItems: "center", gap: 4 },
   seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
-  amountText:   { fontSize: 17, fontFamily: "Inter_700Bold" },
+  amountBadge:  { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
+  amountText:   { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
 
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderRadius: 16, paddingVertical: 15, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3 },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 14, borderRadius: 16, paddingVertical: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 4 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
   waitingRow:   { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, borderRadius: 10, padding: 10 },
   waitingText:  { fontSize: 11, fontFamily: "Inter_500Medium", flex: 1 },

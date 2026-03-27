@@ -897,6 +897,8 @@ export default function HomeScreen() {
         </View>
       )}
 
+      <View style={styles.sectionDivider} />
+
       {/* ── Activity section ── */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -1024,56 +1026,60 @@ export default function HomeScreen() {
         )}
       </View>
 
+      <View style={styles.sectionDivider} />
+
       {/* ── Quick actions grid ── */}
       <View style={styles.quickActions}>
-        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/bookings")}>
-          <LinearGradient colors={["#EEF2FF", "#E0E7FF"]} style={styles.quickIcon}>
-            <Feather name="bookmark" size={22} color={Colors.light.primary} />
+        <Pressable style={[styles.quickCard, { borderTopColor: "#1650D0" }]} onPress={() => router.push("/(tabs)/bookings")}>
+          <LinearGradient colors={["#EEF4FF", "#DDE8FF"]} style={styles.quickIcon}>
+            <Feather name="bookmark" size={24} color={Colors.light.primary} />
           </LinearGradient>
           <Text style={styles.quickLabel}>Mes réservations</Text>
           <Text style={styles.quickSub}>Trajets & billets</Text>
         </Pressable>
 
-        <Pressable style={styles.quickCard} onPress={() => router.push("/client/compagnies" as never)}>
+        <Pressable style={[styles.quickCard, { borderTopColor: "#0369A1" }]} onPress={() => router.push("/client/compagnies" as never)}>
           <LinearGradient colors={["#E0F2FE", "#BAE6FD"]} style={styles.quickIcon}>
-            <Feather name="briefcase" size={22} color="#0369A1" />
+            <Feather name="briefcase" size={24} color="#0369A1" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Compagnies</Text>
           <Text style={styles.quickSub}>Opérateurs & trajets</Text>
         </Pressable>
 
-        <Pressable style={styles.quickCard} onPress={() => router.push("/client/fidelite" as never)}>
-          <LinearGradient colors={["#FFF7ED", "#FEF3C7"]} style={styles.quickIcon}>
-            <Feather name="award" size={22} color="#D97706" />
+        <Pressable style={[styles.quickCard, { borderTopColor: "#D97706" }]} onPress={() => router.push("/client/fidelite" as never)}>
+          <LinearGradient colors={["#FFFBEB", "#FEF3C7"]} style={styles.quickIcon}>
+            <Feather name="award" size={24} color="#D97706" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Fidélité</Text>
           <Text style={styles.quickSub}>Points & récompenses</Text>
         </Pressable>
 
-        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/colis")}>
+        <Pressable style={[styles.quickCard, { borderTopColor: "#059669" }]} onPress={() => router.push("/(tabs)/colis")}>
           <LinearGradient colors={["#ECFDF5", "#D1FAE5"]} style={styles.quickIcon}>
-            <Feather name="package" size={22} color="#059669" />
+            <Feather name="package" size={24} color="#059669" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Mes colis</Text>
           <Text style={styles.quickSub}>Suivi & envois</Text>
         </Pressable>
 
-        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/notifications")}>
+        <Pressable style={[styles.quickCard, { borderTopColor: "#EA580C" }]} onPress={() => router.push("/(tabs)/notifications")}>
           <LinearGradient colors={["#FFF7ED", "#FFEDD5"]} style={styles.quickIcon}>
-            <Feather name="bell" size={22} color="#D97706" />
+            <Feather name="bell" size={24} color="#EA580C" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Notifications</Text>
           <Text style={styles.quickSub}>Alertes & infos</Text>
         </Pressable>
 
-        <Pressable style={styles.quickCard} onPress={() => router.push("/(tabs)/profile")}>
+        <Pressable style={[styles.quickCard, { borderTopColor: "#7C3AED" }]} onPress={() => router.push("/(tabs)/profile")}>
           <LinearGradient colors={["#F5F3FF", "#EDE9FE"]} style={styles.quickIcon}>
-            <Feather name="user" size={22} color="#7C3AED" />
+            <Feather name="user" size={24} color="#7C3AED" />
           </LinearGradient>
           <Text style={styles.quickLabel}>Mon profil</Text>
           <Text style={styles.quickSub}>Compte & paramètres</Text>
         </Pressable>
       </View>
+
+      <View style={styles.sectionDivider} />
 
       {/* ── Popular routes ── */}
       <View style={styles.section}>
@@ -1111,16 +1117,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFF" },
+  container: { flex: 1, backgroundColor: "#EDEEF5" },
 
   // Header
-  header: { paddingHorizontal: 20, paddingBottom: 32 },
+  header: { paddingHorizontal: 20, paddingBottom: 36 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
-  headerLogo: { width: 44, height: 44, borderRadius: 10 },
-  greeting: { fontSize: 18, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 1 },
-  adminBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  headerLogo: { width: 46, height: 46, borderRadius: 12 },
+  greeting: { fontSize: 19, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 2 },
+  adminBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
 
   // Mode selector
   modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 14, padding: 4, marginBottom: 16, gap: 4 },
@@ -1130,30 +1136,34 @@ const styles = StyleSheet.create({
   modeBtnTextActive: { color: Colors.light.primary },
 
   // Search card
-  searchCard: { backgroundColor: "white", borderRadius: 24, padding: 22, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.14, shadowRadius: 22, elevation: 8 },
+  searchCard: {
+    backgroundColor: "white", borderRadius: 26, padding: 22,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 30, elevation: 10,
+    borderTopWidth: 4, borderTopColor: "#1650D0",
+  },
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
   routeInputWrap: { flex: 1 },
-  routeLabel: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  routeLabelText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: Colors.light.textSecondary, letterSpacing: 0.5 },
-  routeInput: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#0F172A", borderBottomWidth: 1.5, borderBottomColor: "#C7D2FE", paddingBottom: 6 },
-  swapBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center", marginTop: 12, borderWidth: 1, borderColor: "#BFCFFF" },
-  bottomRow: { flexDirection: "row", gap: 12, marginBottom: 14 },
-  dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
+  routeLabel: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 5 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  routeLabelText: { fontSize: 10, fontFamily: "Inter_700Bold", color: Colors.light.textSecondary, letterSpacing: 1 },
+  routeInput: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#0F172A", borderBottomWidth: 2, borderBottomColor: "#C7D2FE", paddingBottom: 8 },
+  swapBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", marginTop: 14, borderWidth: 1.5, borderColor: "#BFD0FF" },
+  bottomRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
+  dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, borderWidth: 1.5, borderColor: "#E2E8F0" },
   dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#0F172A" },
-  paxWrap: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0" },
-  paxBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  paxCount: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#0F172A", minWidth: 16, textAlign: "center" },
-  searchBtnWrap: { shadowColor: "#F97316", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 5 },
-  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 15 },
-  searchBtnText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
-  citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16, marginTop: 8 },
-  cityChip: { backgroundColor: "#EEF4FF", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: "#BFD0FF" },
+  paxWrap: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F8FAFC", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, borderWidth: 1.5, borderColor: "#E2E8F0" },
+  paxBtn: { width: 26, height: 26, borderRadius: 13, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  paxCount: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A", minWidth: 18, textAlign: "center" },
+  searchBtnWrap: { shadowColor: "#F97316", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 7 },
+  searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 16, paddingVertical: 17 },
+  searchBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "white", letterSpacing: 0.2 },
+  citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16, marginTop: 10 },
+  cityChip: { backgroundColor: "#EEF4FF", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1.5, borderColor: "#C4D7FF" },
   cityChipText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#1650D0" },
-  colisHero: { alignItems: "center", gap: 10, paddingVertical: 8 },
-  colisIconWrap: { width: 64, height: 64, borderRadius: 20, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  colisTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  colisSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 4 },
+  colisHero: { alignItems: "center", gap: 12, paddingVertical: 10 },
+  colisIconWrap: { width: 72, height: 72, borderRadius: 22, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
+  colisTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  colisSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 6 },
 
   // Quick CTAs
   ctaRow: { paddingHorizontal: 18, paddingTop: 28, gap: 12 },
@@ -1162,37 +1172,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 16,
     borderRadius: 20,
-    padding: 18,
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 4 },
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.09,
-    shadowRadius: 14,
-    elevation: 4,
+    shadowRadius: 18,
+    elevation: 5,
   },
-  ctaBtnPrimary: { backgroundColor: "#EEF4FF", borderWidth: 1.5, borderColor: "#BFD0FF" },
-  ctaBtnGreen:   { backgroundColor: "#EDFAF5", borderWidth: 1.5, borderColor: "#BAECD8" },
-  ctaIcon: { width: 50, height: 50, borderRadius: 16, backgroundColor: "#DBEAFE", justifyContent: "center", alignItems: "center" },
+  ctaBtnPrimary: { backgroundColor: "white", borderWidth: 1.5, borderColor: "#D1DFF8", borderLeftWidth: 5, borderLeftColor: "#1650D0" },
+  ctaBtnGreen:   { backgroundColor: "white", borderWidth: 1.5, borderColor: "#BBE8D4", borderLeftWidth: 5, borderLeftColor: "#059669" },
+  ctaIcon: { width: 52, height: 52, borderRadius: 17, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
   ctaText: { flex: 1 },
-  ctaTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primaryDark },
-  ctaSub:   { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
+  ctaTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  ctaSub:   { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 3 },
 
   liveTrackingBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: "#0B1628", borderRadius: 20, padding: 18, gap: 14,
-    shadowColor: "#0B1628", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 6,
+    backgroundColor: "#0B1628", borderRadius: 20, padding: 20, gap: 14,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 20, elevation: 8,
   },
   liveTrackingLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1 },
-  liveTrackingIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
-  liveTrackingTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
-  liveTrackingSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.55)", marginTop: 1 },
+  liveTrackingIcon: { width: 50, height: 50, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  liveTrackingTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  liveTrackingSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.5)", marginTop: 2 },
   livePill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(239,68,68,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "rgba(239,68,68,0.4)" },
   liveDot2: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444" },
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
+  // Section divider
+  sectionDivider: { height: 12, backgroundColor: "#E8EAF4", marginVertical: 4 },
+
   // Activity section
-  section: { paddingHorizontal: 18, paddingTop: 32, paddingBottom: 12 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  sectionTitle: { fontSize: 19, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.4 },
+  section: { paddingHorizontal: 18, paddingTop: 30, paddingBottom: 14 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  sectionTitle: {
+    fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.5,
+    borderLeftWidth: 4, borderLeftColor: "#1650D0", paddingLeft: 10,
+  },
   sectionLink: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
   activityLoading: { height: 140, justifyContent: "center", alignItems: "center" },
 
@@ -1202,60 +1218,69 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 22,
     padding: 18,
-    gap: 8,
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 5 },
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.10,
-    shadowRadius: 16,
-    elevation: 5,
+    shadowRadius: 22,
+    elevation: 6,
     borderWidth: 1,
     borderColor: "#EEF4FF",
     overflow: "hidden",
   },
   activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
-  activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  activityIconWrap: { width: 42, height: 42, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
+  activityIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
 
-  statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusPillText: { fontSize: 10, fontFamily: "Inter_700Bold" },
 
-  activityLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 0.5 },
-  activityRef: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#0F172A" },
+  activityLabel: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1 },
+  activityRef: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
   activityRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   routeLine: { flex: 1, flexDirection: "row", alignItems: "center", gap: 2 },
-  routeDash: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
-  activityCity: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#334155" },
-  activityFooter: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
-  activityAction: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
-  emptyCardDesc: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  routeDash: { flex: 1, height: 1.5, backgroundColor: "#E2E8F0" },
+  activityCity: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#1E293B" },
+  activityFooter: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: "#F1F5F9" },
+  activityAction: { fontSize: 12, fontFamily: "Inter_700Bold", color: Colors.light.primary },
+  emptyCardDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8" },
 
   demoBadge: { position: "absolute", top: 10, right: 10, backgroundColor: "#F1F5F9", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
   demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
 
   // Quick actions grid
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 18, paddingTop: 24 },
-  quickCard: { width: "47%", backgroundColor: "white", borderRadius: 22, padding: 18, gap: 10, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 16, elevation: 5, borderWidth: 1, borderColor: "#EEF4FF" },
-  quickIcon: { width: 52, height: 52, borderRadius: 17, justifyContent: "center", alignItems: "center" },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 18, paddingTop: 26 },
+  quickCard: {
+    width: "47%", backgroundColor: "white", borderRadius: 22, padding: 18, gap: 10,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 5,
+    borderWidth: 1, borderColor: "#ECEEF8", borderTopWidth: 3,
+  },
+  quickIcon: { width: 54, height: 54, borderRadius: 18, justifyContent: "center", alignItems: "center" },
   quickLabel: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" },
   quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, lineHeight: 17 },
 
   // Dashboard shortcut cards
-  dashCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "white", borderRadius: 18, padding: 16, marginBottom: 10, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#EEF4FF" },
-  dashCardIcon: { width: 46, height: 46, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  dashCard: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "white", borderRadius: 20, padding: 18, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: "#ECEEF8" },
+  dashCardIcon: { width: 50, height: 50, borderRadius: 16, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   dashCardText: { flex: 1 },
-  dashCardTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  dashCardSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 1 },
-  dashCardBadge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  dashCardBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+  dashCardTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  dashCardSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
+  dashCardBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  dashCardBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold" },
 
   // Popular routes
-  routeCard: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "white", borderRadius: 20, padding: 18, paddingLeft: 16, marginBottom: 12, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: "#EEF4FF", borderLeftWidth: 4, borderLeftColor: "#1650D0" },
-  routeCardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
+  routeCard: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+    backgroundColor: "white", borderRadius: 20, padding: 18, marginBottom: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
+    borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5, borderLeftColor: "#1650D0",
+  },
+  routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
-  routeCardIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  routeCardRoute: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#0F172A" },
+  routeCardIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
+  routeCardRoute: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" },
   routeCardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 3 },
   routeCardRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  routeCardPrice: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primary },
+  routeCardPrice: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.light.primary },
 });
