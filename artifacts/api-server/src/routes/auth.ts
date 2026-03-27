@@ -287,16 +287,12 @@ router.get("/demo-roles", async (_req, res) => {
       "chef.test@gobooking.ci":         "chef1234",
       "agent@test.com":                 "test123",
       "embarquement@test.com":          "test123",
-      "bagage@test.com":                "test123",
       "colis@test.com":                 "test123",
       "validepart@test.com":            "test123",
       "logistique@test.com":            "test123",
       "suivi@test.com":                 "test123",
-      "reservation@test.com":           "test123",
-      "user@test.com":                  "test123",
-      "kone.ibrahim.plateau@test.ci":   "test123",
       "route@test.com":                 "test123",
-      "konan.yves@sotral.ci":           "test123",
+      "user@test.com":                  "test123",
     };
 
     const demoEmailsList = Object.keys(DEMO_CREDS);
