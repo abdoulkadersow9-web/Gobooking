@@ -1,0 +1,99 @@
+C’est très propre pour les photos agents et la gestion des agents en service.
+
+Maintenant, il faut faire une amélioration globale sur toute l’application, toujours selon la logique existante.
+
+IMPORTANT :
+	•	Ne rien casser
+	•	Ne rien mélanger
+	•	Continuer uniquement en amélioration
+	•	Toujours respecter la logique métier déjà définie
+
+⸻
+
+OBJECTIF GÉNÉRAL :
+
+Vérifier et harmoniser toute l’application pour que toutes les données soient cohérentes entre :
+	•	client
+	•	agents
+	•	agences
+	•	entreprise
+	•	grand dashboard administrateur
+
+⸻
+
+COHÉRENCE GLOBALE À RESPECTER :
+	•	Les informations du client doivent être cohérentes avec ce qui remonte à l’entreprise
+	•	Les informations des agents doivent être cohérentes avec celles des agences
+	•	Les informations des agences doivent être cohérentes avec celles de l’entreprise
+	•	Les menus, onglets et dashboards doivent afficher les mêmes données logiques selon les rôles
+	•	Tout ce qui est visible côté entreprise doit correspondre exactement aux actions terrain
+
+⸻
+
+À FAIRE SUR TOUTE L’APPLICATION :
+	•	Vérifier toutes les pages
+	•	Vérifier tous les écrans
+	•	Vérifier tous les menus
+	•	Vérifier tous les onglets
+	•	Vérifier toutes les remontées de données
+	•	Harmoniser toute l’interface
+
+⸻
+
+OBJECTIF UI/UX :
+	•	Toutes les pages doivent être modernes
+	•	Toutes les pages doivent être fluides
+	•	Toutes les pages doivent être rapides
+	•	L’application doit être très réactive
+	•	Les écrans doivent être propres, cohérents et professionnels
+
+⸻
+
+LOGIQUE INTER-AGENCES (TRÈS IMPORTANT) :
+
+Lorsqu’un car suit son trajet et quitte une agence pour aller vers une autre :
+
+Exemple :
+	•	départ depuis Abidjan Adjamé
+	•	arrivée à Bouaké ou Yamoussoukro
+
+⸻
+
+LOGIQUE ATTENDUE :
+	•	Quand le car quitte l’agence de départ, le départ reste lié au trajet en cours
+	•	Quand le car arrive dans une autre agence de passage ou de destination, cette agence doit automatiquement pouvoir prendre le relais sur ce même départ
+
+⸻
+
+Cela signifie :
+	•	Les agents de la nouvelle agence doivent pouvoir accéder aux données du départ en cours
+	•	Ils peuvent ajouter :
+	•	passagers
+	•	bagages
+	•	colis
+	•	Tous les ajouts doivent être liés au même départ
+	•	Toutes les données doivent rester centralisées et synchronisées
+	•	Tout doit remonter automatiquement dans :
+	•	le bordereau
+	•	l’historique
+	•	l’entreprise
+	•	le dashboard admin
+
+⸻
+
+OBJECTIF :
+	•	Assurer la continuité du trajet entre agences
+	•	Permettre la reprise automatique du départ par une autre agence
+	•	Garder une seule logique de départ, même s’il y a plusieurs agences impliquées
+	•	Éviter les doublons et les incohérences
+
+⸻
+
+IMPORTANT :
+	•	Toujours travailler selon la logique globale de l’application
+	•	Toujours garder la cohérence entre client, agence, agents, entreprise et administration
+	•	Toujours améliorer sans casser l’existant
+
+⸻
+
+On veut une application complète, cohérente, fluide, rapide et professionnelle sur tous les écrans.

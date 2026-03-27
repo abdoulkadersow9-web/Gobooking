@@ -22,6 +22,7 @@ interface Trip {
   price: number;
   availableSeats?: number;
   date: string;
+  status?: string;
 }
 
 const PAYMENT_METHODS = [
@@ -47,8 +48,16 @@ export default function VenteScreen() {
   const fetchTrips = async () => {
     setLoadingTrips(true);
     try {
-      const res = await apiFetch("/agent/trips", { token: token ?? undefined });
-      setTrips(Array.isArray(res) ? res : []);
+      const res = await apiFetch<Trip[]>("/agent/trips", { token: token ?? undefined });
+      const all  = Array.isArray(res) ? res : [];
+      const today = new Date().toISOString().split("T")[0];
+      const yest  = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
+      const tmrw  = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+      const active = all.filter(t =>
+        (t.date === today || t.date === yest || t.date === tmrw) &&
+        !["arrived", "cancelled"].includes(t.status ?? "")
+      );
+      setTrips(active);
     } catch {
       setTrips([]);
     } finally {
@@ -213,28 +222,40 @@ export default function VenteScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            trips.map(trip => (
-              <TouchableOpacity
-                key={trip.id}
-                style={[styles.tripItem, selectedTrip?.id === trip.id && styles.tripItemSelected]}
-                onPress={() => setSelectedTrip(trip)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.tripRoute}>{trip.from} → {trip.to}</Text>
-                  <Text style={styles.tripTime}>{trip.departureTime} · {trip.date}</Text>
-                  {trip.availableSeats !== undefined ? (
-                    <Text style={styles.tripSeats}>{trip.availableSeats} places dispo.</Text>
-                  ) : null}
-                </View>
-                <View style={styles.tripPrice}>
-                  <Text style={styles.tripPriceText}>{trip.price?.toLocaleString()}</Text>
-                  <Text style={styles.tripPriceSub}>FCFA</Text>
-                </View>
-                {selectedTrip?.id === trip.id && (
-                  <Ionicons name="checkmark-circle" size={20} color={G} />
-                )}
-              </TouchableOpacity>
-            ))
+            trips.map(trip => {
+              const isTransit = trip.status === "en_route";
+              return (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={[styles.tripItem, selectedTrip?.id === trip.id && styles.tripItemSelected, isTransit && { borderLeftWidth: 3, borderLeftColor: G }]}
+                  onPress={() => setSelectedTrip(trip)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <Text style={styles.tripRoute}>{trip.from} → {trip.to}</Text>
+                      {isTransit && (
+                        <View style={{ backgroundColor: G + "18", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: G }}>En transit</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.tripTime}>{trip.departureTime} · {trip.date}</Text>
+                    {isTransit ? (
+                      <Text style={{ fontSize: 11, color: G, fontStyle: "italic" }}>Ce car est en route — montée possible en gare</Text>
+                    ) : trip.availableSeats !== undefined ? (
+                      <Text style={styles.tripSeats}>{trip.availableSeats} places dispo.</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.tripPrice}>
+                    <Text style={styles.tripPriceText}>{trip.price?.toLocaleString()}</Text>
+                    <Text style={styles.tripPriceSub}>FCFA</Text>
+                  </View>
+                  {selectedTrip?.id === trip.id && (
+                    <Ionicons name="checkmark-circle" size={20} color={G} />
+                  )}
+                </TouchableOpacity>
+              );
+            })
           )}
         </View>
 

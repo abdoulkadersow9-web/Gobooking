@@ -4016,6 +4016,46 @@ router.post("/validation-depart/expenses", async (req, res) => {
   }
 });
 
+/* ─── POST /agent/trips/:tripId/transit-join — Prise en charge d'un trajet en route par une autre agence ─── */
+router.post("/trips/:tripId/transit-join", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    if (!["en_route", "scheduled", "confirmed"].includes(trip.status ?? "")) {
+      res.status(400).json({ error: "Ce trajet n'est pas actif ou en route" }); return;
+    }
+
+    const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agent = agentRows[0];
+
+    await recordTripAgent(tripId, user.id);
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      "TRANSIT_JOIN", tripId, "trip",
+      { tripId, agenceId: agent?.agenceId, agenceName: agent?.agenceName, agenceCity: agent?.agenceCity }
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      message: "Prise en charge enregistrée avec succès",
+      tripId,
+      from: trip.from,
+      to: trip.to,
+      status: trip.status,
+      agentName: user.name,
+    });
+  } catch (err) {
+    console.error("[transit-join]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── POST /agent/validation-depart/validate/:tripId ─── */
 router.post("/validation-depart/validate/:tripId", async (req, res) => {
   try {

@@ -103,8 +103,8 @@ const EXPENSE_TYPES = [
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════════════ */
 export default function AgentDepartureValidation() {
-  const { user } = useAuth();
-  const token = (user as any)?.token ?? "";
+  const { user, token: authToken } = useAuth();
+  const token = authToken ?? "";
   const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
 
   const [tab, setTab] = useState<"departs" | "bordereau">("departs");
@@ -127,8 +127,12 @@ export default function AgentDepartureValidation() {
   const [savingExp, setSavingExp]   = useState(false);
 
   // Validation
-  const [validating, setValidating] = useState(false);
-  const [validated, setValidated]   = useState(false);
+  const [validating, setValidating]     = useState(false);
+  const [validated, setValidated]       = useState(false);
+
+  // Transit multi-agence
+  const [transitJoining, setTransitJoining] = useState(false);
+  const [transitJoined, setTransitJoined]   = useState(false);
 
   // PDF generation
   const [pdfLoading, setPdfLoading] = useState<"entreprise" | "route" | null>(null);
@@ -165,8 +169,37 @@ export default function AgentDepartureValidation() {
   const selectTrip = (t: TripSummary) => {
     setTrip(t);
     setValidated(t.isValidated);
+    setTransitJoined(false);
     setTab("bordereau");
     loadBordereau(t.id);
+  };
+
+  /* ─ Join trip as transit agent ─ */
+  const joinTransit = async () => {
+    if (!selectedTrip) return;
+    setTransitJoining(true);
+    try {
+      const r = await fetch(`${API}/agent/trips/${selectedTrip.id}/transit-join`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await r.json();
+      if (r.ok) {
+        setTransitJoined(true);
+        Alert.alert(
+          "Prise en charge confirmée",
+          `Vous êtes enregistré sur ce trajet ${selectedTrip.from} → ${selectedTrip.to}.\nVous pouvez ajouter passagers, bagages et colis.`,
+          [{ text: "OK" }]
+        );
+        loadBordereau(selectedTrip.id);
+      } else {
+        Alert.alert("Erreur", data.error ?? "Impossible de prendre en charge ce trajet");
+      }
+    } catch {
+      Alert.alert("Erreur réseau");
+    } finally {
+      setTransitJoining(false);
+    }
   };
 
   /* ─ Add expense ─ */
@@ -377,40 +410,67 @@ export default function AgentDepartureValidation() {
   };
 
   /* ── Trips tab ── */
-  const renderDeparts = () => (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}
-      refreshControl={<RefreshControl refreshing={refreshing || tripsLoading} onRefresh={() => { setRefr(true); loadTrips(); }} tintColor={P} />}>
-      {/* Info */}
-      <View style={SL.infoBox}>
-        <Feather name="info" size={14} color={P} />
-        <Text style={[SL.infoText, { color: P }]}>
-          Sélectionnez un départ pour voir le bordereau complet et valider le départ.
-        </Text>
-      </View>
+  const renderDeparts = () => {
+    const pendingTrips = trips.filter(t => !t.isValidated);
+    const transitTrips = trips.filter(t => t.isValidated);
+    return (
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}
+        refreshControl={<RefreshControl refreshing={refreshing || tripsLoading} onRefresh={() => { setRefr(true); loadTrips(); }} tintColor={P} />}>
 
-      <View style={SL.sectionHdr}>
-        <View style={[SL.sectionAccent, { backgroundColor: P }]} />
-        <View style={[SL.sectionIconBox, { backgroundColor: P + "18" }]}>
-          <Feather name="navigation" size={17} color={P} />
-        </View>
-        <Text style={[SL.sectionTitle, { color: P }]}>Départs du jour</Text>
-        <View style={[SL.badge, { backgroundColor: P + "18" }]}>
-          <Text style={[SL.badgeText, { color: P }]}>{trips.length}</Text>
-        </View>
-      </View>
+        {tripsLoading ? (
+          <ActivityIndicator color={P} style={{ marginTop: 60 }} />
+        ) : trips.length === 0 ? (
+          <View style={SL.emptyBox}>
+            <Feather name="calendar" size={40} color="#CBD5E1" />
+            <Text style={SL.emptyTitle}>Aucun départ aujourd'hui</Text>
+            <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center" }}>Revenez plus tard ou actualisez</Text>
+          </View>
+        ) : (
+          <>
+            {/* Section — Départs à valider */}
+            {pendingTrips.length > 0 && (
+              <>
+                <View style={SL.sectionHdr}>
+                  <View style={[SL.sectionAccent, { backgroundColor: P }]} />
+                  <View style={[SL.sectionIconBox, { backgroundColor: P + "18" }]}>
+                    <Feather name="navigation" size={17} color={P} />
+                  </View>
+                  <Text style={[SL.sectionTitle, { color: P }]}>Départs à valider</Text>
+                  <View style={[SL.badge, { backgroundColor: P + "18" }]}>
+                    <Text style={[SL.badgeText, { color: P }]}>{pendingTrips.length}</Text>
+                  </View>
+                </View>
+                {pendingTrips.map(renderTripCard)}
+              </>
+            )}
 
-      {tripsLoading ? (
-        <ActivityIndicator color={P} style={{ marginTop: 40 }} />
-      ) : trips.length === 0 ? (
-        <View style={SL.emptyBox}>
-          <Feather name="calendar" size={40} color="#CBD5E1" />
-          <Text style={SL.emptyTitle}>Aucun départ aujourd'hui</Text>
-        </View>
-      ) : (
-        trips.map(renderTripCard)
-      )}
-    </ScrollView>
-  );
+            {/* Section — Trajets en transit */}
+            {transitTrips.length > 0 && (
+              <>
+                <View style={[SL.sectionHdr, { marginTop: pendingTrips.length > 0 ? 8 : 0 }]}>
+                  <View style={[SL.sectionAccent, { backgroundColor: GREEN }]} />
+                  <View style={[SL.sectionIconBox, { backgroundColor: GREEN + "18" }]}>
+                    <Feather name="truck" size={17} color={GREEN} />
+                  </View>
+                  <Text style={[SL.sectionTitle, { color: GREEN }]}>Trajets en transit</Text>
+                  <View style={[SL.badge, { backgroundColor: GREEN + "18" }]}>
+                    <Text style={[SL.badgeText, { color: GREEN }]}>{transitTrips.length}</Text>
+                  </View>
+                </View>
+                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 4, borderWidth: 1, borderColor: GREEN + "33" }}>
+                  <Feather name="info" size={13} color={GREEN} style={{ marginTop: 1 }} />
+                  <Text style={{ fontSize: 12, color: "#065F46", flex: 1, lineHeight: 17 }}>
+                    Ces cars sont en route. Appuyez sur un trajet pour <Text style={{ fontWeight: "700" }}>prendre en charge</Text> et ajouter passagers, bagages ou colis.
+                  </Text>
+                </View>
+                {transitTrips.map(renderTripCard)}
+              </>
+            )}
+          </>
+        )}
+      </ScrollView>
+    );
+  };
 
   /* ── Bordereau tab ── */
   const renderBordereau = () => {
@@ -465,6 +525,48 @@ export default function AgentDepartureValidation() {
             </View>
           )}
         </View>
+
+        {/* Transit join banner — affiché pour les trajets en route */}
+        {validated && (
+          transitJoined ? (
+            <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: GREEN }}>
+              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: GREEN, justifyContent: "center", alignItems: "center" }}>
+                <Feather name="user-check" size={18} color="#fff" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: GREEN }}>Prise en charge active</Text>
+                <Text style={{ fontSize: 11, color: "#065F46", marginTop: 1 }}>
+                  Vous êtes enregistré sur ce trajet. Ajoutez des passagers, bagages ou colis ci-dessous.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: AMBER + "80", gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Feather name="truck" size={16} color={AMBER} />
+                <Text style={{ fontSize: 13, fontWeight: "800", color: AMBER, flex: 1 }}>
+                  Ce car est en route — Logique multi-agences
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: "#92400E", lineHeight: 17 }}>
+                Ce trajet a déjà quitté son agence d'origine. Votre agence peut prendre en charge ce départ pour ajouter des passagers, bagages ou colis au même trajet.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: AMBER, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 12, opacity: transitJoining ? 0.7 : 1 }}
+                onPress={joinTransit}
+                disabled={transitJoining}
+              >
+                {transitJoining
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <>
+                      <Feather name="users" size={16} color="#fff" />
+                      <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Prendre en charge ce trajet</Text>
+                    </>
+                }
+              </TouchableOpacity>
+            </View>
+          )
+        )}
 
         {/* Summary cards row */}
         <View style={SL.statsRow}>
@@ -631,21 +733,17 @@ export default function AgentDepartureValidation() {
           <Text style={[SL.sectionTitle, { color: RED }]}>
             Dépenses ({bordereau.expenses.length})
           </Text>
-          {!validated && (
-            <TouchableOpacity onPress={() => setExpModal(true)} style={[SL.badge, { backgroundColor: RED + "18", marginLeft: "auto" }]}>
-              <Feather name="plus" size={11} color={RED} />
-              <Text style={[SL.badgeText, { color: RED }]}>Ajouter</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => setExpModal(true)} style={[SL.badge, { backgroundColor: RED + "18", marginLeft: "auto" }]}>
+            <Feather name="plus" size={11} color={RED} />
+            <Text style={[SL.badgeText, { color: RED }]}>Ajouter</Text>
+          </TouchableOpacity>
         </View>
         {bordereau.expenses.length === 0 ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Text style={SL.emptyInline}>Aucune dépense enregistrée</Text>
-            {!validated && (
-              <TouchableOpacity onPress={() => setExpModal(true)} style={[SL.badge, { backgroundColor: RED + "10" }]}>
-                <Text style={[SL.badgeText, { color: RED }]}>+ Ajouter (péage, ration...)</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={() => setExpModal(true)} style={[SL.badge, { backgroundColor: RED + "10" }]}>
+              <Text style={[SL.badgeText, { color: RED }]}>+ Ajouter (péage, ration...)</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           bordereau.expenses.map(e => (
