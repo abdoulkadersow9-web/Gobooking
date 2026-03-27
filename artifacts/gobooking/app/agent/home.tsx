@@ -106,6 +106,18 @@ const ALL_MODULES = [
     roles: ["agent_reservation"],
   },
   {
+    id: "impression_depart",
+    label: "Impression Départ",
+    sub: "Dépenses · Feuille de route",
+    desc: "Ajouter péage, ration, carburant — Imprimer la feuille de route sans montants",
+    icon: "printer" as const,
+    path: "/agent/guichet-impression",
+    color: "#92400E",
+    gradient: ["#FFFBEB", "#FEF3C7"] as [string, string],
+    border: "#FBBF24",
+    roles: ["guichet", "vente", "agent_ticket", "agent_guichet"],
+  },
+  {
     id: "bagage",
     label: "Agent Bagage",
     sub: "Enregistrement des bagages",
