@@ -549,29 +549,84 @@ export default function Trips() {
             <DialogTitle className="flex items-center gap-2">
               <MapPin size={18} className="text-emerald-600" />
               Escales &amp; Disponibilité par segment
+              <span className="ml-auto flex items-center gap-1.5 text-xs text-emerald-600 font-normal">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Temps réel
+              </span>
             </DialogTitle>
           </DialogHeader>
           {(waypointsLoading || segmentLoading) ? (
             <div className="py-8 text-center text-muted-foreground">Chargement…</div>
           ) : (
             <div className="space-y-6">
-              {/* Waypoints timeline */}
+
+              {/* ── Bilan global des places libérées ── */}
+              {(waypointsData?.totalSeatsFreed ?? 0) > 0 && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                    {waypointsData.totalSeatsFreed}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">
+                      {waypointsData.totalSeatsFreed} place{waypointsData.totalSeatsFreed !== 1 ? "s" : ""} libérée{waypointsData.totalSeatsFreed !== 1 ? "s" : ""} par rotation
+                    </p>
+                    <p className="text-xs text-emerald-600">Disponibles pour de nouvelles réservations sur les segments suivants</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Timeline des escales ── */}
               {waypointsData?.waypoints?.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Trajet</p>
-                  <ol className="relative border-l-2 border-emerald-200 ml-4 space-y-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Trajet &amp; contrôle par escale</p>
+                  <ol className="relative border-l-2 border-emerald-200 ml-4 space-y-5">
                     {(waypointsData.waypoints as any[]).map((wp: any) => (
                       <li key={wp.id} className="ml-5">
                         <span className={`absolute -left-[9px] w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold
-                          ${wp.arrivedAt ? "bg-emerald-600" : wp.isOrigin ? "bg-blue-600" : wp.isDestination ? "bg-purple-600" : "bg-slate-300"}`}>
-                          {wp.arrivedAt ? "✓" : wp.isOrigin ? "D" : wp.isDestination ? "A" : "•"}
+                          ${wp.isArrived ? "bg-emerald-600" : wp.isOrigin ? "bg-blue-600" : wp.isDestination ? "bg-purple-600" : "bg-slate-300"}`}>
+                          {wp.isArrived ? "✓" : wp.isOrigin ? "D" : wp.isDestination ? "A" : "•"}
                         </span>
-                        <div className="flex items-center gap-3 flex-wrap">
+
+                        {/* Ville + heure */}
+                        <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           <span className="font-semibold text-sm">{wp.city}</span>
                           {wp.scheduledTime && <span className="text-xs text-muted-foreground">{wp.scheduledTime}</span>}
-                          {wp.arrivedAt && <span className="text-xs text-emerald-600 font-medium">✓ Arrivé</span>}
-                          {wp.passengersBoarding > 0  && <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">+{wp.passengersBoarding} montent</span>}
-                          {wp.passengersAlighting > 0 && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">-{wp.passengersAlighting} descendent</span>}
+                          {wp.isArrived && (
+                            <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
+                              ✓ Arrivé
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Stats passagers */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {wp.passengersBoarding > 0 && (
+                            <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5">
+                              +{wp.passengersBoarding} montent
+                            </span>
+                          )}
+                          {wp.passengersAlighting > 0 && (
+                            <span className={`text-xs rounded-full px-2 py-0.5 border ${
+                              wp.isArrived
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                              -{wp.passengersAlighting} {wp.isArrived ? "descendus" : "descendent"}
+                            </span>
+                          )}
+                          {wp.isArrived && wp.seatsFreedHere > 0 && (
+                            <span className="text-xs bg-emerald-600 text-white rounded-full px-2 py-0.5 font-semibold">
+                              {wp.seatsFreedHere} place{wp.seatsFreedHere !== 1 ? "s" : ""} libérée{wp.seatsFreedHere !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {!wp.isArrived && wp.passengersAlighting > 0 && (
+                            <span className="text-xs text-muted-foreground italic">
+                              → {wp.passengersAlighting} libération{wp.passengersAlighting !== 1 ? "s" : ""} prévue{wp.passengersAlighting !== 1 ? "s" : ""}
+                            </span>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -579,27 +634,34 @@ export default function Trips() {
                 </div>
               )}
 
-              {/* Segment availability bars */}
+              {/* ── Disponibilité par segment ── */}
               {segmentData?.segments?.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Places disponibles par segment</p>
                   <div className="space-y-3">
                     {(segmentData.segments as any[]).map((seg: any, i: number) => {
                       const pct = seg.totalSeats > 0 ? (seg.occupied / seg.totalSeats) * 100 : 0;
-                      const color = seg.available === 0 ? "bg-red-500" : seg.available < 5 ? "bg-amber-500" : "bg-emerald-500";
-                      const textColor = seg.available === 0 ? "text-red-600" : seg.available < 5 ? "text-amber-600" : "text-emerald-600";
+                      const isFull = seg.available === 0;
+                      const isLow  = seg.available > 0 && seg.available < 5;
+                      const barColor  = isFull ? "bg-red-500"   : isLow ? "bg-amber-500"   : "bg-emerald-500";
+                      const textColor = isFull ? "text-red-600" : isLow ? "text-amber-600" : "text-emerald-600";
+                      const bgCard    = isFull ? "bg-red-50 border-red-100" : isLow ? "bg-amber-50 border-amber-100" : "bg-muted/40 border-transparent";
                       return (
-                        <div key={i} className="bg-muted/40 rounded-lg p-3">
+                        <div key={i} className={`rounded-lg p-3 border ${bgCard}`}>
                           <div className="flex items-center gap-2 mb-2">
                             <span className="font-medium text-sm">{seg.from}</span>
-                            <span className="text-muted-foreground">→</span>
+                            <span className="text-muted-foreground text-xs">→</span>
                             <span className="font-medium text-sm">{seg.to}</span>
-                            <span className={`ml-auto text-sm font-bold ${textColor}`}>{seg.available} libre{seg.available !== 1 ? "s" : ""}</span>
+                            <div className="ml-auto flex items-center gap-2">
+                              {isFull && <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">COMPLET</span>}
+                              {isLow  && <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">PRESQUE PLEIN</span>}
+                              <span className={`text-sm font-bold ${textColor}`}>{seg.available} libre{seg.available !== 1 ? "s" : ""}</span>
+                            </div>
                           </div>
                           <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                            <div className={`h-2 rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">{seg.occupied}/{seg.totalSeats} places occupées</p>
+                          <p className="text-xs text-muted-foreground mt-1">{seg.occupied} occupée{seg.occupied !== 1 ? "s" : ""} / {seg.totalSeats} total</p>
                         </div>
                       );
                     })}

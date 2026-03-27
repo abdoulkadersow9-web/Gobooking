@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
   StyleSheet, Alert, RefreshControl,
@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 const API = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 const P   = "#166534";
 const PA  = "#D1FAE5";
+const AMBER = "#D97706";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Waypoint {
@@ -20,6 +21,8 @@ interface Waypoint {
   arrivedAt: string | null;
   passengersBoarding: number;
   passengersAlighting: number;
+  seatsFreedHere: number;
+  isArrived: boolean;
   isOrigin: boolean;
   isDestination: boolean;
 }
@@ -33,6 +36,7 @@ interface SegmentInfo {
 interface WaypointsData {
   tripId: string;
   totalSeats: number;
+  totalSeatsFreed: number;
   waypoints: Waypoint[];
 }
 interface SegmentData {
@@ -52,8 +56,10 @@ export default function WaypointsScreen() {
   const [loading,       setLoading]        = useState(true);
   const [refreshing,    setRefreshing]     = useState(false);
   const [arriving,      setArriving]       = useState<string | null>(null);
+  const [lastUpdated,   setLastUpdated]    = useState<Date | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     try {
       const [wpRes, segRes] = await Promise.all([
         fetch(`${API}/agent/trips/${tripId}/waypoints`,      { headers: { Authorization: `Bearer ${token}` } }),
@@ -61,12 +67,19 @@ export default function WaypointsScreen() {
       ]);
       if (wpRes.ok)  setWaypointsData(await wpRes.json());
       if (segRes.ok) setSegmentData(await segRes.json());
+      setLastUpdated(new Date());
     } catch {}
-    setLoading(false);
-    setRefreshing(false);
+    if (!silent) {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [tripId, token]);
 
-  React.useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    pollRef.current = setInterval(() => load(true), 10000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [load]);
 
   const onRefresh = () => { setRefreshing(true); load(); };
 
@@ -90,8 +103,8 @@ export default function WaypointsScreen() {
               const data = await r.json();
               if (r.ok) {
                 Alert.alert(
-                  "Arrivée enregistrée",
-                  `✓ ${data.passengersAlighted} passager(s) descendu(s)\n✓ ${data.seatsFreed} place(s) libérée(s)`,
+                  "Arrivée enregistrée ✓",
+                  `${data.passengersAlighted} passager(s) descendu(s)\n${data.seatsFreed} place(s) libérée(s) et disponibles`,
                 );
                 load();
               } else {
@@ -116,8 +129,14 @@ export default function WaypointsScreen() {
     );
   }
 
-  const wps = waypointsData?.waypoints ?? [];
+  const wps  = waypointsData?.waypoints ?? [];
   const segs = segmentData?.segments ?? [];
+  const totalFreed = waypointsData?.totalSeatsFreed ?? 0;
+  const arrivedCount = wps.filter(w => w.isArrived).length;
+  const pendingAlighting = wps.filter(w => !w.isArrived).reduce((s, w) => s + w.passengersAlighting, 0);
+
+  const fmtTime = (d: Date) =>
+    d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   return (
     <View style={SL.root}>
@@ -130,40 +149,78 @@ export default function WaypointsScreen() {
           <Text style={SL.headerTitle}>Escales & Segments</Text>
           <Text style={SL.headerSub}>{tripName ?? tripId}</Text>
         </View>
-        <Feather name="map-pin" size={22} color="#fff" />
+        <View style={{ alignItems: "flex-end" }}>
+          <View style={SL.liveBadge}>
+            <View style={SL.liveDot} />
+            <Text style={SL.liveTxt}>Live</Text>
+          </View>
+          {lastUpdated && (
+            <Text style={{ color: "#A7F3D0", fontSize: 9, marginTop: 2 }}>
+              {fmtTime(lastUpdated)}
+            </Text>
+          )}
+        </View>
       </View>
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={P} />}
       >
-        {/* Résumé total */}
+        {/* ── Résumé statistiques ── */}
         <View style={SL.summaryRow}>
           <View style={SL.summaryCard}>
             <Text style={SL.summaryNum}>{waypointsData?.totalSeats ?? "–"}</Text>
             <Text style={SL.summaryLbl}>Places totales</Text>
           </View>
           <View style={SL.summaryCard}>
-            <Text style={[SL.summaryNum, { color: P }]}>{wps.length}</Text>
-            <Text style={SL.summaryLbl}>Escales</Text>
+            <Text style={[SL.summaryNum, { color: P }]}>
+              {arrivedCount}/{wps.length}
+            </Text>
+            <Text style={SL.summaryLbl}>Escales faites</Text>
           </View>
           <View style={SL.summaryCard}>
-            <Text style={[SL.summaryNum, { color: "#D97706" }]}>
-              {wps.filter(w => w.arrivedAt).length}/{wps.length}
+            <Text style={[SL.summaryNum, { color: totalFreed > 0 ? P : "#94A3B8" }]}>
+              {totalFreed}
             </Text>
-            <Text style={SL.summaryLbl}>Arrivées</Text>
+            <Text style={SL.summaryLbl}>Places libérées</Text>
           </View>
         </View>
 
-        {/* Section escales */}
+        {/* ── Bilan rotation si des places ont été libérées ── */}
+        {totalFreed > 0 && (
+          <View style={SL.rotationBanner}>
+            <View style={SL.rotationIcon}>
+              <Feather name="refresh-cw" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={SL.rotationTitle}>
+                {totalFreed} place{totalFreed > 1 ? "s" : ""} libérée{totalFreed > 1 ? "s" : ""} par rotation
+              </Text>
+              <Text style={SL.rotationSub}>
+                Disponibles pour nouvelles réservations sur les segments suivants
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* ── Prévision descentes futures ── */}
+        {pendingAlighting > 0 && (
+          <View style={SL.forecastBanner}>
+            <Feather name="clock" size={14} color={AMBER} />
+            <Text style={SL.forecastTxt}>
+              {pendingAlighting} passager{pendingAlighting > 1 ? "s" : ""} prévu{pendingAlighting > 1 ? "s" : ""} à descendre aux prochaines escales
+            </Text>
+          </View>
+        )}
+
+        {/* ── Section escales ── */}
         <Text style={SL.sectionTitle}>Trajet en cours</Text>
         {wps.map((wp, idx) => {
-          const arrived   = !!wp.arrivedAt;
+          const arrived   = wp.isArrived;
           const isLast    = idx === wps.length - 1;
           const canArrive = !arrived && !isLast && !wp.isOrigin;
           return (
             <View key={wp.id} style={[SL.wpCard, arrived && SL.wpArrived]}>
-              {/* Ligne verticale */}
               {idx < wps.length - 1 && <View style={[SL.vline, arrived && SL.vlineArrived]} />}
 
               {/* Dot */}
@@ -187,7 +244,7 @@ export default function WaypointsScreen() {
                     {wp.scheduledTime && (
                       <Text style={SL.wpTime}>
                         <Feather name="clock" size={11} color="#9CA3AF" /> {wp.scheduledTime}
-                        {arrived && " · Arrivé"}
+                        {arrived && " · Arrivé ✓"}
                       </Text>
                     )}
                   </View>
@@ -206,48 +263,78 @@ export default function WaypointsScreen() {
                   )}
                 </View>
 
-                {/* Passagers */}
-                {(wp.passengersBoarding > 0 || wp.passengersAlighting > 0) && (
-                  <View style={SL.paxRow}>
-                    {wp.passengersBoarding > 0 && (
-                      <View style={SL.paxChip}>
-                        <Feather name="user-plus" size={12} color={P} />
-                        <Text style={[SL.paxTxt, { color: P }]}> +{wp.passengersBoarding} montent</Text>
-                      </View>
-                    )}
-                    {wp.passengersAlighting > 0 && (
-                      <View style={[SL.paxChip, { backgroundColor: "#FEF3C7" }]}>
-                        <Feather name="user-minus" size={12} color="#D97706" />
-                        <Text style={[SL.paxTxt, { color: "#D97706" }]}> -{wp.passengersAlighting} descendent</Text>
-                      </View>
-                    )}
-                  </View>
-                )}
+                {/* Passagers embarquement / descente */}
+                <View style={SL.paxRow}>
+                  {wp.passengersBoarding > 0 && (
+                    <View style={SL.paxChip}>
+                      <Feather name="user-plus" size={12} color={P} />
+                      <Text style={[SL.paxTxt, { color: P }]}> +{wp.passengersBoarding} montent</Text>
+                    </View>
+                  )}
+                  {wp.passengersAlighting > 0 && (
+                    <View style={[SL.paxChip, arrived ? { backgroundColor: "#D1FAE5" } : { backgroundColor: "#FEF3C7" }]}>
+                      <Feather name="user-minus" size={12} color={arrived ? P : AMBER} />
+                      <Text style={[SL.paxTxt, { color: arrived ? P : AMBER }]}>
+                        {" "}{arrived ? "" : "-"}{wp.passengersAlighting} {arrived ? "descendus" : "descendent"}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Places libérées badge */}
+                  {arrived && wp.seatsFreedHere > 0 && (
+                    <View style={SL.freedChip}>
+                      <Feather name="unlock" size={11} color="#fff" />
+                      <Text style={SL.freedTxt}>
+                        {" "}{wp.seatsFreedHere} libérée{wp.seatsFreedHere > 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                  )}
+                  {/* Libérations prévues */}
+                  {!arrived && wp.passengersAlighting > 0 && (
+                    <View style={SL.forecastChip}>
+                      <Feather name="clock" size={11} color="#64748B" />
+                      <Text style={SL.forecastChipTxt}>
+                        {" "}{wp.passengersAlighting} lib. prévue{wp.passengersAlighting > 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
           );
         })}
 
-        {/* Section segments */}
+        {/* ── Section segments ── */}
         {segs.length > 0 && (
           <>
-            <Text style={[SL.sectionTitle, { marginTop: 24 }]}>Places disponibles par segment</Text>
+            <Text style={[SL.sectionTitle, { marginTop: 24 }]}>Disponibilité par segment</Text>
             {segs.map((seg, i) => {
-              const pct = seg.totalSeats > 0 ? (seg.occupied / seg.totalSeats) * 100 : 0;
-              const color = seg.available === 0 ? "#EF4444" : seg.available < 5 ? "#F59E0B" : P;
+              const pct    = seg.totalSeats > 0 ? (seg.occupied / seg.totalSeats) * 100 : 0;
+              const isFull = seg.available === 0;
+              const isLow  = seg.available > 0 && seg.available < 5;
+              const color  = isFull ? "#EF4444" : isLow ? AMBER : P;
               return (
-                <View key={i} style={SL.segCard}>
+                <View key={i} style={[SL.segCard, isFull && SL.segCardFull, isLow && SL.segCardLow]}>
                   <View style={SL.segRow}>
                     <Text style={SL.segRoute}>{seg.from}</Text>
                     <Feather name="arrow-right" size={14} color="#9CA3AF" style={{ marginHorizontal: 8 }} />
                     <Text style={SL.segRoute}>{seg.to}</Text>
                     <View style={{ flex: 1 }} />
-                    <Text style={[SL.segAvail, { color }]}>{seg.available} libre{seg.available > 1 ? "s" : ""}</Text>
+                    {isFull && (
+                      <View style={[SL.statusBadge, { backgroundColor: "#FEE2E2" }]}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#DC2626" }}>COMPLET</Text>
+                      </View>
+                    )}
+                    {isLow && (
+                      <View style={[SL.statusBadge, { backgroundColor: "#FEF3C7" }]}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>PRESQUE PLEIN</Text>
+                      </View>
+                    )}
+                    <Text style={[SL.segAvail, { color }]}>{seg.available} libre{seg.available !== 1 ? "s" : ""}</Text>
                   </View>
                   <View style={SL.barBg}>
                     <View style={[SL.barFill, { width: `${pct}%` as any, backgroundColor: color }]} />
                   </View>
-                  <Text style={SL.segDetail}>{seg.occupied}/{seg.totalSeats} occupées</Text>
+                  <Text style={SL.segDetail}>{seg.occupied} occupée{seg.occupied !== 1 ? "s" : ""} / {seg.totalSeats} total</Text>
                 </View>
               );
             })}
@@ -268,15 +355,27 @@ const SL = StyleSheet.create({
   headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
   headerSub:   { color: "#A7F3D0", fontSize: 12, marginTop: 2 },
 
-  summaryRow:  { flexDirection: "row", gap: 8, marginBottom: 20 },
+  liveBadge:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  liveDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: "#6EE7B7" },
+  liveTxt:    { color: "#fff", fontSize: 11, fontWeight: "600" },
+
+  summaryRow:  { flexDirection: "row", gap: 8, marginBottom: 16 },
   summaryCard: { flex: 1, backgroundColor: "#fff", borderRadius: 12, padding: 12, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   summaryNum:  { fontSize: 22, fontWeight: "800", color: "#1E293B" },
-  summaryLbl:  { fontSize: 11, color: "#94A3B8", marginTop: 2 },
+  summaryLbl:  { fontSize: 11, color: "#94A3B8", marginTop: 2, textAlign: "center" },
+
+  rotationBanner: { backgroundColor: P, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
+  rotationIcon:   { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
+  rotationTitle:  { fontSize: 13, fontWeight: "700", color: "#fff" },
+  rotationSub:    { fontSize: 11, color: "#A7F3D0", marginTop: 2 },
+
+  forecastBanner: { backgroundColor: "#FFFBEB", borderRadius: 10, padding: 10, flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12, borderWidth: 1, borderColor: "#FDE68A" },
+  forecastTxt:    { fontSize: 12, color: "#92400E", flex: 1 },
 
   sectionTitle: { fontSize: 13, fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 12 },
 
   wpCard:     { flexDirection: "row", marginBottom: 4, minHeight: 60 },
-  wpArrived:  { opacity: 0.7 },
+  wpArrived:  { opacity: 0.8 },
   vline:      { position: "absolute", left: 15, top: 28, bottom: -4, width: 2, backgroundColor: "#E2E8F0" },
   vlineArrived: { backgroundColor: P },
   dot:        { width: 32, height: 32, borderRadius: 16, backgroundColor: "#CBD5E1", alignItems: "center", justifyContent: "center", marginRight: 12, marginTop: 4, zIndex: 1 },
@@ -293,15 +392,23 @@ const SL = StyleSheet.create({
   arriveBtn:   { backgroundColor: P, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   arriveBtnTxt: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
-  paxRow:  { flexDirection: "row", gap: 8, marginTop: 8, flexWrap: "wrap" },
+  paxRow:  { flexDirection: "row", gap: 6, marginTop: 8, flexWrap: "wrap" },
   paxChip: { flexDirection: "row", alignItems: "center", backgroundColor: PA, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
   paxTxt:  { fontSize: 12, fontWeight: "600" },
 
-  segCard:   { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  segRow:    { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  segRoute:  { fontSize: 14, fontWeight: "600", color: "#1E293B" },
-  segAvail:  { fontSize: 14, fontWeight: "700" },
-  barBg:     { height: 6, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" },
-  barFill:   { height: 6, borderRadius: 3 },
-  segDetail: { fontSize: 11, color: "#94A3B8", marginTop: 4 },
+  freedChip:    { flexDirection: "row", alignItems: "center", backgroundColor: P, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  freedTxt:     { fontSize: 11, fontWeight: "700", color: "#fff" },
+  forecastChip: { flexDirection: "row", alignItems: "center", backgroundColor: "#F1F5F9", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#E2E8F0" },
+  forecastChipTxt: { fontSize: 11, color: "#64748B" },
+
+  segCard:      { backgroundColor: "#fff", borderRadius: 12, padding: 14, marginBottom: 10, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  segCardFull:  { backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" },
+  segCardLow:   { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: "#FDE68A" },
+  segRow:       { flexDirection: "row", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 4 },
+  segRoute:     { fontSize: 14, fontWeight: "600", color: "#1E293B" },
+  segAvail:     { fontSize: 14, fontWeight: "700" },
+  statusBadge:  { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4 },
+  barBg:        { height: 6, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" },
+  barFill:      { height: 6, borderRadius: 3 },
+  segDetail:    { fontSize: 11, color: "#94A3B8", marginTop: 4 },
 });

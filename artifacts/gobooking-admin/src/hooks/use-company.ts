@@ -111,6 +111,8 @@ export function useTripWaypoints(tripId: string | null) {
     queryKey: ["trip-waypoints", tripId],
     queryFn: () => apiFetch<any>(`/company/trips/${tripId}/waypoints`),
     enabled: !!tripId,
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 }
 
@@ -119,6 +121,8 @@ export function useTripSegmentSeats(tripId: string | null) {
     queryKey: ["trip-segment-seats", tripId],
     queryFn: () => apiFetch<any>(`/company/trips/${tripId}/segment-seats`),
     enabled: !!tripId,
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 }
 

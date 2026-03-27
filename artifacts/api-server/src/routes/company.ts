@@ -3218,19 +3218,44 @@ router.get("/trips/:tripId/waypoints", async (req, res) => {
       and(eq(bookingsTable.tripId, tripId), inArray(bookingsTable.status, ["confirmed","boarded","validated","payé"]))
     );
 
+    /* Also count bookings already alighted (seats freed, booking status unchanged) */
+    const allAlightingBookings = await db.execute(sql`
+      SELECT alighting_city,
+             COALESCE(SUM(
+               CASE WHEN seat_numbers IS NOT NULL AND jsonb_array_length(seat_numbers::jsonb) > 0
+                    THEN jsonb_array_length(seat_numbers::jsonb) ELSE 1 END
+             ), 0) AS seats_freed
+      FROM bookings
+      WHERE trip_id = ${tripId}
+        AND status IN ('confirmed','boarded','validated','payé')
+        AND alighting_city IS NOT NULL
+      GROUP BY alighting_city
+    `);
+    const alightedMap: Record<string, number> = {};
+    for (const row of allAlightingBookings.rows as { alighting_city: string; seats_freed: string }[]) {
+      alightedMap[row.alighting_city] = Number(row.seats_freed);
+    }
+
     const waypointStats = waypoints.map(wp => {
       const boarding  = bookings.filter(b => (b as any).boardingCity  === wp.city);
       const alighting = bookings.filter(b => (b as any).alightingCity === wp.city);
+      const boardingSeatCount  = boarding.reduce( (s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+      const alightingSeatCount = alighting.reduce((s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+      const isArrived = !!wp.arrivedAt;
       return {
         ...wp,
-        passengersBoarding:  boarding.reduce( (s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0),
-        passengersAlighting: alighting.reduce((s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0),
+        passengersBoarding:  boardingSeatCount,
+        passengersAlighting: alightingSeatCount,
+        seatsFreedHere: isArrived ? (alightedMap[wp.city] ?? alightingSeatCount) : 0,
+        isArrived,
         isOrigin:      wp.stopOrder === 0,
         isDestination: wp.stopOrder === waypoints[waypoints.length - 1]?.stopOrder,
       };
     });
 
-    res.json({ tripId, totalSeats: trip.totalSeats, waypoints: waypointStats });
+    const totalSeatsFreed = waypointStats.reduce((s, wp) => s + wp.seatsFreedHere, 0);
+
+    res.json({ tripId, totalSeats: trip.totalSeats, waypoints: waypointStats, totalSeatsFreed });
   } catch (err) {
     console.error("[company/trips/waypoints]", err);
     res.status(500).json({ error: "Erreur serveur" });
