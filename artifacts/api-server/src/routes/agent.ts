@@ -734,14 +734,34 @@ router.post("/reservations", async (req, res) => {
       i === 0 ? { name: clientName.trim() } : { name: `Passager ${i + 1}` }
     );
 
+    // Auto-assigner des sièges disponibles
+    let assignedSeatIds: string[]    = [];
+    let assignedSeatNumbers: string[] = [];
+    try {
+      const freeSeats = await db.execute(sql`
+        SELECT id, number FROM seats
+        WHERE trip_id = ${tripId} AND status = 'available'
+        ORDER BY "row", "column"
+        LIMIT ${count}
+      `);
+      assignedSeatIds    = (freeSeats.rows as any[]).map(s => s.id);
+      assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
+      if (assignedSeatIds.length > 0) {
+        await db.execute(sql`
+          UPDATE seats SET status = 'occupied'
+          WHERE id = ANY(${assignedSeatIds}::text[])
+        `);
+      }
+    } catch {}
+
     const [booking] = await db.insert(bookingsTable).values({
       id,
       bookingRef:       ref,
       userId:           user.id,
       tripId,
       passengers,
-      seatIds:          [],
-      seatNumbers:      [],
+      seatIds:          assignedSeatIds,
+      seatNumbers:      assignedSeatNumbers,
       totalAmount:      amount,
       paymentMethod:    paymentMethod || "cash",
       paymentStatus:    "paid",
@@ -756,14 +776,18 @@ router.post("/reservations", async (req, res) => {
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.BOOKING_CREATE, booking.id, "booking",
-      { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod, source: "guichet" }).catch(() => {});
+      { bookingRef: ref, tripId, seatCount: count, clientName, paymentMethod, source: "guichet",
+        seats: assignedSeatNumbers, boardingCity: bCity, alightingCity: aCity }).catch(() => {});
     recordTripAgent(tripId, user.id).catch(() => {});
 
     res.status(201).json({
       id: booking.id, bookingRef: booking.bookingRef, tripId: booking.tripId,
       totalAmount: booking.totalAmount, status: booking.status,
       paymentMethod: booking.paymentMethod, passengers: booking.passengers,
-      seatNumbers: booking.seatNumbers, bookingSource: "guichet",
+      seatNumbers: assignedSeatNumbers,
+      seatIds: assignedSeatIds,
+      boardingCity: bCity, alightingCity: aCity,
+      bookingSource: "guichet",
       createdAt: booking.createdAt?.toISOString(),
     });
   } catch (err) {
@@ -1208,10 +1232,21 @@ router.get("/trips", async (req, res) => {
     const enriched = await Promise.all(trips.map(async (trip) => {
       const availableCount = await db.select().from(seatsTable)
         .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
+      // Build ordered city list (from → stops → to)
+      let stopCities: string[] = [];
+      try {
+        const stopsRaw = (trip as any).stops;
+        const parsedStops = Array.isArray(stopsRaw) ? stopsRaw
+          : (typeof stopsRaw === "string" ? JSON.parse(stopsRaw) : []);
+        stopCities = parsedStops.map((s: any) => s.city ?? s.name ?? s).filter(Boolean);
+      } catch {}
+      const allCities = [trip.fromCity ?? trip.from, ...stopCities, trip.toCity ?? trip.to].filter(Boolean);
       return {
         id: trip.id,
-        from: trip.from,
-        to: trip.to,
+        from: trip.from ?? trip.fromCity,
+        to: trip.to ?? trip.toCity,
+        fromCity: trip.fromCity ?? trip.from,
+        toCity: trip.toCity ?? trip.to,
         date: trip.date,
         departureTime: trip.departureTime,
         arrivalTime: trip.arrivalTime,
@@ -1223,6 +1258,8 @@ router.get("/trips", async (req, res) => {
         availableSeats: availableCount.length,
         guichetSeats: trip.guichetSeats ?? 0,
         onlineSeats: trip.onlineSeats ?? 0,
+        stops: stopCities,
+        allCities,
       };
     }));
 

@@ -39,6 +39,7 @@ type Trip = {
   capacity_status?: string; delay_minutes?: number;
   estimated_arrival_time?: string; actual_departure_time?: string;
   waypoints_passed?: string[]; stops?: any[]; alighted_count?: number;
+  intel?: any;
 };
 
 type Bus = {
@@ -886,25 +887,41 @@ export default function ChefTrips() {
             </View>
 
             <Text style={s.label}>Ville de l'escale *</Text>
-            <View style={s.pickerWrap}>
-              <Feather name="map-pin" size={16} color="#166534" style={{ marginRight: 8 }} />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {CITIES.map(city => {
-                  const sel = waypointCity === city;
-                  return (
-                    <Pressable key={city}
-                      style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 6,
-                        backgroundColor: sel ? "#166534" : "#F3F4F6",
-                        borderWidth: sel ? 0 : 1, borderColor: "#E5E7EB" }]}
-                      onPress={() => setWaypointCity(city)}>
-                      <Text style={{ fontSize: 13, color: sel ? "white" : "#374151", fontWeight: sel ? "700" : "400" }}>
-                        {city}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
+            {(() => {
+              // Escales du trajet en priorité, sinon liste CI complète
+              let tripStops: string[] = [];
+              try {
+                const raw = waypointTrip?.stops;
+                const arr = Array.isArray(raw) ? raw : (typeof raw === "string" ? JSON.parse(raw) : []);
+                tripStops = arr.map((s: any) => s.city ?? s.name ?? s).filter(Boolean);
+              } catch {}
+              const cityOptions = tripStops.length > 0
+                ? [...tripStops, waypointTrip?.to_city].filter(Boolean) as string[]
+                : CI_CITIES;
+              return (
+                <View style={s.pickerWrap}>
+                  <Feather name="map-pin" size={16} color="#166534" style={{ marginRight: 8 }} />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {cityOptions.map(city => {
+                      const sel = waypointCity === city;
+                      const alreadyPassed = waypointTrip?.waypoints_passed?.includes(city);
+                      return (
+                        <Pressable key={city}
+                          style={[{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 6,
+                            backgroundColor: sel ? "#166534" : alreadyPassed ? "#F0FDF4" : "#F3F4F6",
+                            borderWidth: sel ? 0 : 1, borderColor: alreadyPassed ? "#86EFAC" : "#E5E7EB",
+                            opacity: alreadyPassed ? 0.6 : 1 }]}
+                          onPress={() => !alreadyPassed && setWaypointCity(city)}>
+                          <Text style={{ fontSize: 13, color: sel ? "white" : alreadyPassed ? "#166534" : "#374151", fontWeight: sel ? "700" : "400" }}>
+                            {alreadyPassed ? "✓ " : ""}{city}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              );
+            })()}
 
             <Pressable
               style={[s.saveBtn, { backgroundColor: waypointCity ? "#166534" : "#9CA3AF", marginTop: 28 }]}
