@@ -17,7 +17,9 @@ import { saveOffline, useNetworkStatus } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
 import {
   generateBordereauRoute,
+  computeAudit,
   type BordereauData as PdfBordereauData,
+  type AuditItem,
 } from "@/utils/bordereau-pdf";
 
 const G       = "#D97706";
@@ -1181,6 +1183,44 @@ export default function TicketsScreen() {
                       Les dépenses ajoutées ici apparaissent automatiquement sur le bordereau de l'agent de validation. La feuille imprimée ne contient <Text style={{ fontWeight: "800" }}>aucun montant</Text>.
                     </Text>
                   </View>
+
+                  {/* ── RAPPORT DE CONTRÔLE ── */}
+                  {(() => {
+                    const audit = computeAudit({
+                      trip: bordereau.trip, boarded: bordereau.boarded,
+                      absents: bordereau.absents, bagages: bordereau.bagages,
+                      colis: bordereau.colis, expenses: bordereau.expenses,
+                      agents: bordereau.agents, summary: bordereau.summary,
+                    } as PdfBordereauData);
+                    const boxColor = audit.hasErrors ? "#DC2626" : audit.hasWarnings ? G : "#059669";
+                    const icon     = audit.hasErrors ? "alert-circle" : audit.hasWarnings ? "alert-triangle" : "check-circle";
+                    const lbl      = audit.hasErrors ? "Anomalie(s)" : audit.hasWarnings ? "Avertissement" : "OK";
+                    return (
+                      <View style={{ borderRadius: 12, borderWidth: 1.5, borderColor: boxColor, backgroundColor: boxColor + "0D", overflow: "hidden" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderBottomWidth: 1, borderBottomColor: boxColor + "22" }}>
+                          <Feather name={icon as any} size={15} color={boxColor} />
+                          <Text style={{ flex: 1, fontSize: 12, fontWeight: "800", color: "#0F172A" }}>Rapport de contrôle</Text>
+                          <View style={{ backgroundColor: boxColor, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{lbl}</Text>
+                          </View>
+                        </View>
+                        <View style={{ padding: 10, gap: 5 }}>
+                          {(audit.items as AuditItem[]).map((item, i) => {
+                            const ic = item.level === "error" ? "#DC2626" : item.level === "warning" ? G : "#059669";
+                            return (
+                              <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 7 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: ic, marginTop: 5 }} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#0F172A" }}>{item.label}</Text>
+                                  <Text style={{ fontSize: 10, color: "#64748B" }}>{item.detail}</Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })()}
 
                   {/* ── PASSAGERS résumé ── */}
                   <View style={S.card}>

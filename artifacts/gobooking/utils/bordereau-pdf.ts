@@ -91,6 +91,121 @@ export interface BordereauData {
   validatedAt?: string;
 }
 
+/* ═══════════════════════════════════════════════════════
+   AUDIT / RAPPORT DE CONTRÔLE
+═══════════════════════════════════════════════════════ */
+
+export interface AuditItem {
+  level: "error" | "warning" | "ok";
+  category: string;
+  label: string;
+  detail: string;
+}
+
+export interface AuditReport {
+  items: AuditItem[];
+  hasErrors: boolean;
+  hasWarnings: boolean;
+  totalRevenue: number;
+  netBalance: number;
+}
+
+export function computeAudit(data: BordereauData): AuditReport {
+  const { summary: s, boarded, absents, bagages, colis } = data;
+  const items: AuditItem[] = [];
+
+  const totalRevenue = (s.totalPassengerRevenue ?? 0) + (s.totalBagageRevenue ?? 0) + (s.totalColisRevenue ?? 0);
+  const netBalance   = totalRevenue - (s.totalExpenses ?? 0);
+
+  /* ── 1. Passagers embarqués vs tickets ── */
+  if (s.absentCount > 0) {
+    items.push({
+      level:    "warning",
+      category: "Passagers",
+      label:    `${s.absentCount} absent(s) sur ${s.totalPassengers}`,
+      detail:   `${s.boardedCount}/${s.totalPassengers} embarqués — ${s.absentCount} siège(s) non occupé(s)`,
+    });
+  } else if (s.totalPassengers > 0) {
+    items.push({
+      level:    "ok",
+      category: "Passagers",
+      label:    "Tous les passagers embarqués",
+      detail:   `${s.boardedCount}/${s.totalPassengers} à bord`,
+    });
+  }
+
+  /* ── 2. Bagages — passager manquant ── */
+  const unlinked = bagages.filter(b => !b.passengerName || b.passengerName.trim() === "" || b.passengerName === "—");
+  if (unlinked.length > 0) {
+    items.push({
+      level:    "warning",
+      category: "Bagages",
+      label:    `${unlinked.length} bagage(s) sans passager rattaché`,
+      detail:   "Vérifier la saisie des bagages hors-billet",
+    });
+  } else if (bagages.length > 0) {
+    items.push({
+      level:    "ok",
+      category: "Bagages",
+      label:    `${bagages.length} bagage(s) rattachés`,
+      detail:   "Tous les bagages ont un passager associé",
+    });
+  }
+
+  /* ── 3. Colis enregistrés vs embarqués ── */
+  const notLoaded = colis.filter(c => {
+    const st = (c.status ?? "").toLowerCase();
+    return st !== "loaded" && st !== "chargé" && st !== "en_transit" && st !== "livré";
+  });
+  if (notLoaded.length > 0) {
+    items.push({
+      level:    "error",
+      category: "Colis",
+      label:    `${notLoaded.length} colis non embarqué(s)`,
+      detail:   notLoaded.map(c => c.trackingRef).join(", "),
+    });
+  } else if (colis.length > 0) {
+    items.push({
+      level:    "ok",
+      category: "Colis",
+      label:    `${colis.length} colis chargés`,
+      detail:   "Tous les colis sont confirmés embarqués",
+    });
+  }
+
+  /* ── 4. Recettes passagers manquantes ── */
+  if (s.boardedCount > 0 && (s.totalPassengerRevenue ?? 0) === 0) {
+    items.push({
+      level:    "error",
+      category: "Finances",
+      label:    "Recettes passagers absentes",
+      detail:   `${s.boardedCount} passager(s) embarqué(s) mais 0 FCFA enregistré`,
+    });
+  }
+
+  /* ── 5. Dépenses vs recettes ── */
+  if (totalRevenue > 0 && (s.totalExpenses ?? 0) > totalRevenue) {
+    items.push({
+      level:    "error",
+      category: "Finances",
+      label:    "Dépenses supérieures aux recettes",
+      detail:   `Recettes ${totalRevenue.toLocaleString("fr-CI")} FCFA · Dépenses ${(s.totalExpenses ?? 0).toLocaleString("fr-CI")} FCFA`,
+    });
+  } else if (totalRevenue > 0) {
+    items.push({
+      level:    "ok",
+      category: "Finances",
+      label:    "Équilibre financier confirmé",
+      detail:   `Net ${netBalance.toLocaleString("fr-CI")} FCFA`,
+    });
+  }
+
+  const hasErrors   = items.some(i => i.level === "error");
+  const hasWarnings = !hasErrors && items.some(i => i.level === "warning");
+
+  return { items, hasErrors, hasWarnings, totalRevenue, netBalance };
+}
+
 /* ─── helpers ─── */
 const formatFcfa = (n: number) => n.toLocaleString("fr-CI") + " FCFA";
 const today = () => new Date().toLocaleDateString("fr-CI", { day: "2-digit", month: "long", year: "numeric" });
@@ -164,6 +279,32 @@ const BASE_CSS = `
   .sig-underline { border-bottom: 1px solid #94A3B8; height: 20px; }
   .watermark-route { position: fixed; bottom: 60px; right: 30px; opacity: 0.06; font-size: 72px; font-weight: 900; color: #059669; transform: rotate(-20deg); pointer-events: none; }
   .watermark-ent   { position: fixed; bottom: 60px; right: 30px; opacity: 0.06; font-size: 72px; font-weight: 900; color: #4338CA; transform: rotate(-20deg); pointer-events: none; }
+
+  /* Audit block */
+  .audit-box { border-radius: 12px; padding: 14px 16px; margin-bottom: 18px; border: 1.5px solid; }
+  .audit-box-ok   { border-color: #10B981; background: #F0FDF4; }
+  .audit-box-warn { border-color: #F59E0B; background: #FFFBEB; }
+  .audit-box-err  { border-color: #EF4444; background: #FEF2F2; }
+  .audit-header   { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .audit-title    { font-size: 13px; font-weight: 800; flex: 1; }
+  .audit-badge    { padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 800; }
+  .audit-badge-ok   { background: #10B981; color: #fff; }
+  .audit-badge-warn { background: #F59E0B; color: #fff; }
+  .audit-badge-err  { background: #EF4444; color: #fff; }
+  .audit-summary  { display: flex; gap: 0; background: rgba(255,255,255,0.7); border-radius: 8px; overflow: hidden; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.06); }
+  .audit-sum-item { flex: 1; text-align: center; padding: 8px 6px; border-right: 1px solid rgba(0,0,0,0.06); }
+  .audit-sum-item:last-child { border-right: none; }
+  .audit-sum-val  { font-size: 14px; font-weight: 900; display: block; }
+  .audit-sum-lbl  { font-size: 8.5px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; }
+  .audit-item     { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+  .audit-item:last-child { border-bottom: none; }
+  .audit-dot      { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .audit-dot-ok   { background: #10B981; }
+  .audit-dot-warn { background: #F59E0B; }
+  .audit-dot-err  { background: #EF4444; }
+  .audit-item-cat { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #64748B; }
+  .audit-item-lbl { font-size: 10.5px; font-weight: 700; color: #0F172A; }
+  .audit-item-det { font-size: 9.5px; color: #64748B; margin-top: 1px; }
 `;
 
 /* ── Build a passenger row ── */
@@ -237,6 +378,63 @@ function agentsSection(agents: PdfAgent[] | undefined, accentColor: string): str
   </div>`;
 }
 
+/* ── Helper : section audit dans le PDF ── */
+function auditSection(data: BordereauData): string {
+  const report = computeAudit(data);
+  const { items, hasErrors, hasWarnings, totalRevenue, netBalance } = report;
+  const s = data.summary;
+
+  const boxCls  = hasErrors ? "audit-box-err" : hasWarnings ? "audit-box-warn" : "audit-box-ok";
+  const badgeCls = hasErrors ? "audit-badge-err" : hasWarnings ? "audit-badge-warn" : "audit-badge-ok";
+  const badgeTxt = hasErrors ? "⚠ Anomalie(s) détectée(s)" : hasWarnings ? "⚑ Avertissement(s)" : "✓ Contrôle OK";
+  const dotCls   = (lv: string) => lv === "error" ? "audit-dot-err" : lv === "warning" ? "audit-dot-warn" : "audit-dot-ok";
+
+  return `
+  <div class="audit-box ${boxCls}">
+    <div class="audit-header">
+      <span style="font-size:16px">🔍</span>
+      <span class="audit-title">Rapport de contrôle automatique</span>
+      <span class="audit-badge ${badgeCls}">${badgeTxt}</span>
+    </div>
+
+    <div class="audit-summary">
+      <div class="audit-sum-item">
+        <span class="audit-sum-val">${s.boardedCount}/${s.totalPassengers}</span>
+        <span class="audit-sum-lbl">Passagers</span>
+      </div>
+      <div class="audit-sum-item">
+        <span class="audit-sum-val">${s.bagageCount}</span>
+        <span class="audit-sum-lbl">Bagages</span>
+      </div>
+      <div class="audit-sum-item">
+        <span class="audit-sum-val">${s.colisCount}</span>
+        <span class="audit-sum-lbl">Colis</span>
+      </div>
+      <div class="audit-sum-item">
+        <span class="audit-sum-val" style="color:#10B981">${totalRevenue.toLocaleString("fr-CI")} FCFA</span>
+        <span class="audit-sum-lbl">Recettes</span>
+      </div>
+      <div class="audit-sum-item">
+        <span class="audit-sum-val" style="color:#EF4444">${(s.totalExpenses ?? 0).toLocaleString("fr-CI")} FCFA</span>
+        <span class="audit-sum-lbl">Dépenses</span>
+      </div>
+      <div class="audit-sum-item">
+        <span class="audit-sum-val" style="color:#4338CA">${netBalance.toLocaleString("fr-CI")} FCFA</span>
+        <span class="audit-sum-lbl">Net</span>
+      </div>
+    </div>
+
+    ${items.map(it => `
+    <div class="audit-item">
+      <div class="audit-dot ${dotCls(it.level)}"></div>
+      <div>
+        <div><span class="audit-item-cat">${it.category}</span> — <span class="audit-item-lbl">${it.label}</span></div>
+        <div class="audit-item-det">${it.detail}</div>
+      </div>
+    </div>`).join("")}
+  </div>`;
+}
+
 export function generateBordereauEntreprise(data: BordereauData): string {
   const { trip, boarded, absents, bagages, colis, expenses, summary, agents, validatedBy, validatedAt } = data;
   const s = summary;
@@ -303,6 +501,8 @@ export function generateBordereauEntreprise(data: BordereauData): string {
       <div class="stat-label">Net total</div>
     </div>
   </div>
+
+  ${auditSection(data)}
 
   <!-- Passagers embarqués -->
   <div class="section">

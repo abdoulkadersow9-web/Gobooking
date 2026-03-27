@@ -10,7 +10,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Print from "expo-print";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,7 +32,9 @@ import { useRealtime } from "@/hooks/useRealtime";
 import {
   generateBordereauEntreprise,
   generateBordereauRoute,
+  computeAudit,
   type BordereauData as PdfBordereauData,
+  type AuditItem,
 } from "@/utils/bordereau-pdf";
 
 const P       = "#4338CA";   // Indigo-700 — Agent Validation
@@ -380,7 +382,17 @@ export default function AgentDepartureValidation() {
       </View>
     );
 
-    const s = bordereau.summary;
+    const s     = bordereau.summary;
+    const audit = computeAudit({
+      trip:     bordereau.trip,
+      boarded:  bordereau.boarded,
+      absents:  bordereau.absents,
+      bagages:  bordereau.bagages,
+      colis:    bordereau.colis,
+      expenses: bordereau.expenses,
+      agents:   bordereau.agents,
+      summary:  bordereau.summary,
+    } as PdfBordereauData);
 
     return (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 14 }}>
@@ -622,6 +634,63 @@ export default function AgentDepartureValidation() {
             </Text>
           </View>
         </View>
+
+        {/* ── RAPPORT DE CONTRÔLE ── */}
+        {(() => {
+          const hasIssues = audit.hasErrors || audit.hasWarnings;
+          const boxColor  = audit.hasErrors ? RED : audit.hasWarnings ? AMBER : GREEN;
+          const icon      = audit.hasErrors ? "alert-circle" : audit.hasWarnings ? "alert-triangle" : "check-circle";
+          const label     = audit.hasErrors ? "Anomalie(s) détectée(s)" : audit.hasWarnings ? "Avertissement(s)" : "Contrôle OK";
+          return (
+            <View style={{ borderRadius: 14, borderWidth: 1.5, borderColor: boxColor, backgroundColor: boxColor + "0D", overflow: "hidden" }}>
+              {/* Header */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderBottomWidth: 1, borderBottomColor: boxColor + "22" }}>
+                <View style={{ width: 30, height: 30, borderRadius: 8, backgroundColor: boxColor + "20", alignItems: "center", justifyContent: "center" }}>
+                  <Feather name={icon as any} size={16} color={boxColor} />
+                </View>
+                <Text style={{ flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" }}>Rapport de contrôle</Text>
+                <View style={{ backgroundColor: boxColor, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{label}</Text>
+                </View>
+              </View>
+
+              {/* Summary row */}
+              <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: boxColor + "22" }}>
+                {[
+                  { label: "Passagers", val: `${s.boardedCount}/${s.totalPassengers}`, color: GREEN },
+                  { label: "Bagages",   val: `${s.bagageCount}`,                       color: BROWN },
+                  { label: "Colis",     val: `${s.colisCount}`,                        color: P },
+                  { label: "Recettes",  val: `${audit.totalRevenue.toLocaleString()}`,  color: GREEN },
+                  { label: "Dépenses",  val: `${(s.totalExpenses ?? 0).toLocaleString()}`, color: RED },
+                ].map((item, i, arr) => (
+                  <View key={i} style={{ flex: 1, alignItems: "center", paddingVertical: 8, borderRightWidth: i < arr.length - 1 ? 1 : 0, borderRightColor: boxColor + "22" }}>
+                    <Text style={{ fontSize: 12, fontWeight: "900", color: item.color }}>{item.val}</Text>
+                    <Text style={{ fontSize: 8, fontWeight: "600", color: "#64748B", textTransform: "uppercase" }}>{item.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Audit items */}
+              <View style={{ padding: 10, gap: 6 }}>
+                {(audit.items as AuditItem[]).map((item, i) => {
+                  const ic = item.level === "error" ? RED : item.level === "warning" ? AMBER : GREEN;
+                  return (
+                    <View key={i} style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ic, marginTop: 5 }} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: "#0F172A" }}>
+                          <Text style={{ fontSize: 9, fontWeight: "700", color: "#64748B", textTransform: "uppercase" }}>{item.category} — </Text>
+                          {item.label}
+                        </Text>
+                        <Text style={{ fontSize: 10, color: "#64748B", marginTop: 1 }}>{item.detail}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* ── VALIDATE BUTTON ── */}
         {!validated ? (
