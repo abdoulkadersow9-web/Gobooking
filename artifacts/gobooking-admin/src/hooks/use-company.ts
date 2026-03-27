@@ -82,6 +82,21 @@ export function useTripAuditHistory(tripId: string | null) {
   });
 }
 
+export function useAgencePerformance() {
+  return useQuery({
+    queryKey: ["agence-performance"],
+    queryFn: () => apiFetch<any[]>("/company/agences/performance"),
+  });
+}
+
+export function useTripsByAgence(agenceId: string | null) {
+  return useQuery({
+    queryKey: ["trips-by-agence", agenceId],
+    queryFn: () => apiFetch<any[]>(`/company/trips/by-agence/${agenceId}`),
+    enabled: !!agenceId,
+  });
+}
+
 export function useBuses() {
   return useQuery({
     queryKey: ["buses"],

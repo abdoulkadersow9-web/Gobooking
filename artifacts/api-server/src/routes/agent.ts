@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable, notificationsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, agencesTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable, notificationsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -69,9 +69,24 @@ async function recordTripAgent(
   if (!tripId || !userId) return;
   try {
     const uid = Number(userId);
-    const [agentRow] = await db.select({ agentRole: agentsTable.agentRole })
-      .from(agentsTable).where(eq(agentsTable.userId, uid)).limit(1);
+
+    /* Récupère rôle + agence de l'agent */
+    const [agentRow] = await db
+      .select({
+        agentRole:  agentsTable.agentRole,
+        agenceId:   agentsTable.agenceId,
+        agenceName: agencesTable.name,
+        agenceCity: agencesTable.city,
+      })
+      .from(agentsTable)
+      .leftJoin(agencesTable, eq(agentsTable.agenceId, agencesTable.id))
+      .where(eq(agentsTable.userId, uid))
+      .limit(1);
+
     const agentRole = agentRow?.agentRole ?? "agent";
+    const agenceId   = agentRow?.agenceId   ?? null;
+    const agenceName = agentRow?.agenceName ?? null;
+    const agenceCity = agentRow?.agenceCity ?? null;
 
     const [userRow] = await db.select({ name: usersTable.name, phone: usersTable.phone, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
@@ -81,13 +96,16 @@ async function recordTripAgent(
                   : "";
 
     await db.execute(sql`
-      INSERT INTO trip_agents (trip_id, user_id, agent_role, name, contact)
-      VALUES (${tripId}, ${uid}, ${agentRole}, ${name}, ${contact})
+      INSERT INTO trip_agents (trip_id, user_id, agent_role, name, contact, agence_id, agence_name, agence_city)
+      VALUES (${tripId}, ${uid}, ${agentRole}, ${name}, ${contact}, ${agenceId}, ${agenceName}, ${agenceCity})
       ON CONFLICT (trip_id, user_id)
       DO UPDATE SET
         agent_role  = EXCLUDED.agent_role,
         name        = EXCLUDED.name,
         contact     = EXCLUDED.contact,
+        agence_id   = EXCLUDED.agence_id,
+        agence_name = EXCLUDED.agence_name,
+        agence_city = EXCLUDED.agence_city,
         recorded_at = NOW()
     `);
   } catch (e) {

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory } from "@/hooks/use-company";
+import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2 } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -28,6 +28,10 @@ export default function Trips() {
   const { data: tripAgents, isLoading: agentsLoading } = useTripAgents(agentsTripId);
   const [auditTripId, setAuditTripId] = useState<string | null>(null);
   const { data: auditHistory, isLoading: auditLoading } = useTripAuditHistory(auditTripId);
+  const [showPerf, setShowPerf] = useState(false);
+  const { data: agencePerf, isLoading: perfLoading } = useAgencePerformance();
+  const [agenceFilter, setAgenceFilter] = useState<{ id: string; name: string } | null>(null);
+  const { data: filteredTrips, isLoading: filteredLoading } = useTripsByAgence(agenceFilter?.id ?? null);
   const [form, setForm] = useState({
     from: "",
     to: "",
@@ -107,20 +111,74 @@ export default function Trips() {
             <p className="text-muted-foreground text-sm mt-0.5">Gérez vos lignes et départs.</p>
           </div>
         </div>
-        {isCompany ? (
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
-            <Eye size={14} /> Lecture seule
-          </span>
-        ) : (
-          <Button className="gap-2" onClick={() => setOpen(true)}>
-            <Plus size={18} /> Programmer un trajet
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2 text-indigo-700 border-indigo-300 hover:bg-indigo-50" onClick={() => setShowPerf(true)}>
+            <TrendingUp size={16} /> Agences
           </Button>
-        )}
+          {isCompany ? (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">
+              <Eye size={14} /> Lecture seule
+            </span>
+          ) : (
+            <Button className="gap-2" onClick={() => setOpen(true)}>
+              <Plus size={18} /> Programmer un trajet
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* ── Bannière filtre agence actif ── */}
+      {agenceFilter && (
+        <div className="flex items-center justify-between rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-2.5">
+          <div className="flex items-center gap-2 text-sm text-indigo-700 font-semibold">
+            <Filter size={15} />
+            Filtré par agence : <span className="text-indigo-900">{agenceFilter.name}</span>
+            <span className="text-indigo-400 font-normal">({filteredLoading ? "…" : (filteredTrips ?? []).length} trajet{(filteredTrips ?? []).length > 1 ? "s" : ""})</span>
+          </div>
+          <button onClick={() => setAgenceFilter(null)} className="text-indigo-500 hover:text-indigo-800 rounded p-0.5">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
-        {isLoading ? (
+        {(agenceFilter ? filteredLoading : isLoading) ? (
           <p className="text-center py-8">Chargement...</p>
+        ) : agenceFilter ? (
+          /* ── Vue filtrée par agence (liste simplifiée) ── */
+          (filteredTrips ?? []).length === 0 ? (
+            <p className="text-center py-8 text-muted-foreground">Aucun trajet trouvé pour cette agence.</p>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 border-b border-border">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-semibold text-foreground">Trajet</th>
+                    <th className="text-left px-4 py-3 font-semibold text-foreground">Date</th>
+                    <th className="text-left px-4 py-3 font-semibold text-foreground">Heure</th>
+                    <th className="text-left px-4 py-3 font-semibold text-foreground">Bus</th>
+                    <th className="text-left px-4 py-3 font-semibold text-foreground">Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(filteredTrips as any[]).map((t: any, i: number) => (
+                    <tr key={t.id} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                      <td className="px-4 py-2.5 font-semibold text-foreground">{t.from} → {t.to}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{formatDate(t.date)}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{t.departureTime ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{t.busName ?? "—"}</td>
+                      <td className="px-4 py-2.5">
+                        {t.status === "scheduled" ? <Badge variant="warning">Prévu</Badge>
+                         : t.status === "en_route" ? <Badge variant="accent">En route</Badge>
+                         : t.status === "completed" ? <Badge variant="success">Arrivé</Badge>
+                         : <Badge variant="default">{t.status}</Badge>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : trips?.length === 0 ? (
           <p className="text-center py-8 text-muted-foreground">Aucun trajet planifié.</p>
         ) : (
@@ -312,31 +370,55 @@ export default function Trips() {
               <p className="text-center py-6 text-muted-foreground text-sm">Chargement…</p>
             ) : !tripAgents || tripAgents.length === 0 ? (
               <p className="text-center py-6 text-muted-foreground text-sm">Aucun agent enregistré sur ce trajet.</p>
-            ) : (
-              <div className="space-y-2">
-                {(tripAgents as any[]).map((a: any, i: number) => (
-                  <div key={a.user_id} className="flex items-center justify-between rounded-xl bg-muted/40 border border-border px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center">{i + 1}</div>
-                      <div>
-                        <p className="font-semibold text-foreground text-sm">{a.name}</p>
-                        {a.contact && <p className="text-xs text-muted-foreground">{a.contact}</p>}
+            ) : (() => {
+              /* Résumé par agence */
+              const byAgence = (tripAgents as any[]).reduce((acc: Record<string, number>, a: any) => {
+                const key = a.agence_name ?? "Sans agence";
+                acc[key] = (acc[key] ?? 0) + 1;
+                return acc;
+              }, {});
+              return (
+                <div className="space-y-3">
+                  {/* Badges de résumé par agence */}
+                  {Object.keys(byAgence).length > 1 && (
+                    <div className="flex flex-wrap gap-2 pb-1 border-b border-border">
+                      {Object.entries(byAgence).map(([agName, count]) => (
+                        <span key={agName} className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                          {agName} · {count as number} agent{(count as number) > 1 ? "s" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* Liste des agents */}
+                  {(tripAgents as any[]).map((a: any, i: number) => (
+                    <div key={a.user_id} className="flex items-start justify-between rounded-xl bg-muted/40 border border-border px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</div>
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-foreground text-sm">{a.name}</p>
+                          {a.contact && <p className="text-xs text-muted-foreground">{a.contact}</p>}
+                          {a.agence_name && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700">
+                              📍 {a.agence_name}{a.agence_city ? ` · ${a.agence_city}` : ""}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-violet-100 text-violet-700">
+                          {a.agent_role.replace(/_/g, " ")}
+                        </span>
+                        {a.recorded_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-violet-100 text-violet-700">
-                        {a.agent_role.replace(/_/g, " ")}
-                      </span>
-                      {a.recorded_at && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           <DialogFooter>
@@ -438,6 +520,98 @@ export default function Trips() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAuditTripId(null)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ── Dialog : Performance par agence ── */}
+      <Dialog open={showPerf} onOpenChange={setShowPerf}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp size={18} className="text-indigo-600" />
+              Performance par agence
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {perfLoading ? (
+              <p className="text-center py-6 text-muted-foreground text-sm">Chargement…</p>
+            ) : !agencePerf || agencePerf.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground text-sm">Aucune agence configurée.</p>
+            ) : (
+              <div className="space-y-3">
+                {(agencePerf as any[]).map((ag: any) => {
+                  const tripsCount   = Number(ag.trips_count   ?? 0);
+                  const agentsCount  = Number(ag.agents_count  ?? 0);
+                  const opsCount     = Number(ag.operations_count ?? 0);
+                  const hasActivity  = tripsCount > 0;
+                  const roles: string[] = (ag.roles ?? []).filter(Boolean);
+                  return (
+                    <div key={ag.agence_id} className={`rounded-xl border px-4 py-3 ${hasActivity ? "bg-white border-indigo-200" : "bg-muted/30 border-border"}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${hasActivity ? "bg-indigo-100" : "bg-muted"}`}>
+                            <Building2 size={16} className={hasActivity ? "text-indigo-700" : "text-muted-foreground"} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-foreground text-sm">{ag.agence_name ?? "—"}</p>
+                            {ag.agence_city && <p className="text-xs text-muted-foreground">📍 {ag.agence_city}</p>}
+                            {roles.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {roles.map((r: string) => (
+                                  <span key={r} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-700">
+                                    {r.replace(/_/g, " ")}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {hasActivity ? (
+                            <>
+                              <div className="flex gap-3 text-xs">
+                                <div className="text-center">
+                                  <p className="font-bold text-indigo-700 text-base leading-tight">{tripsCount}</p>
+                                  <p className="text-muted-foreground">trajet{tripsCount > 1 ? "s" : ""}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-bold text-violet-700 text-base leading-tight">{agentsCount}</p>
+                                  <p className="text-muted-foreground">agent{agentsCount > 1 ? "s" : ""}</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="font-bold text-emerald-700 text-base leading-tight">{opsCount}</p>
+                                  <p className="text-muted-foreground">opérations</p>
+                                </div>
+                              </div>
+                              {ag.last_trip_date && (
+                                <p className="text-[10px] text-muted-foreground">Dernier trajet : {formatDate(ag.last_trip_date)}</p>
+                              )}
+                              <Button
+                                variant="outline" size="sm"
+                                className="mt-1 text-xs text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                                onClick={() => {
+                                  setAgenceFilter({ id: ag.agence_id, name: ag.agence_name });
+                                  setShowPerf(false);
+                                }}
+                              >
+                                <Filter size={12} className="mr-1" /> Filtrer les trajets
+                              </Button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">Aucune activité enregistrée</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPerf(false)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

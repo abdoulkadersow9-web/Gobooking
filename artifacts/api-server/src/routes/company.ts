@@ -1007,7 +1007,8 @@ router.get("/trips/:id/agents", async (req, res) => {
     if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
 
     const result = await db.execute(sql`
-      SELECT user_id, agent_role, name, contact, recorded_at
+      SELECT user_id, agent_role, name, contact, recorded_at,
+             agence_id, agence_name, agence_city
       FROM trip_agents
       WHERE trip_id = ${tripId}
       ORDER BY recorded_at ASC
@@ -2598,6 +2599,79 @@ router.get("/agences/:id/agents", async (req, res) => {
     res.json(agents);
   } catch (err) {
     console.error("GET /company/agences/:id/agents error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── GET /company/agences/performance — stats de performance par agence ── */
+router.get("/agences/performance", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agences = await db.select().from(agencesTable)
+      .where(eq(agencesTable.companyId, ctx.companyId));
+
+    const stats = await db.execute(sql`
+      SELECT
+        ta.agence_id,
+        ta.agence_name,
+        ta.agence_city,
+        COUNT(DISTINCT ta.trip_id)  AS trips_count,
+        COUNT(DISTINCT ta.user_id)  AS agents_count,
+        COUNT(*)                    AS operations_count,
+        MAX(t.date)                 AS last_trip_date,
+        json_agg(DISTINCT ta.agent_role) FILTER (WHERE ta.agent_role IS NOT NULL) AS roles
+      FROM trip_agents ta
+      INNER JOIN trips t ON t.id = ta.trip_id
+      WHERE t.company_id = ${ctx.companyId}
+        AND ta.agence_id IS NOT NULL
+      GROUP BY ta.agence_id, ta.agence_name, ta.agence_city
+      ORDER BY trips_count DESC
+    `);
+
+    const statsRows: any[] = (stats as any).rows ?? [];
+    const activeIds = new Set(statsRows.map(r => r.agence_id));
+    const inactive  = agences
+      .filter(ag => !activeIds.has(ag.id))
+      .map(ag => ({
+        agence_id:        ag.id,
+        agence_name:      ag.name,
+        agence_city:      ag.city,
+        trips_count:      0,
+        agents_count:     0,
+        operations_count: 0,
+        last_trip_date:   null,
+        roles:            [],
+      }));
+
+    res.json([...statsRows, ...inactive]);
+  } catch (err) {
+    console.error("[company/agences/performance]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ── GET /company/trips/by-agence/:agenceId — trajets gérés par une agence ── */
+router.get("/trips/by-agence/:agenceId", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const agenceId = req.params.agenceId;
+    const result = await db.execute(sql`
+      SELECT DISTINCT t.id, t.from, t.to, t.date, t.departure_time AS "departureTime",
+             t.status, b.name AS "busName"
+      FROM trips t
+      INNER JOIN trip_agents ta ON ta.trip_id = t.id AND ta.agence_id = ${agenceId}
+      LEFT JOIN buses b ON b.id = t.bus_id
+      WHERE t.company_id = ${ctx.companyId}
+      ORDER BY t.date DESC, t.departure_time DESC
+      LIMIT 100
+    `);
+    res.json((result as any).rows ?? []);
+  } catch (err) {
+    console.error("[company/trips/by-agence]", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

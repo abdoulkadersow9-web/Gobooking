@@ -54,6 +54,9 @@ export interface PdfAgent {
   name: string;
   contact: string;
   recorded_at: string;
+  agence_id?:   string | null;
+  agence_name?: string | null;
+  agence_city?: string | null;
 }
 
 export interface PdfTrip {
@@ -377,24 +380,44 @@ const ROLE_LABELS: Record<string, string> = {
 };
 function agentsSection(agents: PdfAgent[] | undefined, accentColor: string): string {
   if (!agents || agents.length === 0) return "";
+  /* Regroupement par agence pour sous-en-têtes */
+  const agenceMap = new Map<string, PdfAgent[]>();
+  for (const a of agents) {
+    const key = a.agence_name ? `${a.agence_name}||${a.agence_city ?? ""}` : "Sans agence";
+    if (!agenceMap.has(key)) agenceMap.set(key, []);
+    agenceMap.get(key)!.push(a);
+  }
+  const rows = agents.map((a, i) => `
+        <tr>
+          <td style="color:#94A3B8;font-size:9px">${i + 1}</td>
+          <td style="font-weight:700">${a.name}</td>
+          <td><span style="background:${accentColor}18;color:${accentColor};padding:2px 7px;border-radius:8px;font-size:9px;font-weight:700">${ROLE_LABELS[a.agent_role] ?? a.agent_role}</span></td>
+          <td>${a.agence_name ? `<span style="background:#F5F3FF;color:#6D28D9;padding:2px 6px;border-radius:6px;font-size:9px;font-weight:600">${a.agence_name}${a.agence_city ? ` · ${a.agence_city}` : ""}</span>` : '<span style="color:#CBD5E1;font-size:9px">—</span>'}</td>
+          <td style="color:#475569">${a.contact || "—"}</td>
+          <td style="color:#94A3B8;font-size:9px">${a.recorded_at ? new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+        </tr>`).join("");
+
+  /* Résumé par agence */
+  const agenceSummary = agenceMap.size > 1 ? `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px 0;">
+      ${[...agenceMap.entries()].map(([key, list]) => {
+        const [agName] = key.split("||");
+        return `<span style="background:#EEF2FF;color:#4338CA;padding:3px 9px;border-radius:20px;font-size:9px;font-weight:700">${agName} · ${list.length} agent${list.length > 1 ? "s" : ""}</span>`;
+      }).join("")}
+    </div>` : "";
+
   return `
   <div class="section">
     <div class="section-header" style="border-color:${accentColor};">
       <div class="section-icon" style="background:${accentColor}22;">👷</div>
       <span class="section-title" style="color:${accentColor}">Équipe en service (${agents.length})</span>
     </div>
+    ${agenceSummary}
     <table>
       <thead>
-        <tr><th>#</th><th>Nom</th><th>Rôle</th><th>Contact</th><th>Enregistré à</th></tr>
+        <tr><th>#</th><th>Nom</th><th>Rôle</th><th>Agence</th><th>Contact</th><th>Heure</th></tr>
       </thead>
-      <tbody>${agents.map((a, i) => `
-        <tr>
-          <td style="color:#94A3B8;font-size:9px">${i + 1}</td>
-          <td style="font-weight:700">${a.name}</td>
-          <td><span style="background:${accentColor}18;color:${accentColor};padding:2px 7px;border-radius:8px;font-size:9px;font-weight:700">${ROLE_LABELS[a.agent_role] ?? a.agent_role}</span></td>
-          <td style="color:#475569">${a.contact || "—"}</td>
-          <td style="color:#94A3B8;font-size:9px">${a.recorded_at ? new Date(a.recorded_at).toLocaleTimeString("fr-CI", { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
-        </tr>`).join("")}
+      <tbody>${rows}
       </tbody>
     </table>
   </div>`;
