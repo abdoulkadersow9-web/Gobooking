@@ -59,6 +59,15 @@ export function useAssignAgent() {
   });
 }
 
+export function useUploadAgentPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, photoBase64 }: { userId: string; photoBase64: string }) =>
+      apiFetch(`/company/agents/${userId}/photo`, { method: "POST", body: JSON.stringify({ photoBase64 }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents"] }),
+  });
+}
+
 export function useTrips() {
   return useQuery({
     queryKey: ["trips"],

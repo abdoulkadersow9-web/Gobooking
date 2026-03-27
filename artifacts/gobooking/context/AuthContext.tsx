@@ -28,6 +28,7 @@ export interface User {
   busId?: string | null;
   tripId?: string | null;
   companyId?: string | null;
+  photoUrl?: string | null;
   referralCode?: string;
   walletBalance?: number;
   totalTrips?: number;
@@ -96,6 +97,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (token: string, user: User) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   isAdmin: boolean;
   isCompanyAdmin: boolean;
   isAgent: boolean;
@@ -180,6 +182,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/(auth)/login");
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const storedToken = await AsyncStorage.getItem("auth_token");
+      if (!storedToken) return;
+      const freshUser = await apiFetch<User>("/auth/me", { token: storedToken });
+      if (freshUser?.role) {
+        await AsyncStorage.setItem("auth_user", JSON.stringify(freshUser));
+        setUser(freshUser);
+      }
+    } catch {
+    }
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -188,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         login,
         logout,
+        refreshUser,
         isAdmin: user?.role === "admin" || user?.role === "super_admin",
         isCompanyAdmin: user?.role === "compagnie" || user?.role === "company_admin",
         isAgent: user?.role === "agent",

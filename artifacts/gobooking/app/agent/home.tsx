@@ -1,14 +1,17 @@
 import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -148,10 +151,61 @@ function useLiveClock() {
 }
 
 export default function AgentHome() {
-  const { user, logout } = useAuth();
-  const token = (user as any)?.token ?? "";
+  const { user, token: authToken, logout, refreshUser } = useAuth();
+  const token = authToken ?? "";
   const { preDepartureAlerts, validationAlerts, agentRole } = useRealtime(token);
   const clock = useLiveClock();
+  const [photoUri, setPhotoUri] = useState<string | null>(user?.photoUrl ?? null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const BASE_URL = process.env.EXPO_PUBLIC_DOMAIN
+    ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
+    : "";
+
+  const handleAvatarPress = () => {
+    Alert.alert("Photo de profil", "Choisir une option", [
+      { text: "Galerie", onPress: pickFromGallery },
+      { text: "Appareil photo", onPress: pickFromCamera },
+      { text: "Annuler", style: "cancel" },
+    ]);
+  };
+
+  const pickFromGallery = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") { Alert.alert("Permission refusée"); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.7, mediaTypes: ["images"] });
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      await uploadPhoto(result.assets[0].base64!, result.assets[0].uri);
+    }
+  };
+
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") { Alert.alert("Permission refusée"); return; }
+    const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.7 });
+    if (!result.canceled && result.assets?.[0]?.base64) {
+      await uploadPhoto(result.assets[0].base64!, result.assets[0].uri);
+    }
+  };
+
+  const uploadPhoto = async (base64: string, localUri: string) => {
+    setUploadingPhoto(true);
+    setPhotoUri(localUri);
+    try {
+      const resp = await fetch(`${BASE_URL}/agent/profile/photo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ photoBase64: `data:image/jpeg;base64,${base64}` }),
+      });
+      const json = await resp.json();
+      if (json.photoUrl) setPhotoUri(json.photoUrl);
+      if (refreshUser) refreshUser();
+    } catch {
+      Alert.alert("Erreur", "Impossible d'uploader la photo");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const roleLabel = () => {
     const r = user?.agentRole;
@@ -185,20 +239,35 @@ export default function AgentHome() {
       <StatusBar barStyle="light-content" backgroundColor={NAVY} />
       {/* Header */}
       <LinearGradient colors={[NAVY, "#1A5C8A"]} style={S.header}>
-        <View style={S.headerLeft}>
-          <Text style={S.headerHello}>Bonjour</Text>
-          <Text style={S.headerName}>{user?.name ?? "Agent"}</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-            {roleLabel() && (
-              <View style={S.rolePill}>
-                <Text style={S.rolePillText}>{roleLabel()}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+          {/* Avatar avec photo */}
+          <Pressable onPress={handleAvatarPress} style={{ position: "relative" }}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" }} />
+            ) : (
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "rgba(255,255,255,0.15)", borderWidth: 2, borderColor: "rgba(255,255,255,0.3)", alignItems: "center", justifyContent: "center" }}>
+                <Text style={{ color: "#fff", fontSize: 18, fontWeight: "800" }}>{(user?.name ?? "A").charAt(0).toUpperCase()}</Text>
               </View>
             )}
-            {extraRoleLabels() && (
-              <View style={[S.rolePill, { backgroundColor: "rgba(56,189,248,0.25)" }]}>
-                <Text style={S.rolePillText}>+ {extraRoleLabels()}</Text>
-              </View>
-            )}
+            <View style={{ position: "absolute", bottom: 0, right: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: uploadingPhoto ? "#9CA3AF" : "#34D399", borderWidth: 1.5, borderColor: NAVY, alignItems: "center", justifyContent: "center" }}>
+              <Feather name={uploadingPhoto ? "loader" : "camera"} size={8} color="#fff" />
+            </View>
+          </Pressable>
+          <View style={S.headerLeft}>
+            <Text style={S.headerHello}>Bonjour</Text>
+            <Text style={S.headerName}>{user?.name ?? "Agent"}</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+              {roleLabel() && (
+                <View style={S.rolePill}>
+                  <Text style={S.rolePillText}>{roleLabel()}</Text>
+                </View>
+              )}
+              {extraRoleLabels() && (
+                <View style={[S.rolePill, { backgroundColor: "rgba(56,189,248,0.25)" }]}>
+                  <Text style={S.rolePillText}>+ {extraRoleLabels()}</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
         <View style={{ alignItems: "flex-end", gap: 6 }}>

@@ -426,8 +426,21 @@ router.get("/agents", async (req, res) => {
       .where(eq(agentsTable.companyId, ctx.companyId))
       .orderBy(desc(agentsTable.createdAt));
 
+    /* Récupérer les photos de profil en une seule requête */
+    const userIds = rows.map(r => r.userId).filter(Boolean);
+    let photoMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const photoRows = await db.execute(
+        sql`SELECT id, photo_url FROM users WHERE id = ANY(${userIds}) AND photo_url IS NOT NULL`
+      ) as any;
+      for (const pr of (photoRows?.rows ?? [])) {
+        if (pr.id && pr.photo_url) photoMap[pr.id] = pr.photo_url;
+      }
+    }
+
     res.json(rows.map(r => ({
       ...r,
+      photoUrl:  photoMap[r.userId ?? ""] ?? null,
       bus:       r.busName  ?? "Non assigné",
       tripName:  r.tripFrom && r.tripTo
         ? `${r.tripFrom} → ${r.tripTo}${r.tripDate ? " · " + r.tripDate : ""}`
@@ -807,9 +820,9 @@ router.post("/agents", async (req, res) => {
     const admin = await requireCompanyAdmin(req.headers.authorization);
     if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { name, email, password, phone, agentRole, agentCode, busId, agenceId } = req.body as {
+    const { name, email, password, phone, agentRole, agentCode, busId, agenceId, photoBase64 } = req.body as {
       name: string; email: string; password: string; phone?: string;
-      agentRole: string; agentCode?: string; busId?: string; agenceId?: string;
+      agentRole: string; agentCode?: string; busId?: string; agenceId?: string; photoBase64?: string;
     };
 
     const VALID_AGENT_ROLES = [
@@ -850,6 +863,20 @@ router.post("/agents", async (req, res) => {
       role: "agent",
     }).returning();
 
+    /* Upload photo si fournie */
+    let photoUrl: string | null = null;
+    if (photoBase64 && typeof photoBase64 === "string" && photoBase64.length > 100) {
+      try {
+        const { uploadProfilePhoto } = await import("../lib/photoStorage");
+        photoUrl = await uploadProfilePhoto(photoBase64, newUser.id);
+        if (photoUrl) {
+          await db.execute(sql`UPDATE users SET photo_url = ${photoUrl} WHERE id = ${newUser.id}`);
+        }
+      } catch (e) {
+        console.error("[create agent photo]", e);
+      }
+    }
+
     const code = agentCode || `AGT-${Date.now().toString().slice(-5)}`;
     const agentId = generateId();
     const [newAgent] = await db.insert(agentsTable).values({
@@ -872,10 +899,40 @@ router.post("/agents", async (req, res) => {
       agentRole: newAgent.agentRole,
       busId: newAgent.busId,
       status: newAgent.status,
+      photoUrl,
     });
   } catch (err) {
     console.error("Create agent error:", err);
     res.status(500).json({ error: "Impossible de créer l'agent" });
+  }
+});
+
+/* ── POST /company/agents/:userId/photo — upload photo de profil agent (admin) ── */
+router.post("/agents/:userId/photo", async (req, res) => {
+  try {
+    const admin = await requireCompanyAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { userId } = req.params;
+    const { photoBase64 } = req.body;
+    if (!photoBase64 || typeof photoBase64 !== "string" || photoBase64.length < 100) {
+      res.status(400).json({ error: "Photo manquante ou invalide" });
+      return;
+    }
+
+    const { uploadProfilePhoto } = await import("../lib/photoStorage");
+    const photoUrl = await uploadProfilePhoto(photoBase64, userId);
+    if (!photoUrl) {
+      res.status(500).json({ error: "Échec de l'upload de la photo" });
+      return;
+    }
+
+    await db.execute(sql`UPDATE users SET photo_url = ${photoUrl} WHERE id = ${userId}`);
+
+    res.json({ success: true, photoUrl });
+  } catch (err) {
+    console.error("POST /company/agents/:userId/photo error:", err);
+    res.status(500).json({ error: "Failed" });
   }
 });
 
@@ -1007,11 +1064,13 @@ router.get("/trips/:id/agents", async (req, res) => {
     if (!trip) { res.status(404).json({ error: "Trajet introuvable" }); return; }
 
     const result = await db.execute(sql`
-      SELECT user_id, agent_role, name, contact, recorded_at,
-             agence_id, agence_name, agence_city
-      FROM trip_agents
-      WHERE trip_id = ${tripId}
-      ORDER BY recorded_at ASC
+      SELECT ta.user_id, ta.agent_role, ta.name, ta.contact, ta.recorded_at,
+             ta.agence_id, ta.agence_name, ta.agence_city,
+             COALESCE(ta.photo_url, u.photo_url) AS photo_url
+      FROM trip_agents ta
+      LEFT JOIN users u ON u.id::text = ta.user_id::text
+      WHERE ta.trip_id = ${tripId}
+      ORDER BY ta.recorded_at ASC
     `);
     res.json((result as any).rows ?? []);
   } catch (err) {

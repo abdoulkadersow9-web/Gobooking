@@ -1,13 +1,11 @@
-import React, { useState } from "react";
-import { useAgents, useCreateAgent } from "@/hooks/use-company";
+import React, { useRef, useState } from "react";
+import { useAgents, useCreateAgent, useUploadAgentPhoto } from "@/hooks/use-company";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Plus, UserCog, Mail, Phone, Bus, Eye, MapPin, Navigation, Package, Ticket, Users } from "lucide-react";
+import { Camera, Plus, UserCog, Mail, Phone, Bus, Eye, MapPin, Navigation, Package, Ticket, Users, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
-/* ── Mapping rôles → affichage ──
-   agent_reservation est fusionné visuellement avec agent_colis (même rôle terrain) */
 const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string; border: string }> = {
   agent_route:       { label: "Agents En Route",         icon: <Navigation size={16} />,   color: "#059669", bg: "#ECFDF5", border: "#A7F3D0" },
   agent_guichet:     { label: "Agents Guichet",          icon: <Ticket size={16} />,        color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
@@ -16,7 +14,6 @@ const ROLE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color:
   validation:        { label: "Agents Validation",       icon: <Users size={16} />,         color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
 };
 
-/* agent_reservation → fusionné dans agent_colis côté affichage */
 const ROLE_DISPLAY_KEY: Record<string, string> = {
   agent_reservation: "agent_colis",
 };
@@ -37,19 +34,69 @@ function statusVariant(s: string): "success" | "destructive" | "warning" | "neut
   return "neutral";
 }
 
+/* ── Avatar circulaire agent ── */
+function AgentAvatar({ agent, cfg, size = 40 }: { agent: any; cfg: any; size?: number }) {
+  const [imgError, setImgError] = useState(false);
+  if (agent.photoUrl && !imgError) {
+    return (
+      <img
+        src={agent.photoUrl}
+        alt={agent.name}
+        onError={() => setImgError(true)}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", border: `1.5px solid ${cfg.border}`, flexShrink: 0 }}
+      />
+    );
+  }
+  return (
+    <div
+      style={{ width: size, height: size, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.border}`, fontWeight: "bold", fontSize: size * 0.35, flexShrink: 0 }}
+    >
+      {(agent.name ?? "?").charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 /* ── Carte individuelle d'un agent ── */
 function AgentCard({ agent, isCompany, roleKey }: { agent: any; isCompany: boolean; roleKey: string }) {
   const cfg = ROLE_CONFIG[roleKey] ?? ROLE_CONFIG["agent_guichet"];
+  const { mutate: uploadPhoto, isPending: uploading } = useUploadAgentPhoto();
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      uploadPhoto({ userId: agent.userId, photoBase64: base64 }, {
+        onSuccess: () => toast({ title: "Photo mise à jour", description: `Photo de ${agent.name} enregistrée.` }),
+        onError: () => toast({ variant: "destructive", title: "Erreur", description: "Impossible d'uploader la photo." }),
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
       {/* En-tête */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
-            style={{ backgroundColor: cfg.bg, color: cfg.color, border: `1.5px solid ${cfg.border}` }}
-          >
-            {(agent.name ?? "?").charAt(0).toUpperCase()}
+          <div className="relative flex-shrink-0">
+            <AgentAvatar agent={agent} cfg={cfg} size={40} />
+            {!isCompany && (
+              <>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
+                  title="Changer la photo"
+                  style={{ position: "absolute", bottom: -2, right: -2, width: 18, height: 18, borderRadius: "50%", background: cfg.color, color: "#fff", border: "1.5px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+                >
+                  <Camera size={10} />
+                </button>
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+              </>
+            )}
           </div>
           <div className="min-w-0">
             <p className="font-bold text-foreground text-sm truncate">{agent.name ?? "—"}</p>
@@ -84,7 +131,6 @@ function AgentCard({ agent, isCompany, roleKey }: { agent: any; isCompany: boole
             </span>
           </div>
         )}
-        {/* Info spécifique agent en route */}
         {roleKey === "agent_route" && agent.tripName && (
           <div className="flex items-center gap-2 mt-1">
             <Navigation size={12} className="flex-shrink-0" style={{ color: cfg.color }} />
@@ -100,7 +146,6 @@ function AgentCard({ agent, isCompany, roleKey }: { agent: any; isCompany: boole
             <span className="italic text-muted-foreground">Aucun départ attribué</span>
           </div>
         )}
-        {/* Bus assigné (sauf agent en route où on montre le départ) */}
         {roleKey !== "agent_route" && agent.busName && agent.busName !== "Non assigné" && (
           <div className="flex items-center gap-2">
             <Bus size={12} className="flex-shrink-0 text-blue-500" />
@@ -124,7 +169,6 @@ function RoleSection({ roleKey, agents, isCompany }: { roleKey: string; agents: 
 
   return (
     <div className="space-y-3">
-      {/* Titre de section */}
       <div
         className="flex items-center gap-3 px-4 py-2.5 rounded-xl border"
         style={{ backgroundColor: cfg.bg, borderColor: cfg.border }}
@@ -139,7 +183,6 @@ function RoleSection({ roleKey, agents, isCompany }: { roleKey: string; agents: 
         </span>
       </div>
 
-      {/* Grille d'agents */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-1">
         {agents.map((agent: any) => (
           <AgentCard key={agent.id} agent={agent} isCompany={isCompany} roleKey={roleKey} />
@@ -155,7 +198,6 @@ export default function Agents() {
   const [showAdd, setShowAdd] = useState(false);
   const { isCompany } = useAuth();
 
-  /* Grouper par rôle — agent_reservation fusionné dans agent_colis */
   const grouped = React.useMemo(() => {
     if (!agents) return {};
     const map: Record<string, any[]> = {};
@@ -168,7 +210,6 @@ export default function Agents() {
     return map;
   }, [agents]);
 
-  /* Rôles présents, dans l'ordre défini */
   const presentRoles = ROLE_ORDER.filter(r => (grouped[r]?.length ?? 0) > 0);
   const otherRoles   = Object.keys(grouped).filter(r => !ROLE_ORDER.includes(r));
   const allRoles     = [...presentRoles, ...otherRoles];
@@ -201,10 +242,8 @@ export default function Agents() {
         )}
       </div>
 
-      {/* ── Formulaire de création ── */}
       {showAdd && <AddAgentForm onClose={() => setShowAdd(false)} />}
 
-      {/* ── Contenu ── */}
       {isLoading ? (
         <p className="py-12 text-center text-muted-foreground">Chargement des agents…</p>
       ) : totalAgents === 0 ? (
@@ -231,18 +270,33 @@ export default function Agents() {
   );
 }
 
-/* ── Formulaire ajout agent (inchangé) ── */
+/* ── Formulaire ajout agent ── */
 function AddAgentForm({ onClose }: { onClose: () => void }) {
   const { mutate, isPending } = useCreateAgent();
   const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: "", email: "", phone: "", password: "", agentCode: "", agentRole: "guichet"
+    name: "", email: "", phone: "", password: "", agentCode: "", agentRole: "agent_guichet"
   });
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result as string;
+      setPhotoPreview(b64);
+      setPhotoBase64(b64);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    mutate(formData, {
+    mutate({ ...formData, photoBase64 }, {
       onSuccess: () => {
         toast({ title: "Agent créé", description: "Le nouvel agent a été ajouté avec succès." });
         onClose();
@@ -255,41 +309,69 @@ function AddAgentForm({ onClose }: { onClose: () => void }) {
     <div className="bg-card rounded-2xl p-6 border border-border shadow-lg mb-6 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
       <h3 className="text-lg font-bold mb-4">Créer un nouvel agent</h3>
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold mb-1">Nom complet</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Photo de profil */}
+        <div className="flex items-center gap-4">
+          <div
+            className="w-16 h-16 rounded-full bg-muted border border-border flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition"
+            onClick={() => fileRef.current?.click()}
+            title="Cliquer pour ajouter une photo"
+          >
+            {photoPreview ? (
+              <img src={photoPreview} alt="preview" className="w-full h-full object-cover" />
+            ) : (
+              <Camera size={24} className="text-muted-foreground" />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Photo de profil</p>
+            <p className="text-xs text-muted-foreground mb-1">Optionnelle — format JPG ou PNG</p>
+            <button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline">
+              <Upload size={12} /> Choisir une photo
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1">Code Agent (Unique)</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none font-mono"
-            value={formData.agentCode} onChange={e => setFormData({ ...formData, agentCode: e.target.value })} />
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold mb-1">Nom complet</label>
+            <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+              value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Code Agent (Unique)</label>
+            <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none font-mono"
+              value={formData.agentCode} onChange={e => setFormData({ ...formData, agentCode: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Email</label>
+            <input required type="email" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+              value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Téléphone</label>
+            <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+              value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Rôle</label>
+            <select className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+              value={formData.agentRole} onChange={e => setFormData({ ...formData, agentRole: e.target.value })}>
+              <option value="agent_guichet">Agent Guichet</option>
+              <option value="agent_embarquement">Agent Embarquement</option>
+              <option value="agent_colis">Agent Colis</option>
+              <option value="agent_route">Agent En Route</option>
+              <option value="validation">Agent Validation</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Mot de passe provisoire</label>
+            <input required type="password" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
+              value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
+          </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1">Email</label>
-          <input required type="email" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1">Téléphone</label>
-          <input required className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1">Rôle</label>
-          <select className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.agentRole} onChange={e => setFormData({ ...formData, agentRole: e.target.value })}>
-            <option value="guichet">Agent de Guichet</option>
-            <option value="embarquement">Agent d'Embarquement (Bus)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold mb-1">Mot de passe provisoire</label>
-          <input required type="password" className="w-full px-3 py-2 rounded-lg border border-border bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-            value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
-        </div>
-        <div className="col-span-full flex justify-end gap-3 mt-2">
+        <div className="flex justify-end gap-3 mt-2">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
           <Button type="submit" isLoading={isPending}>Enregistrer</Button>
         </div>

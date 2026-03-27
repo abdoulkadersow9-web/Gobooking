@@ -88,16 +88,17 @@ async function recordTripAgent(
     const agenceName = agentRow?.agenceName ?? null;
     const agenceCity = agentRow?.agenceCity ?? null;
 
-    const [userRow] = await db.select({ name: usersTable.name, phone: usersTable.phone, email: usersTable.email })
-      .from(usersTable).where(eq(usersTable.id, uid)).limit(1);
+    const photoRow = await db.execute(sql`SELECT name, phone, email, photo_url FROM users WHERE id = ${uid} LIMIT 1`) as any;
+    const userRow = photoRow?.rows?.[0];
     const name    = userRow?.name  ?? "Inconnu";
     const contact = (userRow?.phone && userRow.phone.trim()) ? userRow.phone.trim()
                   : (userRow?.email && userRow.email.trim()) ? userRow.email.trim()
                   : "";
+    const photoUrl = userRow?.photo_url ?? null;
 
     await db.execute(sql`
-      INSERT INTO trip_agents (trip_id, user_id, agent_role, name, contact, agence_id, agence_name, agence_city)
-      VALUES (${tripId}, ${uid}, ${agentRole}, ${name}, ${contact}, ${agenceId}, ${agenceName}, ${agenceCity})
+      INSERT INTO trip_agents (trip_id, user_id, agent_role, name, contact, agence_id, agence_name, agence_city, photo_url)
+      VALUES (${tripId}, ${uid}, ${agentRole}, ${name}, ${contact}, ${agenceId}, ${agenceName}, ${agenceCity}, ${photoUrl})
       ON CONFLICT (trip_id, user_id)
       DO UPDATE SET
         agent_role  = EXCLUDED.agent_role,
@@ -106,6 +107,7 @@ async function recordTripAgent(
         agence_id   = EXCLUDED.agence_id,
         agence_name = EXCLUDED.agence_name,
         agence_city = EXCLUDED.agence_city,
+        photo_url   = EXCLUDED.photo_url,
         recorded_at = NOW()
     `);
   } catch (e) {
@@ -139,8 +141,41 @@ router.get("/info", async (req, res) => {
       bus = buses[0] || null;
     }
 
-    res.json({ agent, user: { id: user.id, name: user.name, email: user.email }, bus });
+    const photoUrlRow = await db.execute(
+      sql`SELECT photo_url FROM users WHERE id = ${user.id} LIMIT 1`
+    ) as any;
+    const photoUrl = photoUrlRow?.rows?.[0]?.photo_url ?? null;
+
+    res.json({ agent, user: { id: user.id, name: user.name, email: user.email, photoUrl }, bus });
   } catch (err) {
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
+/* ── POST /agent/profile/photo — upload photo de profil agent ── */
+router.post("/profile/photo", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { photoBase64 } = req.body;
+    if (!photoBase64 || typeof photoBase64 !== "string" || photoBase64.length < 100) {
+      res.status(400).json({ error: "Photo manquante ou invalide" });
+      return;
+    }
+
+    const { uploadProfilePhoto } = await import("../lib/photoStorage");
+    const photoUrl = await uploadProfilePhoto(photoBase64, user.id);
+    if (!photoUrl) {
+      res.status(500).json({ error: "Échec de l'upload de la photo" });
+      return;
+    }
+
+    await db.execute(sql`UPDATE users SET photo_url = ${photoUrl} WHERE id = ${user.id}`);
+
+    res.json({ success: true, photoUrl });
+  } catch (err) {
+    console.error("POST /agent/profile/photo error:", err);
     res.status(500).json({ error: "Failed" });
   }
 });

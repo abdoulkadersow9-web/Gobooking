@@ -393,7 +393,20 @@ export default function Trips() {
                   {(tripAgents as any[]).map((a: any, i: number) => (
                     <div key={a.user_id} className="flex items-start justify-between rounded-xl bg-muted/40 border border-border px-4 py-3">
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</div>
+                        {a.photo_url ? (
+                          <img
+                            src={a.photo_url}
+                            alt={a.name}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextSibling as HTMLElement).style.display = "flex"; }}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-violet-200"
+                          />
+                        ) : null}
+                        <div
+                          className="w-8 h-8 rounded-full bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0"
+                          style={{ display: a.photo_url ? "none" : "flex" }}
+                        >
+                          {(a.name ?? "?").charAt(0).toUpperCase()}
+                        </div>
                         <div className="space-y-0.5">
                           <p className="font-semibold text-foreground text-sm">{a.name}</p>
                           {a.contact && <p className="text-xs text-muted-foreground">{a.contact}</p>}
@@ -406,7 +419,7 @@ export default function Trips() {
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-violet-100 text-violet-700">
-                          {a.agent_role.replace(/_/g, " ")}
+                          {(a.agent_role ?? "—").replace(/_/g, " ")}
                         </span>
                         {a.recorded_at && (
                           <span className="text-[10px] text-muted-foreground">
