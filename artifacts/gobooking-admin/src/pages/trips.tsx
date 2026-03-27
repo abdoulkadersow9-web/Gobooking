@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence } from "@/hooks/use-company";
+import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence, useTripWaypoints, useTripSegmentSeats } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -28,6 +28,9 @@ export default function Trips() {
   const { data: tripAgents, isLoading: agentsLoading } = useTripAgents(agentsTripId);
   const [auditTripId, setAuditTripId] = useState<string | null>(null);
   const { data: auditHistory, isLoading: auditLoading } = useTripAuditHistory(auditTripId);
+  const [segmentsTripId, setSegmentsTripId] = useState<string | null>(null);
+  const { data: waypointsData, isLoading: waypointsLoading } = useTripWaypoints(segmentsTripId);
+  const { data: segmentData, isLoading: segmentLoading }    = useTripSegmentSeats(segmentsTripId);
   const [showPerf, setShowPerf] = useState(false);
   const { data: agencePerf, isLoading: perfLoading } = useAgencePerformance();
   const [agenceFilter, setAgenceFilter] = useState<{ id: string; name: string } | null>(null);
@@ -220,6 +223,9 @@ export default function Trips() {
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setAuditTripId(trip.id)} className="flex items-center gap-2 text-amber-700 border-amber-300 hover:bg-amber-50">
                   <ClipboardCheck size={15} /> Contrôles
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSegmentsTripId(trip.id)} className="flex items-center gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
+                  <MapPin size={15} /> Escales
                 </Button>
               </div>
 
@@ -536,6 +542,82 @@ export default function Trips() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* ── Dialog : Escales & Segments ── */}
+      <Dialog open={!!segmentsTripId} onOpenChange={(v) => { if (!v) setSegmentsTripId(null); }}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin size={18} className="text-emerald-600" />
+              Escales &amp; Disponibilité par segment
+            </DialogTitle>
+          </DialogHeader>
+          {(waypointsLoading || segmentLoading) ? (
+            <div className="py-8 text-center text-muted-foreground">Chargement…</div>
+          ) : (
+            <div className="space-y-6">
+              {/* Waypoints timeline */}
+              {waypointsData?.waypoints?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Trajet</p>
+                  <ol className="relative border-l-2 border-emerald-200 ml-4 space-y-4">
+                    {(waypointsData.waypoints as any[]).map((wp: any) => (
+                      <li key={wp.id} className="ml-5">
+                        <span className={`absolute -left-[9px] w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold
+                          ${wp.arrivedAt ? "bg-emerald-600" : wp.isOrigin ? "bg-blue-600" : wp.isDestination ? "bg-purple-600" : "bg-slate-300"}`}>
+                          {wp.arrivedAt ? "✓" : wp.isOrigin ? "D" : wp.isDestination ? "A" : "•"}
+                        </span>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="font-semibold text-sm">{wp.city}</span>
+                          {wp.scheduledTime && <span className="text-xs text-muted-foreground">{wp.scheduledTime}</span>}
+                          {wp.arrivedAt && <span className="text-xs text-emerald-600 font-medium">✓ Arrivé</span>}
+                          {wp.passengersBoarding > 0  && <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-2 py-0.5">+{wp.passengersBoarding} montent</span>}
+                          {wp.passengersAlighting > 0 && <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">-{wp.passengersAlighting} descendent</span>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              {/* Segment availability bars */}
+              {segmentData?.segments?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Places disponibles par segment</p>
+                  <div className="space-y-3">
+                    {(segmentData.segments as any[]).map((seg: any, i: number) => {
+                      const pct = seg.totalSeats > 0 ? (seg.occupied / seg.totalSeats) * 100 : 0;
+                      const color = seg.available === 0 ? "bg-red-500" : seg.available < 5 ? "bg-amber-500" : "bg-emerald-500";
+                      const textColor = seg.available === 0 ? "text-red-600" : seg.available < 5 ? "text-amber-600" : "text-emerald-600";
+                      return (
+                        <div key={i} className="bg-muted/40 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-medium text-sm">{seg.from}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium text-sm">{seg.to}</span>
+                            <span className={`ml-auto text-sm font-bold ${textColor}`}>{seg.available} libre{seg.available !== 1 ? "s" : ""}</span>
+                          </div>
+                          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{seg.occupied}/{seg.totalSeats} places occupées</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {(!waypointsData?.waypoints?.length && !segmentData?.segments?.length) && (
+                <p className="text-center text-muted-foreground py-4">Aucune escale définie pour ce trajet.</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSegmentsTripId(null)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Dialog : Performance par agence ── */}
       <Dialog open={showPerf} onOpenChange={setShowPerf}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">

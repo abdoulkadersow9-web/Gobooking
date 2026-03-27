@@ -106,6 +106,22 @@ export function useTripsByAgence(agenceId: string | null) {
   });
 }
 
+export function useTripWaypoints(tripId: string | null) {
+  return useQuery({
+    queryKey: ["trip-waypoints", tripId],
+    queryFn: () => apiFetch<any>(`/company/trips/${tripId}/waypoints`),
+    enabled: !!tripId,
+  });
+}
+
+export function useTripSegmentSeats(tripId: string | null) {
+  return useQuery({
+    queryKey: ["trip-segment-seats", tripId],
+    queryFn: () => apiFetch<any>(`/company/trips/${tripId}/segment-seats`),
+    enabled: !!tripId,
+  });
+}
+
 export function useBuses() {
   return useQuery({
     queryKey: ["buses"],

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable, agencesTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable, notificationsTable } from "@workspace/db";
+import { db, usersTable, agentsTable, agencesTable, busesTable, bookingsTable, parcelsTable, seatsTable, tripsTable, positionsTable, busPositionsTable, boardingRequestsTable, scansTable, agentAlertsTable, colisLogsTable, departuresTable, agentReportsTable, bagageItemsTable, tripExpensesTable, notificationsTable, tripWaypointsTable } from "@workspace/db";
 import { auditLog, ACTIONS } from "../audit";
 import { eq, desc, and, gte, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -676,9 +676,10 @@ router.post("/reservations", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { clientName, clientPhone, tripId, seatCount, paymentMethod } = req.body as {
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod, boardingCity, alightingCity } = req.body as {
       clientName: string; clientPhone: string; tripId: string;
       seatCount: number; paymentMethod: string;
+      boardingCity?: string; alightingCity?: string;
     };
 
     if (!clientName?.trim() || !tripId || !seatCount) {
@@ -691,19 +692,35 @@ router.post("/reservations", async (req, res) => {
 
     const count = Math.max(1, Math.min(10, Number(seatCount) || 1));
 
-    /* ── Guichet seat capacity check ─────────────────────────────────────── */
+    /* ── Segment-aware capacity check ───────────────────────────────────── */
+    const bCity = boardingCity?.trim()  || trip.fromCity;
+    const aCity = alightingCity?.trim() || trip.toCity;
+
     if (trip.guichetSeats > 0) {
-      const guichetBookings = await db.select().from(bookingsTable).where(and(
-        eq(bookingsTable.tripId, tripId),
-        eq(bookingsTable.bookingSource, "guichet"),
-        inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
-      ));
-      const usedGuichet = guichetBookings.reduce(
-        (acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0
-      );
+      let usedGuichet = 0;
+
+      if (bCity !== trip.fromCity || aCity !== trip.toCity) {
+        /* Segment partiel → comptage par chevauchement */
+        const waypoints = await getOrCreateWaypoints(tripId);
+        const bWp = waypoints.find(w => w.city === bCity);
+        const aWp = waypoints.find(w => w.city === aCity);
+        if (bWp && aWp && bWp.stopOrder < aWp.stopOrder) {
+          usedGuichet = await countSegmentOccupancy(tripId, bWp.stopOrder, aWp.stopOrder);
+        }
+      } else {
+        const guichetBookings = await db.select().from(bookingsTable).where(and(
+          eq(bookingsTable.tripId, tripId),
+          eq(bookingsTable.bookingSource, "guichet"),
+          inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
+        ));
+        usedGuichet = guichetBookings.reduce(
+          (acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0
+        );
+      }
+
       if (usedGuichet + count > trip.guichetSeats) {
         res.status(400).json({
-          error: `Plus de places guichet disponibles. Places guichet restantes : ${Math.max(0, trip.guichetSeats - usedGuichet)}`,
+          error: `Plus de places guichet disponibles. Places restantes sur ce segment : ${Math.max(0, trip.guichetSeats - usedGuichet)}`,
           placesRestantes: Math.max(0, trip.guichetSeats - usedGuichet),
         });
         return;
@@ -733,7 +750,9 @@ router.post("/reservations", async (req, res) => {
       contactEmail:     "",
       commissionAmount: Math.round(amount * 0.10),
       bookingSource:    "guichet",
-    }).returning();
+      boardingCity:     bCity,
+      alightingCity:    aCity,
+    } as any).returning();
 
     auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
       ACTIONS.BOOKING_CREATE, booking.id, "booking",
@@ -4312,6 +4331,234 @@ router.post("/trips/:tripId/audit-log", async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("[agent/audit-log]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   SEGMENTATION DES PLACES PAR TRAJET (Waypoints)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Helpers ────────────────────────────────────────────────── */
+
+async function getOrCreateWaypoints(tripId: string) {
+  const existing = await db.select().from(tripWaypointsTable)
+    .where(eq(tripWaypointsTable.tripId, tripId))
+    .orderBy(tripWaypointsTable.stopOrder);
+  if (existing.length > 0) return existing;
+
+  const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+  if (!trips.length) return [];
+  const trip = trips[0];
+
+  type StopJson = { name?: string; city?: string; time?: string };
+  const stopsJson: StopJson[] = Array.isArray(trip.stops) ? trip.stops as StopJson[] : [];
+
+  const waypoints = [
+    { tripId, city: trip.fromCity, stopOrder: 0, scheduledTime: trip.departureTime },
+    ...stopsJson.map((s, i) => ({
+      tripId,
+      city: (s.name ?? s.city ?? "Escale").trim(),
+      stopOrder: i + 1,
+      scheduledTime: s.time ?? null,
+    })),
+    { tripId, city: trip.toCity, stopOrder: stopsJson.length + 1, scheduledTime: trip.arrivalTime },
+  ];
+
+  const ts = Date.now();
+  const inserted: (typeof tripWaypointsTable.$inferSelect)[] = [];
+  for (const w of waypoints) {
+    const id = `wp-${ts}-${w.stopOrder}-${Math.random().toString(36).substr(2, 6)}`;
+    try {
+      const [row] = await db.insert(tripWaypointsTable).values({ id, ...w }).onConflictDoNothing().returning();
+      if (row) inserted.push(row);
+    } catch { /* duplicate = already exists */ }
+  }
+
+  if (inserted.length === 0) {
+    return db.select().from(tripWaypointsTable)
+      .where(eq(tripWaypointsTable.tripId, tripId))
+      .orderBy(tripWaypointsTable.stopOrder);
+  }
+  return inserted.sort((a, b) => a.stopOrder - b.stopOrder);
+}
+
+/** Count bookings that overlap segment [boardingOrder, alightingOrder) on this trip */
+async function countSegmentOccupancy(tripId: string, boardingOrder: number, alightingOrder: number): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COUNT(*) AS cnt
+    FROM bookings b
+    JOIN trip_waypoints wp_from ON wp_from.trip_id = b.trip_id AND wp_from.city = b.boarding_city
+    JOIN trip_waypoints wp_to   ON wp_to.trip_id   = b.trip_id AND wp_to.city   = b.alighting_city
+    WHERE b.trip_id = ${tripId}
+      AND b.status IN ('confirmed','boarded','validated','payé')
+      AND wp_from.stop_order < ${alightingOrder}
+      AND wp_to.stop_order   > ${boardingOrder}
+  `);
+  return Number((result.rows[0] as { cnt: string })?.cnt ?? 0);
+}
+
+/* ─── GET /agent/trips/:tripId/waypoints — liste des escales + stats passagers ── */
+router.get("/trips/:tripId/waypoints", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const waypoints = await getOrCreateWaypoints(tripId);
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const bookings = await db.select().from(bookingsTable).where(
+      and(eq(bookingsTable.tripId, tripId), inArray(bookingsTable.status, ["confirmed","boarded","validated","payé"]))
+    );
+
+    const waypointStats = waypoints.map(wp => {
+      const boarding  = bookings.filter(b => (b as { boardingCity?: string | null }).boardingCity  === wp.city);
+      const alighting = bookings.filter(b => (b as { alightingCity?: string | null }).alightingCity === wp.city);
+      const boardingSeatCount  = boarding.reduce( (s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+      const alightingSeatCount = alighting.reduce((s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+      return {
+        ...wp,
+        passengersBoarding:  boardingSeatCount,
+        passengersAlighting: alightingSeatCount,
+        isOrigin:      wp.stopOrder === 0,
+        isDestination: wp.stopOrder === waypoints[waypoints.length - 1]?.stopOrder,
+      };
+    });
+
+    res.json({ tripId, totalSeats: trip.totalSeats, waypoints: waypointStats });
+  } catch (err) {
+    console.error("[waypoints]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/trips/:tripId/waypoint-arrive — marquer arrivée → libérer places ── */
+router.post("/trips/:tripId/waypoint-arrive", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const { city } = req.body as { city: string };
+    if (!city?.trim()) { res.status(400).json({ error: "city requis" }); return; }
+
+    const waypoints = await getOrCreateWaypoints(tripId);
+    const wp = waypoints.find(w => w.city.toLowerCase() === city.trim().toLowerCase());
+    if (!wp) { res.status(404).json({ error: "Escale introuvable pour ce trajet" }); return; }
+
+    /* 1. Enregistrer l'arrivée */
+    await db.update(tripWaypointsTable)
+      .set({ arrivedAt: new Date() })
+      .where(and(eq(tripWaypointsTable.tripId, tripId), eq(tripWaypointsTable.city, wp.city)));
+
+    /* 2. Trouver les réservations dont alightingCity = cette ville */
+    const alightingBookings = await db.execute(sql`
+      SELECT id, seat_ids FROM bookings
+      WHERE trip_id = ${tripId}
+        AND alighting_city = ${wp.city}
+        AND status IN ('confirmed','boarded','validated','payé')
+    `);
+    const rows = alightingBookings.rows as { id: string; seat_ids: string[] | null }[];
+
+    let seatsFreed = 0;
+    for (const row of rows) {
+      const seatIds: string[] = Array.isArray(row.seat_ids) ? row.seat_ids : [];
+      if (seatIds.length > 0) {
+        await db.update(seatsTable)
+          .set({ status: "available", boardingCity: null, alightingCity: null })
+          .where(inArray(seatsTable.id, seatIds));
+        seatsFreed += seatIds.length;
+      }
+    }
+
+    /* 3. Libérer les guichetSeats / onlineSeats si le trip a des compteurs séparés */
+    const bookingIds = rows.map(r => r.id);
+    const seatCountFreed = await db.execute(sql`
+      SELECT COALESCE(SUM(
+        CASE WHEN seat_numbers IS NOT NULL AND jsonb_array_length(seat_numbers::jsonb) > 0
+             THEN jsonb_array_length(seat_numbers::jsonb) ELSE 1 END
+      ), 0) AS cnt
+      FROM bookings
+      WHERE id = ANY(${bookingIds}::text[])
+        AND booking_source = 'guichet'
+    `);
+    const guichetFreed = Number((seatCountFreed.rows[0] as { cnt: string })?.cnt ?? 0);
+    if (guichetFreed > 0) {
+      await db.execute(sql`
+        UPDATE trips SET guichet_seats = guichet_seats + ${guichetFreed}
+        WHERE id = ${tripId} AND guichet_seats IS NOT NULL
+      `);
+    }
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.TRIP_UPDATE, tripId, "trip",
+      { action: "waypoint_arrive", city: wp.city, passengersAlighted: rows.length, seatsFreed }).catch(() => {});
+
+    res.json({
+      ok: true,
+      city: wp.city,
+      passengersAlighted: rows.length,
+      seatsFreed: Math.max(seatsFreed, rows.length),
+    });
+  } catch (err) {
+    console.error("[waypoint-arrive]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /agent/trips/:tripId/segment-seats — places disponibles par segment ── */
+router.get("/trips/:tripId/segment-seats", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const { boardingCity, alightingCity } = req.query as { boardingCity?: string; alightingCity?: string };
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const waypoints = await getOrCreateWaypoints(tripId);
+
+    const segmentList = waypoints.map((wp, idx) => ({
+      city:      wp.city,
+      order:     wp.stopOrder,
+      arrivedAt: wp.arrivedAt,
+    }));
+
+    if (boardingCity && alightingCity) {
+      const bWp = waypoints.find(w => w.city === boardingCity);
+      const aWp = waypoints.find(w => w.city === alightingCity);
+      if (!bWp || !aWp || bWp.stopOrder >= aWp.stopOrder) {
+        res.status(400).json({ error: "Segment invalide" }); return;
+      }
+      const occupied = await countSegmentOccupancy(tripId, bWp.stopOrder, aWp.stopOrder);
+      const available = Math.max(0, trip.totalSeats - occupied);
+      res.json({ tripId, boardingCity, alightingCity, totalSeats: trip.totalSeats, occupied, available });
+      return;
+    }
+
+    const allSegments = await Promise.all(
+      waypoints.slice(0, -1).map(async (from, i) => {
+        const to = waypoints[i + 1];
+        const occupied = await countSegmentOccupancy(tripId, from.stopOrder, to.stopOrder);
+        return {
+          from: from.city,
+          to:   to.city,
+          totalSeats: trip.totalSeats,
+          occupied,
+          available: Math.max(0, trip.totalSeats - occupied),
+        };
+      })
+    );
+    res.json({ tripId, totalSeats: trip.totalSeats, segments: allSegments, waypoints: segmentList });
+  } catch (err) {
+    console.error("[segment-seats]", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable, agentReportsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable, agentReportsTable, tripWaypointsTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -3172,6 +3172,110 @@ router.patch("/reports/:id", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error("PATCH /company/reports/:id error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   WAYPOINTS & SEGMENTS PAR TRAJET
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── GET /company/trips/:tripId/waypoints — escales + stats ── */
+router.get("/trips/:tripId/waypoints", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    let waypoints = await db.select().from(tripWaypointsTable)
+      .where(eq(tripWaypointsTable.tripId, tripId))
+      .orderBy(tripWaypointsTable.stopOrder);
+
+    if (waypoints.length === 0) {
+      type StopJson = { name?: string; city?: string; time?: string };
+      const stopsJson: StopJson[] = Array.isArray(trip.stops) ? trip.stops as StopJson[] : [];
+      const toInsert = [
+        { tripId, city: trip.fromCity, stopOrder: 0, scheduledTime: trip.departureTime },
+        ...stopsJson.map((s, i) => ({ tripId, city: (s.name ?? s.city ?? "Escale").trim(), stopOrder: i + 1, scheduledTime: s.time ?? null })),
+        { tripId, city: trip.toCity, stopOrder: stopsJson.length + 1, scheduledTime: trip.arrivalTime },
+      ];
+      const ts = Date.now();
+      for (const w of toInsert) {
+        const id = `wp-${ts}-${w.stopOrder}-${Math.random().toString(36).substr(2, 6)}`;
+        try { await db.insert(tripWaypointsTable).values({ id, ...w }).onConflictDoNothing(); } catch {}
+      }
+      waypoints = await db.select().from(tripWaypointsTable)
+        .where(eq(tripWaypointsTable.tripId, tripId))
+        .orderBy(tripWaypointsTable.stopOrder);
+    }
+
+    const bookings = await db.select().from(bookingsTable).where(
+      and(eq(bookingsTable.tripId, tripId), inArray(bookingsTable.status, ["confirmed","boarded","validated","payé"]))
+    );
+
+    const waypointStats = waypoints.map(wp => {
+      const boarding  = bookings.filter(b => (b as any).boardingCity  === wp.city);
+      const alighting = bookings.filter(b => (b as any).alightingCity === wp.city);
+      return {
+        ...wp,
+        passengersBoarding:  boarding.reduce( (s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0),
+        passengersAlighting: alighting.reduce((s, b) => s + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0),
+        isOrigin:      wp.stopOrder === 0,
+        isDestination: wp.stopOrder === waypoints[waypoints.length - 1]?.stopOrder,
+      };
+    });
+
+    res.json({ tripId, totalSeats: trip.totalSeats, waypoints: waypointStats });
+  } catch (err) {
+    console.error("[company/trips/waypoints]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── GET /company/trips/:tripId/segment-seats — disponibilité par segment ── */
+router.get("/trips/:tripId/segment-seats", async (req, res) => {
+  try {
+    const user = await requireCompanyAdmin(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+
+    const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = trips[0];
+
+    const waypoints = await db.select().from(tripWaypointsTable)
+      .where(eq(tripWaypointsTable.tripId, tripId))
+      .orderBy(tripWaypointsTable.stopOrder);
+
+    if (waypoints.length < 2) { res.json({ tripId, totalSeats: trip.totalSeats, segments: [] }); return; }
+
+    const segments = await Promise.all(
+      waypoints.slice(0, -1).map(async (from, i) => {
+        const to  = waypoints[i + 1];
+        const result = await db.execute(sql`
+          SELECT COUNT(*) AS cnt
+          FROM bookings b
+          JOIN trip_waypoints wp_from ON wp_from.trip_id = b.trip_id AND wp_from.city = b.boarding_city
+          JOIN trip_waypoints wp_to   ON wp_to.trip_id   = b.trip_id AND wp_to.city   = b.alighting_city
+          WHERE b.trip_id = ${tripId}
+            AND b.status IN ('confirmed','boarded','validated','payé')
+            AND wp_from.stop_order < ${to.stopOrder}
+            AND wp_to.stop_order   > ${from.stopOrder}
+        `);
+        const occupied = Number((result.rows[0] as { cnt: string })?.cnt ?? 0);
+        return { from: from.city, to: to.city, totalSeats: trip.totalSeats, occupied, available: Math.max(0, trip.totalSeats - occupied) };
+      })
+    );
+
+    res.json({ tripId, totalSeats: trip.totalSeats, segments });
+  } catch (err) {
+    console.error("[company/trips/segment-seats]", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

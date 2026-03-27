@@ -48,8 +48,10 @@ export const bookingsTable = pgTable("bookings", {
   companyId:  text("company_id"),
   fromStopId: text("from_stop_id"),
   toStopId:   text("to_stop_id"),
-  qrCode:     text("qr_code"),
+  qrCode:       text("qr_code"),
   bookingSource: varchar("booking_source", { length: 20 }).default("guichet"),
+  boardingCity:  text("boarding_city"),
+  alightingCity: text("alighting_city"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -529,17 +529,27 @@ export default function AgentDepartureValidation() {
         {/* Transit join banner — affiché pour les trajets en route */}
         {validated && (
           transitJoined ? (
-            <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: GREEN }}>
-              <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: GREEN, justifyContent: "center", alignItems: "center" }}>
-                <Feather name="user-check" size={18} color="#fff" />
+            <>
+              <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: GREEN }}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: GREEN, justifyContent: "center", alignItems: "center" }}>
+                  <Feather name="user-check" size={18} color="#fff" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: GREEN }}>Prise en charge active</Text>
+                  <Text style={{ fontSize: 11, color: "#065F46", marginTop: 1 }}>
+                    Vous êtes enregistré sur ce trajet. Ajoutez des passagers, bagages ou colis ci-dessous.
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: "800", color: GREEN }}>Prise en charge active</Text>
-                <Text style={{ fontSize: 11, color: "#065F46", marginTop: 1 }}>
-                  Vous êtes enregistré sur ce trajet. Ajoutez des passagers, bagages ou colis ci-dessous.
-                </Text>
-              </View>
-            </View>
+              <TouchableOpacity
+                style={{ backgroundColor: "#F0FDF4", borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: GREEN + "40" }}
+                onPress={() => router.push({ pathname: "/agent/waypoints", params: { tripId: selectedTrip.id, tripName: `${selectedTrip.fromCity} → ${selectedTrip.toCity}` } } as any)}
+              >
+                <Feather name="map-pin" size={16} color={GREEN} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: GREEN, flex: 1 }}>Voir les escales & places libres</Text>
+                <Feather name="chevron-right" size={14} color={GREEN} />
+              </TouchableOpacity>
+            </>
           ) : (
             <View style={{ backgroundColor: "#FFFBEB", borderRadius: 12, padding: 14, borderWidth: 1.5, borderColor: AMBER + "80", gap: 10 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

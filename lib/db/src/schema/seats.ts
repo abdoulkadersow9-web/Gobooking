@@ -11,8 +11,10 @@ export const seatsTable = pgTable("seats", {
   row: integer("row").notNull(),
   column: integer("column").notNull(),
   type: varchar("type", { length: 20 }).notNull().default("aisle"),
-  status: varchar("status", { length: 20 }).notNull().default("available"),
-  price: real("price").notNull(),
+  status:        varchar("status", { length: 20 }).notNull().default("available"),
+  price:         real("price").notNull(),
+  boardingCity:  text("boarding_city"),
+  alightingCity: text("alighting_city"),
 });
 
 export const insertSeatSchema = createInsertSchema(seatsTable).omit({});
