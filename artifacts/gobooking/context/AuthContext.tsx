@@ -265,15 +265,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // Run once on mount
 
   const login = useCallback(async (newToken: string, newUser: User) => {
-    /* Mark this as the new active session BEFORE any async work */
+    /* 1. Mark new session FIRST — prevents any race with background validation */
     activeSessionToken.current = newToken;
 
-    await AsyncStorage.setItem("auth_token", newToken);
-    await AsyncStorage.setItem("auth_user", JSON.stringify(newUser));
+    /* 2. Update React state IMMEDIATELY (no async gap) so AuthGuard and screens
+          react instantly without waiting for storage I/O */
     setToken(newToken);
     setUser(newUser);
 
-    /* Push token registration — fire and forget */
+    /* 3. Persist to AsyncStorage in parallel (fast, fire-and-forget for UX) */
+    AsyncStorage.multiSet([
+      ["auth_token", newToken],
+      ["auth_user", JSON.stringify(newUser)],
+    ]).catch(() => {});
+
+    /* 4. Push token registration — fire and forget */
     registerForPushNotifications().then(async (pushToken) => {
       if (!pushToken) return;
       try {
@@ -288,10 +294,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const currentToken = activeSessionToken.current;
+    /* 1. Mark session as cleared immediately */
     activeSessionToken.current = null;
-    await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+
+    /* 2. Clear local state immediately so AuthGuard navigates to login */
     setToken(null);
     setUser(null);
+
+    /* 3. Clear AsyncStorage (fire and forget is OK — UI is already updating) */
+    AsyncStorage.multiRemove(["auth_token", "auth_user"]).catch(() => {});
+
+    /* 4. Invalidate token on server so the session is truly gone (fire and forget) */
+    if (currentToken) {
+      apiFetch("/auth/logout", {
+        method: "POST",
+        token: currentToken,
+      }).catch(() => {});
+    }
+
+    /* 5. Navigate to login — belt-and-suspenders alongside AuthGuard */
     router.replace("/(auth)/login");
   }, []);
 
@@ -302,11 +324,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logoutIfActiveToken = useCallback(async (failedToken: string) => {
     if (!failedToken) return;
-    if (activeSessionToken.current !== failedToken) return; /* New session already active */
+    if (activeSessionToken.current !== failedToken) return; /* New session already active — no-op */
     activeSessionToken.current = null;
-    await AsyncStorage.multiRemove(["auth_token", "auth_user"]);
+
+    /* Clear state immediately */
     setToken(null);
     setUser(null);
+
+    /* Clear storage and invalidate server token (fire and forget) */
+    AsyncStorage.multiRemove(["auth_token", "auth_user"]).catch(() => {});
+    apiFetch("/auth/logout", {
+      method: "POST",
+      token: failedToken,
+    }).catch(() => {});
+
     router.replace("/(auth)/login");
   }, []);
 

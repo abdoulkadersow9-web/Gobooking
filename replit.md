@@ -31,6 +31,7 @@ Iterative development. Detailed explanations. Mobile icons: Ionicons or Feather 
     - **Headers**: `helmet.js` for security headers.
     - **Rate Limiting**: Global and specific rate limits for login and registration endpoints.
     - **Authentication & Authorization**: Centralized middleware (`requireAuth`, `requireRole`, `requireSelf`) enforcing role-based access control (client, agent, company admin, super admin) and data isolation (e.g., `companyId` filtering).
+    - **Session Persistence**: `PersistentTokenStore` in `auth.ts` — tokens stored in PostgreSQL `sessions` table, loaded into in-memory Map on startup. Survives server restarts/hot-reloads. `POST /auth/logout` invalidates token server-side. Client `AuthContext.logout()` calls server logout + clears AsyncStorage.
     - **Audit Logging**: `PERMISSION_DENIED` violations are logged.
     - **Payment Verification**: Server-side verification of payment transactions.
     - **Account Status**: Blocks inactive accounts.

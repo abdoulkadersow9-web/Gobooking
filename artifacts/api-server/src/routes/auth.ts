@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, agentsTable } from "@workspace/db";
+import { db, pool, usersTable, agentsTable } from "@workspace/db";
 import { eq, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import rateLimit from "express-rate-limit";
@@ -39,7 +39,59 @@ function generateToken_simple(): string {
   return generateId() + generateId();
 }
 
-const tokenStore = new Map<string, string>();
+/* ── PersistentTokenStore ─────────────────────────────────────────
+   Token store backed by PostgreSQL so sessions survive server
+   restarts and hot-reloads. Uses an in-memory Map as a fast read
+   cache; PostgreSQL is the source of truth.
+   ───────────────────────────────────────────────────────────────── */
+class PersistentTokenStore {
+  private cache = new Map<string, string>();
+  private ready = false;
+
+  /** Load existing sessions from DB into the in-memory cache. */
+  async init(): Promise<void> {
+    try {
+      const res = await pool.query<{ token: string; user_id: string }>(
+        "SELECT token, user_id FROM sessions"
+      );
+      for (const row of res.rows) {
+        this.cache.set(row.token, row.user_id);
+      }
+      this.ready = true;
+      console.log(`[auth] Loaded ${res.rows.length} session(s) from DB`);
+    } catch (err) {
+      console.error("[auth] Failed to load sessions from DB:", err);
+      this.ready = true;
+    }
+  }
+
+  get(token: string): string | undefined {
+    return this.cache.get(token);
+  }
+
+  has(token: string): boolean {
+    return this.cache.has(token);
+  }
+
+  set(token: string, userId: string): void {
+    this.cache.set(token, userId);
+    pool.query(
+      "INSERT INTO sessions (token, user_id) VALUES ($1, $2) ON CONFLICT (token) DO UPDATE SET user_id = $2, created_at = NOW()",
+      [token, userId]
+    ).catch((err) => console.error("[auth] Failed to persist session:", err));
+  }
+
+  delete(token: string): void {
+    this.cache.delete(token);
+    pool.query("DELETE FROM sessions WHERE token = $1", [token])
+      .catch((err) => console.error("[auth] Failed to delete session:", err));
+  }
+}
+
+const tokenStore = new PersistentTokenStore();
+
+/* Initialize immediately — loads DB sessions into memory cache */
+tokenStore.init().catch(console.error);
 
 const RESTRICTED_ROLES = ["agent", "compagnie", "company_admin", "admin", "super_admin"];
 
@@ -252,6 +304,23 @@ router.get("/me", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to get user" });
+  }
+});
+
+/* ── POST /logout ─────────────────────────────────────────────────
+   Invalidates the session token server-side.
+   Client should also clear AsyncStorage and local state.
+   ──────────────────────────────────────────────────────────────── */
+router.post("/logout", async (req, res) => {
+  try {
+    const auth = req.headers.authorization;
+    if (auth?.startsWith("Bearer ")) {
+      const token = auth.replace("Bearer ", "");
+      tokenStore.delete(token);
+    }
+    res.json({ success: true });
+  } catch {
+    res.json({ success: true });
   }
 });
 
