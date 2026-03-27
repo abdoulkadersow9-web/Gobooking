@@ -1,0 +1,144 @@
+Le développement est maintenant à un niveau avancé.  
+Nous passons immédiatement en phase de vérification complète, tests globaux et préparation à la mise en production.
+
+Merci d’exécuter les actions suivantes de manière rigoureuse, sans rien casser de la logique existante :
+
+---
+
+### 1. Vérification complète de l’application (audit global)
+
+Faire un test complet de toute l’application :
+
+- entreprise  
+- chef d’agence  
+- agents (guichet, embarquement, bagages, colis)  
+- admin  
+- client  
+
+Vérifier :
+
+- cohérence des données  
+- enchaînement logique des actions  
+- absence d’erreurs frontend/backend  
+- synchronisation en temps réel  
+- gestion des états (trajets, cars, escales, transferts)  
+- fonctionnement des notifications  
+- performance globale  
+
+⚠️ Important :  
+Ne rien casser. Respecter strictement la logique déjà en place.
+
+---
+
+### 2. Tests en conditions réelles
+
+Simuler des scénarios réels :
+
+- création de départ  
+- réservation client  
+- embarquement  
+- escales avec libération automatique des places  
+- transfert en cas de panne  
+- modification / suppression  
+- génération de bordereau  
+- historique / audit log  
+
+Tout doit fonctionner parfaitement, sans blocage ni incohérence.
+
+---
+
+### 3. Vérification complète de tous les écrans
+
+- parcourir tous les écrans de l’application  
+- identifier tous les bugs visuels et fonctionnels  
+- corriger tous les problèmes d’affichage  
+- supprimer tous les doublons  
+- vérifier chaque interaction  
+
+Merci de :
+
+- faire des captures de tous les écrans importants  
+- signaler les écrans qui posent problème  
+- corriger tous les écrans non fluides ou incohérents  
+
+---
+
+### 4. Fluidité et performance (PRIORITÉ MAXIMALE)
+
+L’application doit être :
+
+- très rapide  
+- très fluide  
+- sans latence  
+- sans blocage  
+- sans chargement inutile  
+
+Tout ce qui ralentit l’application doit être supprimé ou optimisé.
+
+⚠️ Aucun retard, aucun freeze, aucune lenteur ne doit rester.
+
+---
+
+### 5. Création d’accès de test complets
+
+Fournir des comptes de test fonctionnels :
+
+- compte admin  
+- compte entreprise  
+- compte chef d’agence  
+- comptes agents (différents rôles)  
+- compte client  
+
+Avec accès réel pour tester toutes les fonctionnalités.
+
+---
+
+### 6. Accès complet aux interfaces
+
+Permettre de naviguer librement dans :
+
+- toutes les pages agent  
+- dashboard chef d’agence  
+- gestion des trajets  
+- historique  
+- transferts  
+- escales  
+- états des cars  
+
+Objectif : tester chaque écran et chaque action sans restriction.
+
+---
+
+### 7. Correction immédiate des anomalies
+
+- identifier tous les bugs  
+- corriger immédiatement  
+- optimiser les performances  
+- garantir stabilité et cohérence  
+
+---
+
+### 8. Préparation à la mise en production
+
+Préparer :
+
+- version stable finale  
+- base de données propre  
+- sécurité minimale  
+- environnement prêt pour publication  
+
+---
+
+### Objectif
+
+Finaliser une application :
+
+- stable  
+- rapide  
+- fluide  
+- professionnelle  
+- prête à être utilisée en conditions réelles  
+
+Nous avons déjà plusieurs compagnies intéressées, donc le niveau attendu est élevé.
+
+Merci de traiter cela en priorité, avec rigueur et précision

@@ -427,15 +427,18 @@ router.get("/agents", async (req, res) => {
       .orderBy(desc(agentsTable.createdAt));
 
     /* Récupérer les photos de profil en une seule requête */
-    const userIds = rows.map(r => r.userId).filter(Boolean);
+    const userIds = rows.map(r => r.userId).filter(Boolean) as string[];
     let photoMap: Record<string, string> = {};
     if (userIds.length > 0) {
-      const photoRows = await db.execute(
-        sql`SELECT id, photo_url FROM users WHERE id = ANY(${userIds}) AND photo_url IS NOT NULL`
-      ) as any;
-      for (const pr of (photoRows?.rows ?? [])) {
-        if (pr.id && pr.photo_url) photoMap[pr.id] = pr.photo_url;
-      }
+      try {
+        const idList = userIds.map(id => `'${id.replace(/'/g, "''")}'`).join(",");
+        const photoRows = await db.execute(
+          sql.raw(`SELECT id, photo_url FROM users WHERE id IN (${idList}) AND photo_url IS NOT NULL`)
+        ) as any;
+        for (const pr of (photoRows?.rows ?? [])) {
+          if (pr.id && pr.photo_url) photoMap[pr.id] = pr.photo_url;
+        }
+      } catch { /* photos not critical */ }
     }
 
     res.json(rows.map(r => ({

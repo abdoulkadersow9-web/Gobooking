@@ -68,25 +68,21 @@ async function recordTripAgent(
 ) {
   if (!tripId || !userId) return;
   try {
-    const uid = Number(userId);
+    const uid = String(userId); // IDs are text in the DB
 
-    /* Récupère rôle + agence de l'agent */
-    const [agentRow] = await db
-      .select({
-        agentRole:  agentsTable.agentRole,
-        agenceId:   agentsTable.agenceId,
-        agenceName: agencesTable.name,
-        agenceCity: agencesTable.city,
-      })
-      .from(agentsTable)
-      .leftJoin(agencesTable, eq(agentsTable.agenceId, agencesTable.id))
-      .where(eq(agentsTable.userId, uid))
-      .limit(1);
-
-    const agentRole = agentRow?.agentRole ?? "agent";
-    const agenceId   = agentRow?.agenceId   ?? null;
-    const agenceName = agentRow?.agenceName ?? null;
-    const agenceCity = agentRow?.agenceCity ?? null;
+    /* Récupère rôle + agence de l'agent via raw SQL (IDs textuels) */
+    const agentRows = await db.execute(sql`
+      SELECT a.agent_role, a.agence_id, ag.name as agence_name, ag.city as agence_city
+      FROM agents a
+      LEFT JOIN agences ag ON ag.id = a.agence_id
+      WHERE a.user_id = ${uid}
+      LIMIT 1
+    `) as any;
+    const agentRow  = agentRows?.rows?.[0];
+    const agentRole = agentRow?.agent_role ?? "agent";
+    const agenceId  = agentRow?.agence_id   ?? null;
+    const agenceName = agentRow?.agence_name ?? null;
+    const agenceCity = agentRow?.agence_city ?? null;
 
     const photoRow = await db.execute(sql`SELECT name, phone, email, photo_url FROM users WHERE id = ${uid} LIMIT 1`) as any;
     const userRow = photoRow?.rows?.[0];
@@ -4844,6 +4840,28 @@ router.post("/chef/trips", async (req, res) => {
         '?', '[]'::json, '[]'::json, '[]'::json, 'scheduled'
       )
     `);
+
+    // Générer les sièges pour ce trajet
+    try {
+      const seatPrice = price ?? 0;
+      const cols = 4;
+      const seatRows = Math.ceil(totalSeats / cols);
+      const colLetters = ["A","B","C","D"];
+      const seatInserts: string[] = [];
+      for (let r = 1; r <= seatRows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if ((r - 1) * cols + c >= totalSeats) break;
+          const seatNum = `${r}${colLetters[c]}`;
+          const seatId  = `${tripId}-s${r}${colLetters[c]}`;
+          seatInserts.push(`('${seatId}','${tripId}','${seatNum}',${r},${c},'guichet','available',${seatPrice})`);
+        }
+      }
+      if (seatInserts.length > 0) {
+        await db.execute(sql.raw(
+          `INSERT INTO seats (id, trip_id, number, "row", "column", type, status, price) VALUES ${seatInserts.join(",")} ON CONFLICT DO NOTHING`
+        ));
+      }
+    } catch (e) { console.error("[chef/trips] seat gen:", e); }
 
     // Marquer le bus comme affecté
     if (busId) {
