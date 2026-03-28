@@ -218,7 +218,7 @@ export default function AgentReservation() {
       <StatusBar barStyle="light-content" backgroundColor="#164E63" />
       {/* Header */}
       <LinearGradient colors={["#164E63", "#0E7490", "#0891B2"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={S.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/agent/home")} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 14 }}>

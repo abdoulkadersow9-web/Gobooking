@@ -338,7 +338,7 @@ export default function TrajetsScreen() {
     <SafeAreaView style={S.safe} edges={["bottom"]}>
       {/* Header */}
       <View style={[S.header, { paddingTop: topPad + 8 }]}>
-        <Pressable onPress={() => router.back()} style={S.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
         <View style={{ flex: 1 }}>

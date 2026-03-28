@@ -203,7 +203,7 @@ export default function AgentsPage() {
     <SafeAreaView style={S.root} edges={["top"]}>
       {/* Header */}
       <LinearGradient colors={[PRIMARY, "#1A5C8A"]} style={S.header}>
-        <Pressable onPress={() => router.back()} style={S.backBtn} hitSlop={8}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={S.backBtn} hitSlop={8}>
           <Feather name="arrow-left" size={20} color="#fff" />
         </Pressable>
         <View style={S.headerText}>

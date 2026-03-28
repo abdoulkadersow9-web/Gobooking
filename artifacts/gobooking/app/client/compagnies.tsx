@@ -143,7 +143,7 @@ export default function CompagniesScreen() {
         colors={["#0B3C5D", "#164E71"]}
         style={[styles.header, { paddingTop: insets.top + 8 }]}
       >
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <View>

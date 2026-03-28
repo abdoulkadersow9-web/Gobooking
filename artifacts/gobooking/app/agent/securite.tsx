@@ -182,7 +182,7 @@ export default function SecuriteScreen() {
       <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/agent/home")} style={styles.backBtn} hitSlop={8}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <View>

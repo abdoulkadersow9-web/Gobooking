@@ -93,7 +93,7 @@ export default function AgencesScreen() {
     return (
       <View style={[s.flex, { paddingTop: insets.top }]}>
         <LinearGradient colors={[AMBER, AMBER_DK]} style={s.header}>
-          <Pressable onPress={() => router.back()} style={s.backBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={s.backBtn}>
             <Feather name="arrow-left" size={22} color={WHITE} />
           </Pressable>
           <Text style={s.headerTitle}>Agences</Text>
@@ -108,7 +108,7 @@ export default function AgencesScreen() {
     <View style={[s.flex, { backgroundColor: BG }]}>
       {/* Header */}
       <LinearGradient colors={[AMBER, AMBER_DK]} style={[s.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={s.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={s.backBtn}>
           <Feather name="arrow-left" size={22} color={WHITE} />
         </Pressable>
         <View style={{ flex: 1, alignItems: "center" }}>

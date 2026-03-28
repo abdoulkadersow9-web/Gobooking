@@ -144,7 +144,7 @@ export default function PaymentHistoryScreen() {
     <View style={[ss.flex, { paddingTop: topPad }]}>
       {/* Header */}
       <View style={ss.header}>
-        <Pressable onPress={() => router.back()} style={ss.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
           <Feather name="arrow-left" size={22} color="#0B3C5D" />
         </Pressable>
         <View>

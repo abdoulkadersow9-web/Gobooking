@@ -216,7 +216,7 @@ export default function CinetPayScreen() {
           <Feather name="refresh-cw" size={16} color="white" />
           <Text style={ss.successBtnText}>Réessayer</Text>
         </Pressable>
-        <Pressable style={ss.backLink} onPress={() => router.back()}>
+        <Pressable style={ss.backLink} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
           <Text style={ss.backLinkText}>Revenir à ma réservation</Text>
         </Pressable>
       </View>
@@ -243,7 +243,7 @@ export default function CinetPayScreen() {
     <View style={[ss.flex, { paddingTop: topPad }]}>
       {/* Header */}
       <View style={ss.header}>
-        <Pressable onPress={() => router.back()} style={ss.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
           <Feather name="arrow-left" size={22} color="#0B3C5D" />
         </Pressable>
         <Text style={ss.headerTitle}>Payer avec Mobile Money</Text>

@@ -222,7 +222,7 @@ export default function AnalytiquesScreen() {
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <View style={{ flex: 1 }}>

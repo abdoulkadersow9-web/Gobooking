@@ -199,7 +199,7 @@ export default function ReceiptScreen() {
       <View style={[ss.flex, ss.center, { paddingTop: topPad }]}>
         <Feather name="alert-circle" size={40} color="#EF4444" />
         <Text style={ss.errorText}>Reçu introuvable</Text>
-        <Pressable style={ss.backLink} onPress={() => router.back()}>
+        <Pressable style={ss.backLink} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
           <Text style={ss.backLinkText}>Retour</Text>
         </Pressable>
       </View>
@@ -215,7 +215,7 @@ export default function ReceiptScreen() {
     <View style={[ss.flex, { paddingTop: topPad }]}>
       {/* Header */}
       <View style={ss.header}>
-        <Pressable onPress={() => router.back()} style={ss.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
           <Feather name="arrow-left" size={22} color="#0B3C5D" />
         </Pressable>
         <Text style={ss.headerTitle}>Reçu de paiement</Text>

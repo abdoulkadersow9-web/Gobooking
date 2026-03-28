@@ -384,7 +384,7 @@ export default function ChefTrips() {
       {/* ── Header ── */}
       <LinearGradient colors={[INDIGO, INDIGO2]} style={s.header}>
         <View style={s.headerRow}>
-          <Pressable onPress={() => router.back()} style={s.backBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/agent/home")} style={s.backBtn}>
             <Feather name="arrow-left" size={22} color="white" />
           </Pressable>
           <View style={{ flex: 1 }}>

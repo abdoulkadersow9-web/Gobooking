@@ -135,7 +135,7 @@ export default function ParcelCinetPayScreen() {
           <Feather name="refresh-cw" size={16} color="white" />
           <Text style={ss.primaryBtnText}>Réessayer</Text>
         </Pressable>
-        <Pressable style={ss.backLink} onPress={() => router.back()}>
+        <Pressable style={ss.backLink} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/colis")}>
           <Text style={ss.backLinkText}>Retour</Text>
         </Pressable>
       </View>
@@ -161,7 +161,7 @@ export default function ParcelCinetPayScreen() {
   return (
     <View style={[ss.flex, { paddingTop: topPad }]}>
       <View style={ss.header}>
-        <Pressable onPress={() => router.back()} style={ss.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/colis")} style={ss.backBtn}>
           <Feather name="arrow-left" size={22} color="#0B3C5D" />
         </Pressable>
         <View>

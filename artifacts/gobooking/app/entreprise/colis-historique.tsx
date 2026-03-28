@@ -219,7 +219,7 @@ export default function ColisHistorique() {
 
       {/* ── Header ── */}
       <View style={S.header}>
-        <Pressable onPress={() => router.back()} style={S.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={S.backBtn}>
           <Feather name="arrow-left" size={20} color="white" />
         </Pressable>
         <View style={S.headerText}>

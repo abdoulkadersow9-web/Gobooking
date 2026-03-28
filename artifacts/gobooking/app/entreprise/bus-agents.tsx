@@ -129,7 +129,7 @@ export default function BusAgentsScreen() {
     <SafeAreaView style={S.root} edges={["bottom"]}>
       <LinearGradient colors={[PRIMARY, "#1E5F8A"]} style={[S.header, { paddingTop: insets.top + 12 }]}>
         <View style={S.headerRow}>
-          <Pressable onPress={() => router.back()} style={S.iconBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={S.iconBtn}>
             <Feather name="arrow-left" size={20} color="#fff" />
           </Pressable>
           <View style={{ flex: 1 }}>

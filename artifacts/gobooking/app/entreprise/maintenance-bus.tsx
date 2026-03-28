@@ -214,7 +214,7 @@ export default function MaintenanceBusScreen() {
     <SafeAreaView style={S.root} edges={["bottom"]}>
       <LinearGradient colors={["#0B3C5D", "#1E5F8A"]} style={[S.header, { paddingTop: insets.top + 12 }]}>
         <View style={S.headerRow}>
-          <Pressable onPress={() => router.back()} style={S.backBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={S.backBtn}>
             <Feather name="arrow-left" size={20} color="#fff" />
           </Pressable>
           <View style={{ flex: 1 }}>

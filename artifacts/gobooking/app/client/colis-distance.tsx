@@ -181,7 +181,7 @@ export default function ColisDistanceScreen() {
           <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
             Conservez votre référence pour suivre votre colis dans l'application.
           </Text>
-          <TouchableOpacity style={[S.submitBtn, { width: "100%" }]} onPress={() => router.back()}>
+          <TouchableOpacity style={[S.submitBtn, { width: "100%" }]} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/colis")}>
             <Feather name="arrow-left" size={16} color="#fff" />
             <Text style={S.submitBtnText}>Retour à mes colis</Text>
           </TouchableOpacity>
@@ -194,7 +194,7 @@ export default function ColisDistanceScreen() {
     <SafeAreaView style={S.safe} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={TEAL_DARK} />
       <View style={S.header}>
-        <TouchableOpacity onPress={() => router.back()} style={S.backBtn}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/colis")} style={S.backBtn}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

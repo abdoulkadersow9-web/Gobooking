@@ -224,7 +224,7 @@ export default function RoutesScreen() {
     <View style={ss.root}>
       <SafeAreaView edges={["top"]} style={{ backgroundColor: AMBER }}>
         <View style={ss.header}>
-          <Pressable onPress={() => router.back()} style={ss.backBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={ss.backBtn}>
             <Feather name="arrow-left" size={22} color="#fff" />
           </Pressable>
           <Text style={ss.headerTitle}>Routes & Arrêts</Text>

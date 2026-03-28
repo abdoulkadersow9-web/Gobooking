@@ -146,7 +146,7 @@ export default function WaypointsScreen() {
     <View style={SL.root}>
       {/* Header */}
       <View style={SL.header}>
-        <TouchableOpacity onPress={() => router.back()} style={SL.backBtn}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/agent/home")} style={SL.backBtn}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 12 }}>

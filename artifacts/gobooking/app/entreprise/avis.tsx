@@ -179,7 +179,7 @@ export default function AvisScreen() {
     return (
       <View style={[S.root, { paddingTop: topPad }]}>
         <LinearGradient colors={[AMBER, AMBER_DK]} style={S.header}>
-          <TouchableOpacity style={S.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={S.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")}>
             <Feather name="arrow-left" size={20} color="white" />
           </TouchableOpacity>
           <Text style={S.headerTitle}>Avis clients</Text>
@@ -200,7 +200,7 @@ export default function AvisScreen() {
     <View style={[S.root, { paddingTop: topPad }]}>
       {/* Header */}
       <LinearGradient colors={[AMBER, AMBER_DK]} style={S.header}>
-        <TouchableOpacity style={S.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={S.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")}>
           <Feather name="arrow-left" size={20} color="white" />
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: "center" }}>

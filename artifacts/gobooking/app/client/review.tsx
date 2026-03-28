@@ -114,7 +114,7 @@ export default function ReviewScreen() {
     return (
       <View style={[S.root, { paddingTop: insets.top }]}>
         <LinearGradient colors={[PRIMARY, "#0a2e4a"]} style={S.header}>
-          <TouchableOpacity style={S.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={S.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
             <Feather name="arrow-left" size={20} color="white" />
           </TouchableOpacity>
           <Text style={S.headerTitle}>Avis envoyé</Text>
@@ -134,7 +134,7 @@ export default function ReviewScreen() {
               <Text key={n} style={[S.star, n <= rating && S.starFilled]}>{n <= rating ? "★" : "☆"}</Text>
             ))}
           </View>
-          <TouchableOpacity style={S.doneBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={S.doneBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
             <Text style={S.doneBtnTxt}>Retour à mes réservations</Text>
           </TouchableOpacity>
         </View>
@@ -150,7 +150,7 @@ export default function ReviewScreen() {
       <View style={[S.root, { paddingTop: insets.top }]}>
         {/* Header */}
         <LinearGradient colors={[PRIMARY, "#0a2e4a"]} style={S.header}>
-          <TouchableOpacity style={S.backBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={S.backBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
             <Feather name="arrow-left" size={20} color="white" />
           </TouchableOpacity>
           <Text style={S.headerTitle}>Laisser un avis</Text>

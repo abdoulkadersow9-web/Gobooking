@@ -85,7 +85,7 @@ export default function MesBonsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)")} style={styles.backBtn}>
           <Feather name="arrow-left" size={20} color="#374151" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes bons de voyage</Text>

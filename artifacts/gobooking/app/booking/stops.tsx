@@ -68,7 +68,7 @@ export default function StopsScreen() {
       toStopId:     toStop.id,
       toStopName:   toStop.name,
     });
-    router.back();
+    router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings");
   }
 
   function reset() {
@@ -83,7 +83,7 @@ export default function StopsScreen() {
       <View style={ss.root}>
         <SafeAreaView edges={["top"]} style={{ backgroundColor: BLUE }}>
           <View style={ss.header}>
-            <Pressable onPress={() => router.back()} style={ss.backBtn}>
+            <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
               <Feather name="arrow-left" size={22} color="#fff" />
             </Pressable>
             <Text style={ss.headerTitle}>Choisir ses arrêts</Text>
@@ -94,7 +94,7 @@ export default function StopsScreen() {
           <Text style={{ color: "#6B7280", fontSize: 16, textAlign: "center", paddingHorizontal: 32 }}>
             Ce trajet n'a pas d'arrêts intermédiaires configurés.
           </Text>
-          <Pressable style={ss.confirmBtn} onPress={() => router.back()}>
+          <Pressable style={ss.confirmBtn} onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")}>
             <Text style={ss.confirmTxt}>Retour</Text>
           </Pressable>
         </View>
@@ -106,7 +106,7 @@ export default function StopsScreen() {
     <View style={ss.root}>
       <SafeAreaView edges={["top"]} style={{ backgroundColor: BLUE }}>
         <View style={ss.header}>
-          <Pressable onPress={() => router.back()} style={ss.backBtn}>
+          <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
             <Feather name="arrow-left" size={22} color="#fff" />
           </Pressable>
           <Text style={ss.headerTitle}>Choisir ses arrêts</Text>

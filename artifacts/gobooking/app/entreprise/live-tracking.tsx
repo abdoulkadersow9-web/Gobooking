@@ -144,7 +144,7 @@ export default function LiveTrackingScreen() {
   /* ── Header ── */
   const Header = (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
+      <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/entreprise/dashboard")} style={styles.backBtn}>
         <Feather name="arrow-left" size={22} color="#fff" />
       </Pressable>
       <Text style={styles.headerTitle}>Suivi en temps réel</Text>
