@@ -24,6 +24,8 @@ import { apiFetch } from "@/utils/api";
 import { SkeletonParcelCard } from "@/components/SkeletonCard";
 import { Toast, useToast } from "@/components/Toast";
 
+const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
+
 interface Parcel {
   id: string;
   trackingRef: string;
@@ -474,6 +476,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8ECFA",
     marginBottom: 2,
+    ..._ws("0 12px 30px rgba(22,80,208,0.10)"),
   },
   strip: { width: 6 },
   rowBody: { flex: 1, padding: 22, gap: 18 },
@@ -541,6 +544,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 13, marginTop: 4,
     shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    ..._ws("0 4px 8px rgba(22,80,208,0.30)"),
   },
   ctaBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "white" },
   resetBtn: {
@@ -571,6 +575,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: "#A5F3FC",
     shadowColor: "#0E7490", shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+    ..._ws("0 4px 12px rgba(14,116,144,0.08)"),
   },
   remoteBannerIcon: {
     width: 54, height: 54, borderRadius: 16, backgroundColor: "white",

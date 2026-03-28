@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 
+const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
+
 function TabIcon({
   name,
   focused,
@@ -182,6 +184,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.42,
     shadowRadius: 14,
     elevation: 9,
+    ..._ws("0 5px 14px rgba(22,80,208,0.42)"),
   },
   tabLabel: {
     fontSize: 11,

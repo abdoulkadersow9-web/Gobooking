@@ -22,8 +22,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+
 import { SkeletonBookingCard } from "@/components/SkeletonCard";
 import { Toast, useToast } from "@/components/Toast";
+
+const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
 
 interface Booking {
   id: string;
@@ -668,6 +671,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 20,
     shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 26, elevation: 8,
     borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5,
+    ..._ws("0 8px 26px rgba(22,80,208,0.10)"),
   },
   cardPressed:  { transform: [{ scale: 0.982 }], opacity: 0.95 },
   cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
@@ -697,7 +701,7 @@ const styles = StyleSheet.create({
   amountBadge:  { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 18 },
   amountText:   { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.8 },
 
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 20, borderRadius: 18, paddingVertical: 18, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 20, borderRadius: 18, paddingVertical: 18, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6, ..._ws("0 6px 14px rgba(22,80,208,0.22)") },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
   waitingRow:   { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 18, borderRadius: 16, padding: 18 },
   waitingText:  { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 20 },
@@ -706,7 +710,7 @@ const styles = StyleSheet.create({
   emptyIconWrap:{ width: 96, height: 96, borderRadius: 28, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 6, borderWidth: 1, borderColor: "#C7D2FE" },
   emptyTitle:   { fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.4 },
   emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", lineHeight: 22 },
-  bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 18, paddingHorizontal: 30, paddingVertical: 16, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 5 },
+  bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 18, paddingHorizontal: 30, paddingVertical: 16, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 5, ..._ws("0 5px 14px rgba(22,80,208,0.30)") },
   bookNowText:  { color: "white", fontSize: 15, fontFamily: "Inter_700Bold" },
 
   errorBanner:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA", borderRadius: 14, marginHorizontal: 20, marginTop: 10, paddingHorizontal: 16, paddingVertical: 12 },

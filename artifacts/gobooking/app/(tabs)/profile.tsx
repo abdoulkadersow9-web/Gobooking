@@ -23,6 +23,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { apiFetch } from "@/utils/api";
 
+const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
+
 interface WalletData {
   walletBalance: number;
   totalTrips: number;
@@ -472,6 +474,7 @@ const styles = StyleSheet.create({
     elevation: 10,
     borderWidth: 1,
     borderColor: "#E8ECFA",
+    ..._ws("0 14px 32px rgba(22,80,208,0.12)"),
   },
   statItem: {
     flex: 1,
@@ -521,6 +524,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 36,
     elevation: 12,
+    ..._ws("0 16px 36px rgba(22,80,208,0.28)"),
   },
   walletDecor1: {
     position: "absolute",
@@ -602,6 +606,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 1,
     borderColor: "#ECEEF8",
+    ..._ws("0 8px 22px rgba(0,0,0,0.07)"),
   },
   loyaltyTop: {
     flexDirection: "row",
@@ -658,6 +663,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10,
     shadowRadius: 22,
     elevation: 6,
+    ..._ws("0 8px 22px rgba(124,58,237,0.10)"),
   },
   referralTop: {
     flexDirection: "row",
@@ -736,6 +742,7 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 1,
     borderColor: "#ECEEF8",
+    ..._ws("0 8px 22px rgba(0,0,0,0.07)"),
   },
   menuItem: {
     flexDirection: "row",

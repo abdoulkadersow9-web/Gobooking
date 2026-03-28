@@ -24,6 +24,8 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
+const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
+
 /* ─── Recommandations IA ─────────────────────────────────────────────── */
 interface RecommendedTrip {
   id: string;
@@ -348,7 +350,14 @@ export default function HomeScreen() {
                 color="white"
               />
             </Pressable>
-          ) : null}
+          ) : (
+            <Pressable
+              style={[styles.adminBtn, { backgroundColor: "rgba(255,255,255,0.18)" }]}
+              onPress={() => router.push("/(tabs)/notifications" as never)}
+            >
+              <Feather name="bell" size={17} color="white" />
+            </Pressable>
+          )}
         </View>
 
         {/* Mode selector */}
@@ -1174,6 +1183,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white", borderRadius: 32, padding: 26,
     shadowColor: "#1650D0", shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.14, shadowRadius: 36, elevation: 12,
     borderTopWidth: 4, borderTopColor: "#1650D0",
+    ..._ws("0 16px 36px rgba(22,80,208,0.14)"),
   },
   routeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 18 },
   routeInputWrap: { flex: 1 },
@@ -1188,7 +1198,7 @@ const styles = StyleSheet.create({
   paxWrap: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F4F6FC", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#DDE2F0" },
   paxBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   paxCount: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", minWidth: 18, textAlign: "center" },
-  searchBtnWrap: { shadowColor: "#F97316", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.42, shadowRadius: 18, elevation: 8 },
+  searchBtnWrap: { shadowColor: "#F97316", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.42, shadowRadius: 18, elevation: 8, ..._ws("0 8px 18px rgba(249,115,22,0.40)") },
   searchBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderRadius: 18, paddingVertical: 18 },
   searchBtnText: { fontSize: 17, fontFamily: "Inter_700Bold", color: "white", letterSpacing: 0.2 },
   citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18, marginTop: 12 },
@@ -1212,6 +1222,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 28,
     elevation: 7,
+    ..._ws("0 10px 28px rgba(22,80,208,0.12)"),
   },
   ctaBtnPrimary: { backgroundColor: "white", borderWidth: 1.5, borderColor: "#C4D4F8", borderLeftWidth: 5, borderLeftColor: "#1650D0" },
   ctaBtnGreen:   { backgroundColor: "white", borderWidth: 1.5, borderColor: "#A8E0C8", borderLeftWidth: 5, borderLeftColor: "#059669" },
@@ -1224,6 +1235,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     backgroundColor: "#0B1628", borderRadius: 24, padding: 22, gap: 14,
     shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 10,
+    ..._ws("0 10px 24px rgba(0,0,0,0.24)"),
   },
   liveTrackingLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1 },
   liveTrackingIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
@@ -1261,6 +1273,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E8ECFA",
     overflow: "hidden",
+    ..._ws("0 12px 30px rgba(22,80,208,0.11)"),
   },
   activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
   activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
@@ -1289,13 +1302,14 @@ const styles = StyleSheet.create({
     width: "47%", backgroundColor: "white", borderRadius: 26, padding: 22, gap: 14,
     shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 26, elevation: 7,
     borderWidth: 1, borderColor: "#E8ECFA", borderTopWidth: 4,
+    ..._ws("0 10px 26px rgba(22,80,208,0.10)"),
   },
   quickIcon: { width: 60, height: 60, borderRadius: 22, justifyContent: "center", alignItems: "center" },
   quickLabel: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
   quickSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7A8FAA", lineHeight: 19 },
 
   // Dashboard shortcut cards
-  dashCard: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "white", borderRadius: 22, padding: 20, marginBottom: 14, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6, borderWidth: 1, borderColor: "#E8ECFA" },
+  dashCard: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "white", borderRadius: 22, padding: 20, marginBottom: 14, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6, borderWidth: 1, borderColor: "#E8ECFA", ..._ws("0 8px 20px rgba(22,80,208,0.09)") },
   dashCardIcon: { width: 54, height: 54, borderRadius: 18, justifyContent: "center", alignItems: "center", flexShrink: 0 },
   dashCardText: { flex: 1 },
   dashCardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.3, color: "#06101F" },
@@ -1309,6 +1323,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white", borderRadius: 22, paddingVertical: 20, paddingHorizontal: 20, marginBottom: 14,
     shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6,
     borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 4, borderLeftColor: "#1650D0",
+    ..._ws("0 6px 20px rgba(22,80,208,0.09)"),
   },
   routeCardPressed: { opacity: 0.80, transform: [{ scale: 0.978 }] },
   routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1, paddingRight: 10, minWidth: 0 },
