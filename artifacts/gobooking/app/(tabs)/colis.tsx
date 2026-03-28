@@ -64,6 +64,72 @@ const STATUS_STYLE: Record<string, { color: string; bg: string; strip: string; l
 
 const IN_PROGRESS = ["en_attente", "confirme", "en_cours_ramassage", "arrive_gare_depart", "pris_en_charge", "en_transit", "arrive_destination", "en_livraison"];
 
+// ─── Timeline helpers ──────────────────────────────────────────────────────
+const TL_STEPS = [
+  { key: "expedie",   label: "Expédié",   icon: "package"       as const },
+  { key: "en_route",  label: "En route",  icon: "truck"         as const },
+  { key: "livraison", label: "Livraison", icon: "map-pin"       as const },
+  { key: "livre",     label: "Livré",     icon: "check-circle"  as const },
+];
+
+function getStep(status: string): number {
+  if (status === "livre") return 3;
+  if (["arrive_destination", "en_livraison"].includes(status)) return 2;
+  if (["arrive_gare_depart", "pris_en_charge", "en_transit"].includes(status)) return 1;
+  if (["annule", "refuse"].includes(status)) return -1;
+  return 0;
+}
+
+function ParcelTimeline({ status }: { status: string }) {
+  const step = getStep(status);
+  if (step === -1) {
+    return (
+      <View style={tl.cancelRow}>
+        <Feather name="x-circle" size={11} color="#DC2626" />
+        <Text style={tl.cancelText}>Envoi annulé</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={tl.row}>
+      {TL_STEPS.map((s, i) => {
+        const done   = i <= step;
+        const active = i === step;
+        return (
+          <React.Fragment key={s.key}>
+            <View style={tl.step}>
+              <View style={[tl.dot, done && tl.dotDone, active && tl.dotActive]}>
+                <Feather name={done ? s.icon : "circle"} size={done ? 9 : 7} color={done ? "white" : "#CBD5E1"} />
+              </View>
+              <Text style={[tl.label, done && tl.labelDone, active && tl.labelActive]}>
+                {s.label}
+              </Text>
+            </View>
+            {i < TL_STEPS.length - 1 && (
+              <View style={[tl.line, i < step && tl.lineDone]} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+const tl = StyleSheet.create({
+  row:        { flexDirection: "row", alignItems: "flex-start", paddingVertical: 4 },
+  step:       { alignItems: "center", width: 54 },
+  dot:        { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
+  dotDone:    { backgroundColor: "#1650D0", borderColor: "#1650D0" },
+  dotActive:  { borderWidth: 2.5, borderColor: "#1650D0" },
+  label:      { fontSize: 9, fontFamily: "Inter_500Medium", color: "#94A3B8", marginTop: 5, textAlign: "center" },
+  labelDone:  { color: "#1650D0", fontFamily: "Inter_600SemiBold" },
+  labelActive:{ fontFamily: "Inter_700Bold" },
+  line:       { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 11 },
+  lineDone:   { backgroundColor: "#1650D0" },
+  cancelRow:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  cancelText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#DC2626" },
+});
+
 const DEMO_PARCELS: Parcel[] = [
   { id: "d1", trackingRef: "GBX-A4F2-KM91", fromCity: "Abidjan", toCity: "Bouaké",
     senderName: "Kouamé Yao", receiverName: "Adjoua Koné", parcelType: "electronique",
@@ -129,18 +195,21 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
 
         {/* Route */}
         <View style={styles.routeRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.city} numberOfLines={1}>{item.fromCity}</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.city} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.fromCity}</Text>
           </View>
           <View style={styles.routeConnector}>
             <View style={styles.routeDash} />
             <Feather name="arrow-right" size={14} color={Colors.light.primary} />
             <View style={styles.routeDash} />
           </View>
-          <View style={{ flex: 1, alignItems: "flex-end" }}>
-            <Text style={styles.city} numberOfLines={1}>{item.toCity}</Text>
+          <View style={{ flex: 1, alignItems: "flex-end", minWidth: 0 }}>
+            <Text style={styles.city} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.toCity}</Text>
           </View>
         </View>
+
+        {/* Timeline livraison */}
+        <ParcelTimeline status={item.status} />
 
         {/* Montant + statut paiement + action */}
         <View style={styles.rowBottom}>
@@ -466,20 +535,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     backgroundColor: "white",
-    borderRadius: 26,
+    borderRadius: 20,
     overflow: "hidden",
     shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.10,
-    shadowRadius: 30,
-    elevation: 9,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 6,
     borderWidth: 1,
     borderColor: "#E8ECFA",
     marginBottom: 2,
-    ..._ws("0 12px 30px rgba(22,80,208,0.10)"),
+    ..._ws("0 6px 18px rgba(22,80,208,0.08)"),
   },
-  strip: { width: 6 },
-  rowBody: { flex: 1, padding: 22, gap: 18 },
+  strip: { width: 5 },
+  rowBody: { flex: 1, padding: 18, gap: 14 },
 
   rowTop: {
     flexDirection: "row",
@@ -493,7 +562,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
 
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  city: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.6 },
+  city: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.4 },
   routeConnector: { width: 60, flexDirection: "row", alignItems: "center", gap: 3 },
   routeDash: { flex: 1, height: 2, backgroundColor: "#E2E8F0" },
 
