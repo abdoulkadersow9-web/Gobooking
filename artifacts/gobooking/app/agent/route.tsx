@@ -419,7 +419,7 @@ export default function RouteScreen() {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            streamUrl: `rtsp://sim.gobooking.ci/${camDevice ?? "cam-sim"}`,
+            streamUrl: `https://stream.gobooking.ci/live/${camDevice ?? "cam-sim"}.m3u8`,
             position: "conducteur",
           }),
         });

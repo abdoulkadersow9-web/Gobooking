@@ -1,6 +1,6 @@
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -222,9 +222,18 @@ export default function SuiviScreen() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const hasAlerts    = !!(data?.alerts?.length);
+  const hasAlerts      = !!(data?.alerts?.length);
   const activeCamCount = data?.trips?.filter(t => t.cameraStatus === "connected").length ?? 0;
-  const hasCameras   = activeCamCount > 0;
+  const hasCameras     = activeCamCount > 0;
+
+  /* ── Live simulation frames/signal per camera trip ── */
+  type LiveCamData = { frames: number; signal: number };
+  const [liveFrames, setLiveFrames] = useState<Record<string, LiveCamData>>({});
+
+  const activeCamTrips = useMemo(
+    () => data?.trips?.filter(t => t.cameraStatus === "connected" && !!t.cameraStreamUrl) ?? [],
+    [data]
+  );
 
   useEffect(() => {
     if (hasAlerts) {
@@ -254,17 +263,39 @@ export default function SuiviScreen() {
     setRefreshing(false);
   }, [token]);
 
-  /* Dynamic polling: 10s when cameras active, 30s otherwise */
+  /* Dynamic polling: 5s when cameras active, 30s otherwise */
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    const delay = hasCameras ? 10_000 : 30_000;
+    const delay = hasCameras ? 5_000 : 30_000;
     intervalRef.current = setInterval(() => load(true), delay);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [hasCameras, load]);
+
+  /* ── Simulated frame counter for connected camera trips ── */
+  useEffect(() => {
+    if (!hasCameras || activeCamTrips.length === 0) {
+      setLiveFrames({});
+      return;
+    }
+    const iv = setInterval(() => {
+      setLiveFrames(prev => {
+        const next: Record<string, LiveCamData> = { ...prev };
+        activeCamTrips.forEach(trip => {
+          const cur = next[trip.id] ?? { frames: 0, signal: 93 };
+          next[trip.id] = {
+            frames: cur.frames + 25 + Math.floor(Math.random() * 9),
+            signal: 80 + Math.floor(Math.random() * 19),
+          };
+        });
+        return next;
+      });
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [hasCameras, activeCamTrips]);
 
   /* When watching a camera live, refresh its trip data every 8s to detect disconnect */
   useEffect(() => {
@@ -424,6 +455,122 @@ export default function SuiviScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
           showsVerticalScrollIndicator={false}
         >
+
+          {/* ══ COCKPIT LIVE — affiché uniquement quand caméras actives ══ */}
+          {hasCameras && (
+            <View style={S.cockpitBlock}>
+              {/* Header */}
+              <View style={S.cockpitBlockHdr}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Animated.View style={{
+                    width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF3B3B",
+                    opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }),
+                  }} />
+                  <Text style={S.cockpitBlockTitle}>TOUR DE CONTRÔLE · EN DIRECT</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="videocam" size={11} color={CAM_GR} />
+                  <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "900" }}>{activeCamCount} CAM LIVE</Text>
+                </View>
+              </View>
+
+              {/* KPI strip */}
+              <View style={S.cockpitKpiRow}>
+                <View style={S.cockpitKpiItem}>
+                  <Text style={[S.cockpitKpiNum, { color: CAM_GR }]}>{activeCamCount}</Text>
+                  <Text style={S.cockpitKpiLbl}>Caméras</Text>
+                </View>
+                <View style={S.cockpitKpiDiv} />
+                <View style={S.cockpitKpiItem}>
+                  <Text style={[S.cockpitKpiNum, { color: hasAlerts ? "#F87171" : "#94A3B8" }]}>{data?.alerts?.length ?? 0}</Text>
+                  <Text style={S.cockpitKpiLbl}>Alertes</Text>
+                </View>
+                <View style={S.cockpitKpiDiv} />
+                <View style={S.cockpitKpiItem}>
+                  <Text style={[S.cockpitKpiNum, { color: "#60A5FA" }]}>{data?.buses?.length ?? 0}</Text>
+                  <Text style={S.cockpitKpiLbl}>Bus actifs</Text>
+                </View>
+                <View style={S.cockpitKpiDiv} />
+                <View style={S.cockpitKpiItem}>
+                  <Text style={[S.cockpitKpiNum, { color: "#A78BFA" }]}>
+                    {activeCamTrips.reduce((sum, t) => sum + (t.passengerCount ?? 0), 0)}
+                  </Text>
+                  <Text style={S.cockpitKpiLbl}>Passagers</Text>
+                </View>
+              </View>
+
+              {/* Live trips panels */}
+              {activeCamTrips.map(trip => {
+                const liveCam = liveFrames[trip.id];
+                const tripBus = data?.buses?.find(b => b.id === trip.busId);
+                const tripAlerts = data?.alerts?.filter(a => a.busId === trip.busId) ?? [];
+                return (
+                  <View key={trip.id} style={S.cockpitTripRow}>
+                    {/* Left info */}
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={S.cockpitLiveDot} />
+                        <Text style={S.cockpitTripName} numberOfLines={1}>
+                          {trip.from} → {trip.to}
+                        </Text>
+                        {tripAlerts.length > 0 && (
+                          <View style={{ backgroundColor: "#7F1D1D", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
+                            <Text style={{ color: "#FCA5A5", fontSize: 9, fontWeight: "900" }}>⚠ {tripAlerts.length}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Text style={S.cockpitTripSub}>{tripBus?.busName ?? "Bus"} · {trip.departureTime}</Text>
+                        {tripBus?.currentLocation && (
+                          <Text style={[S.cockpitTripSub, { color: "#A78BFA" }]}>
+                            <Ionicons name="location" size={9} color="#A78BFA" /> {tripBus.currentLocation}
+                          </Text>
+                        )}
+                      </View>
+                      {/* Frame + signal */}
+                      {liveCam && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 }}>
+                          <Text style={S.cockpitFramesTxt}>▲ {liveCam.frames} img</Text>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                            {[0, 1, 2, 3].map(b => (
+                              <View key={b} style={{
+                                width: 3, height: 5 + b * 2,
+                                backgroundColor: b < Math.ceil((liveCam.signal / 100) * 4) ? CAM_GR : "#1E293B",
+                                borderRadius: 1,
+                              }} />
+                            ))}
+                            <Text style={[S.cockpitFramesTxt, { marginLeft: 2 }]}>{liveCam.signal}%</Text>
+                          </View>
+                          <Text style={S.cockpitFramesTxt}>1280×720 · H.264</Text>
+                        </View>
+                      )}
+                      {!liveCam && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 }}>
+                          <ActivityIndicator size="small" color={CAM_GR} />
+                          <Text style={S.cockpitFramesTxt}>Initialisation flux...</Text>
+                        </View>
+                      )}
+                    </View>
+                    {/* Watch button */}
+                    <TouchableOpacity
+                      style={S.cockpitWatchBtn}
+                      onPress={() => setCameraTrip(trip)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="play-circle" size={18} color={CAM_GR} />
+                      <Text style={S.cockpitWatchTxt}>Voir</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              {/* Sync indicator */}
+              <View style={S.cockpitSyncRow}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR }} />
+                <Text style={S.cockpitSyncTxt}>Données synchronisées toutes les 5s · {syncLabel}</Text>
+              </View>
+            </View>
+          )}
 
           {/* ── DASHBOARD STATS ROW ── */}
           <View style={S.statsRow}>
@@ -671,8 +818,24 @@ export default function SuiviScreen() {
                   )}
 
                   {/* ── CAMÉRA LIVE PANEL — always visible ── */}
-                  <View style={S.busCardSection}>
+                  <View style={S.busCardDiv} />
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Text style={S.busCardSectionLbl}>CAMÉRA</Text>
+                    {camOk && liveFrames[trip?.id ?? ""] && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginLeft: 10 }}>
+                        <Text style={{ color: CAM_GR, fontSize: 9, fontWeight: "800" }}>
+                          ▲ {liveFrames[trip!.id].frames} img
+                        </Text>
+                        {[0, 1, 2, 3].map(b => (
+                          <View key={b} style={{
+                            width: 3, height: 5 + b * 2,
+                            backgroundColor: b < Math.ceil((liveFrames[trip!.id].signal / 100) * 4) ? CAM_GR : "#CBD5E1",
+                            borderRadius: 1,
+                          }} />
+                        ))}
+                        <Text style={{ color: CAM_GR, fontSize: 9, fontWeight: "800" }}>{liveFrames[trip!.id].signal}%</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={[S.tcCamPanel, camOk && S.tcCamPanelActive]}>
                     <View style={S.tcCamPanelLeft}>
@@ -694,11 +857,17 @@ export default function SuiviScreen() {
                         </View>
                         <Text style={S.tcCamSub}>
                           {camOk
-                            ? `Position : ${trip?.cameraPosition ?? "intérieur"} · Flux HLS actif`
+                            ? `Position : ${trip?.cameraPosition ?? "intérieur"} · Flux HLS · 1280×720`
                             : trip
                               ? `Position prévue : ${trip.cameraPosition ?? "intérieur"} · Non connectée`
                               : "Aucun trajet actif · Caméra en veille"}
                         </Text>
+                        {camOk && !liveFrames[trip?.id ?? ""] && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                            <ActivityIndicator size="small" color={CAM_GR} />
+                            <Text style={{ color: "#64748B", fontSize: 10 }}>Initialisation flux...</Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                     {camOk && trip ? (
@@ -960,4 +1129,30 @@ const S = StyleSheet.create({
   responseOptionTxt:{ flex: 1, fontSize: 14, color: "#374151", fontWeight: "600" },
   modalActions:{ flexDirection: "row", gap: 10, marginTop: 8 },
   modalBtn:  { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 12 },
+
+  /* ── Cockpit block styles ── */
+  cockpitBlock:      { backgroundColor: CAM_BG, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#1E293B" },
+  cockpitBlockHdr:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                       paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  cockpitBlockTitle: { color: "#E2E8F0", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
+
+  cockpitKpiRow:  { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 10, gap: 0,
+                    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  cockpitKpiItem: { flex: 1, alignItems: "center", gap: 3 },
+  cockpitKpiNum:  { fontSize: 20, fontWeight: "900", color: "#E2E8F0" },
+  cockpitKpiLbl:  { fontSize: 9, fontWeight: "700", color: "#475569", letterSpacing: 0.5 },
+  cockpitKpiDiv:  { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 4 },
+
+  cockpitTripRow:  { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingHorizontal: 14, paddingVertical: 12,
+                     borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  cockpitLiveDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF3B3B", marginTop: 3 },
+  cockpitTripName: { fontSize: 13, fontWeight: "800", color: "#E2E8F0", flex: 1 },
+  cockpitTripSub:  { fontSize: 10, color: "#64748B", fontWeight: "600" },
+  cockpitFramesTxt:{ fontSize: 9, color: CAM_GR, fontWeight: "800" },
+  cockpitWatchBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(34,197,94,0.12)",
+                     borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: "#166534" },
+  cockpitWatchTxt: { color: CAM_GR, fontSize: 11, fontWeight: "800" },
+
+  cockpitSyncRow:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
+  cockpitSyncTxt:  { fontSize: 9, color: "#334155", fontWeight: "600" },
 });
