@@ -193,7 +193,7 @@ export default function ColisScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
   const { t } = useLanguage();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
 
   const [parcels,    setParcels]    = useState<Parcel[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -400,13 +400,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 22,
-    paddingBottom: 28,
-    gap: 14,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    gap: 12,
   },
   headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.6 },
-  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 5 },
+  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
   sendBtn: {
     flexDirection: "row",
     alignItems: "center",

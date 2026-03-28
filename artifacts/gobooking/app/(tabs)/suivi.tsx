@@ -114,7 +114,7 @@ export default function SuiviScreen() {
   const { parcel: contextParcel } = useParcel();
   const { ref: refParam } = useLocalSearchParams<{ ref?: string }>();
   const { t } = useLanguage();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
 
   const [query, setQuery] = useState("");

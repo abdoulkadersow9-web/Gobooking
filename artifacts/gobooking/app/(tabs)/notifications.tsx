@@ -121,7 +121,7 @@ const FILTER_TYPE: Record<Filter, NotifType | null> = {
 export default function NotificationsScreen() {
   const insets  = useSafeAreaInsets();
   const { token } = useAuth();
-  const topPad  = Platform.OS === "web" ? 67 : insets.top;
+  const topPad  = Platform.OS === "web" ? 24 : insets.top;
   const botPad  = Platform.OS === "web" ? 34 : insets.bottom;
 
   const [items, setItems]         = useState<Notif[]>(DEMO);

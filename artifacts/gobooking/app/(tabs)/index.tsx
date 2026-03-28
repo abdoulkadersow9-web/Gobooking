@@ -141,7 +141,7 @@ function formatDeparture(iso: string): string {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, dashboardPath } = useAuth();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
   const firstName = user?.name?.split(" ")[0] || "";
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
@@ -328,7 +328,7 @@ export default function HomeScreen() {
             />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.greeting} numberOfLines={1} ellipsizeMode="tail">
-                {firstName ? `Bonjour, ${firstName} 👋` : "GoBooking"}
+                {firstName ? `Bonjour, ${firstName}` : "GoBooking"}
               </Text>
               <Text style={styles.headerSub} numberOfLines={1}>Que souhaitez-vous faire ?</Text>
             </View>
@@ -1154,13 +1154,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
 
   // Header
-  header: { paddingHorizontal: 20, paddingBottom: 44 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 12 },
+  header: { paddingHorizontal: 20, paddingBottom: 36 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 12 },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
-  headerLogo: { width: 44, height: 44, borderRadius: 14, flexShrink: 0 },
-  greeting: { fontSize: 20, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.3 },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.78)", marginTop: 3 },
-  adminBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.20)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.30)", flexShrink: 0 },
+  headerLogo: { width: 42, height: 42, borderRadius: 13, flexShrink: 0 },
+  greeting: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
+  adminBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.28)", flexShrink: 0 },
 
   // Mode selector
   modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 16, padding: 5, marginBottom: 18, gap: 4 },
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
   colisSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 23, marginBottom: 6 },
 
   // Quick CTAs
-  ctaRow: { paddingHorizontal: 16, paddingTop: 28, gap: 12 },
+  ctaRow: { paddingHorizontal: 16, paddingTop: 22, gap: 14 },
   ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1237,7 +1237,7 @@ const styles = StyleSheet.create({
   sectionDivider: { height: 10, backgroundColor: "#E2E5F4", marginVertical: 0 },
 
   // Activity section
-  section: { paddingHorizontal: 16, paddingTop: 32, paddingBottom: 12 },
+  section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 14 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   sectionTitle: {
     fontSize: 20, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.5,
@@ -1306,9 +1306,9 @@ const styles = StyleSheet.create({
   // Popular routes
   routeCard: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "white", borderRadius: 24, paddingVertical: 18, paddingHorizontal: 18, marginBottom: 16,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 24, elevation: 8,
-    borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 4, borderLeftColor: "#1650D0",
+    backgroundColor: "white", borderRadius: 22, paddingVertical: 20, paddingHorizontal: 20, marginBottom: 14,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6,
+    borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 4, borderLeftColor: "#1650D0",
   },
   routeCardPressed: { opacity: 0.80, transform: [{ scale: 0.978 }] },
   routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1, paddingRight: 10, minWidth: 0 },

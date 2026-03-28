@@ -521,7 +521,7 @@ export default function BookingsScreen() {
     );
   };
 
-  const topPad    = Platform.OS === "web" ? 67 : insets.top;
+  const topPad    = Platform.OS === "web" ? 24 : insets.top;
   const bottomPad = Platform.OS === "web" ? 120 : insets.bottom + 120;
 
   const FILTER_TABS: { key: FilterKey; label: string }[] = [
@@ -650,9 +650,9 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 20, paddingBottom: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  headerTitle:  { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
-  headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 4 },
+  header:       { paddingHorizontal: 20, paddingBottom: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
+  headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
   historyBtn:   { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 26, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.20)" },
   historyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -665,23 +665,23 @@ const styles = StyleSheet.create({
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
   card:         {
-    backgroundColor: "white", borderRadius: 28, padding: 26, marginBottom: 24,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 34, elevation: 10,
-    borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 5,
+    backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 20,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 26, elevation: 8,
+    borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5,
   },
   cardPressed:  { transform: [{ scale: 0.982 }], opacity: 0.95 },
   cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
   cardCancelled:{ borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
-  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26 },
-  refText:      { fontSize: 17, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  dateText:     { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 5 },
-  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 26, maxWidth: 160 },
+  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
+  refText:      { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
+  dateText:     { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 4 },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 24, maxWidth: 160 },
   statusText:   { fontSize: 13, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1.5, borderBottomColor: "#ECEEF8" },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 20, paddingBottom: 20, borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
   cityBlock:    { flex: 1, minWidth: 0 },
-  timeText:     { fontSize: 32, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -1.5 },
-  cityText:     { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#7A8FAA", marginTop: 7 },
+  timeText:     { fontSize: 28, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -1 },
+  cityText:     { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7A8FAA", marginTop: 6 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 4 },
   routeArrow:   { width: 26, height: 26, borderRadius: 13, backgroundColor: "#EEF4FF", alignItems: "center", justifyContent: "center" },
   routeLine:    { width: 24, height: 2, backgroundColor: "#DDE2F0" },
@@ -689,13 +689,13 @@ const styles = StyleSheet.create({
   rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EFF6FF", borderRadius: 14, padding: 16, marginTop: 16, borderWidth: 1, borderColor: "#BFDBFE" },
   rule45Text:   { fontSize: 12, fontFamily: "Inter_500Medium", color: "#1D4ED8", flex: 1, lineHeight: 20 },
 
-  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 22, borderTopWidth: 1, borderTopColor: "#F1F4FA" },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 18, borderTopWidth: 1, borderTopColor: "#F1F4FA" },
   methodRow:    { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
   methodText:   { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
   seatRow:      { flexDirection: "row", alignItems: "center", gap: 6 },
   seatText:     { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7A8FAA" },
-  amountBadge:  { paddingHorizontal: 22, paddingVertical: 14, borderRadius: 22 },
-  amountText:   { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -1 },
+  amountBadge:  { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 18 },
+  amountText:   { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.8 },
 
   ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 20, borderRadius: 18, paddingVertical: 18, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },

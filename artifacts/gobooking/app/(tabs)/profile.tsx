@@ -34,7 +34,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, token, logout, isAdmin } = useAuth();
   const { t, lang, setLang } = useLanguage();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
 
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [copied, setCopied] = useState(false);
@@ -402,8 +402,8 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: "center",
-    paddingHorizontal: 26,
-    paddingBottom: 52,
+    paddingHorizontal: 20,
+    paddingBottom: 38,
   },
   avatarRing: {
     width: 108,
