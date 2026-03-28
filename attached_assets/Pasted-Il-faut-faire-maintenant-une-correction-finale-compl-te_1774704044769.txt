@@ -1,0 +1,112 @@
+Il faut faire maintenant une correction finale complète de l’espace client. Il reste encore un bug critique et plusieurs problèmes de finition UI/UX.
+
+PRIORITÉ 1 — BUG CRITIQUE À CORRIGER IMMÉDIATEMENT
+
+Quand on clique sur l’icône promotion / bons depuis "Mes Réservations", l’application part sur une page blanche puis affiche une erreur.
+
+Captures observées :
+- page blanche
+- "Something went wrong"
+- renderer error / component stack
+- crash sur la page liée à bons.tsx
+
+Ce bug doit être corrigé immédiatement.
+
+À faire :
+1. Corriger la page Bons / Promotions
+- aucune page blanche
+- aucun crash
+- aucun renderer error
+- navigation stable
+
+2. Vérifier la cause réelle du crash
+- composant React qui retourne un objet au lieu d’un élément ou texte
+- mauvais rendu dans bons.tsx
+- props / children / map / objet affiché directement
+- vérifier toute la page et corriger à la racine
+
+3. Ajouter gestion d’erreur propre
+- si données absentes : afficher empty state propre
+- si chargement : afficher skeleton / loader propre
+- jamais de crash visible pour l’utilisateur
+- jamais de page blanche
+
+PRIORITÉ 2 — FINALISATION DE MES RÉSERVATIONS
+
+La page est améliorée, mais pas encore au niveau final premium.
+
+À corriger :
+1. rendre la carte réservation plus propre et plus légère visuellement
+2. mieux séparer :
+- référence
+- date
+- statut
+- horaires
+- messages
+- timeline
+- prix
+3. améliorer la hiérarchie visuelle
+4. garder le rendu clair, premium, fluide
+5. vérifier le rendu réel mobile sur iPhone
+
+PRIORITÉ 3 — FINALISATION TRAJETS POPULAIRES
+
+La section est plus lisible qu’avant, mais encore pas totalement premium.
+
+À faire :
+1. homogénéiser toutes les cartes
+2. mieux équilibrer :
+- icône
+- trajet
+- durée
+- prix
+- bouton action
+3. réduire l’effet rigide / maquette
+4. rendre la liste plus moderne et naturelle
+5. améliorer spacing, alignement, proportions
+
+PRIORITÉ 4 — COHÉRENCE GLOBALE HOME / CLIENT
+
+Il faut maintenant unifier tout l’espace client :
+- même niveau de qualité visuelle
+- même logique de spacing
+- même style de cartes
+- même style d’icônes
+- même qualité premium sur toutes les pages
+
+PRIORITÉ 5 — SIMULATIONS ET TESTS COMPLETS
+
+Faire des tests réels sur toutes les interactions de l’espace client :
+- Accueil
+- Trajets populaires
+- Mes Réservations
+- Bons / Promotions
+- Paiements
+- Colis
+- Suivi
+- Profil
+
+Pour chaque page :
+- aucun crash
+- aucune page blanche
+- aucun texte coupé
+- aucune interface cassée
+- aucune navigation morte
+- aucun composant qui ne répond pas
+
+OBJECTIF FINAL
+
+Obtenir un espace client :
+- propre
+- fluide
+- stable
+- premium
+- sans crash
+- sans page blanche
+- digne d’une vraie application startup transport
+
+IMPORTANT
+- corriger le bug technique du crash en priorité absolue
+- puis finaliser toute l’interface client
+- tester sur mobile réel, pas seulement canvas
+- ne rien casser dans la logique métier existante

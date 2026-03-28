@@ -24,8 +24,9 @@ const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {
 interface WalletData {
   walletBalance: number;
   referralCode: string;
-  loyalty: string;
   totalTrips: number;
+  totalReferrals?: number;
+  loyalty?: unknown;
 }
 interface BonBooking {
   id: string;
@@ -113,7 +114,12 @@ export default function MesBonsScreen() {
   const LOYALTY_COLOR: Record<string, string> = {
     Bronze: "#92400E", Silver: "#64748B", Gold: "#B45309", Platinum: "#0E7490", Diamond: "#6D28D9",
   };
-  const loyaltyLevel = wallet?.loyalty ?? "Bronze";
+  const trips = wallet?.totalTrips ?? user?.totalTrips ?? 0;
+  const loyaltyLevel =
+    trips >= 30 ? "Diamond" :
+    trips >= 20 ? "Platinum" :
+    trips >= 10 ? "Gold" :
+    trips >= 5  ? "Silver" : "Bronze";
   const loyaltyColor = LOYALTY_COLOR[loyaltyLevel] ?? "#1650D0";
 
   return (
