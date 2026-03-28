@@ -115,7 +115,6 @@ export default function ResultatsScreen() {
 
   const doSearch = async (f: string, t: string, d: string, p: number) => {
     if (!f.trim() || !t.trim()) return;
-    console.log("[Resultats] Recherche:", { from: f, to: t, date: d, passengers: p });
     setLoading(true);
     setSearched(true);
     setUsingFallback(false);
@@ -123,7 +122,6 @@ export default function ResultatsScreen() {
       const url = `/trips/search?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}&date=${d}&passengers=${p}`;
       const raw = await apiFetch<unknown>(url);
       const data: Trip[] = Array.isArray(raw) ? (raw as Trip[]) : [];
-      console.log("[Resultats] Trajets reçus:", data.length);
       if (data.length === 0) {
         const fallback = buildFallbackTrips(f, t, d);
         if (fallback.length > 0) {
@@ -199,7 +197,6 @@ export default function ResultatsScreen() {
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setQuickStates((s) => ({ ...s, [item.id]: "success" }));
-      console.log("[Resultats] Réservation créée:", res.bookingRef);
       setTimeout(() => {
         router.push("/client/mes-reservations" as any);
       }, 900);

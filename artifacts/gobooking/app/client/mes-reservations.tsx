@@ -133,9 +133,7 @@ export default function MesReservationsScreen() {
   const load = useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
-      console.log("[mes-reservations] chargement…");
       const data = await apiFetch<Booking[]>("/bookings", { token: token ?? undefined });
-      console.log("[mes-reservations] reçu:", data?.length ?? 0, "réservations");
       setBookings(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("[mes-reservations] erreur:", err);

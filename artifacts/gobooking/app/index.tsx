@@ -11,7 +11,8 @@ import {
 
 import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
-const MIN_DISPLAY_MS = 900;
+const MIN_DISPLAY_MS = 300;
+const ND = Platform.OS !== "web";
 
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
@@ -26,12 +27,12 @@ export default function SplashScreen() {
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
-        Animated.timing(logoOpacity,  { toValue: 1, duration: 380, useNativeDriver: false }),
-        Animated.spring(logoScale,    { toValue: 1, tension: 80, friction: 7, useNativeDriver: false }),
+        Animated.timing(logoOpacity,  { toValue: 1, duration: 240, useNativeDriver: ND }),
+        Animated.spring(logoScale,    { toValue: 1, tension: 100, friction: 8, useNativeDriver: ND }),
       ]),
       Animated.parallel([
-        Animated.timing(textOpacity,    { toValue: 1, duration: 280, useNativeDriver: false }),
-        Animated.timing(textTranslateY, { toValue: 0, duration: 280, useNativeDriver: false }),
+        Animated.timing(textOpacity,    { toValue: 1, duration: 180, useNativeDriver: ND }),
+        Animated.timing(textTranslateY, { toValue: 0, duration: 180, useNativeDriver: ND }),
       ]),
     ]).start();
 

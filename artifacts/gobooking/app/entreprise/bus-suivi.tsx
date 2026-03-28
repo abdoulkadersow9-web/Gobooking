@@ -162,7 +162,6 @@ export default function BusSuiviScreen() {
     if (!token) { setLoading(false); setRefreshing(false); return; }
     try {
       const data = await apiFetch("/company/buses/suivi", { token: token ?? undefined });
-      console.log("[bus-suivi] API response:", JSON.stringify(data).substring(0, 200));
       setBuses(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("[bus-suivi] fetch error:", err);

@@ -332,7 +332,6 @@ export default function HomeScreen() {
       Alert.alert("Trajet invalide", "La ville de départ et d'arrivée doivent être différentes.");
       return;
     }
-    console.log("[GoBooking] Recherche trajet:", { from, to, date, passengers });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push({ pathname: "/client/resultats", params: { from, to, date, passengers: passengers.toString() } } as never);
   };

@@ -96,7 +96,6 @@ export default function TripDetailScreen() {
       router.push("/(auth)/login" as any);
       return;
     }
-    console.log("[Réserver] bouton cliqué — tripId:", trip.id, "user:", user?.email);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBooking("loading");
     try {
@@ -105,7 +104,6 @@ export default function TripDetailScreen() {
         token: token ?? undefined,
         body: { tripId: trip.id },
       });
-      console.log("[Réserver] succès:", result.bookingRef, result.from, "→", result.to);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setBooking("success");
       setTimeout(() => {

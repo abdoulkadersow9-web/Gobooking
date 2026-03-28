@@ -309,7 +309,6 @@ export default function RouteScreen() {
   };
 
   const handleManualBooking = async () => {
-    console.log("[Montée] Bouton cliqué — début validation");
     if (!manualName.trim()) { Alert.alert("Erreur", "Entrez le nom du passager."); return; }
     if (!manualPhone.trim()) { Alert.alert("Erreur", "Entrez le numéro de téléphone."); return; }
     const seats = parseInt(manualSeats, 10);
@@ -321,7 +320,6 @@ export default function RouteScreen() {
       boardingPoint: manualPoint.trim() || undefined,
       seatCount: seats,
     };
-    console.log("[Montée] Données envoyées :", JSON.stringify(payload));
 
     setManualSaving(true);
     try {
@@ -329,7 +327,6 @@ export default function RouteScreen() {
         token: token ?? undefined, method: "POST",
         body: payload,
       });
-      console.log("[Montée] Réponse API :", JSON.stringify(res));
       setManualSuccess({ bookingRef: res.bookingRef, total: res.totalAmount });
       setManualName(""); setManualPhone(""); setManualPoint(""); setManualSeats("1");
       if (activeTrip) loadPassengers(activeTrip.id);
