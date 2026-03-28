@@ -9,8 +9,8 @@ import { Ionicons, Feather } from "@expo/vector-icons";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { BackHandler, Platform, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { BackHandler, InteractionManager, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -131,7 +131,7 @@ function AuthGuard() {
   return null;
 }
 
-/* ─── Indicateur offline global ───────────────────────────── */
+/* ─── Indicateur offline global — monté après le premier rendu ── */
 function GlobalNetworkMonitor() {
   const insets  = useSafeAreaInsets();
   const network = useNetworkStatus(BASE_URL);
@@ -172,9 +172,19 @@ function BackHandlerGuard() {
 }
 
 function RootLayoutNav() {
+  /* Defer the network monitor until after the first interaction completes —
+     avoids blocking the initial render with a NetInfo subscription. */
+  const [networkReady, setNetworkReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setNetworkReady(true);
+    });
+    return () => task.cancel();
+  }, []);
+
   return (
     <View style={{ flex: 1 }}>
-      <GlobalNetworkMonitor />
+      {networkReady && <GlobalNetworkMonitor />}
       <AuthGuard />
       <BackHandlerGuard />
       <Stack
@@ -212,13 +222,17 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  /* Notification listeners — non-blocking */
+  /* Notification listeners — deferred until after first interactions complete
+     so they don't compete with the initial render pipeline. */
   useEffect(() => {
-    const cleanup = setupNotificationListeners(
-      (_notification) => {},
-      (_response) => {},
-    );
-    return cleanup;
+    const task = InteractionManager.runAfterInteractions(() => {
+      const cleanup = setupNotificationListeners(
+        (_notification) => {},
+        (_response) => {},
+      );
+      return cleanup;
+    });
+    return () => task.cancel();
   }, []);
 
   return (

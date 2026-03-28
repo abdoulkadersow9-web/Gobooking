@@ -8,7 +8,7 @@ const config = getDefaultConfig(__dirname);
 config.maxWorkers = Math.max(os.cpus().length - 1, 2);
 
 /* ── Stable cache version — only bump if you change the transform pipeline ── */
-config.cacheVersion = "gobooking-v3";
+config.cacheVersion = "gobooking-v4";
 
 /* ── Faster resolver ── */
 config.resolver = {
@@ -36,6 +36,14 @@ config.resolver = {
 config.transformer = {
   ...config.transformer,
   assetPlugins: config.transformer?.assetPlugins ?? [],
+  /**
+   * inlineRequires: the single most impactful startup optimization in React Native.
+   * Metro wraps require() calls so modules are only evaluated when first accessed,
+   * NOT at bundle parse time. Heavy screens (route, company, suivi…) are deferred
+   * until the user actually navigates to them.
+   * Official recommendation: https://reactnative.dev/docs/ram-bundles-inline-requires
+   */
+  inlineRequires: true,
 };
 
 /* ── Serializer: keep output lean ── */
