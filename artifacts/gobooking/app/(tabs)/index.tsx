@@ -25,6 +25,40 @@ import { apiFetch } from "@/utils/api";
 
 const _ws = (css: string): any => Platform.OS === "web" ? { boxShadow: css } : {};
 
+/* ─── Helpers UX ──────────────────────────────────────────────────────── */
+function getDepartsIn(departureTime: string, date?: string): number | null {
+  try {
+    const now = new Date();
+    const [h, m] = (departureTime ?? "").split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    const dep = date ? new Date(date) : new Date();
+    dep.setHours(h, m, 0, 0);
+    const diff = Math.round((dep.getTime() - now.getTime()) / 60000);
+    return diff >= 0 && diff <= 180 ? diff : null;
+  } catch { return null; }
+}
+
+function seatsColor(n: number): string {
+  if (n <= 2) return "#DC2626";
+  if (n <= 5) return "#D97706";
+  return "#059669";
+}
+
+function PulsingDot({ color = "#EF4444", size = 8 }: { color?: string; size?: number }) {
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.7, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1,   duration: 650, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return (
+    <Animated.View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color, transform: [{ scale: pulse }] }} />
+  );
+}
+
 /* ─── Recommandations IA ─────────────────────────────────────────────── */
 interface RecommendedTrip {
   id: string;
@@ -547,7 +581,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={styles.livePill}>
-            <View style={styles.liveDot2} />
+            <PulsingDot color="#EF4444" size={7} />
             <Text style={styles.livePillText}>LIVE</Text>
           </View>
         </Pressable>
@@ -865,26 +899,46 @@ export default function HomeScreen() {
                   </View>
 
                   {/* Détails */}
-                  <View style={{ flexDirection: "row", gap: 14, marginBottom: 10 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <Feather name="calendar" size={11} color="#94A3B8" />
-                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{fmtDate}</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <Feather name="clock" size={11} color="#94A3B8" />
-                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.departureTime}</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                      <Feather name="users" size={11} color="#94A3B8" />
-                      <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.availableSeats} places</Text>
-                    </View>
-                    {trip.duration && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Feather name="activity" size={11} color="#94A3B8" />
-                        <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.duration}</Text>
+                  {(() => {
+                    const departsIn = getDepartsIn(trip.departureTime, trip.date);
+                    const sc = seatsColor(trip.availableSeats);
+                    return (
+                      <View style={{ gap: 6, marginBottom: 10 }}>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Feather name="calendar" size={11} color="#94A3B8" />
+                            <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{fmtDate}</Text>
+                          </View>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Feather name="clock" size={11} color="#94A3B8" />
+                            <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.departureTime}</Text>
+                          </View>
+                          {trip.duration && (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Feather name="activity" size={11} color="#94A3B8" />
+                              <Text style={{ fontSize: 11, color: "#64748B", fontFamily: "Inter_500Medium" }}>{trip.duration}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                          {departsIn !== null && (
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: departsIn <= 30 ? "#FEF2F2" : "#EFF6FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                              <PulsingDot color={departsIn <= 30 ? "#EF4444" : "#3B82F6"} size={5} />
+                              <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: departsIn <= 30 ? "#DC2626" : "#1D4ED8" }}>
+                                {departsIn === 0 ? "Départ imminent" : `Dans ${departsIn} min`}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Feather name="users" size={11} color={sc} />
+                            <Text style={{ fontSize: 11, color: sc, fontFamily: "Inter_600SemiBold" }}>
+                              {trip.availableSeats} place{trip.availableSeats !== 1 ? "s" : ""}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
-                    )}
-                  </View>
+                    );
+                  })()}
 
                   {/* CTA Réserver */}
                   <Pressable

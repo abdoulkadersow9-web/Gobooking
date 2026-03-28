@@ -114,6 +114,17 @@ export default function MesBonsScreen() {
   const LOYALTY_COLOR: Record<string, string> = {
     Bronze: "#92400E", Silver: "#64748B", Gold: "#B45309", Platinum: "#0E7490", Diamond: "#6D28D9",
   };
+  const LOYALTY_ICON: Record<string, "award" | "star" | "zap" | "shield" | "sun"> = {
+    Bronze: "award", Silver: "star", Gold: "zap", Platinum: "shield", Diamond: "sun",
+  };
+  const TIER_THRESHOLDS = [
+    { name: "Bronze",   min: 0,  max: 5,  next: "Silver"   },
+    { name: "Silver",   min: 5,  max: 10, next: "Gold"     },
+    { name: "Gold",     min: 10, max: 20, next: "Platinum" },
+    { name: "Platinum", min: 20, max: 30, next: "Diamond"  },
+    { name: "Diamond",  min: 30, max: 30, next: null       },
+  ];
+
   const trips = wallet?.totalTrips ?? user?.totalTrips ?? 0;
   const loyaltyLevel =
     trips >= 30 ? "Diamond" :
@@ -121,6 +132,18 @@ export default function MesBonsScreen() {
     trips >= 10 ? "Gold" :
     trips >= 5  ? "Silver" : "Bronze";
   const loyaltyColor = LOYALTY_COLOR[loyaltyLevel] ?? "#1650D0";
+
+  const currentTier = TIER_THRESHOLDS.find(t => t.name === loyaltyLevel) ?? TIER_THRESHOLDS[0];
+  const isDiamond   = loyaltyLevel === "Diamond";
+  const tierProgress = isDiamond ? 1 : Math.min(1, (trips - currentTier.min) / (currentTier.max - currentTier.min));
+  const tripsToNext  = isDiamond ? 0 : currentTier.max - trips;
+
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (wallet) {
+      Animated.timing(progressAnim, { toValue: tierProgress, duration: 1100, useNativeDriver: false }).start();
+    }
+  }, [wallet, tierProgress]);
 
   return (
     <View style={styles.container}>
@@ -154,11 +177,40 @@ export default function MesBonsScreen() {
           </View>
           {wallet && (
             <View style={[styles.loyaltyTag, { backgroundColor: loyaltyColor + "22", borderColor: loyaltyColor + "55" }]}>
-              <Feather name="star" size={11} color={loyaltyColor} />
+              <Feather name={LOYALTY_ICON[loyaltyLevel] ?? "star"} size={11} color={loyaltyColor} />
               <Text style={[styles.loyaltyTagText, { color: loyaltyColor }]}>{loyaltyLevel}</Text>
             </View>
           )}
         </View>
+
+        {/* ── Loyalty progress bar ── */}
+        {wallet && (
+          <View style={styles.loyaltyBar}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Feather name={LOYALTY_ICON[loyaltyLevel] ?? "star"} size={13} color={loyaltyColor} />
+                <Text style={styles.loyaltyBarLevel}>{loyaltyLevel}</Text>
+              </View>
+              {isDiamond ? (
+                <Text style={styles.loyaltyBarSub}>Niveau maximum ✦</Text>
+              ) : (
+                <Text style={styles.loyaltyBarSub}>
+                  {tripsToNext} voyage{tripsToNext !== 1 ? "s" : ""} → {currentTier.next}
+                </Text>
+              )}
+            </View>
+            <View style={styles.loyaltyTrack}>
+              <Animated.View style={[styles.loyaltyFill, {
+                width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+                backgroundColor: loyaltyColor,
+              }]} />
+            </View>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 5 }}>
+              <Text style={styles.loyaltyTrip}>{trips} voyage{trips !== 1 ? "s" : ""}</Text>
+              {!isDiamond && <Text style={styles.loyaltyTrip}>{currentTier.max} voyages</Text>}
+            </View>
+          </View>
+        )}
       </LinearGradient>
 
       <ScrollView
@@ -282,29 +334,65 @@ export default function MesBonsScreen() {
 
         {/* Loyalty tips (when wallet loaded) */}
         {wallet && !loading && (
-          <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardIconWrap, { backgroundColor: "#ECFDF5" }]}>
-                <Feather name="trending-up" size={16} color="#059669" />
+          <Animated.View style={{ opacity: fadeAnim, gap: 14 }}>
+            {/* Tier ladder */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, { backgroundColor: "#FEF9C3" }]}>
+                  <Feather name="award" size={16} color="#B45309" />
+                </View>
+                <Text style={styles.cardTitle}>Programme fidélité</Text>
               </View>
-              <Text style={styles.cardTitle}>Votre fidélité</Text>
+              {[
+                { name: "Bronze",   icon: "award"  as const, min: 0,  max: 5,  color: "#92400E", bg: "#FEF3C7" },
+                { name: "Silver",   icon: "star"   as const, min: 5,  max: 10, color: "#64748B", bg: "#F1F5F9" },
+                { name: "Gold",     icon: "zap"    as const, min: 10, max: 20, color: "#B45309", bg: "#FFFBEB" },
+                { name: "Platinum", icon: "shield" as const, min: 20, max: 30, color: "#0E7490", bg: "#ECFEFF" },
+                { name: "Diamond",  icon: "sun"    as const, min: 30, max: 30, color: "#6D28D9", bg: "#F5F3FF" },
+              ].map((tier, i, arr) => {
+                const isCurrent = tier.name === loyaltyLevel;
+                const isPassed  = trips >= tier.max && i < arr.length - 1;
+                return (
+                  <View key={tier.name} style={[styles.tierRow, i === arr.length - 1 && { borderBottomWidth: 0 }, isCurrent && { backgroundColor: tier.bg, borderRadius: 12, marginHorizontal: -4, paddingHorizontal: 4 }]}>
+                    <View style={[styles.tierIcon, { backgroundColor: isPassed || isCurrent ? tier.bg : "#F8FAFC", borderColor: isCurrent ? tier.color + "50" : "transparent", borderWidth: 1 }]}>
+                      <Feather name={tier.icon} size={14} color={isPassed || isCurrent ? tier.color : "#CBD5E1"} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.tierName, { color: isPassed || isCurrent ? "#0F172A" : "#94A3B8" }]}>{tier.name}</Text>
+                      <Text style={styles.tierSub}>{tier.min === tier.max ? `${tier.min}+ voyages` : `${tier.min}–${tier.max} voyages`}</Text>
+                    </View>
+                    {isCurrent && (
+                      <View style={[styles.tierBadge, { backgroundColor: tier.color }]}>
+                        <Text style={styles.tierBadgeText}>Votre niveau</Text>
+                      </View>
+                    )}
+                    {isPassed && <Feather name="check-circle" size={16} color={tier.color} />}
+                  </View>
+                );
+              })}
             </View>
-            <View style={styles.tipRow}>
-              <Feather name="award" size={13} color="#059669" />
-              <Text style={styles.tipText}>{wallet.totalTrips} voyage{wallet.totalTrips !== 1 ? "s" : ""} effectué{wallet.totalTrips !== 1 ? "s" : ""}</Text>
-            </View>
-            {wallet.referralCode ? (
-              <View style={styles.tipRow}>
-                <Feather name="share-2" size={13} color={Colors.light.primary} />
-                <Text style={styles.tipText}>
-                  Code parrainage :{" "}
-                  <Text style={{ fontFamily: "Inter_700Bold", color: Colors.light.primary }}>{wallet.referralCode}</Text>
-                </Text>
+
+            {/* Parrainage & infos */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <View style={[styles.cardIconWrap, { backgroundColor: "#ECFDF5" }]}>
+                  <Feather name="trending-up" size={16} color="#059669" />
+                </View>
+                <Text style={styles.cardTitle}>Avantages</Text>
               </View>
-            ) : null}
-            <View style={[styles.tipRow, { borderBottomWidth: 0 }]}>
-              <Feather name="info" size={13} color="#D97706" />
-              <Text style={styles.tipText}>Parrainez vos amis → +500 FCFA par inscription réussie</Text>
+              {wallet.referralCode ? (
+                <View style={styles.tipRow}>
+                  <Feather name="share-2" size={13} color={Colors.light.primary} />
+                  <Text style={styles.tipText}>
+                    Code parrainage :{" "}
+                    <Text style={{ fontFamily: "Inter_700Bold", color: Colors.light.primary }}>{wallet.referralCode}</Text>
+                  </Text>
+                </View>
+              ) : null}
+              <View style={[styles.tipRow, { borderBottomWidth: 0 }]}>
+                <Feather name="info" size={13} color="#D97706" />
+                <Text style={styles.tipText}>Parrainez vos amis → +500 FCFA par inscription réussie</Text>
+              </View>
             </View>
           </Animated.View>
         )}
@@ -346,6 +434,23 @@ const styles = StyleSheet.create({
     borderWidth: 1, flexShrink: 0,
   },
   loyaltyTagText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+
+  loyaltyBar: {
+    marginTop: 16, backgroundColor: "rgba(255,255,255,0.10)",
+    borderRadius: 16, padding: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)",
+  },
+  loyaltyBarLevel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.2 },
+  loyaltyBarSub:   { fontSize: 11, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.55)" },
+  loyaltyTrack:    { height: 7, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 4, overflow: "hidden" },
+  loyaltyFill:     { height: 7, borderRadius: 4 },
+  loyaltyTrip:     { fontSize: 10, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.45)" },
+
+  tierRow:     { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  tierIcon:    { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  tierName:    { fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 1 },
+  tierSub:     { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  tierBadge:   { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  tierBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "white" },
 
   sectionTitle: {
     fontSize: 13, fontFamily: "Inter_700Bold", color: "#64748B",

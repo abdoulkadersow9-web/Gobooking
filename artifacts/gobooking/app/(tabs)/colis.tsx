@@ -82,6 +82,14 @@ function getStep(status: string): number {
 
 function ParcelTimeline({ status }: { status: string }) {
   const step = getStep(status);
+  const dotAnims = useRef(TL_STEPS.map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    Animated.stagger(
+      100,
+      dotAnims.map(a => Animated.spring(a, { toValue: 1, speed: 20, bounciness: 7, useNativeDriver: true }))
+    ).start();
+  }, []);
+
   if (step === -1) {
     return (
       <View style={tl.cancelRow}>
@@ -98,12 +106,12 @@ function ParcelTimeline({ status }: { status: string }) {
         return (
           <React.Fragment key={s.key}>
             <View style={tl.step}>
-              <View style={[tl.dot, done && tl.dotDone, active && tl.dotActive]}>
+              <Animated.View style={[tl.dot, done && tl.dotDone, active && tl.dotActive, { transform: [{ scale: dotAnims[i] }] }]}>
                 <Feather name={done ? s.icon : "circle"} size={done ? 9 : 7} color={done ? "white" : "#CBD5E1"} />
-              </View>
-              <Text style={[tl.label, done && tl.labelDone, active && tl.labelActive]}>
+              </Animated.View>
+              <Animated.Text style={[tl.label, done && tl.labelDone, active && tl.labelActive, { opacity: dotAnims[i] }]}>
                 {s.label}
-              </Text>
+              </Animated.Text>
             </View>
             {i < TL_STEPS.length - 1 && (
               <View style={[tl.line, i < step && tl.lineDone]} />
