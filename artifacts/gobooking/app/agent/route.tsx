@@ -799,9 +799,36 @@ export default function RouteScreen() {
             </>
           )}
 
+          {/* ── TOUR DE CONTRÔLE — Bloc central ── */}
+          <View style={S.tourBlock}>
+            {/* Header du bloc */}
+            <View style={S.tourBlockHdr}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                <Feather name="monitor" size={12} color="#22C55E" />
+                <Text style={S.tourBlockTitle}>TOUR DE CONTRÔLE</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                {camSim === "linked" && (
+                  <>
+                    <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E", opacity: camBlink }} />
+                    <Text style={{ color: "#22C55E", fontSize: 9, fontWeight: "900", letterSpacing: 0.8 }}>LIVE</Text>
+                  </>
+                )}
+                {camSim !== "linked" && activeTrip && (
+                  <>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#60A5FA" }} />
+                    <Text style={{ color: "#60A5FA", fontSize: 9, fontWeight: "800" }}>ACTIF</Text>
+                  </>
+                )}
+                {!activeTrip && (
+                  <Text style={{ color: "#475569", fontSize: 9, fontWeight: "700" }}>EN VEILLE</Text>
+                )}
+              </View>
+            </View>
+
           {/* ── Cockpit KPI Strip ── */}
           {activeTrip && (
-            <View style={S.cockpitStrip}>
+            <View style={[S.cockpitStrip, { marginHorizontal: 0, marginBottom: 0, marginTop: 0 }]}>
               <View style={S.cockpitItem}>
                 <Text style={[S.cockpitNum, { color: "#059669" }]}>{boardedCount}</Text>
                 <Text style={S.cockpitLbl}>À bord</Text>
@@ -839,6 +866,7 @@ export default function RouteScreen() {
           <View style={[S.camPanel,
             camSim === "linked"    && S.camPanelLive,
             camSim === "connected" && S.camPanelReady,
+            { marginHorizontal: 0, backgroundColor: "#111827", borderColor: "#1E2D40" },
           ]}>
             {/* Header row */}
             <View style={S.camPanelHdr}>
@@ -898,12 +926,37 @@ export default function RouteScreen() {
               <View style={S.camVideoArea}>
                 {/* Grille 2×2 caméras simulées */}
                 <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 2 }}>
-                  {[0, 1, 2, 3].map(i => (
+                  {([
+                    { label: "AVANT",    active: true },
+                    { label: "ARRIÈRE",  active: false },
+                    { label: "GAUCHE",   active: false },
+                    { label: "DROITE",   active: false },
+                  ] as const).map(({ label, active }, i) => (
                     <View key={i} style={{ width: "50%", height: "50%", padding: 1.5 }}>
                       <View style={{
-                        flex: 1, borderRadius: 3,
-                        backgroundColor: `rgba(${10 + i * 8},${16 + i * 8},${34 + i * 10},0.92)`,
-                      }} />
+                        flex: 1, borderRadius: 4, overflow: "hidden", position: "relative",
+                        backgroundColor: `rgba(${10 + i * 9},${16 + i * 9},${34 + i * 11},0.95)`,
+                      }}>
+                        {/* Label caméra */}
+                        <Text style={{
+                          position: "absolute", top: 5, left: 5,
+                          fontSize: 7.5, fontWeight: "900", color: "rgba(148,163,184,0.85)",
+                          letterSpacing: 0.6,
+                        }}>{label}</Text>
+                        {/* Dot actif / inactif */}
+                        <View style={{
+                          position: "absolute", top: 5, right: 5,
+                          width: 5, height: 5, borderRadius: 3,
+                          backgroundColor: active && camSim === "linked" ? "#22C55E"
+                            : active && camSim === "testing" ? "#FCD34D"
+                            : "rgba(100,116,139,0.5)",
+                        }} />
+                        {/* Faux scan-line horizontal central */}
+                        <View style={{
+                          position: "absolute", bottom: "40%", left: 6, right: 6,
+                          height: 1, backgroundColor: "rgba(148,163,184,0.06)",
+                        }} />
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -1034,7 +1087,7 @@ export default function RouteScreen() {
 
           {/* ── Alertes actives (bannière rapide) ── */}
           {allAlerts.length > 0 && (
-            <TouchableOpacity onPress={() => setTab("alertes")} style={S.alertBanner}>
+            <TouchableOpacity onPress={() => setTab("alertes")} style={[S.alertBanner, { marginHorizontal: 0 }]}>
               <View style={S.alertBannerIcon}>
                 <Ionicons name="warning" size={16} color="#DC2626" />
               </View>
@@ -1044,6 +1097,7 @@ export default function RouteScreen() {
               <Ionicons name="chevron-forward" size={15} color="#DC2626" />
             </TouchableOpacity>
           )}
+          </View>{/* ── FIN TOUR DE CONTRÔLE ── */}
 
           {/* ── Actions rapides (grille dashboard) ── */}
           <View style={S.quickGrid}>
@@ -2581,8 +2635,16 @@ const S = StyleSheet.create({
   camAdvancedLink: { alignItems: "flex-end", paddingTop: 2 },
   camAdvancedTxt:  { fontSize: 11, color: "#334155", fontWeight: "600" },
 
+  /* ── Tour de Contrôle block wrapper ── */
+  tourBlock:       { backgroundColor: "#0A0E1A", borderRadius: 18, padding: 14, gap: 10,
+                     borderWidth: 1, borderColor: "#1E293B",
+                     shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
+  tourBlockHdr:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                     paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "#1E293B" },
+  tourBlockTitle:  { fontSize: 10, fontWeight: "900", color: "#64748B", letterSpacing: 1 },
+
   /* ── Camera video preview area ── */
-  camVideoArea:    { height: 148, backgroundColor: "#020817", borderRadius: 11,
+  camVideoArea:    { height: 220, backgroundColor: "#020817", borderRadius: 11,
                      overflow: "hidden", position: "relative" },
   camVideoOverlay: { position: "absolute", bottom: 0, left: 0, right: 0,
                      paddingHorizontal: 10, paddingVertical: 8,
