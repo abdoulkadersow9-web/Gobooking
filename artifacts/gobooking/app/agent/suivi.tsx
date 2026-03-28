@@ -424,37 +424,73 @@ export default function SuiviScreen() {
           showsVerticalScrollIndicator={false}
         >
 
+          {/* ── DASHBOARD STATS ROW ── */}
+          <View style={S.statsRow}>
+            <View style={[S.statCard, { borderLeftColor: "#1D4ED8" }]}>
+              <Text style={S.statNum}>{data?.buses?.length ?? 0}</Text>
+              <Text style={S.statLabel}>Bus actifs</Text>
+            </View>
+            <View style={[S.statCard, { borderLeftColor: hasAlerts ? RED : "#4ADE80" }]}>
+              <Text style={[S.statNum, { color: hasAlerts ? RED : "#166534" }]}>{data?.alerts?.length ?? 0}</Text>
+              <Text style={S.statLabel}>Alertes</Text>
+            </View>
+            <View style={[S.statCard, { borderLeftColor: hasCameras ? CAM_GR : "#94A3B8" }]}>
+              <Text style={[S.statNum, { color: hasCameras ? "#166534" : "#94A3B8" }]}>{activeCamCount}</Text>
+              <Text style={S.statLabel}>Caméras live</Text>
+            </View>
+          </View>
+
           {/* ── ALERT PANEL ── */}
           {hasAlerts && (
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <View style={S.alarmBanner}>
-                <Ionicons name="warning" size={24} color="#fff" />
-                <Text style={S.alarmTxt}>{data!.alerts.length} ALERTE{data!.alerts.length > 1 ? "S" : ""} ACTIVE{data!.alerts.length > 1 ? "S" : ""}</Text>
-                <Ionicons name="warning" size={24} color="#fff" />
+                <Ionicons name="warning" size={20} color="#fff" />
+                <View style={{ flex: 1 }}>
+                  <Text style={S.alarmTxt}>
+                    {data!.alerts.length} ALERTE{data!.alerts.length > 1 ? "S" : ""} ACTIVE{data!.alerts.length > 1 ? "S" : ""}
+                  </Text>
+                  <Text style={S.alarmSub}>
+                    {data!.alerts[0]?.busName ? `Bus : ${data!.alerts[0].busName}` : "Intervention requise"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.7)" />
               </View>
             </Animated.View>
           )}
 
           {/* ── ALERTS LIST ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>Alertes ({data?.alerts?.length ?? 0})</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={S.sectionTitle}>Alertes actives</Text>
+              {data?.alerts?.length ? (
+                <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{data.alerts.length}</Text>
+                </View>
+              ) : null}
+            </View>
             {!data?.alerts?.length && (
-              <View style={S.empty}><Ionicons name="checkmark-circle" size={32} color="#4ADE80" />
+              <View style={S.empty}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center", marginBottom: 4 }}>
+                  <Ionicons name="checkmark-circle" size={28} color="#22C55E" />
+                </View>
                 <Text style={S.emptyTxt}>Aucune alerte active</Text>
+                <Text style={{ fontSize: 11, color: "#94A3B8", textAlign: "center" }}>Tous les bus roulent normalement</Text>
               </View>
             )}
             {data?.alerts?.map(alert => {
               const hasResponse   = !!alert.response;
               const reqRequested  = !!alert.responseRequested;
               const responseOpt   = RESPONSE_OPTIONS.find(r => r.id === alert.response);
+              const typeColor  = alert.type === "panne" ? "#DC2626" : alert.type === "controle" ? "#D97706" : RED;
+              const typeBg     = alert.type === "panne" ? "#FEE2E2" : alert.type === "controle" ? "#FEF3C7" : RED_L;
+              const borderCol  = alert.type === "panne" ? "#DC2626" : alert.type === "controle" ? "#D97706" : "#94A3B8";
+              const typeLabel  = alert.type === "panne" ? "PANNE" : alert.type === "controle" ? "CONTRÔLE" : "ALERTE";
               return (
-                <View key={alert.id} style={S.alertCard}>
+                <View key={alert.id} style={[S.alertCard, { borderLeftColor: borderCol }]}>
                   {/* Top row */}
                   <View style={S.alertTop}>
-                    <View style={[S.alertTypeBadge, { backgroundColor: alert.type === "panne" ? "#FEE2E2" : RED_L }]}>
-                      <Text style={[S.alertTypeTxt, { color: alert.type === "panne" ? "#DC2626" : RED }]}>
-                        {alert.type === "panne" ? "PANNE" : "ALERTE"}
-                      </Text>
+                    <View style={[S.alertTypeBadge, { backgroundColor: typeBg }]}>
+                      <Text style={[S.alertTypeTxt, { color: typeColor }]}>{typeLabel}</Text>
                     </View>
                     <Text style={S.alertBus}>{alert.busName ?? "Bus inconnu"}</Text>
                     <Text style={S.alertTime}>
@@ -463,11 +499,15 @@ export default function SuiviScreen() {
                   </View>
 
                   <Text style={S.alertMsg}>{alert.message}</Text>
-                  <Text style={S.alertAgent}>Déclenché par : {alert.agentName ?? alert.agentId}</Text>
+                  <Text style={S.alertAgent}>
+                    <Ionicons name="person-outline" size={10} color="#94A3B8" />{" "}
+                    {alert.agentName ?? alert.agentId}
+                  </Text>
 
                   {/* Response */}
                   {hasResponse && responseOpt && (
                     <View style={[S.responsePill, { backgroundColor: responseOpt.bg }]}>
+                      <Ionicons name="checkmark-circle" size={13} color={responseOpt.color} />
                       <Text style={[S.responseTxt, { color: responseOpt.color }]}>
                         Réponse : {responseOpt.label}
                       </Text>
@@ -476,7 +516,7 @@ export default function SuiviScreen() {
                   {reqRequested && !hasResponse && (
                     <View style={S.waitPill}>
                       <ActivityIndicator size="small" color="#D97706" />
-                      <Text style={S.waitTxt}>Réponse en attente de l'agent...</Text>
+                      <Text style={S.waitTxt}>En attente de réponse de l'agent route…</Text>
                     </View>
                   )}
 
@@ -498,7 +538,7 @@ export default function SuiviScreen() {
                       disabled={acting}
                     >
                       {acting ? <ActivityIndicator size="small" color="#166534" /> : <Ionicons name="checkmark-circle-outline" size={14} color="#166534" />}
-                      <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Confirmer résolution</Text>
+                      <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Résolu</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -509,7 +549,10 @@ export default function SuiviScreen() {
           {/* ── BUS LIST — Tour de contrôle ── */}
           <View style={S.section}>
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={S.sectionTitle}>Bus en temps réel ({data?.buses?.length ?? 0})</Text>
+              <View>
+                <Text style={S.sectionTitle}>Bus en temps réel</Text>
+                <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{data?.buses?.length ?? 0} véhicule{(data?.buses?.length ?? 0) > 1 ? "s" : ""} suivi{(data?.buses?.length ?? 0) > 1 ? "s" : ""}</Text>
+              </View>
               {hasCameras && (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
                   <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CAM_GR }} />
@@ -734,7 +777,7 @@ const CP = StyleSheet.create({
 
 /* ── Styles ───────────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe:       { flex: 1, backgroundColor: "#FFF1F2" },
+  safe:       { flex: 1, backgroundColor: "#F1F5F9" },
   header:     { backgroundColor: RED_D, paddingHorizontal: 16, paddingVertical: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerRow:  { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
   headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", justifyContent: "center", alignItems: "center" },
@@ -748,8 +791,15 @@ const S = StyleSheet.create({
   syncDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },
   syncTxt:    { color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
 
-  alarmBanner:{ backgroundColor: RED, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, shadowColor: RED, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
-  alarmTxt:   { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
+  statsRow:   { flexDirection: "row", gap: 10 },
+  statCard:   { flex: 1, backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
+                borderLeftWidth: 3, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+  statNum:    { fontSize: 22, fontWeight: "900", color: "#0F172A", lineHeight: 26 },
+  statLabel:  { fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 1 },
+
+  alarmBanner:{ backgroundColor: RED, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, shadowColor: RED, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6 },
+  alarmTxt:   { color: "#fff", fontSize: 14, fontWeight: "900", letterSpacing: 0.4 },
+  alarmSub:   { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 },
 
   section:      { gap: 10 },
   sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
