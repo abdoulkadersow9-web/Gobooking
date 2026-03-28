@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing,
@@ -141,10 +141,13 @@ export default function RouteScreen() {
 
   /* ── Caméra embarquée — simulation ── */
   type CamSimState = "none" | "qr_scanning" | "bt_scanning" | "wifi_scanning" | "connecting" | "testing" | "connected" | "linked";
-  const [camSim,    setCamSim]    = useState<CamSimState>("none");
-  const [camDevice, setCamDevice] = useState<string | null>(null);
-  const camScanLine = useRef(new Animated.Value(0)).current;
-  const camBlink    = useRef(new Animated.Value(1)).current;
+  const [camSim,        setCamSim]        = useState<CamSimState>("none");
+  const [camDevice,     setCamDevice]     = useState<string | null>(null);
+  const [camFrameCount, setCamFrameCount] = useState(0);
+  const [camSignal,     setCamSignal]     = useState(95);
+  const camAutoLinkRef  = useRef(false);
+  const camScanLine     = useRef(new Animated.Value(0)).current;
+  const camBlink        = useRef(new Animated.Value(1)).current;
 
   interface StopWithPassengers {
     id: string;
@@ -402,40 +405,76 @@ export default function RouteScreen() {
     camBlink.setValue(1);
   }, [camSim]);
 
-  const camStartQr = () => {
-    setCamSim("qr_scanning"); setCamDevice(null);
-    setTimeout(() => { setCamSim("connecting"); setCamDevice("CAM-GTB-" + (1000 + Math.floor(Math.random() * 8999))); }, 2500);
-    setTimeout(() => setCamSim("connected"), 4200);
-  };
-  const camStartBt = () => {
-    setCamSim("bt_scanning"); setCamDevice(null);
-    setTimeout(() => setCamDevice("GOBOOKING-CAM-01"), 2000);
-    setTimeout(() => setCamSim("connecting"), 2900);
-    setTimeout(() => setCamSim("connected"), 4500);
-  };
-  const camStartWifi = () => {
-    setCamSim("wifi_scanning"); setCamDevice(null);
-    setTimeout(() => setCamDevice("192.168.43.1:8080"), 2000);
-    setTimeout(() => setCamSim("connecting"), 2900);
-    setTimeout(() => setCamSim("connected"), 4500);
-  };
-  const camTest = () => {
-    setCamSim("testing");
-    setTimeout(() => setCamSim("connected"), 3000);
-  };
-  const camAssociate = async () => {
+  /* ── Caméra — fonctions memoïsées (useCallback pour performance) ── */
+  const camDisconnect = useCallback(() => {
+    setCamSim("none"); setCamDevice(null);
+    setCamFrameCount(0); setCamSignal(95);
+    camAutoLinkRef.current = false;
+  }, []);
+
+  const camAssociate = useCallback(async () => {
     if (activeTrip && token) {
       try {
         await fetch(`${BASE_URL}/agent/suivi/trips/${activeTrip.id}/camera/connect`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ streamUrl: `rtsp://sim.gobooking.ci/${camDevice ?? "cam-sim"}`, position: "conducteur" }),
+          body: JSON.stringify({
+            streamUrl: `rtsp://sim.gobooking.ci/${camDevice ?? "cam-sim"}`,
+            position: "conducteur",
+          }),
         });
       } catch {}
     }
     setCamSim("linked");
-  };
-  const camDisconnect = () => { setCamSim("none"); setCamDevice(null); };
+  }, [activeTrip, token, camDevice]);
+
+  const camTest = useCallback(() => {
+    setCamSim("testing");
+    setTimeout(() => setCamSim("connected"), 3000);
+  }, []);
+
+  const camStartQr = useCallback(() => {
+    setCamSim("qr_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
+    setTimeout(() => { setCamSim("connecting"); setCamDevice("CAM-GTB-" + (1000 + Math.floor(Math.random() * 8999))); }, 2500);
+    setTimeout(() => setCamSim("connected"), 4200);
+  }, []);
+
+  const camStartBt = useCallback(() => {
+    setCamSim("bt_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
+    setTimeout(() => setCamDevice("GOBOOKING-CAM-01"), 2000);
+    setTimeout(() => setCamSim("connecting"), 2900);
+    setTimeout(() => setCamSim("connected"), 4500);
+  }, []);
+
+  const camStartWifi = useCallback(() => {
+    setCamSim("wifi_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
+    setTimeout(() => setCamDevice("192.168.43.1:8080"), 2000);
+    setTimeout(() => setCamSim("connecting"), 2900);
+    setTimeout(() => setCamSim("connected"), 4500);
+  }, []);
+
+  /* ── Auto-liaison : dès que la caméra est "connected" → associer automatiquement ── */
+  useEffect(() => {
+    if (camSim === "connected" && activeTrip && !camAutoLinkRef.current) {
+      camAutoLinkRef.current = true;
+      const t = setTimeout(() => {
+        camAssociate();
+      }, 1800);
+      return () => clearTimeout(t);
+    }
+  }, [camSim, activeTrip, camAssociate]);
+
+  /* ── Flux simulé : compteur de frames + signal quand LIVE ── */
+  useEffect(() => {
+    if (camSim !== "linked") { setCamFrameCount(0); return; }
+    let frames = 0;
+    const iv = setInterval(() => {
+      frames += 25 + Math.floor(Math.random() * 8);
+      setCamFrameCount(frames);
+      setCamSignal(82 + Math.floor(Math.random() * 17));
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [camSim]);
 
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
@@ -449,7 +488,7 @@ export default function RouteScreen() {
     pollRef.current = setInterval(() => {
       loadPassengers(tripIdToLoad, true);
       loadMyDeparture();
-    }, 15000);
+    }, 8000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeTrip?.id, assignedTripId, loadPassengers, loadMyDeparture]);
 
@@ -593,11 +632,11 @@ export default function RouteScreen() {
     ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")}`
     : null;
 
-  const boardedCount  = passengers.filter(p => p.status === "boarded" || p.status === "confirmed").length;
-  const pendingCount  = passengers.filter(p => p.status !== "boarded" && p.status !== "confirmed").length;
+  const boardedCount = useMemo(() => passengers.filter(p => p.status === "boarded" || p.status === "confirmed").length, [passengers]);
+  const pendingCount = useMemo(() => passengers.filter(p => p.status !== "boarded" && p.status !== "confirmed").length, [passengers]);
 
   /* Toutes les alertes : API + auto-détectées */
-  const allAlerts: BusAlert[] = [...busAlerts, ...autoAlerts];
+  const allAlerts = useMemo<BusAlert[]>(() => [...busAlerts, ...autoAlerts], [busAlerts, autoAlerts]);
 
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
@@ -847,8 +886,8 @@ export default function RouteScreen() {
               </View>
               <View style={S.cockpitDiv} />
               <View style={S.cockpitItem}>
-                <Text style={[S.cockpitNum, { color: camSim === "linked" ? "#22C55E" : "#94A3B8" }]}>
-                  {camSim === "linked" ? "●" : camSim === "connected" ? "○" : "--"}
+                <Text style={[S.cockpitNum, { color: camSim === "linked" ? "#22C55E" : camSim === "connected" ? "#60A5FA" : "#94A3B8" }]}>
+                  {camSim === "linked" ? "●" : camSim === "connected" ? "◎" : camSim !== "none" ? "…" : "--"}
                 </Text>
                 <Text style={S.cockpitLbl}>Caméra</Text>
               </View>
@@ -962,31 +1001,49 @@ export default function RouteScreen() {
                 </View>
                 {/* Overlay info */}
                 <View style={S.camVideoOverlay}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    {camSim === "linked" && (
-                      <>
-                        <Animated.View style={{
-                          width: 7, height: 7, borderRadius: 4,
-                          backgroundColor: "#FF3B3B", opacity: camBlink,
-                        }} />
-                        <Text style={{ color: "#FF3B3B", fontSize: 11, fontWeight: "900", letterSpacing: 0.8 }}>LIVE</Text>
-                      </>
-                    )}
-                    {camSim === "testing" && (
-                      <>
-                        <ActivityIndicator size="small" color="#FCD34D" />
-                        <Text style={{ color: "#FCD34D", fontSize: 11, fontWeight: "800", marginLeft: 2 }}>TEST EN COURS</Text>
-                      </>
-                    )}
-                    {camSim === "connected" && (
-                      <>
-                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#60A5FA" }} />
-                        <Text style={{ color: "#60A5FA", fontSize: 11, fontWeight: "800" }}>PRÊT</Text>
-                      </>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {camSim === "linked" && (
+                        <>
+                          <Animated.View style={{
+                            width: 7, height: 7, borderRadius: 4,
+                            backgroundColor: "#FF3B3B", opacity: camBlink,
+                          }} />
+                          <Text style={{ color: "#FF3B3B", fontSize: 11, fontWeight: "900", letterSpacing: 0.8 }}>LIVE</Text>
+                        </>
+                      )}
+                      {camSim === "testing" && (
+                        <>
+                          <ActivityIndicator size="small" color="#FCD34D" />
+                          <Text style={{ color: "#FCD34D", fontSize: 11, fontWeight: "800", marginLeft: 2 }}>TEST EN COURS</Text>
+                        </>
+                      )}
+                      {camSim === "connected" && (
+                        <>
+                          <ActivityIndicator size="small" color="#60A5FA" />
+                          <Text style={{ color: "#60A5FA", fontSize: 11, fontWeight: "800", marginLeft: 2 }}>Association…</Text>
+                        </>
+                      )}
+                    </View>
+                    {camSim === "linked" && camFrameCount > 0 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <Text style={{ color: "#22C55E", fontSize: 9, fontWeight: "800" }}>▲ {camFrameCount} img</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                          {[0,1,2,3].map(b => (
+                            <View key={b} style={{
+                              width: 3, height: 6 + b * 2,
+                              backgroundColor: b < Math.ceil((camSignal / 100) * 4) ? "#22C55E" : "#1E293B",
+                              borderRadius: 1,
+                            }} />
+                          ))}
+                          <Text style={{ color: "#22C55E", fontSize: 8, fontWeight: "800", marginLeft: 2 }}>{camSignal}%</Text>
+                        </View>
+                      </View>
                     )}
                   </View>
-                  <Text style={{ color: "#475569", fontSize: 9, marginTop: 2 }}>
+                  <Text style={{ color: "#475569", fontSize: 9, marginTop: 3 }}>
                     {camDevice ?? "CAM-SIM"} · 1280×720 · H.264
+                    {camSim === "linked" && activeTrip ? ` · ${activeTrip.from}→${activeTrip.to}` : ""}
                   </Text>
                 </View>
                 {/* Coins de visée */}
