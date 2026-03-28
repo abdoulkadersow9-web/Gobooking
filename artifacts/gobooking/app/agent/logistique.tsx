@@ -22,7 +22,7 @@ const BLUE   = "#0369A1";
 const BLUE_D = "#075985";
 const BLUE_L = "#E0F2FE";
 
-function authHeader(token: string | null) {
+function authHeader(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

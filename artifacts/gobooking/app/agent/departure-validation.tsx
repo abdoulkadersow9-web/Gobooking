@@ -547,7 +547,7 @@ export default function AgentDepartureValidation() {
               </View>
               <TouchableOpacity
                 style={{ backgroundColor: "#F0FDF4", borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderWidth: 1, borderColor: GREEN + "40" }}
-                onPress={() => router.push({ pathname: "/agent/waypoints", params: { tripId: selectedTrip.id, tripName: `${selectedTrip.fromCity} → ${selectedTrip.toCity}` } } as any)}
+                onPress={() => router.push({ pathname: "/agent/waypoints", params: { tripId: selectedTrip.id, tripName: `${selectedTrip.from} → ${selectedTrip.to}` } } as any)}
               >
                 <Feather name="map-pin" size={16} color={GREEN} />
                 <Text style={{ fontSize: 13, fontWeight: "700", color: GREEN, flex: 1 }}>Voir les escales & places libres</Text>

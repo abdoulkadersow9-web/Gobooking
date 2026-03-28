@@ -25,7 +25,7 @@ const RED_D  = "#9F1239";
 const RED_L  = "#FFF1F2";
 const RED_M  = "#FDA4AF";
 
-function authHeader(token: string | null) {
+function authHeader(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 

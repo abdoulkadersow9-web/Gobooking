@@ -140,6 +140,7 @@ interface Parcel {
   deliveryType: string;
   status: string;
   createdAt: string;
+  photoUrl?: string | null;
 }
 
 type TabType = "creer" | "liste" | "retrait" | "valider";

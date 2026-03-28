@@ -426,7 +426,7 @@ export default function TicketsScreen() {
         await saveOffline({
           type: "reservation",
           payload: { tripId: selectedTrip.id, passengerName: passengerName.trim(),
-            passengerPhone: passengerPhone.trim(), seatCount: count, paymentMethod },
+            passengerPhone: passengerPhone.trim(), passengerCount: count, paymentMethod },
           token: token ?? "", createdAt: Date.now(),
         });
         setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count,

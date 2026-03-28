@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { Animated, StyleSheet, View, ViewStyle } from "react-native";
 
 function SkeletonPulse({ width, height = 14, br = 8 }: { width: number | string; height?: number; br?: number }) {
   const opacity = useRef(new Animated.Value(0.35)).current;
@@ -11,7 +11,7 @@ function SkeletonPulse({ width, height = 14, br = 8 }: { width: number | string;
       ])
     ).start();
   }, []);
-  return <Animated.View style={{ width, height, borderRadius: br, backgroundColor: "#D1D5DB", opacity }} />;
+  return <Animated.View style={[{ width, height, borderRadius: br, backgroundColor: "#D1D5DB" } as ViewStyle, { opacity }]} />;
 }
 
 export function SkeletonBookingCard() {

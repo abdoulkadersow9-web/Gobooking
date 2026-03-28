@@ -1034,7 +1034,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={[styles.activityCard, styles.activityCardEmpty]}
                 activeOpacity={0.82}
-                onPress={() => setMode("trajet")}
+                onPress={() => router.push("/client/resultats" as never)}
               >
                 <View style={[styles.activityIconWrap, { backgroundColor: "#EEF2FF", marginBottom: 12 }]}>
                   <Feather name="map" size={18} color={Colors.light.primary} />
@@ -1117,7 +1117,6 @@ export default function HomeScreen() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setFrom(route.from);
               setTo(route.to);
-              setMode("trajet");
               router.push({ pathname: "/client/resultats", params: { from: route.from, to: route.to, date, passengers: "1" } } as never);
             }}
           >

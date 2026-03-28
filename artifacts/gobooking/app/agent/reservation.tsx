@@ -453,7 +453,7 @@ export default function AgentReservation() {
                   {hasBaggage ? (
                     <View style={S.baggageDetails}>
                       <View style={S.baggageDetailRow}>
-                        <Feather name={baggageTypeLabel(b.baggageType).icon} size={14} color="#6B7280" />
+                        <Ionicons name={baggageTypeLabel(b.baggageType).icon as any} size={14} color="#6B7280" />
                         <Text style={S.baggageDetailTxt}>{baggageTypeLabel(b.baggageType).label}</Text>
                       </View>
                       {b.baggageDescription ? (
