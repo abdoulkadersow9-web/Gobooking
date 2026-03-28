@@ -1569,9 +1569,12 @@ router.post("/trip/:tripId/arrive", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    await db.update(tripsTable)
-      .set({ status: "arrived", arrivedAt: new Date() })
-      .where(eq(tripsTable.id, req.params.tripId));
+    await db.execute(sql`
+      UPDATE trips
+      SET status = 'arrived', arrived_at = NOW(),
+          camera_status = 'disconnected', camera_stream_url = NULL, camera_connected_at = NULL
+      WHERE id = ${req.params.tripId}
+    `);
 
     /* ── Clear live GPS — trip is over ── */
     locationStore.delete(req.params.tripId);

@@ -371,9 +371,12 @@ async function autoUpdateTripStatuses() {
     const etaMs = new Date(today + "T" + eta + ":00").getTime();
     if (now.getTime() >= etaMs) {
       await db.execute(sql`
-        UPDATE trips SET status = 'arrived', arrived_at = ${now.toISOString()} WHERE id = ${row.id}
+        UPDATE trips
+        SET status = 'arrived', arrived_at = ${now.toISOString()},
+            camera_status = 'disconnected', camera_stream_url = NULL, camera_connected_at = NULL
+        WHERE id = ${row.id}
       `);
-      console.log(`[Scheduler] 🏁 Trajet ${row.id} (${row.from_city}→${row.to_city}) → ARRIVED`);
+      console.log(`[Scheduler] 🏁 Trajet ${row.id} (${row.from_city}→${row.to_city}) → ARRIVED · caméra déconnectée`);
 
       // Notifier les passagers
       const bookings = await db.select({ id: bookingsTable.id, userId: bookingsTable.userId })
