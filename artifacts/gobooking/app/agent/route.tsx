@@ -2441,7 +2441,7 @@ const S = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: "#F8FAFC" },
 
   /* Header — cockpit */
-  header:       { backgroundColor: G_DARK, paddingHorizontal: 16, paddingVertical: 11,
+  header:       { backgroundColor: G_DARK, paddingHorizontal: 16, paddingVertical: 14,
                   flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   hdrLeft:      { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
   hdrRight:     { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -2463,7 +2463,7 @@ const S = StyleSheet.create({
                   backgroundColor: "#DC2626", borderRadius: 7,
                   paddingHorizontal: 8, paddingVertical: 4 },
   hdrAlertTxt:  { color: "#fff", fontSize: 10, fontWeight: "800" },
-  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 34, height: 34, justifyContent: "center", alignItems: "center" },
+  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
 
   /* Cockpit KPI Strip */
   cockpitStrip: { flexDirection: "row", marginHorizontal: 16, marginBottom: 6, marginTop: 2,

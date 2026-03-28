@@ -23,6 +23,7 @@ Iterative development. Detailed explanations. Mobile icons: Ionicons or Feather 
     - **Offline Mode**: Supports offline operations for agent tasks (boarding, sales, parcel handling) with queuing and synchronization mechanisms using `@react-native-community/netinfo`.
     - **Animated Splash Screen**: Custom animated splash screen at app startup.
     - **Functional Robustness** (added 2026-03-28): Network error banners in Bookings + Colis tabs (tap to retry), `useFocusEffect` auto-refresh when returning to a tab, Toast notification system (`components/Toast.tsx` + `useToast` hook), step-specific validation hints in the Parcel send form (shown only when Next is disabled), silent `catch {}` blocks replaced with proper error state management.
+    - **Finition Produit v3** (added 2026-03-28): `suivi.tsx` — load error retry screen (3 tries, exponential backoff, visual retry UI); cockpit sync row upgraded (animated flux dot, cleaner tick labels); `route.tsx` — linkedBanner transformed into live surveillance dashboard (dark panel #052E16, animated LIVE dot, frame counter, 4-bar signal meter, HLS badge, TDC footer); header `paddingVertical` 11→14 (matches all other dashboards); logoutBtn 34→36 (matches suivi.tsx); `dashboard/agent.tsx` — `textShadow*` deprecation removed; `suivi.tsx`+`route.tsx` — `boxShadow` web fallback on statCard and connBtn; `Platform` import added to suivi.tsx.
 
 ### Backend
 - **Framework**: Express.js API server.
