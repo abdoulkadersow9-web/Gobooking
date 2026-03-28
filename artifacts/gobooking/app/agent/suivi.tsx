@@ -575,7 +575,7 @@ export default function SuiviScreen() {
               const eta   = trip?.etaTime ?? trip?.arrivalTime;
 
               return (
-                <View key={bus.id} style={[S.busCard, busAlerts.length > 0 && { borderLeftWidth: 3, borderLeftColor: RED }]}>
+                <View key={bus.id} style={[S.busCard, { borderLeftWidth: 3, borderLeftColor: busAlerts.length > 0 ? RED : st.color }]}>
 
                   {/* ── Header row ── */}
                   <View style={S.busTop}>

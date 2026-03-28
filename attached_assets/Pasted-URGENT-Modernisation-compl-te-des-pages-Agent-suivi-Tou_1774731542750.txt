@@ -1,0 +1,104 @@
+URGENT — Modernisation complète des pages “Agent suivi / Tour de contrôle” et “Agent route” sans modifier la logique existante
+
+IMPORTANT :
+- Ne rien casser
+- Ne rien supprimer de la logique actuelle
+- Ne pas remplacer le fonctionnement déjà en place
+- Ajouter uniquement des améliorations visuelles, fonctionnelles et des modules complémentaires
+- Respecter entièrement la logique GoBooking déjà construite
+
+OBJECTIF :
+Transformer les pages “Agent suivi / Tour de contrôle” et “Agent route” en interfaces modernes, propres, professionnelles et très développées, au même niveau de qualité que l’espace client.
+
+1. PAGE AGENT SUIVI / TOUR DE CONTRÔLE
+La logique est visible, mais l’interface reste encore trop brute.
+
+À améliorer immédiatement :
+- Rendre toute la page plus moderne, plus clean et plus premium
+- Refaire la hiérarchie visuelle :
+  - header plus propre
+  - sous-titres lisibles
+  - cartes mieux espacées
+  - blocs d’alertes plus élégants
+- Réduire l’effet trop agressif du rouge partout
+- Mieux équilibrer les couleurs :
+  - rouge = urgence réelle
+  - orange = attente / attention
+  - vert = actif / normal
+  - bleu/gris = informations standards
+- Uniformiser padding, bordures, ombres, rayons, typographie
+- Donner un vrai rendu “salle de contrôle / supervision entreprise”
+
+À afficher clairement sur un seul écran :
+- trajets suivis
+- alertes actives
+- statut caméra
+- synchronisation
+- informations de bus
+- actions rapides
+
+2. PAGE AGENT ROUTE
+La base existe, mais il manque le module caméra embarquée et les outils de connexion.
+
+À ajouter visiblement dans l’interface :
+- un bloc dédié “Caméra embarquée”
+- état caméra :
+  - non connectée
+  - connexion en cours
+  - connectée
+- bouton “Scanner QR caméra”
+- bouton “Connecter en Bluetooth”
+- bouton “Connecter en Wi-Fi direct”
+- bouton “Tester la caméra”
+- bouton “Associer au trajet actif”
+
+3. SIMULATION CAMÉRA OBLIGATOIRE
+Même si le vrai système n’est pas finalisé, il faut que la simulation soit visible.
+
+À prévoir :
+- simulation de caméra embarquée
+- simulation de connexion QR code
+- simulation Bluetooth
+- simulation Wi-Fi direct
+- simulation d’image / flux vidéo
+- simulation d’association automatique au trajet actif
+
+Objectif :
+Pouvoir tester visuellement tout le parcours caméra dans l’app.
+
+4. LOGIQUE D’ASSOCIATION AUTOMATIQUE
+Respecter la logique déjà définie :
+- quand l’agent route démarre son trajet
+- et connecte la caméra
+→ la caméra doit être associée automatiquement au trajet actif
+→ les images / le flux remontent automatiquement vers l’agent suivi / tour de contrôle
+
+Cela doit être visible dans l’UI :
+- trajet actif
+- caméra liée
+- état du flux
+- statut transmission
+
+5. MODERNISATION VISUELLE COMPLÈTE
+Appliquer le même niveau de qualité que l’espace client :
+- interface plus propre
+- cartes modernes
+- meilleures icônes
+- meilleure lisibilité
+- meilleur équilibre des couleurs
+- spacing premium
+- rendu fluide et professionnel
+
+6. OBJECTIF FINAL
+Obtenir :
+- une page Agent suivi = vraie tour de contrôle moderne
+- une page Agent route = cockpit terrain moderne et puissant
+- un module caméra embarquée visible, testable et simulé
+- une interface propre, avancée, crédible et incontournable
+
+PRIORITÉ :
+- affichage réel
+- modernisation UI
+- module caméra visible
+- simulation complète
+- aucune régression sur la logique existante

@@ -820,75 +820,151 @@ export default function RouteScreen() {
             </View>
           )}
 
-          {/* ── Caméra embarquée — carte accès rapide ── */}
-          <TouchableOpacity
-            style={[S.camCard,
-              camSim === "connected" && S.camCardActive,
-              camSim === "linked"    && S.camCardLinked,
-            ]}
-            onPress={() => { setTab("camera"); setIsModalOpen(true); }}
-            activeOpacity={0.82}
-          >
-            <View style={S.camCardLeft}>
-              <View style={[S.camCardIconWrap,
+          {/* ── Caméra embarquée — Panneau principal ── */}
+          <View style={[S.camPanel,
+            camSim === "linked"    && S.camPanelLive,
+            camSim === "connected" && S.camPanelReady,
+          ]}>
+            {/* Header row */}
+            <View style={S.camPanelHdr}>
+              <View style={[S.camPanelIconWrap,
                 camSim === "linked"    ? { backgroundColor: "rgba(34,197,94,0.18)" }
                 : camSim === "connected" ? { backgroundColor: "rgba(59,130,246,0.15)" }
                 : camSim === "testing"   ? { backgroundColor: "rgba(253,186,116,0.15)" }
                 : ["qr_scanning","bt_scanning","wifi_scanning","connecting"].includes(camSim)
                   ? { backgroundColor: "rgba(99,102,241,0.15)" }
-                  : { backgroundColor: "#1E293B" },
+                  : { backgroundColor: "#1E2A3B" },
               ]}>
-                <Ionicons name="videocam" size={22} color={
+                <Ionicons name="videocam" size={20} color={
                   camSim === "linked"    ? "#22C55E"
                   : camSim === "connected" ? "#60A5FA"
                   : camSim === "testing"   ? "#FCD34D"
                   : ["qr_scanning","bt_scanning","wifi_scanning","connecting"].includes(camSim) ? "#818CF8"
                   : "#475569"
                 } />
-                {(camSim === "connected" || camSim === "linked" || camSim === "testing") && (
-                  <View style={[S.camCardDot, {
-                    backgroundColor: camSim === "linked" ? "#22C55E" : camSim === "testing" ? "#FCD34D" : "#60A5FA",
+                {(camSim === "connected" || camSim === "linked") && (
+                  <View style={[S.camPanelDot, {
+                    backgroundColor: camSim === "linked" ? "#22C55E" : "#60A5FA",
                   }]} />
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[S.camCardTitle, (camSim === "connected" || camSim === "linked") && { color: "#E2E8F0" }]}>
-                  Caméra embarquée
-                </Text>
-                <Text style={S.camCardSub} numberOfLines={1}>
-                  {camSim === "none"         ? "Non connectée — Appuyez pour configurer"
-                   : camSim === "qr_scanning"  ? "Scan QR en cours…"
-                   : camSim === "bt_scanning"  ? "Recherche Bluetooth…"
-                   : camSim === "wifi_scanning"? "Recherche Wi-Fi Direct…"
-                   : camSim === "connecting"   ? "Connexion en cours…"
-                   : camSim === "testing"      ? "Test du flux en cours…"
-                   : camSim === "connected"    ? `Connectée · ${camDevice ?? "CAM-SIM"}`
-                   : camSim === "linked"       ? `Associée au trajet · Flux actif`
+                <Text style={S.camPanelTitle}>Caméra embarquée</Text>
+                <Text style={S.camPanelSub}>
+                  {camSim === "none"          ? "Connexion directe via QR, Bluetooth ou Wi-Fi"
+                   : camSim === "qr_scanning"  ? "Scan QR code en cours…"
+                   : camSim === "bt_scanning"  ? (camDevice ? `Trouvé : ${camDevice}` : "Recherche Bluetooth…")
+                   : camSim === "wifi_scanning"? (camDevice ? `Adresse : ${camDevice}` : "Recherche Wi-Fi Direct…")
+                   : camSim === "connecting"   ? `Connexion à ${camDevice ?? "…"}…`
+                   : camSim === "testing"      ? "Test du flux vidéo…"
+                   : camSim === "connected"    ? `Prête · ${camDevice ?? "CAM-SIM"}`
+                   : camSim === "linked"       ? `LIVE · ${camDevice ?? "CAM-SIM"} · flux actif`
                    : ""}
                 </Text>
               </View>
-            </View>
-            <View style={S.camCardRight}>
-              {camSim === "none" && (
-                <View style={S.camCardCta}>
-                  <Ionicons name="add-circle" size={13} color="#60A5FA" />
-                  <Text style={{ color: "#60A5FA", fontSize: 11, fontWeight: "700" }}>Configurer</Text>
-                </View>
-              )}
               {camSim === "linked" && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 }}>
+                <View style={S.camPanelLiveBadge}>
                   <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" }} />
                   <Text style={{ color: "#22C55E", fontSize: 10, fontWeight: "800" }}>LIVE</Text>
                 </View>
               )}
-              {camSim === "connected" && (
-                <Ionicons name="chevron-forward" size={16} color="#64748B" />
-              )}
               {["qr_scanning","bt_scanning","wifi_scanning","connecting","testing"].includes(camSim) && (
-                <ActivityIndicator size="small" color="#818CF8" />
+                <ActivityIndicator size="small" color={
+                  camSim === "bt_scanning"    ? "#818CF8"
+                  : camSim === "wifi_scanning" ? "#34D399"
+                  : camSim === "testing"       ? "#FCD34D"
+                  : "#60A5FA"
+                } />
               )}
             </View>
-          </TouchableOpacity>
+
+            {/* STATE: none → 3 boutons connexion directe */}
+            {camSim === "none" && (
+              <View style={S.camConnGrid}>
+                <TouchableOpacity style={S.camConnBtn} onPress={camStartQr} activeOpacity={0.8}>
+                  <View style={[S.camConnIcon, { backgroundColor: "#EFF6FF" }]}>
+                    <Ionicons name="qr-code" size={22} color="#2563EB" />
+                  </View>
+                  <Text style={S.camConnLabel}>Scanner{"\n"}QR caméra</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.camConnBtn} onPress={camStartBt} activeOpacity={0.8}>
+                  <View style={[S.camConnIcon, { backgroundColor: "#F0F0FF" }]}>
+                    <Ionicons name="bluetooth" size={22} color="#6366F1" />
+                  </View>
+                  <Text style={S.camConnLabel}>Bluetooth</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.camConnBtn} onPress={camStartWifi} activeOpacity={0.8}>
+                  <View style={[S.camConnIcon, { backgroundColor: "#F0FDF4" }]}>
+                    <Ionicons name="wifi" size={22} color="#16A34A" />
+                  </View>
+                  <Text style={S.camConnLabel}>Wi-Fi{"\n"}Direct</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* STATE: scanning → progress pill */}
+            {["qr_scanning","bt_scanning","wifi_scanning","connecting"].includes(camSim) && (
+              <View style={S.camProgressRow}>
+                <ActivityIndicator size="small" color={
+                  camSim === "bt_scanning"    ? "#818CF8"
+                  : camSim === "wifi_scanning" ? "#34D399"
+                  : "#60A5FA"
+                } />
+                <Text style={S.camProgressTxt}>
+                  {camSim === "qr_scanning"    ? "Pointez le QR code de la caméra vers l'écran"
+                   : camSim === "bt_scanning"   ? (camDevice ? `Appareil trouvé : ${camDevice}` : "Recherche d'appareils Bluetooth…")
+                   : camSim === "wifi_scanning" ? (camDevice ? `Adresse trouvée : ${camDevice}` : "Recherche Wi-Fi Direct…")
+                   : camSim === "connecting"    ? `Établissement de la connexion…`
+                   : ""}
+                </Text>
+              </View>
+            )}
+
+            {/* STATE: testing */}
+            {camSim === "testing" && (
+              <View style={S.camProgressRow}>
+                <ActivityIndicator size="small" color="#FCD34D" />
+                <Text style={[S.camProgressTxt, { color: "#FCD34D" }]}>Test du flux vidéo en cours…</Text>
+              </View>
+            )}
+
+            {/* STATE: connected → tester + associer */}
+            {camSim === "connected" && (
+              <View style={S.camActionRow}>
+                <TouchableOpacity style={S.camTestBtn} onPress={camTest} activeOpacity={0.8}>
+                  <Ionicons name="play-circle" size={16} color="#D97706" />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>Tester</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.camAssocBtn} onPress={camAssociate} activeOpacity={0.82}>
+                  <Ionicons name="link" size={16} color="#fff" />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>Associer au trajet actif</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* STATE: linked → live + déconnecter */}
+            {camSim === "linked" && (
+              <>
+                <View style={S.camLinkedRow}>
+                  <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
+                  <Text style={S.camLinkedTxt}>Flux transmis · Tour de Contrôle notifiée</Text>
+                </View>
+                <TouchableOpacity style={S.camDisconnectBtn} onPress={camDisconnect} activeOpacity={0.8}>
+                  <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
+                  <Text style={{ color: "#DC2626", fontSize: 12, fontWeight: "700" }}>Déconnecter la caméra</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Lien paramètres avancés */}
+            <TouchableOpacity
+              style={S.camAdvancedLink}
+              onPress={() => { setTab("camera"); setIsModalOpen(true); }}
+              activeOpacity={0.7}
+            >
+              <Text style={S.camAdvancedTxt}>Paramètres avancés →</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* ── Alertes actives (bannière rapide) ── */}
           {allAlerts.length > 0 && (
@@ -2379,7 +2455,7 @@ const S = StyleSheet.create({
   demoScanBtn:      { width: 36, height: 36, borderRadius: 18, backgroundColor: G_LIGHT,
                       justifyContent: "center", alignItems: "center" },
 
-  /* ── Caméra card (main screen) ── */
+  /* ── Caméra card (main screen) — legacy kept for ref ── */
   camCard:       { flexDirection: "row", alignItems: "center", backgroundColor: "#0A0E1A", borderRadius: 14,
                    padding: 14, gap: 12, marginHorizontal: 16, marginBottom: 8,
                    borderWidth: 1, borderColor: "#1E293B",
@@ -2394,6 +2470,50 @@ const S = StyleSheet.create({
   camCardRight:  { alignItems: "flex-end" },
   camCardCta:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#0F2B4A",
                    borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+
+  /* ── Caméra Panel (expanded, main screen) ── */
+  camPanel:         { backgroundColor: "#0A0E1A", borderRadius: 16, padding: 14, gap: 10,
+                      marginHorizontal: 16, marginBottom: 8,
+                      borderWidth: 1, borderColor: "#1E293B",
+                      shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 10, elevation: 4 },
+  camPanelLive:     { borderColor: "#166534" },
+  camPanelReady:    { borderColor: "#1E3A5F" },
+  camPanelHdr:      { flexDirection: "row", alignItems: "center", gap: 12 },
+  camPanelIconWrap: { width: 44, height: 44, borderRadius: 12, justifyContent: "center",
+                      alignItems: "center", position: "relative" },
+  camPanelDot:      { position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: 4,
+                      borderWidth: 1.5, borderColor: "#0A0E1A" },
+  camPanelTitle:    { fontSize: 13, fontWeight: "700", color: "#94A3B8" },
+  camPanelSub:      { fontSize: 11, color: "#475569", marginTop: 2 },
+  camPanelLiveBadge:{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#052E16",
+                      borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+
+  camConnGrid:  { flexDirection: "row", gap: 8 },
+  camConnBtn:   { flex: 1, alignItems: "center", backgroundColor: "#0F172A", borderRadius: 12,
+                  paddingVertical: 12, gap: 6, borderWidth: 1, borderColor: "#1E293B" },
+  camConnIcon:  { width: 42, height: 42, borderRadius: 11, justifyContent: "center", alignItems: "center" },
+  camConnLabel: { fontSize: 10, fontWeight: "700", color: "#94A3B8", textAlign: "center", lineHeight: 14 },
+
+  camProgressRow: { flexDirection: "row", alignItems: "center", gap: 10,
+                    backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 12 },
+  camProgressTxt: { fontSize: 12, fontWeight: "600", color: "#64748B", flex: 1 },
+
+  camActionRow:  { flexDirection: "row", gap: 8 },
+  camTestBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                   backgroundColor: "#1C1507", borderRadius: 10, paddingVertical: 11,
+                   borderWidth: 1, borderColor: "#92400E" },
+  camAssocBtn:   { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                   backgroundColor: G, borderRadius: 10, paddingVertical: 11 },
+
+  camLinkedRow:    { flexDirection: "row", alignItems: "center", gap: 8,
+                     backgroundColor: "rgba(34,197,94,0.1)", borderRadius: 10, padding: 12 },
+  camLinkedTxt:    { fontSize: 12, fontWeight: "700", color: "#22C55E", flex: 1 },
+  camDisconnectBtn:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+                     paddingVertical: 9, borderRadius: 9, borderWidth: 1,
+                     borderColor: "rgba(220,38,38,0.35)", backgroundColor: "rgba(220,38,38,0.08)" },
+
+  camAdvancedLink: { alignItems: "flex-end", paddingTop: 2 },
+  camAdvancedTxt:  { fontSize: 11, color: "#334155", fontWeight: "600" },
 });
 
 /* ── Camera Module Styles ─────────────────────────────────────────── */
