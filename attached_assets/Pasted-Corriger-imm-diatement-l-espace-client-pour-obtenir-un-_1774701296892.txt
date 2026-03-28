@@ -1,0 +1,74 @@
+Corriger immédiatement l’espace client pour obtenir un rendu fluide, propre et professionnel, comme une vraie application startup prête pour production. Ne rien casser dans la logique métier existante.
+
+PROBLÈMES RÉELS OBSERVÉS DANS L’APP MOBILE
+
+1. PAGE MES RÉSERVATIONS
+- Le titre est coupé ("Mes Réser...")
+- Le header bleu n’est pas encore bien structuré
+- Les boutons "Bons" et "Paiements" ne donnent pas un rendu propre
+- L’affichage n’est pas fluide
+- L’expérience visuelle reste incomplète
+
+2. CLIC SUR TRAJETS / RÉSERVATIONS
+- Quand on clique, la réponse UI n’est pas fluide
+- Impression de page mal chargée ou mal finalisée
+- Certaines zones semblent vides, lentes ou non réactives
+- L’interface doit répondre instantanément et proprement
+
+3. BOUTON "BONS"
+- Quand on clique sur "Bons", on arrive sur un écran blanc
+- Corriger immédiatement :
+  - la navigation
+  - le rendu de la page
+  - l’état loading
+  - le fallback si aucune donnée
+- Ne jamais afficher une page blanche vide
+
+4. ÉTATS DE CHARGEMENT / EMPTY STATES
+- Remplacer tous les écrans blancs ou zones vides par des états propres :
+  - skeleton loader propre
+  - message clair si aucune donnée
+  - CTA utile si nécessaire
+- Aucun écran ne doit sembler cassé
+
+5. HEADER / TOP SECTION
+- Refaire complètement la page Mes Réservations :
+  - titre complet et visible
+  - sous-titre bien lisible
+  - boutons bien alignés
+  - spacing premium
+  - SafeArea parfaite
+- Le rendu doit être propre sur iPhone réel, pas seulement sur canvas
+
+6. FLUIDITÉ / UX
+- Améliorer fortement la fluidité de navigation
+- Ajouter transitions propres et réactivité visible
+- Réduire toute impression de blocage ou de chargement cassé
+- Faire en sorte que chaque clic donne un retour clair et rapide
+
+7. CARTES DE RÉSERVATION
+- Refaire les cartes pour un rendu haut de gamme :
+  - hiérarchie visuelle claire
+  - horaires lisibles
+  - villes lisibles
+  - badges propres
+  - timeline propre
+  - prix bien positionné
+- Corriger tout élément encore flou, coupé ou mal aligné
+
+8. QUALITÉ ATTENDUE
+Objectif final :
+- rendu clean
+- navigation fluide
+- aucun écran blanc
+- aucun titre coupé
+- aucune section bancale
+- apparence d’une vraie application transport / fintech moderne
+
+9. IMPORTANT
+- Vérifier le rendu réel mobile après chaque correction
+- Corriger sur l’app réelle, pas seulement sur le canvas
+- Ne rien casser dans la logique actuelle
+- Priorité absolue : expérience utilisateur fluide, propre, premium
+
+Faire une très grande amélioration visuelle et fonctionnelle sur l’espace client.

@@ -1,11 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Linking,
   Platform,
   Pressable,
@@ -67,6 +69,60 @@ const METHOD_ICONS: Record<string, { label: string; color: string }> = {
   card:   { label: "Carte bancaire", color: "#1A56DB" },
 };
 
+function SkeletonPulse({ w, h, r = 10 }: { w: number | string; h: number; r?: number }) {
+  const anim = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.5, duration: 750, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+  return <Animated.View style={{ width: w as any, height: h, borderRadius: r, backgroundColor: "#DDE4F0", opacity: anim }} />;
+}
+
+function BookingDetailSkeleton() {
+  return (
+    <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
+      {/* Status banner skeleton */}
+      <View style={{ backgroundColor: "#EEF4FF", borderRadius: 14, padding: 18, flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <SkeletonPulse w={28} h={28} r={14} />
+        <SkeletonPulse w="60%" h={16} r={8} />
+      </View>
+      {/* Ref card skeleton */}
+      <View style={{ backgroundColor: "#1650D0", borderRadius: 20, padding: 22, alignItems: "center", gap: 12 }}>
+        <SkeletonPulse w={80} h={80} r={12} />
+        <SkeletonPulse w={120} h={20} r={8} />
+        <SkeletonPulse w={80} h={14} r={6} />
+      </View>
+      {/* Route skeleton */}
+      <View style={{ backgroundColor: "white", borderRadius: 18, padding: 20, gap: 16, borderWidth: 1, borderColor: "#ECEEF8" }}>
+        <SkeletonPulse w={90} h={13} r={6} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={{ flex: 1, gap: 8 }}>
+            <SkeletonPulse w="80%" h={28} r={6} />
+            <SkeletonPulse w="60%" h={13} r={6} />
+          </View>
+          <SkeletonPulse w={32} h={32} r={16} />
+          <View style={{ flex: 1, gap: 8, alignItems: "flex-end" }}>
+            <SkeletonPulse w="80%" h={28} r={6} />
+            <SkeletonPulse w="60%" h={13} r={6} />
+          </View>
+        </View>
+      </View>
+      {/* Info cards skeletons */}
+      {[1, 2].map((i) => (
+        <View key={i} style={{ backgroundColor: "white", borderRadius: 18, padding: 18, gap: 12, borderWidth: 1, borderColor: "#ECEEF8" }}>
+          <SkeletonPulse w={100} h={13} r={6} />
+          <SkeletonPulse w="90%" h={16} r={6} />
+          <SkeletonPulse w="70%" h={16} r={6} />
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
 export default function BookingDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,7 +131,14 @@ export default function BookingDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.spring(fadeAnim, { toValue: 1, speed: 14, bounciness: 2, useNativeDriver: true }).start();
+    }
+  }, [loading]);
 
   useEffect(() => {
     const load = async () => {
@@ -147,35 +210,45 @@ export default function BookingDetailScreen() {
     setGeneratingPdf(false);
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.center, { paddingTop: topPad }]}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
-      </View>
-    );
-  }
-
-  if (!booking) {
-    return (
-      <View style={[styles.center, { paddingTop: topPad }]}>
-        <Text style={styles.errorText}>Réservation introuvable</Text>
-      </View>
-    );
-  }
-
-  const status = STATUS_CONFIG[booking.status] || STATUS_CONFIG.confirmed;
+  const status = booking ? (STATUS_CONFIG[booking.status] || STATUS_CONFIG.confirmed) : null;
 
   return (
-    <View style={[styles.container, { paddingTop: topPad }]}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+    <View style={styles.container}>
+      {/* Gradient header — always visible even while loading */}
+      <LinearGradient
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: topPad + 14 }]}
+      >
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings"); }}
+          style={styles.backBtn}
+        >
+          <Feather name="arrow-left" size={18} color="white" />
         </Pressable>
-        <Text style={styles.headerTitle}>Détail de la réservation</Text>
-        <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-          <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.headerTitle}>
+            {loading ? "Chargement..." : "Détail de la réservation"}
+          </Text>
+          {booking && <Text style={styles.headerSub}>#{booking.bookingRef}</Text>}
         </View>
-      </View>
+        {status && !loading && (
+          <View style={[styles.statusBadge, { backgroundColor: "rgba(255,255,255,0.22)" }]}>
+            <Text style={styles.statusText}>{status.label}</Text>
+          </View>
+        )}
+      </LinearGradient>
+
+      {loading ? (
+        <BookingDetailSkeleton />
+      ) : !booking ? (
+        <View style={styles.center}>
+          <View style={styles.emptyIconWrap}>
+            <Feather name="alert-circle" size={32} color={Colors.light.primary} />
+          </View>
+          <Text style={styles.errorText}>Réservation introuvable</Text>
+        </View>
+      ) : (
 
       <ScrollView
         contentContainerStyle={{
@@ -519,6 +592,7 @@ export default function BookingDetailScreen() {
           </Pressable>
         )}
       </ScrollView>
+      )}
     </View>
   );
 }
@@ -526,40 +600,36 @@ export default function BookingDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorText: { fontSize: 16, color: Colors.light.textSecondary, fontFamily: "Inter_400Regular" },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 24,
+    backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center",
+    borderWidth: 1, borderColor: "#C7D9FF", marginBottom: 12,
+  },
+  errorText: { fontSize: 15, color: Colors.light.textSecondary, fontFamily: "Inter_500Medium", marginTop: 8 },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 8,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-    gap: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 14,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.light.background,
-    justifyContent: "center",
-    alignItems: "center",
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center", alignItems: "center",
+    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)", flexShrink: 0,
   },
   headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: Colors.light.text,
+    fontSize: 18, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 2,
   },
   statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, flexShrink: 0,
   },
   statusText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 12, fontFamily: "Inter_700Bold", color: "white",
   },
   refCard: {
     backgroundColor: Colors.light.primary,
