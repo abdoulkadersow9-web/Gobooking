@@ -145,9 +145,11 @@ export default function RouteScreen() {
   const [camDevice,     setCamDevice]     = useState<string | null>(null);
   const [camFrameCount, setCamFrameCount] = useState(0);
   const [camSignal,     setCamSignal]     = useState(95);
-  const camAutoLinkRef  = useRef(false);
-  const camScanLine     = useRef(new Animated.Value(0)).current;
-  const camBlink        = useRef(new Animated.Value(1)).current;
+  const camAutoLinkRef   = useRef(false);
+  const camLowSigCount   = useRef(0);
+  const camWasLinked     = useRef(false);
+  const camScanLine      = useRef(new Animated.Value(0)).current;
+  const camBlink         = useRef(new Animated.Value(1)).current;
 
   interface StopWithPassengers {
     id: string;
@@ -464,17 +466,69 @@ export default function RouteScreen() {
     }
   }, [camSim, activeTrip, camAssociate]);
 
-  /* ── Flux simulé : compteur de frames + signal quand LIVE ── */
+  /* ── Flux simulé : compteur de frames + signal + détection anomalie ── */
   useEffect(() => {
-    if (camSim !== "linked") { setCamFrameCount(0); return; }
+    if (camSim !== "linked") {
+      setCamFrameCount(0);
+      camLowSigCount.current = 0;
+      return;
+    }
+    camWasLinked.current = true;
     let frames = 0;
     const iv = setInterval(() => {
-      frames += 25 + Math.floor(Math.random() * 8);
+      const rand   = Math.random();
+      const signal = rand < 0.07 ? 55 + Math.floor(Math.random() * 18)   // occasional dip
+                   : rand < 0.20 ? 88 + Math.floor(Math.random() * 10)
+                   :               91 + Math.floor(Math.random() * 8);
+      frames += 23 + Math.floor(Math.random() * 5);
       setCamFrameCount(frames);
-      setCamSignal(82 + Math.floor(Math.random() * 17));
-    }, 2000);
+      setCamSignal(signal);
+
+      /* ── Auto-alerte signal faible (3 lectures consécutives < 70%) ── */
+      if (signal < 70) {
+        camLowSigCount.current += 1;
+        if (camLowSigCount.current >= 3) {
+          camLowSigCount.current = 0;
+          setAutoAlerts(prev => [
+            ...prev.filter(a => a.type !== "signal_faible"),
+            {
+              id:        `sig-${Date.now()}`,
+              type:      "signal_faible",
+              message:   `Signal caméra faible (${signal}%) — vérifiez la liaison`,
+              status:    "active",
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        }
+      } else {
+        camLowSigCount.current = 0;
+        /* Supprimer auto-alerte si signal récupéré */
+        setAutoAlerts(prev => prev.filter(a => a.type !== "signal_faible"));
+      }
+    }, 1000);
     return () => clearInterval(iv);
   }, [camSim]);
+
+  /* ── Déconnexion caméra en cours de trajet → auto-alerte ── */
+  useEffect(() => {
+    if (camSim === "none" && camWasLinked.current && activeTrip) {
+      camWasLinked.current = false;
+      setAutoAlerts(prev => [
+        ...prev.filter(a => a.type !== "cam_deconnectee"),
+        {
+          id:        `cam-disc-${Date.now()}`,
+          type:      "cam_deconnectee",
+          message:   "Flux caméra interrompu — reconnexion requise",
+          status:    "active",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+    if (camSim === "linked") {
+      /* Clear disconnect alert when reconnected */
+      setAutoAlerts(prev => prev.filter(a => a.type !== "cam_deconnectee"));
+    }
+  }, [camSim, activeTrip]);
 
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
@@ -1919,17 +1973,32 @@ export default function RouteScreen() {
                   const hasResponse = !!alert.response;
                   const isActing    = alertActing === alert.id;
                   const responseOpt = RESP.find(r => r.id === alert.response);
-                  const isAuto = alert.id.startsWith("auto-") || alert.id.startsWith("sim-");
+                  const isAuto      = alert.id.startsWith("auto-") || alert.id.startsWith("sim-") || alert.id.startsWith("sig-") || alert.id.startsWith("cam-disc-");
+                  const isCamAlert  = alert.type === "signal_faible" || alert.type === "cam_deconnectee";
+                  const alertColor  = isCamAlert ? "#7C3AED" : isAuto ? "#D97706" : "#DC2626";
+                  const alertIcon   = isCamAlert ? "videocam-off" : "warning";
                   return (
-                    <View key={alert.id} style={[S.alertCard, isAuto && { borderLeftColor: "#D97706" }]}>
+                    <View key={alert.id} style={[S.alertCard, { borderLeftColor: alertColor }, isCamAlert && { backgroundColor: "#FAF5FF" }]}>
                       <View style={S.alertRow}>
-                        <Ionicons name="warning" size={20} color={isAuto ? "#D97706" : "#DC2626"} />
+                        <Ionicons name={alertIcon as any} size={20} color={alertColor} />
                         <Text style={S.alertMessage}>{alert.message}</Text>
                         <Text style={S.alertTime}>
                           {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </Text>
                       </View>
-                      {isAuto && (
+                      {isCamAlert && (
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#EDE9FE", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                          <Ionicons name="videocam" size={12} color="#7C3AED" />
+                          <Text style={{ fontSize: 11, color: "#7C3AED", fontWeight: "700" }}>
+                            {alert.type === "signal_faible" ? "Alerte liaison caméra · Signal faible" : "Connexion caméra perdue"}
+                          </Text>
+                          <TouchableOpacity style={{ marginLeft: "auto", backgroundColor: "#7C3AED", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}
+                            onPress={() => { setTab("camera"); setIsModalOpen(true); }}>
+                            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "800" }}>Caméra</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      {isAuto && !isCamAlert && (
                         <View style={S.autoDetectedBadge}>
                           <Ionicons name="flash" size={12} color="#D97706" />
                           <Text style={S.autoDetectedTxt}>Détectée automatiquement</Text>

@@ -229,10 +229,34 @@ export default function SuiviScreen() {
   /* ── Live simulation frames/signal per camera trip ── */
   type LiveCamData = { frames: number; signal: number };
   const [liveFrames, setLiveFrames] = useState<Record<string, LiveCamData>>({});
+  const [syncSec,    setSyncSec]    = useState(0);
 
   const activeCamTrips = useMemo(
     () => data?.trips?.filter(t => t.cameraStatus === "connected" && !!t.cameraStreamUrl) ?? [],
     [data]
+  );
+
+  /* ── Sorted buses: alert+camera first, then alert-only, then rest ── */
+  const sortedBuses = useMemo(() => {
+    if (!data?.buses) return [];
+    return [...data.buses].sort((a, b) => {
+      const aAlerts = data.alerts.filter(x => x.busId === a.id).length;
+      const bAlerts = data.alerts.filter(x => x.busId === b.id).length;
+      const aTrip   = data.trips.find(t => t.busId === a.id);
+      const bTrip   = data.trips.find(t => t.busId === b.id);
+      const aCamOk  = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
+      const bCamOk  = !!(bTrip?.cameraStatus === "connected" && bTrip?.cameraStreamUrl);
+      // Priority: alerts+camera → alerts → camera → rest
+      const aScore = (aAlerts > 0 ? 10 : 0) + (aCamOk ? 5 : 0) + aAlerts;
+      const bScore = (bAlerts > 0 ? 10 : 0) + (bCamOk ? 5 : 0) + bAlerts;
+      return bScore - aScore;
+    });
+  }, [data]);
+
+  /* ── Signal warning: any camera with signal < 75% ── */
+  const signalWarnTrips = useMemo(
+    () => activeCamTrips.filter(t => (liveFrames[t.id]?.signal ?? 100) < 75),
+    [activeCamTrips, liveFrames]
   );
 
   useEffect(() => {
@@ -275,7 +299,14 @@ export default function SuiviScreen() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [hasCameras, load]);
 
-  /* ── Simulated frame counter for connected camera trips ── */
+  /* ── Live seconds counter (resets on each sync) ── */
+  useEffect(() => {
+    setSyncSec(0);
+    const iv = setInterval(() => setSyncSec(s => s + 1), 1000);
+    return () => clearInterval(iv);
+  }, [lastSync]);
+
+  /* ── Simulated frame counter for connected camera trips (1s for fluidity) ── */
   useEffect(() => {
     if (!hasCameras || activeCamTrips.length === 0) {
       setLiveFrames({});
@@ -286,14 +317,18 @@ export default function SuiviScreen() {
         const next: Record<string, LiveCamData> = { ...prev };
         activeCamTrips.forEach(trip => {
           const cur = next[trip.id] ?? { frames: 0, signal: 93 };
-          next[trip.id] = {
-            frames: cur.frames + 25 + Math.floor(Math.random() * 9),
-            signal: 80 + Math.floor(Math.random() * 19),
-          };
+          /* 25fps ± small jitter — natural stream rhythm */
+          const fps    = 23 + Math.floor(Math.random() * 5);
+          /* signal: mostly stable 87-99%, occasional dip to 65-80% */
+          const rand   = Math.random();
+          const signal = rand < 0.08 ? 65 + Math.floor(Math.random() * 14)   // 8% dip
+                       : rand < 0.25 ? 87 + Math.floor(Math.random() * 10)   // 17% high
+                       :               90 + Math.floor(Math.random() * 9);    // 75% nominal
+          next[trip.id] = { frames: cur.frames + fps, signal };
         });
         return next;
       });
-    }, 2000);
+    }, 1000);
     return () => clearInterval(iv);
   }, [hasCameras, activeCamTrips]);
 
@@ -499,13 +534,28 @@ export default function SuiviScreen() {
                 </View>
               </View>
 
+              {/* Signal warning banner */}
+              {signalWarnTrips.length > 0 && (
+                <View style={S.cockpitSignalWarn}>
+                  <Ionicons name="warning" size={13} color="#FCD34D" />
+                  <Text style={S.cockpitSignalWarnTxt}>
+                    SIGNAL FAIBLE — {signalWarnTrips.map(t => `${t.from}→${t.to}`).join(", ")}
+                  </Text>
+                  <Text style={{ color: "#FCD34D", fontSize: 9, fontWeight: "900" }}>
+                    {Math.min(...signalWarnTrips.map(t => liveFrames[t.id]?.signal ?? 99))}%
+                  </Text>
+                </View>
+              )}
+
               {/* Live trips panels */}
               {activeCamTrips.map(trip => {
-                const liveCam = liveFrames[trip.id];
-                const tripBus = data?.buses?.find(b => b.id === trip.busId);
+                const liveCam    = liveFrames[trip.id];
+                const tripBus    = data?.buses?.find(b => b.id === trip.busId);
                 const tripAlerts = data?.alerts?.filter(a => a.busId === trip.busId) ?? [];
+                const hasAlert   = tripAlerts.length > 0;
+                const sigLow     = (liveCam?.signal ?? 100) < 75;
                 return (
-                  <View key={trip.id} style={S.cockpitTripRow}>
+                  <View key={trip.id} style={[S.cockpitTripRow, hasAlert && S.cockpitTripRowAlert, sigLow && !hasAlert && S.cockpitTripRowSigWarn]}>
                     {/* Left info */}
                     <View style={{ flex: 1, gap: 4 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -564,10 +614,16 @@ export default function SuiviScreen() {
                 );
               })}
 
-              {/* Sync indicator */}
+              {/* Sync indicator — live ticker */}
               <View style={S.cockpitSyncRow}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR }} />
-                <Text style={S.cockpitSyncTxt}>Données synchronisées toutes les 5s · {syncLabel}</Text>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: syncSec < 4 ? CAM_GR : syncSec < 8 ? "#FCD34D" : "#94A3B8" }} />
+                <Text style={S.cockpitSyncTxt}>
+                  {syncSec < 2 ? "Synchronisé" : `Prochain sync dans ${Math.max(0, 5 - syncSec)}s`}
+                  {" · "}{syncLabel}
+                </Text>
+                <Text style={{ color: "#22C55E", fontSize: 9, fontWeight: "900", marginLeft: "auto" }}>
+                  {hasCameras ? `${activeCamCount} flux actif${activeCamCount > 1 ? "s" : ""}` : ""}
+                </Text>
               </View>
             </View>
           )}
@@ -710,20 +766,26 @@ export default function SuiviScreen() {
                 </View>
               )}
             </View>
-            {!data?.buses?.length && (
+            {!sortedBuses.length && (
               <View style={S.empty}><Ionicons name="bus-outline" size={32} color="#CBD5E1" />
                 <Text style={S.emptyTxt}>Aucun bus trouvé</Text>
               </View>
             )}
-            {data?.buses?.map(bus => {
-              const st   = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
-              const trip = data.trips.find(t => t.busId === bus.id);
-              const busAlerts = data.alerts.filter(a => a.busId === bus.id);
-              const camOk = !!(trip && trip.cameraStatus === "connected" && trip.cameraStreamUrl);
-              const eta   = trip?.etaTime ?? trip?.arrivalTime;
+            {sortedBuses.map(bus => {
+              const st         = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
+              const trip       = data!.trips.find(t => t.busId === bus.id);
+              const busAlerts  = data!.alerts.filter(a => a.busId === bus.id);
+              const camOk      = !!(trip && trip.cameraStatus === "connected" && trip.cameraStreamUrl);
+              const eta        = trip?.etaTime ?? trip?.arrivalTime;
+              const isPriority = busAlerts.length > 0;
+              const sigLow     = camOk && trip && (liveFrames[trip.id]?.signal ?? 100) < 75;
 
               return (
-                <View key={bus.id} style={[S.busCard, { borderLeftWidth: 3, borderLeftColor: busAlerts.length > 0 ? RED : st.color }]}>
+                <View key={bus.id} style={[
+                  S.busCard,
+                  { borderLeftWidth: 3, borderLeftColor: isPriority ? RED : st.color },
+                  isPriority && S.busCardPriority,
+                ]}>
 
                   {/* ── Header row ── */}
                   <View style={S.busTop}>
@@ -1130,6 +1192,9 @@ const S = StyleSheet.create({
   modalActions:{ flexDirection: "row", gap: 10, marginTop: 8 },
   modalBtn:  { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 12 },
 
+  /* ── Bus card priority highlight ── */
+  busCardPriority:   { backgroundColor: "#FFF5F5", shadowColor: RED, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4 },
+
   /* ── Cockpit block styles ── */
   cockpitBlock:      { backgroundColor: CAM_BG, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#1E293B" },
   cockpitBlockHdr:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -1155,4 +1220,13 @@ const S = StyleSheet.create({
 
   cockpitSyncRow:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
   cockpitSyncTxt:  { fontSize: 9, color: "#334155", fontWeight: "600" },
+
+  /* Alert + signal warning highlights on cockpit trip rows */
+  cockpitTripRowAlert:    { borderLeftWidth: 2, borderLeftColor: "#EF4444", backgroundColor: "rgba(239,68,68,0.06)" },
+  cockpitTripRowSigWarn:  { borderLeftWidth: 2, borderLeftColor: "#FCD34D", backgroundColor: "rgba(252,211,77,0.05)" },
+
+  /* Signal warning banner */
+  cockpitSignalWarn:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8,
+                          backgroundColor: "rgba(252,211,77,0.08)", borderTopWidth: 1, borderTopColor: "rgba(252,211,77,0.2)" },
+  cockpitSignalWarnTxt: { flex: 1, color: "#FCD34D", fontSize: 10, fontWeight: "700" },
 });
