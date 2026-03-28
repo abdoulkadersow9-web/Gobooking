@@ -281,6 +281,15 @@ export default function ColisScreen() {
   const [netError,   setNetError]   = useState(false);
   const { toast } = useToast();
 
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const filterAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.stagger(70, [
+      Animated.spring(headerAnim, { toValue: 1, speed: 18, bounciness: 2, useNativeDriver: true }),
+      Animated.spring(filterAnim, { toValue: 1, speed: 16, bounciness: 3, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   const load = useCallback(async (silent = false) => {
     if (!token) { setLoading(false); return; }
     if (!silent) setLoading(true);
@@ -334,33 +343,41 @@ export default function ColisScreen() {
       <Toast {...toast} />
 
       {/* Header */}
-      <LinearGradient
-        colors={["#1650D0", "#1030B4", "#0A1C84"]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: topPad + 22 }]}
-      >
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>{t.mesColis}</Text>
-          {!loading && token && parcels.length > 0 && (
-            <Text style={styles.headerSub}>
-              {parcels.length} {parcels.length > 1 ? t.expeditionsPlural : t.expeditions}
-            </Text>
-          )}
-          {(!token || parcels.length === 0) && (
-            <Text style={styles.headerSub}>{t.suiviExpeditions}</Text>
-          )}
-        </View>
-        <TouchableOpacity
-          style={styles.sendBtn}
-          onPress={() => router.push("/parcel/send")}
+      <Animated.View style={{
+        opacity: headerAnim,
+        transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
+      }}>
+        <LinearGradient
+          colors={["#1650D0", "#1030B4", "#0A1C84"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: topPad + 22 }]}
         >
-          <Feather name="plus" size={16} color="white" />
-          <Text style={styles.sendBtnText}>{t.envoyer}</Text>
-        </TouchableOpacity>
-      </LinearGradient>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>{t.mesColis}</Text>
+            {!loading && token && parcels.length > 0 && (
+              <Text style={styles.headerSub}>
+                {parcels.length} {parcels.length > 1 ? t.expeditionsPlural : t.expeditions}
+              </Text>
+            )}
+            {(!token || parcels.length === 0) && (
+              <Text style={styles.headerSub}>{t.suiviExpeditions}</Text>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.sendBtn}
+            onPress={() => router.push("/parcel/send")}
+          >
+            <Feather name="plus" size={16} color="white" />
+            <Text style={styles.sendBtnText}>{t.envoyer}</Text>
+          </TouchableOpacity>
+        </LinearGradient>
+      </Animated.View>
 
       {/* Filter bar */}
-      <View style={styles.filterBar}>
+      <Animated.View style={[styles.filterBar, {
+        opacity: filterAnim,
+        transform: [{ translateY: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+      }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -386,7 +403,7 @@ export default function ColisScreen() {
             );
           })}
         </ScrollView>
-      </View>
+      </Animated.View>
 
       {/* Network error banner */}
       {netError && !loading && token && (

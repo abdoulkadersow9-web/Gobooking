@@ -466,8 +466,17 @@ export default function BookingsScreen() {
   const [reviewed,   setReviewed]   = useState<Set<string>>(new Set());
   const [filter,     setFilter]     = useState<FilterKey>("tous");
   const [netError,   setNetError]   = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const headerAnim   = useRef(new Animated.Value(0)).current;
+  const filterAnim   = useRef(new Animated.Value(0)).current;
   const { toast, show: showToast } = useToast();
+
+  useEffect(() => {
+    Animated.stagger(60, [
+      Animated.spring(headerAnim, { toValue: 1, speed: 18, bounciness: 2, useNativeDriver: true }),
+      Animated.spring(filterAnim, { toValue: 1, speed: 16, bounciness: 3, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const loadData = useCallback(async (silent = false) => {
     if (!token) { setLoading(false); return; }
@@ -547,35 +556,43 @@ export default function BookingsScreen() {
       {/* Toast */}
       <Toast {...toast} />
 
-      <LinearGradient
-        colors={["#1650D0", "#1030B4", "#0A1C84"]}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: topPad + 22 }]}
-      >
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.headerTitle}>Mes Réservations</Text>
-          <Text style={styles.headerSub}>
-            {bookings.length > 0 ? `${bookings.length} trajet${bookings.length > 1 ? "s" : ""} au total` : "Vos billets de voyage"}
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", gap: 10, flexShrink: 0 }}>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}
-          >
-            <Feather name="gift" size={18} color="white" />
-          </Pressable>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
-          >
-            <Feather name="clock" size={18} color="white" />
-          </Pressable>
-        </View>
-      </LinearGradient>
+      <Animated.View style={{
+        opacity: headerAnim,
+        transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
+      }}>
+        <LinearGradient
+          colors={["#1650D0", "#1030B4", "#0A1C84"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: topPad + 22 }]}
+        >
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.headerTitle}>Mes Réservations</Text>
+            <Text style={styles.headerSub}>
+              {bookings.length > 0 ? `${bookings.length} trajet${bookings.length > 1 ? "s" : ""} au total` : "Vos billets de voyage"}
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 10, flexShrink: 0 }}>
+            <Pressable
+              style={styles.iconBtn}
+              onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}
+            >
+              <Feather name="gift" size={18} color="white" />
+            </Pressable>
+            <Pressable
+              style={styles.iconBtn}
+              onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
+            >
+              <Feather name="clock" size={18} color="white" />
+            </Pressable>
+          </View>
+        </LinearGradient>
+      </Animated.View>
 
       {/* Filter tabs */}
-      <View style={styles.filterBar}>
+      <Animated.View style={[styles.filterBar, {
+        opacity: filterAnim,
+        transform: [{ translateY: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+      }]}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -593,7 +610,7 @@ export default function BookingsScreen() {
             </Pressable>
           ))}
         </ScrollView>
-      </View>
+      </Animated.View>
 
       {/* Network error banner */}
       {netError && !loading && (
