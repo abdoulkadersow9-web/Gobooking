@@ -12,5 +12,9 @@ export const modules: ModuleMap = {
   "./components/mockups/seat-manager.tsx": () => import("../components/mockups/seat-manager.tsx"),
   "./components/mockups/seat-selection.tsx": () => import("../components/mockups/seat-selection.tsx"),
   "./components/mockups/ticket-scanner.tsx": () => import("../components/mockups/ticket-scanner.tsx"),
-  "./components/mockups/trip-results.tsx": () => import("../components/mockups/trip-results.tsx")
+  "./components/mockups/trip-results.tsx": () => import("../components/mockups/trip-results.tsx"),
+  "./components/mockups/gobooking-ui/Badges.tsx": () => import("../components/mockups/gobooking-ui/Badges.tsx"),
+  "./components/mockups/gobooking-ui/BottomNav.tsx": () => import("../components/mockups/gobooking-ui/BottomNav.tsx"),
+  "./components/mockups/gobooking-ui/ReservationCard.tsx": () => import("../components/mockups/gobooking-ui/ReservationCard.tsx"),
+  "./components/mockups/gobooking-ui/TrajetsPopulaires.tsx": () => import("../components/mockups/gobooking-ui/TrajetsPopulaires.tsx")
 };
