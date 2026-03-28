@@ -420,6 +420,7 @@ export default function SuiviScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16, gap: 18, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
+          removeClippedSubviews
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
           showsVerticalScrollIndicator={false}
         >
@@ -586,67 +587,93 @@ export default function SuiviScreen() {
                       <Text style={S.busName}>{bus.busName}</Text>
                       <Text style={S.busPlate}>{bus.plateNumber}</Text>
                     </View>
-                    <View style={[S.statusPill, { backgroundColor: st.bg }]}>
-                      <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {busAlerts.length > 0 && (
+                        <View style={S.alertCountBadge}>
+                          <Ionicons name="warning" size={11} color="#fff" />
+                          <Text style={S.alertCountTxt}>{busAlerts.length}</Text>
+                        </View>
+                      )}
+                      <View style={[S.statusPill, { backgroundColor: st.bg }]}>
+                        <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
+                      </View>
                     </View>
                   </View>
 
-                  {/* ── Route + GPS row ── */}
+                  {/* ── Infos trajet ── */}
                   {trip && (
-                    <View style={S.tcRouteRow}>
-                      <View style={S.tcRouteInner}>
-                        <Ionicons name="navigate" size={13} color="#1D4ED8" />
-                        <Text style={S.tcRoute}>{trip.from}</Text>
-                        <Ionicons name="arrow-forward" size={12} color="#94A3B8" />
-                        <Text style={S.tcRoute}>{trip.to}</Text>
-                      </View>
-                      <View style={{ flexDirection: "row", gap: 10 }}>
-                        <View style={S.tcChip}>
-                          <Ionicons name="time-outline" size={11} color="#64748B" />
-                          <Text style={S.tcChipTxt}>{trip.departureTime}</Text>
-                        </View>
-                        {eta && (
-                          <View style={[S.tcChip, { backgroundColor: "#F0FDF4" }]}>
-                            <Ionicons name="flag-outline" size={11} color="#15803D" />
-                            <Text style={[S.tcChipTxt, { color: "#15803D" }]}>{eta}</Text>
+                    <>
+                      <View style={S.busCardDiv} />
+                      <View style={S.busCardSection}>
+                        <Text style={S.busCardSectionLbl}>TRAJET</Text>
+                        <View style={S.tcRouteRow}>
+                          <View style={S.tcRouteInner}>
+                            <Ionicons name="navigate" size={13} color="#1D4ED8" />
+                            <Text style={S.tcRoute}>{trip.from}</Text>
+                            <Ionicons name="arrow-forward" size={12} color="#94A3B8" />
+                            <Text style={S.tcRoute}>{trip.to}</Text>
                           </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* GPS location */}
-                  {bus.currentLocation && (
-                    <View style={S.tcGpsRow}>
-                      <Ionicons name="location" size={13} color="#7C3AED" />
-                      <Text style={S.tcGpsTxt}>{bus.currentLocation}</Text>
-                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR, marginLeft: 4 }} />
-                      <Text style={{ fontSize: 10, color: CAM_GR, fontWeight: "700" }}>GPS actif</Text>
-                    </View>
-                  )}
-
-                  {/* ── Occupancy bar ── */}
-                  {trip && trip.passengerCount != null && trip.seatCount != null && trip.seatCount > 0 && (
-                    <View style={S.tcOccRow}>
-                      <View style={S.tcOccHeader}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                          <Ionicons name="people" size={12} color="#059669" />
-                          <Text style={S.tcOccLabel}>Occupation</Text>
+                          <View style={{ flexDirection: "row", gap: 8 }}>
+                            <View style={S.tcChip}>
+                              <Ionicons name="time-outline" size={11} color="#64748B" />
+                              <Text style={S.tcChipTxt}>{trip.departureTime}</Text>
+                            </View>
+                            {eta && (
+                              <View style={[S.tcChip, { backgroundColor: "#F0FDF4" }]}>
+                                <Ionicons name="flag-outline" size={11} color="#15803D" />
+                                <Text style={[S.tcChipTxt, { color: "#15803D" }]}>{eta}</Text>
+                              </View>
+                            )}
+                          </View>
                         </View>
-                        <Text style={S.tcOccValue}>
-                          {trip.passengerCount} / {trip.seatCount} passagers · {Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%
-                        </Text>
                       </View>
-                      <View style={S.tcOccBar}>
-                        <View style={[S.tcOccFill, {
-                          width: `${Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%` as any,
-                          backgroundColor: trip.passengerCount / trip.seatCount > 0.9 ? "#DC2626" : "#22C55E",
-                        }]} />
+                    </>
+                  )}
+
+                  {/* ── Position GPS ── */}
+                  {bus.currentLocation && (
+                    <>
+                      <View style={S.busCardDiv} />
+                      <View style={S.busCardSection}>
+                        <Text style={S.busCardSectionLbl}>POSITION GPS</Text>
+                        <View style={S.tcGpsRow}>
+                          <Ionicons name="location" size={13} color="#7C3AED" />
+                          <Text style={S.tcGpsTxt}>{bus.currentLocation}</Text>
+                          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR, marginLeft: 4 }} />
+                          <Text style={{ fontSize: 10, color: CAM_GR, fontWeight: "700" }}>GPS actif</Text>
+                        </View>
                       </View>
-                    </View>
+                    </>
+                  )}
+
+                  {/* ── Taux d'occupation ── */}
+                  {trip && trip.passengerCount != null && trip.seatCount != null && trip.seatCount > 0 && (
+                    <>
+                      <View style={S.busCardDiv} />
+                      <View style={S.busCardSection}>
+                        <View style={S.tcOccHeader}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                            <Ionicons name="people" size={12} color="#059669" />
+                            <Text style={S.tcOccLabel}>Occupation</Text>
+                          </View>
+                          <Text style={S.tcOccValue}>
+                            {trip.passengerCount} / {trip.seatCount} · {Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%
+                          </Text>
+                        </View>
+                        <View style={S.tcOccBar}>
+                          <View style={[S.tcOccFill, {
+                            width: `${Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%` as any,
+                            backgroundColor: trip.passengerCount / trip.seatCount > 0.9 ? "#DC2626" : "#22C55E",
+                          }]} />
+                        </View>
+                      </View>
+                    </>
                   )}
 
                   {/* ── CAMÉRA LIVE PANEL — always visible ── */}
+                  <View style={S.busCardSection}>
+                    <Text style={S.busCardSectionLbl}>CAMÉRA</Text>
+                  </View>
                   <View style={[S.tcCamPanel, camOk && S.tcCamPanelActive]}>
                     <View style={S.tcCamPanelLeft}>
                       <View style={[S.tcCamIconWrap, camOk && { backgroundColor: "rgba(34,197,94,0.15)" }]}>
@@ -857,16 +884,24 @@ const S = StyleSheet.create({
   alertBtn:     { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   alertBtnTxt:  { fontSize: 12, fontWeight: "700" },
 
-  busCard:   { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 12, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  busTop:    { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  busStatus: { width: 42, height: 42, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  busName:   { fontSize: 15, fontWeight: "800", color: "#0F172A" },
-  busPlate:  { fontSize: 11, color: "#64748B" },
-  busLoc:    { fontSize: 11, color: "#64748B", marginTop: 2 },
-  busTrip:   { fontSize: 11, color: "#0369A1", marginTop: 2, fontWeight: "600" },
-  busIssue:  { fontSize: 11, color: "#DC2626", marginTop: 2, fontWeight: "600" },
-  statusPill:{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
-  statusTxt: { fontSize: 10, fontWeight: "700" },
+  busCard:         { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 10, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  busTop:          { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  busStatus:       { width: 42, height: 42, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  busName:         { fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  busPlate:        { fontSize: 11, color: "#64748B" },
+  busLoc:          { fontSize: 11, color: "#64748B", marginTop: 2 },
+  busTrip:         { fontSize: 11, color: "#0369A1", marginTop: 2, fontWeight: "600" },
+  busIssue:        { fontSize: 11, color: "#DC2626", marginTop: 2, fontWeight: "600" },
+  statusPill:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
+  statusTxt:       { fontSize: 10, fontWeight: "700" },
+
+  /* ── Bus card section organization ── */
+  alertCountBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#BE123C",
+                     borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  alertCountTxt:   { fontSize: 10, fontWeight: "900", color: "#fff" },
+  busCardDiv:      { height: 1, backgroundColor: "#F1F5F9", marginHorizontal: -14 },
+  busCardSection:  { gap: 6 },
+  busCardSectionLbl:{ fontSize: 9, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.8 },
 
   camBlock:       { backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: "#E2E8F0" },
   camBlockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

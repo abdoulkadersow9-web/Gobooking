@@ -144,6 +144,7 @@ export default function RouteScreen() {
   const [camSim,    setCamSim]    = useState<CamSimState>("none");
   const [camDevice, setCamDevice] = useState<string | null>(null);
   const camScanLine = useRef(new Animated.Value(0)).current;
+  const camBlink    = useRef(new Animated.Value(1)).current;
 
   interface StopWithPassengers {
     id: string;
@@ -386,6 +387,19 @@ export default function RouteScreen() {
       return () => loop.stop();
     }
     camScanLine.setValue(0);
+  }, [camSim]);
+
+  /* ── Clignotement LIVE du point rouge caméra ── */
+  useEffect(() => {
+    if (camSim === "linked") {
+      const blink = Animated.loop(Animated.sequence([
+        Animated.timing(camBlink, { toValue: 0.12, duration: 650, useNativeDriver: true }),
+        Animated.timing(camBlink, { toValue: 1,    duration: 650, useNativeDriver: true }),
+      ]));
+      blink.start();
+      return () => blink.stop();
+    }
+    camBlink.setValue(1);
   }, [camSim]);
 
   const camStartQr = () => {
@@ -666,6 +680,7 @@ export default function RouteScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
+          removeClippedSubviews
           keyboardShouldPersistTaps="handled"
         >
 
@@ -877,6 +892,57 @@ export default function RouteScreen() {
                 } />
               )}
             </View>
+
+            {/* ── Lecteur vidéo simulé (visible quand connectée/test/live) ── */}
+            {["connected", "testing", "linked"].includes(camSim) && (
+              <View style={S.camVideoArea}>
+                {/* Grille 2×2 caméras simulées */}
+                <View style={{ flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 2 }}>
+                  {[0, 1, 2, 3].map(i => (
+                    <View key={i} style={{ width: "50%", height: "50%", padding: 1.5 }}>
+                      <View style={{
+                        flex: 1, borderRadius: 3,
+                        backgroundColor: `rgba(${10 + i * 8},${16 + i * 8},${34 + i * 10},0.92)`,
+                      }} />
+                    </View>
+                  ))}
+                </View>
+                {/* Overlay info */}
+                <View style={S.camVideoOverlay}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {camSim === "linked" && (
+                      <>
+                        <Animated.View style={{
+                          width: 7, height: 7, borderRadius: 4,
+                          backgroundColor: "#FF3B3B", opacity: camBlink,
+                        }} />
+                        <Text style={{ color: "#FF3B3B", fontSize: 11, fontWeight: "900", letterSpacing: 0.8 }}>LIVE</Text>
+                      </>
+                    )}
+                    {camSim === "testing" && (
+                      <>
+                        <ActivityIndicator size="small" color="#FCD34D" />
+                        <Text style={{ color: "#FCD34D", fontSize: 11, fontWeight: "800", marginLeft: 2 }}>TEST EN COURS</Text>
+                      </>
+                    )}
+                    {camSim === "connected" && (
+                      <>
+                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#60A5FA" }} />
+                        <Text style={{ color: "#60A5FA", fontSize: 11, fontWeight: "800" }}>PRÊT</Text>
+                      </>
+                    )}
+                  </View>
+                  <Text style={{ color: "#475569", fontSize: 9, marginTop: 2 }}>
+                    {camDevice ?? "CAM-SIM"} · 1280×720 · H.264
+                  </Text>
+                </View>
+                {/* Coins de visée */}
+                <View style={[S.camVCorner, S.camVcTL, { borderColor: camSim === "linked" ? "#22C55E" : camSim === "testing" ? "#FCD34D" : "#60A5FA" }]} />
+                <View style={[S.camVCorner, S.camVcTR, { borderColor: camSim === "linked" ? "#22C55E" : camSim === "testing" ? "#FCD34D" : "#60A5FA" }]} />
+                <View style={[S.camVCorner, S.camVcBL, { borderColor: camSim === "linked" ? "#22C55E" : camSim === "testing" ? "#FCD34D" : "#60A5FA" }]} />
+                <View style={[S.camVCorner, S.camVcBR, { borderColor: camSim === "linked" ? "#22C55E" : camSim === "testing" ? "#FCD34D" : "#60A5FA" }]} />
+              </View>
+            )}
 
             {/* STATE: none → 3 boutons connexion directe */}
             {camSim === "none" && (
@@ -2514,6 +2580,18 @@ const S = StyleSheet.create({
 
   camAdvancedLink: { alignItems: "flex-end", paddingTop: 2 },
   camAdvancedTxt:  { fontSize: 11, color: "#334155", fontWeight: "600" },
+
+  /* ── Camera video preview area ── */
+  camVideoArea:    { height: 148, backgroundColor: "#020817", borderRadius: 11,
+                     overflow: "hidden", position: "relative" },
+  camVideoOverlay: { position: "absolute", bottom: 0, left: 0, right: 0,
+                     paddingHorizontal: 10, paddingVertical: 8,
+                     backgroundColor: "rgba(0,0,0,0.72)" },
+  camVCorner:      { position: "absolute", width: 15, height: 15, borderWidth: 2 },
+  camVcTL:         { top: 6, left: 6, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 3 },
+  camVcTR:         { top: 6, right: 6, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 3 },
+  camVcBL:         { bottom: 6, left: 6, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 3 },
+  camVcBR:         { bottom: 6, right: 6, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 3 },
 });
 
 /* ── Camera Module Styles ─────────────────────────────────────────── */
