@@ -326,11 +326,11 @@ export default function HomeScreen() {
               style={styles.headerLogo}
               resizeMode="contain"
             />
-            <View>
-              <Text style={styles.greeting}>
-                {firstName ? `Bonjour, ${firstName}` : "GoBooking"}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.greeting} numberOfLines={1} ellipsizeMode="tail">
+                {firstName ? `Bonjour, ${firstName} 👋` : "GoBooking"}
               </Text>
-              <Text style={styles.headerSub}>Que souhaitez-vous faire ?</Text>
+              <Text style={styles.headerSub} numberOfLines={1}>Que souhaitez-vous faire ?</Text>
             </View>
           </View>
           {dashboardPath ? (
@@ -1099,7 +1099,7 @@ export default function HomeScreen() {
 
       {/* ── Popular routes ── */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { marginBottom: 28 }]}>Trajets populaires</Text>
+        <Text style={[styles.sectionTitle, { marginBottom: 20 }]}>Trajets populaires</Text>
         {POPULAR_ROUTES.map((route, i) => (
           <Pressable
             key={i}
@@ -1154,13 +1154,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
 
   // Header
-  header: { paddingHorizontal: 22, paddingBottom: 44 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 28 },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
-  headerLogo: { width: 48, height: 48, borderRadius: 15 },
-  greeting: { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.4 },
-  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.82)", marginTop: 4 },
-  adminBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.20)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.30)" },
+  header: { paddingHorizontal: 20, paddingBottom: 44 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 12 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
+  headerLogo: { width: 44, height: 44, borderRadius: 14, flexShrink: 0 },
+  greeting: { fontSize: 20, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.3 },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.78)", marginTop: 3 },
+  adminBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.20)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.30)", flexShrink: 0 },
 
   // Mode selector
   modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 16, padding: 5, marginBottom: 18, gap: 4 },
@@ -1200,7 +1200,7 @@ const styles = StyleSheet.create({
   colisSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 23, marginBottom: 6 },
 
   // Quick CTAs
-  ctaRow: { paddingHorizontal: 20, paddingTop: 44, gap: 14 },
+  ctaRow: { paddingHorizontal: 16, paddingTop: 28, gap: 12 },
   ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1234,13 +1234,13 @@ const styles = StyleSheet.create({
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Section divider
-  sectionDivider: { height: 20, backgroundColor: "#CDD2EB", marginVertical: 0 },
+  sectionDivider: { height: 10, backgroundColor: "#E2E5F4", marginVertical: 0 },
 
   // Activity section
-  section: { paddingHorizontal: 20, paddingTop: 44, paddingBottom: 18 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 28 },
+  section: { paddingHorizontal: 16, paddingTop: 32, paddingBottom: 12 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   sectionTitle: {
-    fontSize: 22, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.7,
+    fontSize: 20, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.5,
     borderLeftWidth: 4, borderLeftColor: "#1650D0", paddingLeft: 12,
   },
   sectionLink: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.primary },
@@ -1284,7 +1284,7 @@ const styles = StyleSheet.create({
   demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
 
   // Quick actions grid
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 14, paddingHorizontal: 20, paddingTop: 0, paddingBottom: 4 },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingHorizontal: 16, paddingTop: 0, paddingBottom: 4 },
   quickCard: {
     width: "47%", backgroundColor: "white", borderRadius: 26, padding: 22, gap: 14,
     shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 26, elevation: 7,
@@ -1306,17 +1306,17 @@ const styles = StyleSheet.create({
   // Popular routes
   routeCard: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "white", borderRadius: 28, paddingVertical: 22, paddingHorizontal: 22, marginBottom: 22,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 30, elevation: 9,
-    borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 5, borderLeftColor: "#1650D0",
+    backgroundColor: "white", borderRadius: 24, paddingVertical: 18, paddingHorizontal: 18, marginBottom: 16,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.10, shadowRadius: 24, elevation: 8,
+    borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 4, borderLeftColor: "#1650D0",
   },
   routeCardPressed: { opacity: 0.80, transform: [{ scale: 0.978 }] },
-  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1, paddingRight: 12 },
-  routeCardIcon: { width: 54, height: 54, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "#C7D9FF", flexShrink: 0 },
-  routeCities: { flexDirection: "row", alignItems: "center", gap: 6 },
-  routeArrowWrap: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F4F6FF", justifyContent: "center", alignItems: "center" },
-  routeFrom: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3, flexShrink: 1 },
-  routeTo: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3, flexShrink: 1 },
+  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1, paddingRight: 10, minWidth: 0 },
+  routeCardIcon: { width: 50, height: 50, borderRadius: 18, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "#C7D9FF", flexShrink: 0 },
+  routeCities: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1, minWidth: 0 },
+  routeArrowWrap: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#F4F6FF", justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  routeFrom: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3, flexShrink: 1, minWidth: 0 },
+  routeTo: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3, flexShrink: 1, minWidth: 0 },
   routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   routeCardMeta: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
   routeCardRight: { flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0 },

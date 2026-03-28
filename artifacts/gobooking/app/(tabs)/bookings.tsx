@@ -262,29 +262,35 @@ function BookingCard({
     >
       {/* Header */}
       <View style={styles.cardHeader}>
-        <View>
-          <Text style={styles.refText}>#{item.bookingRef}</Text>
-          <Text style={styles.dateText}>{item.trip?.date ?? "—"}</Text>
+        <View style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+          <Text style={styles.refText} numberOfLines={1}>#{item.bookingRef}</Text>
+          <Text style={styles.dateText} numberOfLines={1}>{item.trip?.date ?? "—"}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-          <Feather name={cfg.icon as any} size={11} color={cfg.color} />
+        <View style={[styles.statusBadge, { backgroundColor: cfg.bg, flexShrink: 0 }]}>
+          <Feather name={cfg.icon as any} size={12} color={cfg.color} />
           <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
         </View>
       </View>
 
       {/* Route */}
       <View style={styles.routeRow}>
-        <View style={styles.cityBlock}>
-          <Text style={styles.timeText} numberOfLines={1}>{item.trip?.departureTime ?? "—"}</Text>
+        <View style={[styles.cityBlock, { alignItems: "flex-start" }]}>
+          <Text style={styles.timeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {item.trip?.departureTime ?? "—"}
+          </Text>
           <Text style={styles.cityText} numberOfLines={1}>{item.trip?.from ?? "—"}</Text>
         </View>
         <View style={styles.routeMiddle}>
           <View style={styles.routeLine} />
-          <Feather name="arrow-right" size={14} color={Colors.light.textMuted} />
+          <View style={styles.routeArrow}>
+            <Feather name="arrow-right" size={13} color="#1650D0" />
+          </View>
           <View style={styles.routeLine} />
         </View>
         <View style={[styles.cityBlock, { alignItems: "flex-end" }]}>
-          <Text style={styles.timeText} numberOfLines={1}>{item.trip?.arrivalTime ?? "—"}</Text>
+          <Text style={styles.timeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {item.trip?.arrivalTime ?? "—"}
+          </Text>
           <Text style={styles.cityText} numberOfLines={1}>{item.trip?.to ?? "—"}</Text>
         </View>
       </View>
@@ -541,13 +547,13 @@ export default function BookingsScreen() {
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: topPad + 22 }]}
       >
-        <View>
-          <Text style={styles.headerTitle}>Mes Réservations</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.headerTitle} numberOfLines={1}>Mes Réservations</Text>
           {bookings.length > 0 && (
-            <Text style={styles.headerSub}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""} au total</Text>
+            <Text style={styles.headerSub} numberOfLines={1}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""} au total</Text>
           )}
         </View>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 8, flexShrink: 0 }}>
           <Pressable style={styles.historyBtn} onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}>
             <Feather name="gift" size={15} color="white" />
             <Text style={styles.historyBtnText}>Bons</Text>
@@ -644,11 +650,11 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 22, paddingBottom: 32, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:  { fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.6 },
-  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 5 },
-  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.28)", borderRadius: 30, paddingHorizontal: 18, paddingVertical: 13, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.22)" },
-  historyBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
+  header:       { paddingHorizontal: 20, paddingBottom: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  headerTitle:  { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
+  headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 4 },
+  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 26, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.20)" },
+  historyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
   filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 70 },
@@ -672,12 +678,13 @@ const styles = StyleSheet.create({
   statusBadge:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 26, maxWidth: 160 },
   statusText:   { fontSize: 13, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 28, paddingBottom: 28, borderBottomWidth: 1.5, borderBottomColor: "#ECEEF8" },
-  cityBlock:    { flex: 1 },
-  timeText:     { fontSize: 36, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -2 },
-  cityText:     { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#7A8FAA", marginTop: 9 },
-  routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
-  routeLine:    { width: 32, height: 2, backgroundColor: "#DDE2F0" },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 24, paddingBottom: 24, borderBottomWidth: 1.5, borderBottomColor: "#ECEEF8" },
+  cityBlock:    { flex: 1, minWidth: 0 },
+  timeText:     { fontSize: 32, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -1.5 },
+  cityText:     { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#7A8FAA", marginTop: 7 },
+  routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 4 },
+  routeArrow:   { width: 26, height: 26, borderRadius: 13, backgroundColor: "#EEF4FF", alignItems: "center", justifyContent: "center" },
+  routeLine:    { width: 24, height: 2, backgroundColor: "#DDE2F0" },
 
   rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EFF6FF", borderRadius: 14, padding: 16, marginTop: 16, borderWidth: 1, borderColor: "#BFDBFE" },
   rule45Text:   { fontSize: 12, fontFamily: "Inter_500Medium", color: "#1D4ED8", flex: 1, lineHeight: 20 },
