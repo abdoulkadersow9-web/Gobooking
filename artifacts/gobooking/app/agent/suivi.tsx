@@ -112,61 +112,178 @@ interface AlertItem {
 interface Overview { buses: BusItem[]; trips: TripItem[]; alerts: AlertItem[] }
 
 /* ══════════════════════════════════════════════════════════════════
-   CAMÉRA LIVE — Lecteur vidéo embarqué
+   CAMÉRA LIVE — Lecteur vidéo plein écran immersif
    ══════════════════════════════════════════════════════════════════ */
-function CameraPlayer({ trip, onClose }: { trip: TripItem; onClose: () => void }) {
-  const [loading, setLoading] = useState(true);
-  const streamUrl = trip.cameraStreamUrl!;
+function CameraPlayer({
+  trip, onClose, liveData,
+}: {
+  trip: TripItem;
+  onClose: () => void;
+  liveData?: { frames: number; signal: number };
+}) {
+  const [loading,    setLoading]    = useState(true);
+  const [zoomIdx,    setZoomIdx]    = useState(0);           // 0=1× 1=1.5× 2=2×
+  const [showMeta,   setShowMeta]   = useState(true);        // metadata overlay auto-hides
+  const [webErr,     setWebErr]     = useState(false);
+  const liveDotAnim  = useRef(new Animated.Value(1)).current;
+  const zoomAnim     = useRef(new Animated.Value(1)).current;
+  const metaAnim     = useRef(new Animated.Value(1)).current;
+  const streamUrl    = trip.cameraStreamUrl!;
+  const ZOOM_LEVELS  = [1, 1.5, 2];
+  const signal       = liveData?.signal ?? 92;
+  const frames       = liveData?.frames ?? 0;
+  const sigBars      = Math.ceil((signal / 100) * 4);
+  const sigColor     = signal >= 80 ? CAM_GR : signal >= 60 ? "#FCD34D" : "#EF4444";
+
+  /* Blinking LIVE dot */
+  useEffect(() => {
+    const blink = Animated.loop(Animated.sequence([
+      Animated.timing(liveDotAnim, { toValue: 0.15, duration: 600, useNativeDriver: true }),
+      Animated.timing(liveDotAnim, { toValue: 1,    duration: 600, useNativeDriver: true }),
+    ]));
+    blink.start();
+    return () => blink.stop();
+  }, []);
+
+  /* Auto-hide metadata overlay after 5s */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      Animated.timing(metaAnim, { toValue: 0, duration: 400, useNativeDriver: true }).start();
+      setShowMeta(false);
+    }, 5000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const toggleMeta = () => {
+    const next = !showMeta;
+    setShowMeta(next);
+    Animated.timing(metaAnim, { toValue: next ? 1 : 0, duration: 300, useNativeDriver: true }).start();
+  };
+
+  const handleDoubleTap = () => {
+    const nextIdx = (zoomIdx + 1) % ZOOM_LEVELS.length;
+    setZoomIdx(nextIdx);
+    Animated.spring(zoomAnim, { toValue: ZOOM_LEVELS[nextIdx], useNativeDriver: true, tension: 120, friction: 8 }).start();
+  };
 
   return (
     <View style={CS.container}>
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={CS.header}>
         <View style={CS.liveBadge}>
-          <View style={CS.liveDot} />
+          <Animated.View style={[CS.liveDot, { opacity: liveDotAnim }]} />
           <Text style={CS.liveText}>LIVE</Text>
         </View>
         <Text style={CS.camTitle} numberOfLines={1}>
           {trip.from} → {trip.to}  ·  {trip.cameraPosition ?? "intérieur"}
         </Text>
+        {/* Signal bars inline */}
+        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, marginRight: 8 }}>
+          {[1,2,3,4].map(b => (
+            <View key={b} style={{
+              width: 4, height: 4 + b * 3,
+              borderRadius: 2,
+              backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.18)",
+            }} />
+          ))}
+          <Text style={{ color: sigColor, fontSize: 10, fontWeight: "800", marginLeft: 3 }}>{signal}%</Text>
+        </View>
         <TouchableOpacity onPress={onClose} hitSlop={12} style={CS.closeBtn}>
           <Ionicons name="close" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Video */}
-      <View style={CS.videoWrap}>
-        {loading && (
+      {/* ── Video zone ── */}
+      <TouchableOpacity activeOpacity={1} style={CS.videoWrap} onPress={toggleMeta} onLongPress={handleDoubleTap}>
+        {loading && !webErr && (
           <View style={CS.videoLoader}>
             <ActivityIndicator size="large" color={CAM_GR} />
             <Text style={{ color: "#94A3B8", fontSize: 12, marginTop: 10 }}>Connexion au flux caméra...</Text>
           </View>
         )}
-        <WebView
-          source={{ html: buildVideoHtml(streamUrl) }}
-          style={CS.video}
-          allowsInlineMediaPlayback
-          mediaPlaybackRequiresUserAction={false}
-          javaScriptEnabled
-          onLoadEnd={() => setLoading(false)}
-          scrollEnabled={false}
-          bounces={false}
-        />
-      </View>
+        {webErr && (
+          <View style={CS.videoLoader}>
+            <Ionicons name="wifi-outline" size={42} color="#EF4444" />
+            <Text style={{ color: "#EF4444", fontSize: 14, fontWeight: "700", marginTop: 12 }}>Flux interrompu</Text>
+            <Text style={{ color: "#94A3B8", fontSize: 12, marginTop: 6, textAlign: "center" }}>Vérifiez la connexion réseau{"\n"}et la liaison caméra</Text>
+          </View>
+        )}
+        <Animated.View style={{ flex: 1, transform: [{ scale: zoomAnim }] }}>
+          <WebView
+            source={{ html: buildVideoHtml(streamUrl) }}
+            style={CS.video}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            javaScriptEnabled
+            onLoadEnd={() => setLoading(false)}
+            onError={() => { setLoading(false); setWebErr(true); }}
+            scrollEnabled={false}
+            bounces={false}
+          />
+        </Animated.View>
 
-      {/* Footer info */}
+        {/* ── Metadata overlay (tap to toggle) ── */}
+        <Animated.View style={[CS.metaOverlay, { opacity: metaAnim }]} pointerEvents="none">
+          <View style={CS.metaRow}>
+            <View style={CS.metaChip}>
+              <Ionicons name="bus" size={10} color="#94A3B8" />
+              <Text style={CS.metaChipTxt}>{trip.busName ?? "Bus"}</Text>
+            </View>
+            <View style={CS.metaChip}>
+              <Ionicons name="people" size={10} color="#94A3B8" />
+              <Text style={CS.metaChipTxt}>{trip.passengerCount ?? "—"} pax</Text>
+            </View>
+            <View style={CS.metaChip}>
+              <Ionicons name="film-outline" size={10} color="#94A3B8" />
+              <Text style={CS.metaChipTxt}>▲{frames} img</Text>
+            </View>
+            {zoomIdx > 0 && (
+              <View style={[CS.metaChip, { backgroundColor: "rgba(251,191,36,0.25)", borderColor: "#FCD34D" }]}>
+                <Text style={[CS.metaChipTxt, { color: "#FCD34D" }]}>{ZOOM_LEVELS[zoomIdx]}×</Text>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* ── Zoom hint ── */}
+        {!loading && !webErr && zoomIdx === 0 && (
+          <View style={CS.zoomHint} pointerEvents="none">
+            <Text style={CS.zoomHintTxt}>Maintenir pour zoomer</Text>
+          </View>
+        )}
+        {!loading && !webErr && zoomIdx > 0 && (
+          <View style={[CS.zoomHint, { backgroundColor: "rgba(251,191,36,0.18)", borderColor: "#FCD34D" }]} pointerEvents="none">
+            <Ionicons name="search" size={10} color="#FCD34D" />
+            <Text style={[CS.zoomHintTxt, { color: "#FCD34D" }]}>{ZOOM_LEVELS[zoomIdx]}× — maintenir pour changer</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* ── Footer info ── */}
       <View style={CS.footer}>
         <View style={CS.footerItem}>
-          <Ionicons name="wifi" size={13} color={CAM_GR} />
-          <Text style={CS.footerTxt}>Signal actif</Text>
+          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+            {[1,2,3,4].map(b => (
+              <View key={b} style={{
+                width: 3, height: 3 + b * 2,
+                borderRadius: 1,
+                backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.15)",
+              }} />
+            ))}
+          </View>
+          <Text style={[CS.footerTxt, { color: sigColor }]}>Signal {signal}%</Text>
         </View>
         <View style={CS.footerItem}>
-          <Ionicons name="videocam" size={13} color={CAM_GR} />
-          <Text style={CS.footerTxt}>Caméra embarquée</Text>
+          <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR, opacity: liveDotAnim }} />
+          <Text style={[CS.footerTxt, { color: CAM_GR }]}>LIVE · HLS</Text>
         </View>
         <View style={CS.footerItem}>
-          <Ionicons name="shield-checkmark" size={13} color={CAM_GR} />
+          <Ionicons name="shield-checkmark" size={13} color="#4ADE80" />
           <Text style={CS.footerTxt}>Flux sécurisé</Text>
+        </View>
+        <View style={CS.footerItem}>
+          <Ionicons name="film-outline" size={13} color="#64748B" />
+          <Text style={CS.footerTxt}>{frames} img</Text>
         </View>
       </View>
     </View>
@@ -210,6 +327,20 @@ function CamPill({ trip, onView }: { trip: TripItem; onView: () => void }) {
 /* ══════════════════════════════════════════════════════════════════
    MAIN SCREEN
    ══════════════════════════════════════════════════════════════════ */
+
+/* ── FadeCard : animation d'entrée fluide ── */
+function FadeCard({ children, style }: { children: React.ReactNode; style?: object }) {
+  const opacity    = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue: 1, duration: 360, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, []);
+  return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
+}
+
 export default function SuiviScreen() {
   const { user, token, logout } = useAuth();
   const [data,        setData]        = useState<Overview | null>(null);
@@ -428,7 +559,11 @@ export default function SuiviScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: CAM_BG }}>
         <StatusBar barStyle="light-content" backgroundColor={CAM_BG} />
-        <CameraPlayer trip={cameraTrip} onClose={() => setCameraTrip(null)} />
+        <CameraPlayer
+          trip={cameraTrip}
+          onClose={() => setCameraTrip(null)}
+          liveData={liveFrames[cameraTrip.id]}
+        />
       </SafeAreaView>
     );
   }
@@ -691,7 +826,7 @@ export default function SuiviScreen() {
               const borderCol  = alert.type === "panne" ? "#DC2626" : alert.type === "controle" ? "#D97706" : "#94A3B8";
               const typeLabel  = alert.type === "panne" ? "PANNE" : alert.type === "controle" ? "CONTRÔLE" : "ALERTE";
               return (
-                <View key={alert.id} style={[S.alertCard, { borderLeftColor: borderCol }]}>
+                <FadeCard key={alert.id} style={[S.alertCard, { borderLeftColor: borderCol }]}>
                   {/* Top row */}
                   <View style={S.alertTop}>
                     <View style={[S.alertTypeBadge, { backgroundColor: typeBg }]}>
@@ -746,7 +881,7 @@ export default function SuiviScreen() {
                       <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Résolu</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </FadeCard>
               );
             })}
           </View>
@@ -1030,19 +1165,27 @@ export default function SuiviScreen() {
 
 /* ── Camera Player Styles ─────────────────────────────────────── */
 const CS = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: CAM_BG },
-  header:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  liveBadge:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
-  liveText:   { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  camTitle:   { flex: 1, color: "#E2E8F0", fontSize: 13, fontWeight: "700" },
-  closeBtn:   { width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
-  videoWrap:  { flex: 1, position: "relative" },
-  videoLoader:{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 10, backgroundColor: CAM_BG },
-  video:      { flex: 1, backgroundColor: "#000" },
-  footer:     { flexDirection: "row", justifyContent: "space-around", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
-  footerItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  footerTxt:  { color: "#64748B", fontSize: 11, fontWeight: "600" },
+  container:   { flex: 1, backgroundColor: CAM_BG },
+  header:      { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  liveBadge:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  liveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  liveText:    { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  camTitle:    { flex: 1, color: "#E2E8F0", fontSize: 13, fontWeight: "700" },
+  closeBtn:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
+  videoWrap:   { flex: 1, position: "relative", overflow: "hidden" },
+  videoLoader: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 10, backgroundColor: CAM_BG },
+  video:       { flex: 1, backgroundColor: "#000" },
+  footer:      { flexDirection: "row", justifyContent: "space-around", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  footerItem:  { flexDirection: "row", alignItems: "center", gap: 5 },
+  footerTxt:   { color: "#64748B", fontSize: 11, fontWeight: "600" },
+  /* Metadata overlay */
+  metaOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(10,14,26,0.82)", paddingHorizontal: 12, paddingVertical: 8 },
+  metaRow:     { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  metaChip:    { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  metaChipTxt: { color: "#94A3B8", fontSize: 10, fontWeight: "700" },
+  /* Zoom hint */
+  zoomHint:    { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(10,14,26,0.75)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  zoomHintTxt: { color: "rgba(255,255,255,0.5)", fontSize: 10 },
 });
 
 /* ── Camera Pill Styles ────────────────────────────────────────── */

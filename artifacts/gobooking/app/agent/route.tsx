@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, Modal,
-  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Platform, Linking, TextInput, Animated, Easing, LayoutAnimation, UIManager,
 } from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -96,6 +100,19 @@ const DEMO_ALERTS_FALLBACK = [
     createdAt: new Date(Date.now() - 12 * 60_000).toISOString(),
   },
 ];
+
+/* ── FadeCard : animation d'entrée pour les alertes ── */
+function FadeCard({ children, style }: { children: React.ReactNode; style?: object }) {
+  const opacity   = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity,    { toValue: 1, duration: 380, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 320, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+    ]).start();
+  }, []);
+  return <Animated.View style={[style, { opacity, transform: [{ translateY }] }]}>{children}</Animated.View>;
+}
 
 export default function RouteScreen() {
   const { user, token, logout } = useAuth();
@@ -408,11 +425,22 @@ export default function RouteScreen() {
   }, [camSim]);
 
   /* ── Caméra — fonctions memoïsées (useCallback pour performance) ── */
+  /* ── Layout animation helper for camera state transitions ── */
+  const camTransition = useCallback(() => {
+    LayoutAnimation.configureNext({
+      duration: 280,
+      create:  { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+      update:  { type: LayoutAnimation.Types.easeInEaseOut },
+      delete:  { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+    });
+  }, []);
+
   const camDisconnect = useCallback(() => {
+    camTransition();
     setCamSim("none"); setCamDevice(null);
     setCamFrameCount(0); setCamSignal(95);
     camAutoLinkRef.current = false;
-  }, []);
+  }, [camTransition]);
 
   const camAssociate = useCallback(async () => {
     if (activeTrip && token) {
@@ -427,33 +455,38 @@ export default function RouteScreen() {
         });
       } catch {}
     }
+    camTransition();
     setCamSim("linked");
-  }, [activeTrip, token, camDevice]);
+  }, [activeTrip, token, camDevice, camTransition]);
 
   const camTest = useCallback(() => {
+    camTransition();
     setCamSim("testing");
-    setTimeout(() => setCamSim("connected"), 3000);
-  }, []);
+    setTimeout(() => { camTransition(); setCamSim("connected"); }, 3000);
+  }, [camTransition]);
 
   const camStartQr = useCallback(() => {
+    camTransition();
     setCamSim("qr_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
-    setTimeout(() => { setCamSim("connecting"); setCamDevice("CAM-GTB-" + (1000 + Math.floor(Math.random() * 8999))); }, 2500);
-    setTimeout(() => setCamSim("connected"), 4200);
-  }, []);
+    setTimeout(() => { camTransition(); setCamSim("connecting"); setCamDevice("CAM-GTB-" + (1000 + Math.floor(Math.random() * 8999))); }, 2500);
+    setTimeout(() => { camTransition(); setCamSim("connected"); }, 4200);
+  }, [camTransition]);
 
   const camStartBt = useCallback(() => {
+    camTransition();
     setCamSim("bt_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
     setTimeout(() => setCamDevice("GOBOOKING-CAM-01"), 2000);
-    setTimeout(() => setCamSim("connecting"), 2900);
-    setTimeout(() => setCamSim("connected"), 4500);
-  }, []);
+    setTimeout(() => { camTransition(); setCamSim("connecting"); }, 2900);
+    setTimeout(() => { camTransition(); setCamSim("connected"); }, 4500);
+  }, [camTransition]);
 
   const camStartWifi = useCallback(() => {
+    camTransition();
     setCamSim("wifi_scanning"); setCamDevice(null); camAutoLinkRef.current = false;
     setTimeout(() => setCamDevice("192.168.43.1:8080"), 2000);
-    setTimeout(() => setCamSim("connecting"), 2900);
-    setTimeout(() => setCamSim("connected"), 4500);
-  }, []);
+    setTimeout(() => { camTransition(); setCamSim("connecting"); }, 2900);
+    setTimeout(() => { camTransition(); setCamSim("connected"); }, 4500);
+  }, [camTransition]);
 
   /* ── Auto-liaison : dès que la caméra est "connected" → associer automatiquement ── */
   useEffect(() => {
@@ -1978,7 +2011,7 @@ export default function RouteScreen() {
                   const alertColor  = isCamAlert ? "#7C3AED" : isAuto ? "#D97706" : "#DC2626";
                   const alertIcon   = isCamAlert ? "videocam-off" : "warning";
                   return (
-                    <View key={alert.id} style={[S.alertCard, { borderLeftColor: alertColor }, isCamAlert && { backgroundColor: "#FAF5FF" }]}>
+                    <FadeCard key={alert.id} style={[S.alertCard, { borderLeftColor: alertColor }, isCamAlert && { backgroundColor: "#FAF5FF" }]}>
                       <View style={S.alertRow}>
                         <Ionicons name={alertIcon as any} size={20} color={alertColor} />
                         <Text style={S.alertMessage}>{alert.message}</Text>
@@ -2039,7 +2072,7 @@ export default function RouteScreen() {
                           </View>
                         </>
                       )}
-                    </View>
+                    </FadeCard>
                   );
                 })}
               </View>
@@ -2048,6 +2081,30 @@ export default function RouteScreen() {
             {/* ══ CAMÉRA EMBARQUÉE ══ */}
             {tab === "camera" && (
               <View style={SC.wrap}>
+
+                {/* ── Bannière réseau hors-ligne ── */}
+                {!networkStatus.isOnline && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#7C3AED", borderRadius: 12, padding: 12, marginBottom: 4 }}>
+                    <Ionicons name="wifi-outline" size={18} color="#fff" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: "#fff", fontSize: 13, fontWeight: "800" }}>Hors ligne</Text>
+                      <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 }}>Le flux caméra nécessite une connexion active</Text>
+                    </View>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                )}
+                {networkStatus.isOnline && camSim === "linked" && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#052E16", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginBottom: 4 }}>
+                    <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#22C55E", opacity: camBlink }} />
+                    <Text style={{ color: "#22C55E", fontSize: 12, fontWeight: "800" }}>Connexion stable · Réseau disponible</Text>
+                    <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, marginLeft: "auto" }}>
+                      {[1,2,3,4].map(b => {
+                        const filled = b <= Math.ceil((camSignal / 100) * 4);
+                        return <View key={b} style={{ width: 3, height: 3 + b * 2, borderRadius: 1, backgroundColor: filled ? "#22C55E" : "rgba(255,255,255,0.15)" }} />;
+                      })}
+                    </View>
+                  </View>
+                )}
 
                 {/* ── Header status ── */}
                 <View style={SC.hdr}>
@@ -2165,21 +2222,46 @@ export default function RouteScreen() {
                       </View>
                       {/* Overlay */}
                       <View style={SC.previewOverlay}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                           {camSim === "testing"
                             ? <><ActivityIndicator size="small" color="#FCD34D" /><Text style={{ color: "#FCD34D", fontSize: 13, fontWeight: "800" }}>TEST EN COURS</Text></>
                             : <>
-                                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: camSim === "linked" ? "#22C55E" : "#60A5FA" }} />
+                                <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: camSim === "linked" ? "#22C55E" : "#60A5FA", opacity: camBlink }} />
                                 <Text style={{ color: camSim === "linked" ? "#22C55E" : "#60A5FA", fontSize: 13, fontWeight: "800" }}>
-                                  {camSim === "linked" ? "SIMULATION LIVE" : "SIMULATION PRÊT"}
+                                  {camSim === "linked" ? "● LIVE" : "PRÊT"}
                                 </Text>
                               </>
                           }
+                          {/* Signal bars */}
+                          {camSim === "linked" && (
+                            <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, marginLeft: 6 }}>
+                              {[1,2,3,4].map(b => {
+                                const filled = b <= Math.ceil((camSignal / 100) * 4);
+                                const barColor = camSignal >= 80 ? "#22C55E" : camSignal >= 60 ? "#FCD34D" : "#EF4444";
+                                return (
+                                  <View key={b} style={{
+                                    width: 3, height: 3 + b * 3, borderRadius: 1,
+                                    backgroundColor: filled ? barColor : "rgba(255,255,255,0.18)",
+                                  }} />
+                                );
+                              })}
+                              <Text style={{ color: camSignal >= 80 ? "#22C55E" : camSignal >= 60 ? "#FCD34D" : "#EF4444", fontSize: 10, fontWeight: "800", marginLeft: 3 }}>
+                                {camSignal}%
+                              </Text>
+                            </View>
+                          )}
                         </View>
                         <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 4 }}>{camDevice ?? "CAM-SIM"} · 1280×720 · H.264</Text>
-                        <Text style={{ color: "#475569", fontSize: 10, marginTop: 2, fontFamily: "monospace" }}>
-                          {new Date().toLocaleTimeString("fr-FR")}
-                        </Text>
+                        {camSim === "linked" && (
+                          <Text style={{ color: "#4ADE80", fontSize: 10, marginTop: 2, fontFamily: "monospace" }}>
+                            ▲ {camFrameCount} frames · {new Date().toLocaleTimeString("fr-FR")}
+                          </Text>
+                        )}
+                        {camSim !== "linked" && (
+                          <Text style={{ color: "#475569", fontSize: 10, marginTop: 2, fontFamily: "monospace" }}>
+                            {new Date().toLocaleTimeString("fr-FR")}
+                          </Text>
+                        )}
                       </View>
                       {/* Corners */}
                       <View style={[SC.corner, SC.cTL, { borderColor: camSim === "linked" ? "#22C55E" : "#60A5FA" }]} />
