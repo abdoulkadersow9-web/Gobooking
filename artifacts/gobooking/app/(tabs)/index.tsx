@@ -160,7 +160,6 @@ const DEMO_BOOKING: Booking = {
   status: "confirmed", totalAmount: 2000,
 };
 
-type Mode = "trajet" | "colis";
 
 function formatDeparture(iso: string): string {
   const d = new Date(iso);
@@ -196,7 +195,6 @@ export default function HomeScreen() {
     )).start();
   }, []);
 
-  const [mode, setMode] = useState<Mode>("trajet");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -391,182 +389,134 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Mode selector */}
-        <View style={styles.modeSelector}>
+        {/* ── 3 Quick Actions ── */}
+        <View style={styles.quickActionsRow}>
           <Pressable
-            style={[styles.modeBtn, mode === "trajet" && styles.modeBtnActive]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode("trajet"); }}
+            style={({ pressed }) => [styles.qaCard, pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); scrollRef.current?.scrollTo({ y: 0, animated: true }); }}
           >
-            <Feather name="map" size={16} color={mode === "trajet" ? Colors.light.primary : "rgba(255,255,255,0.7)"} />
-            <Text style={[styles.modeBtnText, mode === "trajet" && styles.modeBtnTextActive]}>
-              Réserver un trajet
-            </Text>
+            <View style={[styles.qaIconCircle, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
+              <Feather name="map" size={22} color="white" />
+            </View>
+            <Text style={styles.qaLabel}>Réserver</Text>
+            <Text style={styles.qaSub}>un trajet</Text>
           </Pressable>
+
           <Pressable
-            style={[styles.modeBtn, mode === "colis" && styles.modeBtnActive]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode("colis"); }}
+            style={({ pressed }) => [styles.qaCard, pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/parcel/send"); }}
           >
-            <Feather name="package" size={16} color={mode === "colis" ? Colors.light.primary : "rgba(255,255,255,0.7)"} />
-            <Text style={[styles.modeBtnText, mode === "colis" && styles.modeBtnTextActive]}>
-              Envoyer un colis
-            </Text>
+            <View style={[styles.qaIconCircle, { backgroundColor: "rgba(16,185,129,0.25)" }]}>
+              <Feather name="package" size={22} color="#6EE7B7" />
+            </View>
+            <Text style={styles.qaLabel}>Envoyer</Text>
+            <Text style={styles.qaSub}>un colis</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.qaCard, pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/(tabs)/suivi" as never); }}
+          >
+            <View style={[styles.qaIconCircle, { backgroundColor: "rgba(251,191,36,0.22)" }]}>
+              <Feather name="navigation" size={22} color="#FCD34D" />
+            </View>
+            <Text style={styles.qaLabel}>Suivre</Text>
+            <Text style={styles.qaSub}>un colis</Text>
           </Pressable>
         </View>
 
-        {/* Search card */}
-        {mode === "trajet" ? (
-          <View style={styles.searchCard}>
-            <View style={styles.routeRow}>
-              <View style={styles.routeInputWrap}>
-                <View style={styles.routeLabel}>
-                  <View style={[styles.dot, { backgroundColor: "#10B981" }]} />
-                  <Text style={styles.routeLabelText}>DÉPART</Text>
-                </View>
-                <TextInput
-                  style={styles.routeInput}
-                  placeholder="Ville de départ"
-                  placeholderTextColor={Colors.light.textMuted}
-                  value={from}
-                  onChangeText={setFrom}
-                />
+        {/* ── Search card (toujours trajet) ── */}
+        <View style={styles.searchCard}>
+          <View style={styles.routeRow}>
+            <View style={styles.routeInputWrap}>
+              <View style={styles.routeLabel}>
+                <View style={[styles.dot, { backgroundColor: "#10B981" }]} />
+                <Text style={styles.routeLabelText}>DÉPART</Text>
               </View>
-              <Pressable style={styles.swapBtn} onPress={swap}>
-                <Feather name="repeat" size={18} color={Colors.light.primary} />
-              </Pressable>
-              <View style={styles.routeInputWrap}>
-                <View style={styles.routeLabel}>
-                  <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
-                  <Text style={styles.routeLabelText}>ARRIVÉE</Text>
-                </View>
-                <TextInput
-                  style={styles.routeInput}
-                  placeholder="Ville d'arrivée"
-                  placeholderTextColor={Colors.light.textMuted}
-                  value={to}
-                  onChangeText={setTo}
-                />
-              </View>
+              <TextInput
+                style={styles.routeInput}
+                placeholder="Ville de départ"
+                placeholderTextColor={Colors.light.textMuted}
+                value={from}
+                onChangeText={setFrom}
+              />
             </View>
-            {/* ── Villes populaires ── */}
-            <View style={styles.citiesRow}>
-              {["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa", "Man"].map((city, i) => (
-                <Pressable
-                  key={`city-${i}-${city}`}
-                  style={({ pressed }) => [styles.cityChip, pressed && { opacity: 0.7 }]}
-                  onPress={() => {
-                    if (!from) { setFrom(city); }
-                    else if (!to) { setTo(city); }
-                    else { setTo(city); }
-                  }}
-                >
-                  <Text style={styles.cityChipText}>{city}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.bottomRow}>
-              <View style={styles.dateWrap}>
-                <Feather name="calendar" size={15} color={Colors.light.textSecondary} />
-                <TextInput
-                  style={styles.dateInput}
-                  value={date}
-                  onChangeText={setDate}
-                  placeholder="AAAA-MM-JJ"
-                  placeholderTextColor={Colors.light.textMuted}
-                />
-              </View>
-              <View style={styles.paxWrap}>
-                <Feather name="users" size={15} color={Colors.light.textSecondary} />
-                <Pressable style={styles.paxBtn} onPress={() => setPassengers(Math.max(1, passengers - 1))}>
-                  <Feather name="minus" size={13} color={Colors.light.primary} />
-                </Pressable>
-                <Text style={styles.paxCount}>{passengers}</Text>
-                <Pressable style={styles.paxBtn} onPress={() => setPassengers(Math.min(9, passengers + 1))}>
-                  <Feather name="plus" size={13} color={Colors.light.primary} />
-                </Pressable>
-              </View>
-            </View>
-            <Pressable
-              style={({ pressed }) => [styles.searchBtnWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
-              onPress={search}
-            >
-              <LinearGradient
-                colors={["#F97316", "#E05500"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.searchBtn}
-              >
-                <Feather name="search" size={17} color="white" />
-                <Text style={styles.searchBtnText}>Rechercher des bus</Text>
-              </LinearGradient>
+            <Pressable style={styles.swapBtn} onPress={swap}>
+              <Feather name="repeat" size={18} color={Colors.light.primary} />
             </Pressable>
-          </View>
-        ) : (
-          <View style={styles.searchCard}>
-            <View style={styles.colisHero}>
-              <View style={styles.colisIconWrap}>
-                <Feather name="package" size={32} color={Colors.light.primary} />
+            <View style={styles.routeInputWrap}>
+              <View style={styles.routeLabel}>
+                <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
+                <Text style={styles.routeLabelText}>ARRIVÉE</Text>
               </View>
-              <Text style={styles.colisTitle}>Envoi de colis</Text>
-              <Text style={styles.colisSub}>
-                Expédiez vos colis partout en Côte d'Ivoire en toute sécurité
-              </Text>
+              <TextInput
+                style={styles.routeInput}
+                placeholder="Ville d'arrivée"
+                placeholderTextColor={Colors.light.textMuted}
+                value={to}
+                onChangeText={setTo}
+              />
+            </View>
+          </View>
+
+          {/* ── Villes rapides ── */}
+          <View style={styles.citiesRow}>
+            {["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pédro", "Daloa"].map((city, i) => (
               <Pressable
-                style={({ pressed }) => [styles.searchBtnWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
-                onPress={() => router.push("/parcel/send")}
+                key={`city-${i}`}
+                style={({ pressed }) => [styles.cityChip, pressed && { opacity: 0.7 }]}
+                onPress={() => { if (!from) setFrom(city); else setTo(city); }}
               >
-                <LinearGradient
-                  colors={["#F97316", "#E05500"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.searchBtn}
-                >
-                  <Feather name="arrow-right" size={17} color="white" />
-                  <Text style={styles.searchBtnText}>Envoyer un colis</Text>
-                </LinearGradient>
+                <Text style={styles.cityChipText}>{city}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.bottomRow}>
+            <View style={styles.dateWrap}>
+              <Feather name="calendar" size={15} color={Colors.light.textSecondary} />
+              <TextInput
+                style={styles.dateInput}
+                value={date}
+                onChangeText={setDate}
+                placeholder="AAAA-MM-JJ"
+                placeholderTextColor={Colors.light.textMuted}
+              />
+            </View>
+            <View style={styles.paxWrap}>
+              <Feather name="users" size={15} color={Colors.light.textSecondary} />
+              <Pressable style={styles.paxBtn} onPress={() => setPassengers(Math.max(1, passengers - 1))}>
+                <Feather name="minus" size={13} color={Colors.light.primary} />
+              </Pressable>
+              <Text style={styles.paxCount}>{passengers}</Text>
+              <Pressable style={styles.paxBtn} onPress={() => setPassengers(Math.min(9, passengers + 1))}>
+                <Feather name="plus" size={13} color={Colors.light.primary} />
               </Pressable>
             </View>
           </View>
-        )}
+
+          <Pressable
+            style={({ pressed }) => [styles.searchBtnWrap, pressed && { opacity: 0.92, transform: [{ scale: 0.98 }] }]}
+            onPress={search}
+          >
+            <LinearGradient
+              colors={["#F97316", "#E05500"]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.searchBtn}
+            >
+              <Feather name="search" size={18} color="white" />
+              <Text style={styles.searchBtnText}>Rechercher maintenant</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
       </LinearGradient>
 
-      {/* ── Quick CTAs ── */}
+      {/* ── Live tracking CTA ── */}
       <Animated.View style={{
         opacity: sectionAnims[0],
         transform: [{ translateY: sectionAnims[0].interpolate({ inputRange: [0,1], outputRange: [20,0] }) }],
+        paddingHorizontal: 16, paddingTop: 16,
       }}>
-      <View style={styles.ctaRow}>
-        <Pressable
-          style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnPrimary, pressed && { transform: [{ scale: 0.97 }], opacity: 0.93 }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push("/client/resultats" as never);
-          }}
-        >
-          <View style={styles.ctaIcon}>
-            <Feather name="map" size={20} color={Colors.light.primary} />
-          </View>
-          <View style={styles.ctaText}>
-            <Text style={styles.ctaTitle}>Réserver un trajet</Text>
-            <Text style={styles.ctaSub}>Bus interurbains CI</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={Colors.light.primary} />
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnGreen, pressed && { transform: [{ scale: 0.97 }], opacity: 0.93 }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/parcel/send"); }}
-        >
-          <View style={[styles.ctaIcon, { backgroundColor: "#DCFCE7" }]}>
-            <Feather name="package" size={20} color="#059669" />
-          </View>
-          <View style={styles.ctaText}>
-            <Text style={[styles.ctaTitle, { color: "#064E3B" }]}>Envoyer un colis</Text>
-            <Text style={[styles.ctaSub, { color: "#065F46" }]}>Livraison sécurisée</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color="#059669" />
-        </Pressable>
-
-        {/* ── Live tracking CTA ── */}
         <Pressable
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/live-tracking"); }}
           style={({ pressed }) => [styles.liveTrackingBtn, pressed && { transform: [{ scale: 0.97 }], opacity: 0.95 }]}
@@ -576,7 +526,7 @@ export default function HomeScreen() {
               <Feather name="truck" size={20} color="white" />
             </View>
             <View style={styles.ctaText}>
-              <Text style={styles.liveTrackingTitle}>Voir les cars en route</Text>
+              <Text style={styles.liveTrackingTitle}>Cars en route maintenant</Text>
               <Text style={styles.liveTrackingSub}>Positions en temps réel · CI</Text>
             </View>
           </View>
@@ -585,7 +535,6 @@ export default function HomeScreen() {
             <Text style={styles.livePillText}>LIVE</Text>
           </View>
         </Pressable>
-      </View>
       </Animated.View>
 
       {/* ── Matching intelligent ── */}
@@ -1234,12 +1183,16 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
   adminBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.28)", flexShrink: 0 },
 
-  // Mode selector
-  modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.16)", borderRadius: 16, padding: 5, marginBottom: 18, gap: 4 },
-  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, paddingVertical: 11, borderRadius: 12 },
-  modeBtnActive: { backgroundColor: "white" },
-  modeBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "rgba(255,255,255,0.8)" },
-  modeBtnTextActive: { color: Colors.light.primary },
+  // Quick Actions (header)
+  quickActionsRow: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  qaCard: {
+    flex: 1, alignItems: "center", gap: 7, paddingVertical: 14,
+    backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 18,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.16)",
+  },
+  qaIconCircle: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center" },
+  qaLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.1 },
+  qaSub: { fontSize: 10, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.55)", marginTop: -4 },
 
   // Search card
   searchCard: {
@@ -1267,32 +1220,8 @@ const styles = StyleSheet.create({
   citiesRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18, marginTop: 12 },
   cityChip: { backgroundColor: "#EEF4FF", borderRadius: 22, paddingHorizontal: 15, paddingVertical: 8, borderWidth: 1.5, borderColor: "#C4D7FF" },
   cityChipText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#1650D0" },
-  colisHero: { alignItems: "center", gap: 14, paddingVertical: 12 },
-  colisIconWrap: { width: 80, height: 80, borderRadius: 26, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
-  colisTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.4 },
-  colisSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 23, marginBottom: 6 },
-
-  // Quick CTAs
-  ctaRow: { paddingHorizontal: 16, paddingTop: 22, gap: 14 },
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 18,
-    borderRadius: 26,
-    padding: 22,
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 28,
-    elevation: 7,
-    ..._ws("0 10px 28px rgba(22,80,208,0.12)"),
-  },
-  ctaBtnPrimary: { backgroundColor: "white", borderWidth: 1.5, borderColor: "#C4D4F8", borderLeftWidth: 5, borderLeftColor: "#1650D0" },
-  ctaBtnGreen:   { backgroundColor: "white", borderWidth: 1.5, borderColor: "#A8E0C8", borderLeftWidth: 5, borderLeftColor: "#059669" },
-  ctaIcon: { width: 60, height: 60, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
+  // Live tracking CTA wrapper text
   ctaText: { flex: 1 },
-  ctaTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  ctaSub:   { fontSize: 13, fontFamily: "Inter_400Regular", color: "#7A8FAA", marginTop: 4, lineHeight: 20 },
 
   liveTrackingBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
