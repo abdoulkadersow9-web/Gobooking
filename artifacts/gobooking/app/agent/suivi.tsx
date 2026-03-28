@@ -460,10 +460,11 @@ export default function SuiviScreen() {
 
           {/* ── ALERTS LIST ── */}
           <View style={S.section}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <View style={S.sectionHeader}>
+              <Ionicons name="warning" size={15} color={hasAlerts ? RED : "#22C55E"} />
               <Text style={S.sectionTitle}>Alertes actives</Text>
               {data?.alerts?.length ? (
-                <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: "auto" }}>
                   <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{data.alerts.length}</Text>
                 </View>
               ) : null}
@@ -548,8 +549,9 @@ export default function SuiviScreen() {
 
           {/* ── BUS LIST — Tour de contrôle ── */}
           <View style={S.section}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <View>
+            <View style={S.sectionHeader}>
+              <Feather name="radio" size={14} color="#1D4ED8" />
+              <View style={{ flex: 1 }}>
                 <Text style={S.sectionTitle}>Bus en temps réel</Text>
                 <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 1 }}>{data?.buses?.length ?? 0} véhicule{(data?.buses?.length ?? 0) > 1 ? "s" : ""} suivi{(data?.buses?.length ?? 0) > 1 ? "s" : ""}</Text>
               </View>
@@ -620,6 +622,27 @@ export default function SuiviScreen() {
                       <Text style={S.tcGpsTxt}>{bus.currentLocation}</Text>
                       <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR, marginLeft: 4 }} />
                       <Text style={{ fontSize: 10, color: CAM_GR, fontWeight: "700" }}>GPS actif</Text>
+                    </View>
+                  )}
+
+                  {/* ── Occupancy bar ── */}
+                  {trip && trip.passengerCount != null && trip.seatCount != null && trip.seatCount > 0 && (
+                    <View style={S.tcOccRow}>
+                      <View style={S.tcOccHeader}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <Ionicons name="people" size={12} color="#059669" />
+                          <Text style={S.tcOccLabel}>Occupation</Text>
+                        </View>
+                        <Text style={S.tcOccValue}>
+                          {trip.passengerCount} / {trip.seatCount} passagers · {Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%
+                        </Text>
+                      </View>
+                      <View style={S.tcOccBar}>
+                        <View style={[S.tcOccFill, {
+                          width: `${Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%` as any,
+                          backgroundColor: trip.passengerCount / trip.seatCount > 0.9 ? "#DC2626" : "#22C55E",
+                        }]} />
+                      </View>
                     </View>
                   )}
 
@@ -739,12 +762,9 @@ export default function SuiviScreen() {
       </Modal>
 
       {/* Rapport button */}
-      <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 16, marginTop: 0, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-        onPress={() => router.push("/agent/rapport" as never)}
-      >
-        <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
+      <TouchableOpacity style={S.rapportBtn} onPress={() => router.push("/agent/rapport" as never)}>
+        <Feather name="file-text" size={16} color="#fff" />
+        <Text style={S.rapportBtnTxt}>Faire un rapport</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -801,10 +821,25 @@ const S = StyleSheet.create({
   alarmTxt:   { color: "#fff", fontSize: 14, fontWeight: "900", letterSpacing: 0.4 },
   alarmSub:   { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 },
 
-  section:      { gap: 10 },
-  sectionTitle: { fontSize: 14, fontWeight: "800", color: "#0F172A" },
-  empty:        { backgroundColor: "#fff", borderRadius: 12, padding: 28, alignItems: "center", gap: 8 },
-  emptyTxt:     { color: "#94A3B8", fontSize: 14, fontWeight: "600" },
+  section:       { gap: 10 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sectionTitle:  { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  empty:         { backgroundColor: "#fff", borderRadius: 12, padding: 28, alignItems: "center", gap: 8 },
+  emptyTxt:      { color: "#94A3B8", fontSize: 14, fontWeight: "600" },
+
+  /* Occupancy bar */
+  tcOccRow:    { gap: 5 },
+  tcOccHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  tcOccLabel:  { fontSize: 11, color: "#64748B", fontWeight: "600" },
+  tcOccValue:  { fontSize: 11, color: "#059669", fontWeight: "700" },
+  tcOccBar:    { height: 6, backgroundColor: "#DCFCE7", borderRadius: 4, overflow: "hidden" },
+  tcOccFill:   { height: 6, borderRadius: 4 },
+
+  /* Rapport button */
+  rapportBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                   backgroundColor: RED_D, borderRadius: 14, paddingVertical: 14, margin: 16,
+                   marginTop: 0, shadowColor: RED_D, shadowOpacity: 0.25, shadowRadius: 8, elevation: 4 },
+  rapportBtnTxt: { fontSize: 14, fontWeight: "800", color: "#fff" },
 
   alertCard:    { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 10, borderLeftWidth: 4, borderLeftColor: RED, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   alertTop:     { flexDirection: "row", alignItems: "center", gap: 8 },

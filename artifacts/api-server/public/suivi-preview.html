@@ -1,486 +1,423 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=860" />
-<title>GoBooking — Preview · Suivi + Caméra Route</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#CBD5E1;padding:24px;display:flex;gap:24px;align-items:flex-start}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GoBooking — Aperçu Agent Suivi & En Route</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #1A1F2E; display: flex; gap: 20px; padding: 20px; min-height: 100vh; align-items: flex-start; justify-content: center; }
 
-/* ────────── Phone shell ────────── */
-.phone{background:#F1F5F9;width:390px;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.25);flex-shrink:0}
-.phone-header{background:linear-gradient(135deg,#9F1239,#BE123C);padding:48px 16px 14px;display:flex;justify-content:space-between;align-items:center}
-.ph-left{display:flex;align-items:center;gap:12px}
-.ph-icon{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px}
-.ph-title{color:#fff;font-size:17px;font-weight:800}
-.ph-sub{color:rgba(255,255,255,.8);font-size:12px;margin-top:2px}
-.ph-right{display:flex;align-items:center;gap:8px}
-.cam-badge{display:flex;align-items:center;gap:4px;background:#052E16;border-radius:6px;padding:3px 8px}
-.cam-dot{width:6px;height:6px;border-radius:3px;background:#22C55E}
-.cam-txt{color:#22C55E;font-size:9px;font-weight:900;letter-spacing:.4px}
-.sync-pill{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);border-radius:8px;padding:4px 8px}
-.sync-dot{width:6px;height:6px;border-radius:3px;background:#22C55E}
-.sync-txt{color:rgba(255,255,255,.8);font-size:10px;font-weight:700}
+    .phone { width: 375px; flex-shrink: 0; background: #fff; border-radius: 40px; overflow: hidden;
+             box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.1);
+             border: 6px solid #111; }
+    .phone-notch { height: 28px; background: #111; border-radius: 0 0 20px 20px; margin: 0 60px; }
+    .screen { background: #F1F5F9; overflow: hidden; }
 
-.scroll{padding:14px;display:flex;flex-direction:column;gap:12px}
+    /* ─── SUIVI HEADER ─── */
+    .suivi-header { background: #9F1239; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .suivi-hdr-left { display: flex; align-items: center; gap: 12px; }
+    .suivi-hdr-icon { width: 40px; height: 40px; background: rgba(255,255,255,.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .suivi-title { color: #fff; font-size: 17px; font-weight: 800; }
+    .suivi-sub { color: rgba(255,255,255,.8); font-size: 12px; margin-top: 2px; }
+    .suivi-hdr-right { display: flex; align-items: center; gap: 8px; }
+    .cam-badge { display: flex; align-items: center; gap: 4px; background: #052E16; border-radius: 6px; padding: 3px 7px; }
+    .cam-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #22C55E; }
+    .cam-badge-txt { color: #22C55E; font-size: 9px; font-weight: 900; letter-spacing: .5px; }
+    .sync-pill { display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,.1); border-radius: 8px; padding: 5px 8px; }
+    .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #22C55E; }
+    .sync-txt { color: rgba(255,255,255,.8); font-size: 10px; font-weight: 700; }
+    .hdr-btn { width: 34px; height: 34px; background: rgba(255,255,255,.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
 
-/* Stats row */
-.stats-row{display:flex;gap:10px}
-.stat-card{flex:1;background:#fff;border-radius:12px;padding:10px 12px;border-left-width:3px;border-left-style:solid;box-shadow:0 2px 6px rgba(0,0,0,.06)}
-.stat-num{font-size:22px;font-weight:900;color:#0F172A;line-height:1.1}
-.stat-lbl{font-size:11px;color:#64748B;font-weight:600;margin-top:1px}
+    .scroll { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 
-/* Alarm banner */
-.alarm{background:#E11D48;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 6px 18px rgba(225,29,72,.35)}
-.alarm-content{flex:1}
-.alarm-title{color:#fff;font-size:14px;font-weight:900;letter-spacing:.4px}
-.alarm-sub{color:rgba(255,255,255,.75);font-size:11px;margin-top:2px}
+    /* Stats row */
+    .stats-row { display: flex; gap: 10px; }
+    .stat-card { flex: 1; background: #fff; border-radius: 12px; padding: 10px 12px; border-left: 3px solid; box-shadow: 0 2px 6px rgba(0,0,0,.05); }
+    .stat-num { font-size: 22px; font-weight: 900; color: #0F172A; line-height: 1; }
+    .stat-lbl { font-size: 11px; color: #64748B; font-weight: 600; margin-top: 2px; }
 
-/* Section */
-.section{display:flex;flex-direction:column;gap:10px}
-.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px}
-.section-title{font-size:14px;font-weight:800;color:#0F172A}
-.section-sub{font-size:11px;color:#94A3B8;margin-top:1px}
-.red-badge{background:#E11D48;border-radius:10px;padding:2px 8px;color:#fff;font-size:11px;font-weight:800}
+    /* Alarm banner */
+    .alarm-banner { background: #BE123C; border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; box-shadow: 0 8px 20px rgba(190,18,60,.35); }
+    .alarm-txt { color: #fff; font-size: 14px; font-weight: 900; letter-spacing: .3px; }
+    .alarm-sub { color: rgba(255,255,255,.75); font-size: 11px; margin-top: 1px; }
 
-/* Alert card */
-.alert-card{background:#fff;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;border-left-width:4px;border-left-style:solid;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.alert-top{display:flex;align-items:center;gap:8px}
-.alert-type-badge{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:800}
-.alert-bus{flex:1;font-size:13px;font-weight:700;color:#0F172A}
-.alert-time{font-size:11px;color:#94A3B8}
-.alert-msg{font-size:13px;color:#1E293B;font-weight:600;line-height:1.4}
-.alert-agent{font-size:11px;color:#94A3B8}
-.wait-pill{display:flex;align-items:center;gap:8px;background:#FEF3C7;padding:6px 10px;border-radius:8px;font-size:12px;color:#D97706;font-weight:600}
-.alert-actions{display:flex;gap:8px;flex-wrap:wrap}
-.alert-btn{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;border-width:1px;border-style:solid;cursor:pointer}
+    /* Section */
+    .section { display: flex; flex-direction: column; gap: 10px; }
+    .section-hdr { display: flex; align-items: center; gap: 8px; }
+    .section-title { font-size: 14px; font-weight: 800; color: #0F172A; }
+    .section-badge { background: #BE123C; border-radius: 10px; padding: 2px 8px; margin-left: auto; }
+    .section-badge-txt { color: #fff; font-size: 11px; font-weight: 800; }
+    .section-sub { font-size: 11px; color: #94A3B8; }
 
-/* Bus card */
-.bus-card{background:#fff;border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-.bus-card.alerted{border-left:3px solid #E11D48}
-.bus-top{display:flex;align-items:flex-start;gap:12px}
-.bus-status-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.bus-name{font-size:15px;font-weight:800;color:#0F172A}
-.bus-plate{font-size:11px;color:#64748B;margin-top:1px}
-.status-pill{padding:4px 8px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap}
+    /* Alert card */
+    .alert-card { background: #fff; border-radius: 14px; padding: 14px; border-left: 4px solid; box-shadow: 0 3px 10px rgba(0,0,0,.06); display: flex; flex-direction: column; gap: 8px; }
+    .alert-top { display: flex; align-items: center; gap: 8px; }
+    .alert-type-badge { padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+    .alert-bus { flex: 1; font-size: 13px; font-weight: 700; color: #0F172A; }
+    .alert-time { font-size: 11px; color: #94A3B8; }
+    .alert-msg { font-size: 13px; color: #1E293B; font-weight: 600; line-height: 1.4; }
+    .alert-actions { display: flex; gap: 8px; }
+    .alert-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 8px; border: 1px solid; font-size: 12px; font-weight: 700; }
 
-/* Route row */
-.tc-route-row{display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border-radius:10px;padding:8px 10px;gap:8px}
-.tc-route-inner{display:flex;align-items:center;gap:5px;flex:1}
-.tc-route-txt{font-size:13px;font-weight:800;color:#0F172A}
-.tc-chips{display:flex;gap:8px}
-.tc-chip{display:flex;align-items:center;gap:4px;background:#E2E8F0;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:700;color:#475569}
-.tc-chip.green{background:#F0FDF4;color:#15803D}
+    /* Bus card */
+    .bus-card { background: #fff; border-radius: 14px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.05); display: flex; flex-direction: column; gap: 10px; }
+    .bus-top { display: flex; align-items: flex-start; gap: 12px; }
+    .bus-status-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .bus-name { font-size: 15px; font-weight: 800; color: #0F172A; }
+    .bus-plate { font-size: 11px; color: #64748B; }
+    .status-pill { padding: 4px 8px; border-radius: 8px; font-size: 10px; font-weight: 700; align-self: flex-start; }
+    .route-row { display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; border-radius: 10px; padding: 8px 10px; }
+    .route-inner { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 800; color: #0F172A; }
+    .route-chips { display: flex; gap: 8px; }
+    .chip { display: flex; align-items: center; gap: 4px; background: #E2E8F0; border-radius: 6px; padding: 4px 7px; font-size: 11px; font-weight: 700; color: #475569; }
+    .gps-row { display: flex; align-items: center; gap: 5px; padding: 0 4px; font-size: 12px; color: #7C3AED; font-weight: 600; }
 
-/* GPS row */
-.tc-gps{display:flex;align-items:center;gap:5px;padding:0 4px}
-.tc-gps-txt{font-size:12px;color:#7C3AED;font-weight:600;flex:1}
-.gps-live-dot{width:5px;height:5px;border-radius:3px;background:#22C55E}
-.gps-live-txt{font-size:10px;color:#22C55E;font-weight:700}
+    /* Occupancy bar — NEW */
+    .occ-row { display: flex; flex-direction: column; gap: 5px; }
+    .occ-header { display: flex; align-items: center; justify-content: space-between; }
+    .occ-lbl { font-size: 11px; color: #64748B; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .occ-val { font-size: 11px; color: #059669; font-weight: 700; }
+    .occ-bar { height: 6px; background: #DCFCE7; border-radius: 4px; overflow: hidden; }
+    .occ-fill { height: 6px; border-radius: 4px; }
 
-/* Camera panel */
-.tc-cam{background:#0A0E1A;border-radius:12px;padding:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid #1E293B}
-.tc-cam.live{border-color:#166534}
-.tc-cam-left{display:flex;align-items:center;gap:10px;flex:1}
-.tc-cam-icon{width:44px;height:44px;border-radius:10px;background:#1E293B;display:flex;align-items:center;justify-content:center;font-size:22px;position:relative;flex-shrink:0}
-.tc-cam-icon.live{background:rgba(34,197,94,.15)}
-.tc-live-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:4px;background:#22C55E;border:1.5px solid #0A0E1A}
-.tc-cam-lbl{font-size:11px;font-weight:800;color:#94A3B8;letter-spacing:.3px}
-.tc-cam-lbl.live{color:#22C55E}
-.tc-cam-sub{font-size:10px;color:#475569;margin-top:2px;font-weight:500}
-.tc-live-badge{display:flex;align-items:center;gap:4px;background:#DC2626;border-radius:5px;padding:2px 6px;margin-left:6px}
-.tc-live-badge-dot{width:5px;height:5px;border-radius:3px;background:#fff}
-.tc-live-badge-txt{color:#fff;font-size:8px;font-weight:900;letter-spacing:1px}
-.tc-watch-btn{display:flex;align-items:center;gap:5px;background:rgba(34,197,94,.12);border:1px solid #166534;border-radius:8px;padding:6px 10px;cursor:pointer}
-.tc-watch-txt{color:#22C55E;font-size:12px;font-weight:800}
-.tc-cam-off{display:flex;align-items:center;gap:5px;background:#1E293B;border-radius:8px;padding:5px 10px}
-.tc-cam-off-dot{width:6px;height:6px;border-radius:3px;background:#475569}
-.tc-cam-off-txt{color:#475569;font-size:11px;font-weight:600}
+    /* Camera panel */
+    .cam-panel { background: #0A0E1A; border-radius: 12px; padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid; }
+    .cam-panel-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .cam-icon-wrap { width: 44px; height: 44px; border-radius: 10px; background: #1E293B; display: flex; align-items: center; justify-content: center; font-size: 20px; position: relative; }
+    .cam-live-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; border: 1.5px solid #0A0E1A; }
+    .cam-lbl { font-size: 11px; font-weight: 800; color: #94A3B8; letter-spacing: .3px; }
+    .cam-sub { font-size: 10px; color: #475569; margin-top: 2px; font-weight: 500; }
+    .live-badge { display: inline-flex; align-items: center; gap: 4px; background: #DC2626; border-radius: 5px; padding: 2px 6px; margin-top: 3px; }
+    .live-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: #fff; }
+    .live-badge-txt { color: #fff; font-size: 8px; font-weight: 900; letter-spacing: 1px; }
+    .watch-btn { display: flex; align-items: center; gap: 5px; background: rgba(34,197,94,.12); border: 1px solid #166534; border-radius: 8px; padding: 8px 10px; font-size: 12px; font-weight: 800; color: #22C55E; }
+    .cam-off-pill { display: flex; align-items: center; gap: 5px; background: #1E293B; border-radius: 8px; padding: 6px 10px; }
+    .cam-off-dot { width: 6px; height: 6px; border-radius: 50%; background: #475569; }
+    .cam-off-txt { font-size: 11px; color: #475569; font-weight: 600; }
 
-/* Inline alert */
-.tc-alert-inline{display:flex;align-items:flex-start;gap:8px;background:#FFF1F2;border-radius:10px;padding:10px;border:1px solid #FDA4AF}
-.tc-alert-txt{font-size:12px;color:#9F1239;font-weight:700;line-height:1.4;flex:1}
-.tc-alert-time{font-size:10px;color:#E11D48;margin-top:2px}
+    /* Inline alert */
+    .tc-alert { display: flex; align-items: flex-start; gap: 8px; background: #FFF1F2; border-radius: 10px; padding: 10px; border: 1px solid #FDA4AF; }
+    .tc-alert-txt { font-size: 12px; color: #9F1239; font-weight: 700; line-height: 1.4; }
+    .tc-alert-time { font-size: 10px; color: #BE123C; margin-top: 2px; }
 
-/* Issue */
-.issue-row{display:flex;align-items:center;gap:6px;background:#FEF2F2;border-radius:8px;padding:8px}
-.issue-txt{font-size:12px;color:#DC2626;font-weight:600;flex:1}
+    /* Trigger button */
+    .trigger-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 10px; border: 1.5px solid #FDA4AF; background: #FFF1F2; font-size: 13px; font-weight: 700; color: #BE123C; }
 
-/* Trigger btn */
-.trigger-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:10px;border:1.5px solid #FDA4AF;background:#FFF1F2;cursor:pointer}
-.trigger-btn-txt{font-size:13px;font-weight:700;color:#BE123C}
+    /* Rapport buttons */
+    .rapport-btn { display: flex; align-items: center; justify-content: center; gap: 10px; background: #9F1239; border-radius: 14px; padding: 14px; margin: 16px; margin-top: 0; box-shadow: 0 6px 16px rgba(159,18,57,.25); font-size: 14px; font-weight: 800; color: #fff; }
+    .rapport-btn-route { display: flex; align-items: center; justify-content: center; gap: 10px; background: #059669; border-radius: 14px; padding: 14px; margin: 8px 16px; box-shadow: 0 6px 16px rgba(5,150,105,.3); font-size: 14px; font-weight: 800; color: #fff; }
 
-/* Rapport btn */
-.rapport-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:#BE123C;border-radius:14px;padding:14px;margin:8px 0 4px;box-shadow:0 6px 18px rgba(190,18,60,.3)}
-.rapport-btn-txt{color:#fff;font-size:14px;font-weight:800}
+    /* ─── ROUTE COCKPIT HEADER ─── */
+    .route-header { background: #065F46; padding: 11px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .route-hdr-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+    .route-hdr-icon { width: 34px; height: 34px; background: rgba(255,255,255,.14); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .route-title { color: #fff; font-size: 16px; font-weight: 800; }
+    .route-sub { color: rgba(255,255,255,.6); font-size: 11px; margin-top: 1px; }
+    .route-hdr-right { display: flex; align-items: center; gap: 6px; }
+    .gps-badge { display: flex; align-items: center; gap: 4px; background: rgba(16,185,129,.22); border-radius: 7px; padding: 4px 8px; }
+    .gps-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
+    .gps-badge-txt { color: #6EE7B7; font-size: 10px; font-weight: 800; }
+    .cam-hdr-badge { display: flex; align-items: center; gap: 4px; background: rgba(34,197,94,.22); border-radius: 7px; padding: 4px 8px; }
+    .cam-hdr-dot { width: 6px; height: 6px; border-radius: 50%; background: #22C55E; }
+    .cam-hdr-txt { color: #86EFAC; font-size: 10px; font-weight: 800; }
 
-/* Footer note */
-.footer-note{display:flex;align-items:center;gap:8px;background:#EFF6FF;border-radius:10px;padding:10px;border:1px solid #DBEAFE}
-.footer-note-txt{font-size:11px;color:#1D4ED8;flex:1}
-</style>
+    /* Trip card */
+    .trip-card { margin: 12px 16px 0; background: #fff; border-radius: 18px; padding: 18px; box-shadow: 0 4px 16px rgba(0,0,0,.08); display: flex; flex-direction: column; gap: 14px; }
+    .trip-route-row { display: flex; align-items: center; justify-content: space-between; }
+    .trip-city-lbl { font-size: 10px; color: #94A3B8; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; }
+    .trip-city { font-size: 22px; font-weight: 800; color: #0F172A; letter-spacing: -.3px; }
+    .trip-time-pill { display: inline-flex; align-items: center; gap: 4px; background: #F0FDF4; border-radius: 8px; padding: 4px 8px; margin-top: 5px; font-size: 13px; color: #059669; font-weight: 700; }
+    .arrow-block { width: 64px; display: flex; align-items: center; }
+    .arrow-line { flex: 1; height: 2px; background: #D1FAE5; }
+    .bus-badge { background: #059669; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 3px 8px rgba(5,150,105,.35); }
+    .card-divider { height: 1px; background: #F1F5F9; }
+    .trip-info-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .trip-info-pill { display: flex; align-items: center; gap: 6px; background: #F1F5F9; border-radius: 20px; padding: 6px 12px; font-size: 12px; color: #475569; font-weight: 600; }
+    .occ-bar2 { height: 7px; background: #D1FAE5; border-radius: 4px; overflow: hidden; }
+    .occ-fill2 { height: 7px; background: #059669; border-radius: 4px; }
+
+    /* GPS strip */
+    .gps-strip { display: flex; align-items: center; gap: 7px; border-radius: 12px; margin: 8px 16px 6px; padding: 9px 14px; border: 1px solid #A7F3D0; background: #F0FDF4; }
+    .gps-pulse { width: 8px; height: 8px; border-radius: 50%; background: #059669; }
+    .gps-strip-txt { font-size: 12px; font-weight: 600; color: #065F46; flex: 1; }
+    .gps-live-badge { background: #DCFCE7; border-radius: 8px; padding: 4px 9px; }
+    .gps-live-txt { font-size: 10px; font-weight: 800; color: #166534; }
+
+    /* Cockpit KPI Strip — NEW */
+    .cockpit-strip { display: flex; margin: 2px 16px 6px; background: #fff; border-radius: 13px; padding: 10px 8px; border: 1.5px solid #E9EEF6; box-shadow: 0 2px 8px rgba(0,0,0,.05); }
+    .cockpit-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .cockpit-num { font-size: 17px; font-weight: 900; letter-spacing: -.5px; }
+    .cockpit-lbl { font-size: 9px; color: #94A3B8; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .cockpit-div { width: 1px; background: #F1F5F9; align-self: stretch; }
+
+    /* Camera card */
+    .cam-card { margin: 0 16px 6px; background: #0A0E1A; border-radius: 16px; padding: 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #166834; }
+    .cam-card-left { display: flex; align-items: center; gap: 12px; flex: 1; }
+    .cam-card-icon { width: 46px; height: 46px; border-radius: 12px; background: rgba(34,197,94,.18); display: flex; align-items: center; justify-content: center; font-size: 20px; position: relative; }
+    .cam-card-live-dot { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; border: 1.5px solid #0A0E1A; }
+    .cam-card-title { font-size: 14px; font-weight: 700; color: #E2E8F0; }
+    .cam-card-sub { font-size: 12px; color: #64748B; margin-top: 2px; }
+    .cam-live-pill { display: flex; align-items: center; gap: 4px; background: #052E16; border-radius: 8px; padding: 5px 8px; }
+    .cam-live-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: #22C55E; }
+    .cam-live-pill-txt { color: #22C55E; font-size: 10px; font-weight: 800; }
+
+    /* Quick grid */
+    .quick-grid { display: flex; margin: 4px 16px; gap: 8px; }
+    .quick-btn { flex: 1; display: flex; flex-direction: column; align-items: center; background: #fff; border-radius: 14px; padding: 12px 4px; box-shadow: 0 2px 8px rgba(0,0,0,.06); border: 1.5px solid #F1F5F9; gap: 6px; }
+    .quick-icon { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+    .quick-lbl { font-size: 11px; font-weight: 600; color: #374151; text-align: center; line-height: 1.4; }
+
+    /* Layout */
+    .label { font-size: 11px; font-weight: 700; color: #64748B; text-align: center; margin-top: 8px; letter-spacing: .5px; text-transform: uppercase; }
+    .phones-wrapper { display: flex; gap: 24px; align-items: flex-start; justify-content: center; width: 100%; }
+    .phone-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  </style>
 </head>
 <body>
+  <div class="phones-wrapper">
 
-<!-- ════════════════ ÉCRAN 1 : AGENT SUIVI ════════════════ -->
-<div class="phone">
-  <!-- Header -->
-  <div class="phone-header">
-    <div class="ph-left">
-      <div class="ph-icon">📡</div>
-      <div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <span class="ph-title">Tour de contrôle</span>
-          <div class="cam-badge"><div class="cam-dot"></div><span class="cam-txt">1 CAM LIVE</span></div>
-        </div>
-        <div class="ph-sub">1 caméra active · sync 10s</div>
-      </div>
-    </div>
-    <div class="ph-right">
-      <div class="sync-pill"><div class="sync-dot"></div><span class="sync-txt">Sync 15:34:22</span></div>
-      <div style="width:34px;height:34px;border-radius:17px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:14px">↻</div>
-    </div>
-  </div>
+    <!-- ═══════ PHONE 1 — SUIVI : Tour de Contrôle ═══════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="screen">
 
-  <div class="scroll">
-
-    <!-- Stats Row (NEW) -->
-    <div class="stats-row">
-      <div class="stat-card" style="border-left-color:#1D4ED8">
-        <div class="stat-num">3</div>
-        <div class="stat-lbl">Bus actifs</div>
-      </div>
-      <div class="stat-card" style="border-left-color:#E11D48">
-        <div class="stat-num" style="color:#BE123C">1</div>
-        <div class="stat-lbl">Alertes</div>
-      </div>
-      <div class="stat-card" style="border-left-color:#22C55E">
-        <div class="stat-num" style="color:#166534">1</div>
-        <div class="stat-lbl">Caméras live</div>
-      </div>
-    </div>
-
-    <!-- Alarm banner (improved) -->
-    <div class="alarm">
-      <span style="font-size:20px">⚠️</span>
-      <div class="alarm-content">
-        <div class="alarm-title">1 ALERTE ACTIVE</div>
-        <div class="alarm-sub">Bus : Abidjan Express 03 · Intervention requise</div>
-      </div>
-      <span style="color:rgba(255,255,255,.7);font-size:16px">›</span>
-    </div>
-
-    <!-- Alertes section -->
-    <div class="section">
-      <div class="section-head">
-        <span class="section-title">Alertes actives</span>
-        <span class="red-badge">1</span>
-      </div>
-      <div class="alert-card" style="border-left-color:#DC2626">
-        <div class="alert-top">
-          <div class="alert-type-badge" style="background:#FEE2E2;color:#DC2626">PANNE</div>
-          <div class="alert-bus">Abidjan Express 03</div>
-          <div class="alert-time">15:22</div>
-        </div>
-        <div class="alert-msg">Retard estimé de 25 minutes sur le trajet Abidjan → Yamoussoukro</div>
-        <div class="alert-agent">👤 Koné Abdoulaye</div>
-        <div class="wait-pill">⏳ En attente de réponse de l'agent route…</div>
-        <div class="alert-actions">
-          <div class="alert-btn" style="background:#EFF6FF;border-color:#BFDBFE;color:#1D4ED8">💬 Demander rapport</div>
-          <div class="alert-btn" style="background:#F0FDF4;border-color:#BBF7D0;color:#166534">✓ Résolu</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bus section -->
-    <div class="section">
-      <div class="section-head">
-        <div>
-          <div class="section-title">Bus en temps réel</div>
-          <div class="section-sub">3 véhicules suivis</div>
-        </div>
-        <div class="cam-badge"><div class="cam-dot"></div><span class="cam-txt">1 CAM LIVE</span></div>
-      </div>
-
-      <!-- BUS 1 — En route + Camera LIVE -->
-      <div class="bus-card alerted">
-        <div class="bus-top">
-          <div class="bus-status-icon" style="background:#DCFCE7">🛣️</div>
-          <div style="flex:1">
-            <div class="bus-name">Abidjan Express 03</div>
-            <div class="bus-plate">3412 CI 03</div>
-          </div>
-          <div class="status-pill" style="background:#DCFCE7;color:#166534">En route</div>
-        </div>
-        <div class="tc-route-row">
-          <div class="tc-route-inner">
-            <span>🔵</span><span class="tc-route-txt">Abidjan</span>
-            <span style="color:#94A3B8">→</span><span class="tc-route-txt">Yamoussoukro</span>
-          </div>
-          <div class="tc-chips">
-            <div class="tc-chip">⏱ 08:00</div>
-            <div class="tc-chip green">🏁 11:30</div>
-          </div>
-        </div>
-        <div class="tc-gps">
-          <span style="font-size:13px">📍</span>
-          <span class="tc-gps-txt">Axe Abidjan-Yamoussoukro, km 87</span>
-          <div class="gps-live-dot"></div>
-          <span class="gps-live-txt">GPS actif</span>
-        </div>
-        <!-- Camera LIVE -->
-        <div class="tc-cam live">
-          <div class="tc-cam-left">
-            <div class="tc-cam-icon live">📹<div class="tc-live-dot"></div></div>
-            <div>
-              <div style="display:flex;align-items:center">
-                <span class="tc-cam-lbl live">CAMÉRA EMBARQUÉE · EN DIRECT</span>
-                <div class="tc-live-badge"><div class="tc-live-badge-dot"></div><span class="tc-live-badge-txt">LIVE</span></div>
+          <div class="suivi-header">
+            <div class="suivi-hdr-left">
+              <div class="suivi-hdr-icon">📡</div>
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="suivi-title">Tour de contrôle</span>
+                  <div class="cam-badge"><div class="cam-badge-dot"></div><span class="cam-badge-txt">2 LIVE</span></div>
+                </div>
+                <div class="suivi-sub">2 caméras actives · sync 10s</div>
               </div>
-              <div class="tc-cam-sub">Position : intérieur · Flux HLS actif</div>
+            </div>
+            <div class="suivi-hdr-right">
+              <div class="sync-pill"><div class="sync-dot"></div><span class="sync-txt">Sync 14:32:08</span></div>
+              <div class="hdr-btn">🔄</div>
+              <div class="hdr-btn">↗</div>
             </div>
           </div>
-          <div class="tc-watch-btn"><span style="font-size:14px">▶</span><span class="tc-watch-txt">Voir</span></div>
-        </div>
-        <!-- Alert inline -->
-        <div class="tc-alert-inline">
-          <span style="font-size:14px">⚠️</span>
-          <div>
-            <div class="tc-alert-txt">Retard estimé de 25 minutes sur le trajet Abidjan → Yamoussoukro</div>
-            <div class="tc-alert-time">15:22 · Koné Abdoulaye</div>
-          </div>
-        </div>
-        <div class="trigger-btn"><span>⚠</span><span class="trigger-btn-txt">Déclencher une alerte</span></div>
-      </div>
 
-      <!-- BUS 2 — En attente + Camera offline (no trip) -->
-      <div class="bus-card">
-        <div class="bus-top">
-          <div class="bus-status-icon" style="background:#FEF3C7">⏸</div>
-          <div style="flex:1">
-            <div class="bus-name">Daloa Express 07</div>
-            <div class="bus-plate">0258 AB 07</div>
-          </div>
-          <div class="status-pill" style="background:#FEF3C7;color:#D97706">En attente</div>
-        </div>
-        <div class="tc-cam">
-          <div class="tc-cam-left">
-            <div class="tc-cam-icon">📹</div>
-            <div>
-              <span class="tc-cam-lbl">CAMÉRA EMBARQUÉE</span>
-              <div class="tc-cam-sub">Aucun trajet actif · Caméra en veille</div>
+          <div class="scroll">
+            <!-- Stats -->
+            <div class="stats-row">
+              <div class="stat-card" style="border-left-color:#1D4ED8;"><div class="stat-num">3</div><div class="stat-lbl">Bus actifs</div></div>
+              <div class="stat-card" style="border-left-color:#BE123C;"><div class="stat-num" style="color:#BE123C;">1</div><div class="stat-lbl">Alertes</div></div>
+              <div class="stat-card" style="border-left-color:#22C55E;"><div class="stat-num" style="color:#166534;">2</div><div class="stat-lbl">Caméras live</div></div>
+            </div>
+
+            <!-- Alarm banner -->
+            <div class="alarm-banner">
+              <span style="font-size:20px;">⚠️</span>
+              <div style="flex:1;"><div class="alarm-txt">1 ALERTE ACTIVE</div><div class="alarm-sub">Bus : Autocar Akwaba · Intervention</div></div>
+              <span style="color:rgba(255,255,255,.7);">⌄</span>
+            </div>
+
+            <!-- Alertes section avec icône -->
+            <div class="section">
+              <div class="section-hdr">
+                <span style="font-size:14px;">⚠️</span>
+                <span class="section-title">Alertes actives</span>
+                <div class="section-badge"><span class="section-badge-txt">1</span></div>
+              </div>
+              <div class="alert-card" style="border-left-color:#DC2626;">
+                <div class="alert-top">
+                  <div class="alert-type-badge" style="background:#FEE2E2;color:#DC2626;">PANNE</div>
+                  <span class="alert-bus">Autocar Akwaba</span>
+                  <span class="alert-time">14:28</span>
+                </div>
+                <div class="alert-msg">Bus immobilisé sur route nationale</div>
+                <div style="font-size:11px;color:#94A3B8;">👤 Koné Mamadou</div>
+                <div class="alert-actions">
+                  <div class="alert-btn" style="border-color:#BFDBFE;background:#EFF6FF;color:#1D4ED8;">💬 Demander rapport</div>
+                  <div class="alert-btn" style="border-color:#BBF7D0;background:#F0FDF4;color:#166534;">✓ Résolu</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bus section avec icône -->
+            <div class="section">
+              <div class="section-hdr">
+                <span style="font-size:14px;color:#1D4ED8;">📻</span>
+                <div style="flex:1;">
+                  <div class="section-title">Bus en temps réel</div>
+                  <div class="section-sub">3 véhicules suivis</div>
+                </div>
+                <div class="cam-badge"><div class="cam-badge-dot"></div><span class="cam-badge-txt">2 CAM LIVE</span></div>
+              </div>
+
+              <!-- Bus 1 — En route + Occupancy NEW + CAM LIVE -->
+              <div class="bus-card">
+                <div class="bus-top">
+                  <div class="bus-status-icon" style="background:#DCFCE7;">🚌</div>
+                  <div style="flex:1;"><div class="bus-name">Autocar Premium ABJ-1</div><div class="bus-plate">CI-4821-AB</div></div>
+                  <div class="status-pill" style="background:#DCFCE7;color:#166534;">En route</div>
+                </div>
+                <div class="route-row">
+                  <div class="route-inner">🧭 <strong>Abidjan</strong> → <strong>Bouaké</strong></div>
+                  <div class="route-chips"><div class="chip">🕐 06:00</div><div class="chip" style="background:#F0FDF4;color:#15803D;">🏁 14:30</div></div>
+                </div>
+                <div class="gps-row">📍 5.3542° N, 4.0082° E <span style="width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block;margin:0 4px;"></span><span style="color:#22C55E;font-size:10px;font-weight:700;">GPS actif</span></div>
+
+                <!-- Occupancy bar — NEW -->
+                <div class="occ-row">
+                  <div class="occ-header">
+                    <div class="occ-lbl">👥 Occupation</div>
+                    <div class="occ-val">42 / 55 passagers · 76%</div>
+                  </div>
+                  <div class="occ-bar"><div class="occ-fill" style="width:76%;background:#22C55E;"></div></div>
+                </div>
+
+                <!-- Camera — LIVE -->
+                <div class="cam-panel" style="border-color:#166534;">
+                  <div class="cam-panel-left">
+                    <div class="cam-icon-wrap" style="background:rgba(34,197,94,.15);">📹<div class="cam-live-dot"></div></div>
+                    <div>
+                      <div style="display:flex;align-items:center;gap:6px;"><span class="cam-lbl" style="color:#22C55E;">CAMÉRA EMBARQUÉE · EN DIRECT</span></div>
+                      <div class="live-badge"><div class="live-badge-dot"></div><span class="live-badge-txt">LIVE</span></div>
+                      <div class="cam-sub">intérieur · Flux HLS actif</div>
+                    </div>
+                  </div>
+                  <div class="watch-btn">▶ Voir</div>
+                </div>
+                <div class="trigger-btn">⚠ Déclencher une alerte</div>
+              </div>
+
+              <!-- Bus 2 — En panne + alerte inline -->
+              <div class="bus-card" style="border-left:3px solid #BE123C;">
+                <div class="bus-top">
+                  <div class="bus-status-icon" style="background:#FEE2E2;">🚌</div>
+                  <div style="flex:1;"><div class="bus-name">Autocar Akwaba</div><div class="bus-plate">CI-7730-YB</div></div>
+                  <div class="status-pill" style="background:#FEE2E2;color:#DC2626;">En panne</div>
+                </div>
+                <div class="route-row">
+                  <div class="route-inner">🧭 <strong>Yamoussoukro</strong> → <strong>Abidjan</strong></div>
+                  <div class="route-chips"><div class="chip">🕐 08:00</div></div>
+                </div>
+                <div class="cam-panel" style="border-color:#1E293B;">
+                  <div class="cam-panel-left">
+                    <div class="cam-icon-wrap">📹</div>
+                    <div><span class="cam-lbl">CAMÉRA EMBARQUÉE</span><div class="cam-sub">intérieur · Non connectée</div></div>
+                  </div>
+                  <div class="cam-off-pill"><div class="cam-off-dot"></div><span class="cam-off-txt">Hors ligne</span></div>
+                </div>
+                <div class="tc-alert">
+                  <span>⚠️</span>
+                  <div><div class="tc-alert-txt">Bus immobilisé · Assistance requise</div><div class="tc-alert-time">14:28</div></div>
+                </div>
+                <div class="trigger-btn">⚠ Déclencher une alerte</div>
+              </div>
             </div>
           </div>
-          <div class="tc-cam-off"><div class="tc-cam-off-dot"></div><span class="tc-cam-off-txt">Hors ligne</span></div>
-        </div>
-        <div class="issue-row"><span style="font-size:14px">⚡</span><span class="issue-txt">Panne en route — transféré le 27/03/2026</span></div>
-        <div class="trigger-btn"><span>⚠</span><span class="trigger-btn-txt">Déclencher une alerte</span></div>
-      </div>
 
-      <!-- BUS 3 — En panne + Camera offline (with trip) -->
-      <div class="bus-card">
-        <div class="bus-top">
-          <div class="bus-status-icon" style="background:#FEE2E2">⚠️</div>
-          <div style="flex:1">
-            <div class="bus-name">Korhogo Night 12</div>
-            <div class="bus-plate">7891 KR 12</div>
-          </div>
-          <div class="status-pill" style="background:#FEE2E2;color:#DC2626">En panne</div>
+          <div class="rapport-btn">📄 Faire un rapport</div>
         </div>
-        <div class="tc-route-row">
-          <div class="tc-route-inner">
-            <span>🔵</span><span class="tc-route-txt">Bouaké</span>
-            <span style="color:#94A3B8">→</span><span class="tc-route-txt">Korhogo</span>
-          </div>
-          <div class="tc-chips">
-            <div class="tc-chip">⏱ 14:00</div>
-            <div class="tc-chip green">🏁 17:00</div>
-          </div>
-        </div>
-        <div class="tc-gps">
-          <span style="font-size:13px">📍</span>
-          <span class="tc-gps-txt">Bouaké — gare routière nord</span>
-          <div class="gps-live-dot"></div>
-          <span class="gps-live-txt">GPS actif</span>
-        </div>
-        <div class="tc-cam">
-          <div class="tc-cam-left">
-            <div class="tc-cam-icon">📹</div>
-            <div>
-              <span class="tc-cam-lbl">CAMÉRA EMBARQUÉE</span>
-              <div class="tc-cam-sub">Position prévue : conducteur · Non connectée</div>
-            </div>
-          </div>
-          <div class="tc-cam-off"><div class="tc-cam-off-dot"></div><span class="tc-cam-off-txt">Hors ligne</span></div>
-        </div>
-        <div class="trigger-btn"><span>⚠</span><span class="trigger-btn-txt">Déclencher une alerte</span></div>
       </div>
-
+      <div class="label">🏢 Suivi · Tour de Contrôle</div>
     </div>
 
-    <!-- Rapport button -->
-    <div class="rapport-btn">
-      <span style="font-size:16px;color:#fff">⚠</span>
-      <span class="rapport-btn-txt">Faire un rapport</span>
-    </div>
+    <!-- ═══════ PHONE 2 — ROUTE : Agent En Route — Cockpit ═══════ -->
+    <div class="phone-col">
+      <div class="phone">
+        <div class="phone-notch"></div>
+        <div class="screen">
 
-    <div class="footer-note">
-      <span style="font-size:16px">✅</span>
-      <span class="footer-note-txt">Rendu fidèle au code suivi.tsx — Fond slate #F1F5F9, stats row, alertes colorées par type, alarm banner enrichi · 28/03/2026</span>
+          <!-- Cockpit Header — REDESIGNED -->
+          <div class="route-header">
+            <div class="route-hdr-left">
+              <div class="route-hdr-icon">🚌</div>
+              <div>
+                <div class="route-title">Agent En Route</div>
+                <div class="route-sub">Abidjan → Bouaké</div>
+              </div>
+            </div>
+            <div class="route-hdr-right">
+              <div class="gps-badge"><div class="gps-badge-dot"></div><span class="gps-badge-txt">87 km/h</span></div>
+              <div class="cam-hdr-badge"><div class="cam-hdr-dot"></div><span class="cam-hdr-txt">CAM</span></div>
+              <div style="width:34px;height:34px;background:rgba(255,255,255,.15);border-radius:8px;display:flex;align-items:center;justify-content:center;">↗</div>
+            </div>
+          </div>
+
+          <div style="overflow:auto;">
+            <!-- Trip card -->
+            <div class="trip-card">
+              <div class="trip-route-row">
+                <div>
+                  <div class="trip-city-lbl">DÉPART</div>
+                  <div class="trip-city">Abidjan</div>
+                  <div class="trip-time-pill">🕐 06:00</div>
+                </div>
+                <div class="arrow-block"><div class="arrow-line"></div><div class="bus-badge">🚌</div><div class="arrow-line"></div></div>
+                <div style="text-align:right;">
+                  <div class="trip-city-lbl" style="text-align:right;">ARRIVÉE</div>
+                  <div class="trip-city" style="text-align:right;">Bouaké</div>
+                  <div class="trip-time-pill" style="color:#7C3AED;">🏁 14:30</div>
+                </div>
+              </div>
+              <div class="card-divider"></div>
+              <div class="trip-info-row">
+                <div class="trip-info-pill">🚛 Premium ABJ-1</div>
+                <div class="trip-info-pill" style="background:#DCFCE7;color:#065F46;font-weight:700;">👥 42 / 55</div>
+                <div class="trip-info-pill" style="background:#FEF3C7;color:#D97706;font-weight:700;">⚡ 87 km/h</div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:11px;color:#64748B;font-weight:600;">Taux d'occupation</span><span style="font-size:11px;color:#065F46;font-weight:800;">76%</span></div>
+                <div class="occ-bar2"><div class="occ-fill2" style="width:76%;"></div></div>
+              </div>
+            </div>
+
+            <!-- GPS strip -->
+            <div class="gps-strip">
+              <div class="gps-pulse"></div>
+              <span>🧭</span>
+              <span class="gps-strip-txt">5.3542° N, 4.0082° E</span>
+              <div class="gps-live-badge"><span class="gps-live-txt">EN DIRECT · 87 km/h</span></div>
+            </div>
+
+            <!-- Cockpit KPI Strip — NEW -->
+            <div class="cockpit-strip">
+              <div class="cockpit-item"><span class="cockpit-num" style="color:#059669;">42</span><span class="cockpit-lbl">À bord</span></div>
+              <div class="cockpit-div"></div>
+              <div class="cockpit-item"><span class="cockpit-num" style="color:#D97706;">3</span><span class="cockpit-lbl">En attente</span></div>
+              <div class="cockpit-div"></div>
+              <div class="cockpit-item"><span class="cockpit-num" style="color:#10B981;">87</span><span class="cockpit-lbl">km/h</span></div>
+              <div class="cockpit-div"></div>
+              <div class="cockpit-item"><span class="cockpit-num" style="color:#22C55E;">●</span><span class="cockpit-lbl">Caméra</span></div>
+              <div class="cockpit-div"></div>
+              <div class="cockpit-item"><span class="cockpit-num" style="color:#059669;">OK</span><span class="cockpit-lbl">Alertes</span></div>
+            </div>
+
+            <!-- Camera card — LIVE -->
+            <div class="cam-card">
+              <div class="cam-card-left">
+                <div class="cam-card-icon">📹<div class="cam-card-live-dot"></div></div>
+                <div>
+                  <div class="cam-card-title">Caméra embarquée</div>
+                  <div class="cam-card-sub">Associée au trajet · Flux actif</div>
+                </div>
+              </div>
+              <div class="cam-live-pill"><div class="cam-live-pill-dot"></div><span class="cam-live-pill-txt">LIVE</span></div>
+            </div>
+
+            <!-- Quick actions grid -->
+            <div class="quick-grid">
+              <div class="quick-btn"><div class="quick-icon" style="background:#EFF6FF;">🎫</div><span class="quick-lbl">Scanner ticket</span></div>
+              <div class="quick-btn"><div class="quick-icon" style="background:#F0FDF4;">👤</div><span class="quick-lbl">Ajouter passager</span></div>
+              <div class="quick-btn"><div class="quick-icon" style="background:#F5F3FF;">👥</div><span class="quick-lbl">Passagers (42)</span></div>
+              <div class="quick-btn"><div class="quick-icon" style="background:#F8FAFC;">⚠️</div><span class="quick-lbl">Alertes</span></div>
+            </div>
+
+            <div class="rapport-btn-route">📋 Faire un rapport</div>
+          </div>
+        </div>
+      </div>
+      <div class="label">🚌 Route · Agent En Route — Cockpit</div>
     </div>
 
   </div>
-</div>
-
-<!-- ════════════════ ÉCRAN 2 : AGENT ROUTE — MODULE CAMÉRA ════════════════ -->
-<div class="phone">
-  <!-- Header (green - agent route) -->
-  <div class="phone-header" style="background:linear-gradient(135deg,#065F46,#059669)">
-    <div class="ph-left">
-      <div class="ph-icon">🚌</div>
-      <div>
-        <div class="ph-title">Mon trajet en cours</div>
-        <div class="ph-sub">Abidjan → Bouaké · Daloa Express 07</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="scroll">
-
-    <!-- Camera card (main screen) - état "non connectée" -->
-    <div style="background:#0A0E1A;border-radius:14px;padding:14px;display:flex;align-items:center;gap:12px;border:1px solid #1E293B;box-shadow:0 4px 14px rgba(0,0,0,.2)">
-      <div style="width:44px;height:44px;border-radius:12px;background:#1E293B;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📹</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:700;color:#94A3B8">Caméra embarquée</div>
-        <div style="font-size:11px;color:#475569;margin-top:2px">Non connectée — Appuyez pour configurer</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;background:#0F2B4A;border-radius:8px;padding:5px 10px">
-        <span style="font-size:11px">➕</span>
-        <span style="color:#60A5FA;font-size:11px;font-weight:700">Configurer</span>
-      </div>
-    </div>
-
-    <div style="height:1px;background:#E2E8F0;margin:2px 0"></div>
-
-    <!-- ══ CAMÉRA TAB CONTENT ══ -->
-
-    <!-- Header camera tab -->
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="width:48px;height:48px;border-radius:14px;background:rgba(34,197,94,.18);display:flex;align-items:center;justify-content:center;font-size:22px">📹</div>
-      <div style="flex:1">
-        <div style="font-size:16px;font-weight:800;color:#0F172A">Caméra embarquée</div>
-        <div style="font-size:12px;color:#64748B;margin-top:2px">Module de connexion et supervision du flux</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;background:#052E16;border-radius:8px;padding:4px 8px">
-        <div style="width:6px;height:6px;border-radius:3px;background:#22C55E"></div>
-        <span style="color:#22C55E;font-size:10px;font-weight:800">LIVE</span>
-      </div>
-    </div>
-
-    <!-- Camera Preview — État LIVE -->
-    <div style="height:220px;background:#0A0E1A;border-radius:16px;overflow:hidden;border:1px solid #166634;position:relative;display:flex;align-items:center;justify-content:center">
-      <!-- Simulated video grid -->
-      <div style="position:absolute;inset:0;display:flex;flex-wrap:wrap">
-        <div style="width:25%;height:50%;background:rgba(18,28,50,.7)"></div>
-        <div style="width:25%;height:50%;background:rgba(22,32,56,.6)"></div>
-        <div style="width:25%;height:50%;background:rgba(16,26,46,.8)"></div>
-        <div style="width:25%;height:50%;background:rgba(20,30,54,.65)"></div>
-        <div style="width:25%;height:50%;background:rgba(14,24,44,.75)"></div>
-        <div style="width:25%;height:50%;background:rgba(18,28,50,.7)"></div>
-        <div style="width:25%;height:50%;background:rgba(22,32,56,.6)"></div>
-        <div style="width:25%;height:50%;background:rgba(16,26,46,.8)"></div>
-      </div>
-      <!-- Overlay -->
-      <div style="position:relative;z-index:2;text-align:center">
-        <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-          <div style="width:8px;height:8px;border-radius:4px;background:#22C55E"></div>
-          <span style="color:#22C55E;font-size:13px;font-weight:800">SIMULATION LIVE</span>
-        </div>
-        <div style="color:#94A3B8;font-size:11px;margin-top:4px">GOBOOKING-CAM-01 · 1280×720 · H.264</div>
-        <div style="color:#475569;font-size:10px;margin-top:2px;font-family:monospace">15:34:22</div>
-      </div>
-      <!-- Corners -->
-      <div style="position:absolute;top:10px;left:10px;width:22px;height:22px;border-top:2.5px solid #22C55E;border-left:2.5px solid #22C55E;border-radius:6px 0 0 0"></div>
-      <div style="position:absolute;top:10px;right:10px;width:22px;height:22px;border-top:2.5px solid #22C55E;border-right:2.5px solid #22C55E;border-radius:0 6px 0 0"></div>
-      <div style="position:absolute;bottom:10px;left:10px;width:22px;height:22px;border-bottom:2.5px solid #22C55E;border-left:2.5px solid #22C55E;border-radius:0 0 0 6px"></div>
-      <div style="position:absolute;bottom:10px;right:10px;width:22px;height:22px;border-bottom:2.5px solid #22C55E;border-right:2.5px solid #22C55E;border-radius:0 0 6px 0"></div>
-    </div>
-
-    <!-- Connection buttons grid -->
-    <div style="font-size:13px;font-weight:800;color:#374151;margin-bottom:2px">Connexion de la caméra</div>
-    <div style="display:flex;gap:8px">
-      <!-- QR -->
-      <div style="flex:1;background:#fff;border-radius:14px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;border:1.5px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,.05)">
-        <div style="width:48px;height:48px;border-radius:14px;background:#EFF6FF;display:flex;align-items:center;justify-content:center;font-size:22px">⬛</div>
-        <span style="font-size:11px;font-weight:700;color:#374151;text-align:center;line-height:1.3">Scanner<br>QR caméra</span>
-      </div>
-      <!-- BT -->
-      <div style="flex:1;background:#fff;border-radius:14px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;border:1.5px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,.05);opacity:.45">
-        <div style="width:48px;height:48px;border-radius:14px;background:#F0F0FF;display:flex;align-items:center;justify-content:center;font-size:22px">📶</div>
-        <span style="font-size:11px;font-weight:700;color:#374151;text-align:center;line-height:1.3">Bluetooth</span>
-      </div>
-      <!-- WiFi -->
-      <div style="flex:1;background:#fff;border-radius:14px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;border:1.5px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,.05);opacity:.45">
-        <div style="width:48px;height:48px;border-radius:14px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;font-size:22px">📡</div>
-        <span style="font-size:11px;font-weight:700;color:#374151;text-align:center;line-height:1.3">Wi-Fi<br>Direct</span>
-      </div>
-      <!-- Test -->
-      <div style="flex:1;background:#fff;border-radius:14px;padding:13px 6px;display:flex;flex-direction:column;align-items:center;gap:8px;border:1.5px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,.05)">
-        <div style="width:48px;height:48px;border-radius:14px;background:#FEF9C3;display:flex;align-items:center;justify-content:center;font-size:22px">▶️</div>
-        <span style="font-size:11px;font-weight:700;color:#374151;text-align:center;line-height:1.3">Tester<br>caméra</span>
-      </div>
-    </div>
-
-    <!-- Statut de transmission -->
-    <div style="font-size:13px;font-weight:800;color:#374151;margin-bottom:2px">Statut de transmission</div>
-    <div style="background:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:0;border:1px solid #E2E8F0;box-shadow:0 2px 6px rgba(0,0,0,.05)">
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
-        <div style="width:8px;height:8px;border-radius:4px;background:#22C55E;flex-shrink:0"></div>
-        <span style="font-size:13px;color:#64748B;flex:1">Trajet actif</span>
-        <span style="font-size:13px;font-weight:700;color:#059669">Abidjan → Bouaké</span>
-      </div>
-      <div style="height:1px;background:#F1F5F9"></div>
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
-        <div style="width:8px;height:8px;border-radius:4px;background:#22C55E;flex-shrink:0"></div>
-        <span style="font-size:13px;color:#64748B;flex:1">Caméra liée</span>
-        <span style="font-size:13px;font-weight:700;color:#059669">Oui · GOBOOKING-CAM-01</span>
-      </div>
-      <div style="height:1px;background:#F1F5F9"></div>
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
-        <div style="width:8px;height:8px;border-radius:4px;background:#22C55E;flex-shrink:0"></div>
-        <span style="font-size:13px;color:#64748B;flex:1">État du flux</span>
-        <span style="font-size:13px;font-weight:700;color:#059669">LIVE · HLS actif</span>
-      </div>
-      <div style="height:1px;background:#F1F5F9"></div>
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
-        <div style="width:8px;height:8px;border-radius:4px;background:#22C55E;flex-shrink:0"></div>
-        <span style="font-size:13px;color:#64748B;flex:1">Transmission</span>
-        <span style="font-size:13px;font-weight:700;color:#059669">✓ Active · suivi notifié</span>
-      </div>
-    </div>
-
-    <!-- Linked banner -->
-    <div style="display:flex;align-items:center;gap:12px;background:#F0FDF4;border-radius:12px;padding:14px;border:1px solid #BBF7D0">
-      <span style="font-size:22px">✅</span>
-      <div>
-        <div style="font-size:14px;font-weight:800;color:#166534">Caméra associée</div>
-        <div style="font-size:12px;color:#4B5563;margin-top:2px">Flux transmis à l'agent suivi · Tour de contrôle actif</div>
-      </div>
-    </div>
-
-    <!-- Disconnect -->
-    <div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;background:#FFF1F2;border-radius:12px;border:1px solid #FECDD3">
-      <span style="font-size:14px">✕</span>
-      <span style="color:#DC2626;font-size:13px;font-weight:700">Déconnecter la caméra</span>
-    </div>
-
-    <div class="footer-note">
-      <span style="font-size:16px">✅</span>
-      <span class="footer-note-txt">Module caméra route.tsx — QR, Bluetooth, WiFi Direct, Test, Associate · Simulation complète · 28/03/2026</span>
-    </div>
-
-  </div>
-</div>
-
 </body>
 </html>

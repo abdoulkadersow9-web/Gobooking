@@ -589,15 +589,40 @@ export default function RouteScreen() {
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
 
-      {/* ── Header ── */}
+      {/* ── Header — Cockpit ── */}
       <View style={S.header}>
-        <View>
-          <Text style={S.headerTitle}>Agent En Route</Text>
-          <Text style={S.headerSub}>
-            {syncTime ? `${syncTime} · auto 15s` : (user?.name ?? "En route")}
-          </Text>
+        <View style={S.hdrLeft}>
+          <View style={S.hdrIconWrap}>
+            <Ionicons name="bus" size={18} color="#fff" />
+          </View>
+          <View>
+            <Text style={S.headerTitle}>Agent En Route</Text>
+            <Text style={S.headerSub}>
+              {activeTrip ? `${activeTrip.from} → ${activeTrip.to}` : (user?.name ?? "En route")}
+            </Text>
+          </View>
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <View style={S.hdrRight}>
+          {gps.active && (
+            <View style={S.hdrGpsBadge}>
+              <View style={S.hdrGpsDot} />
+              <Text style={S.hdrGpsTxt}>
+                {gps.speed && gps.speed > 0 ? `${Math.round(gps.speed)} km/h` : "GPS"}
+              </Text>
+            </View>
+          )}
+          {camSim === "linked" && (
+            <View style={S.hdrCamBadge}>
+              <View style={S.hdrCamDot} />
+              <Text style={S.hdrCamTxt}>CAM</Text>
+            </View>
+          )}
+          {allAlerts.length > 0 && (
+            <View style={S.hdrAlertBadge}>
+              <Ionicons name="warning" size={11} color="#fff" />
+              <Text style={S.hdrAlertTxt}>{allAlerts.length}</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={S.logoutBtn}
             hitSlop={8}
@@ -757,6 +782,42 @@ export default function RouteScreen() {
                 )}
               </View>
             </>
+          )}
+
+          {/* ── Cockpit KPI Strip ── */}
+          {activeTrip && (
+            <View style={S.cockpitStrip}>
+              <View style={S.cockpitItem}>
+                <Text style={[S.cockpitNum, { color: "#059669" }]}>{boardedCount}</Text>
+                <Text style={S.cockpitLbl}>À bord</Text>
+              </View>
+              <View style={S.cockpitDiv} />
+              <View style={S.cockpitItem}>
+                <Text style={[S.cockpitNum, { color: pendingCount > 0 ? "#D97706" : "#94A3B8" }]}>{pendingCount}</Text>
+                <Text style={S.cockpitLbl}>En attente</Text>
+              </View>
+              <View style={S.cockpitDiv} />
+              <View style={S.cockpitItem}>
+                <Text style={[S.cockpitNum, { color: gps.active ? "#10B981" : "#94A3B8" }]}>
+                  {gps.active && gps.speed && gps.speed > 0 ? `${Math.round(gps.speed)}` : gps.active ? "0" : "--"}
+                </Text>
+                <Text style={S.cockpitLbl}>km/h</Text>
+              </View>
+              <View style={S.cockpitDiv} />
+              <View style={S.cockpitItem}>
+                <Text style={[S.cockpitNum, { color: camSim === "linked" ? "#22C55E" : "#94A3B8" }]}>
+                  {camSim === "linked" ? "●" : camSim === "connected" ? "○" : "--"}
+                </Text>
+                <Text style={S.cockpitLbl}>Caméra</Text>
+              </View>
+              <View style={S.cockpitDiv} />
+              <View style={S.cockpitItem}>
+                <Text style={[S.cockpitNum, { color: allAlerts.length > 0 ? "#DC2626" : "#059669" }]}>
+                  {allAlerts.length > 0 ? allAlerts.length : "OK"}
+                </Text>
+                <Text style={S.cockpitLbl}>Alertes</Text>
+              </View>
+            </View>
           )}
 
           {/* ── Caméra embarquée — carte accès rapide ── */}
@@ -1948,12 +2009,40 @@ export default function RouteScreen() {
 const S = StyleSheet.create({
   safe:         { flex: 1, backgroundColor: "#F8FAFC" },
 
-  /* Header */
-  header:       { backgroundColor: G_DARK, paddingHorizontal: 20, paddingVertical: 14,
+  /* Header — cockpit */
+  header:       { backgroundColor: G_DARK, paddingHorizontal: 16, paddingVertical: 11,
                   flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:  { color: "white", fontSize: 18, fontWeight: "700" },
-  headerSub:    { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
-  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
+  hdrLeft:      { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  hdrRight:     { flexDirection: "row", alignItems: "center", gap: 6 },
+  hdrIconWrap:  { width: 34, height: 34, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.14)",
+                  justifyContent: "center", alignItems: "center" },
+  headerTitle:  { color: "white", fontSize: 16, fontWeight: "800" },
+  headerSub:    { color: "rgba(255,255,255,0.6)", fontSize: 11, marginTop: 1 },
+  hdrGpsBadge:  { flexDirection: "row", alignItems: "center", gap: 4,
+                  backgroundColor: "rgba(16,185,129,0.22)", borderRadius: 7,
+                  paddingHorizontal: 8, paddingVertical: 4 },
+  hdrGpsDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" },
+  hdrGpsTxt:    { color: "#6EE7B7", fontSize: 10, fontWeight: "800" },
+  hdrCamBadge:  { flexDirection: "row", alignItems: "center", gap: 4,
+                  backgroundColor: "rgba(34,197,94,0.22)", borderRadius: 7,
+                  paddingHorizontal: 8, paddingVertical: 4 },
+  hdrCamDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },
+  hdrCamTxt:    { color: "#86EFAC", fontSize: 10, fontWeight: "800" },
+  hdrAlertBadge:{ flexDirection: "row", alignItems: "center", gap: 4,
+                  backgroundColor: "#DC2626", borderRadius: 7,
+                  paddingHorizontal: 8, paddingVertical: 4 },
+  hdrAlertTxt:  { color: "#fff", fontSize: 10, fontWeight: "800" },
+  logoutBtn:    { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 34, height: 34, justifyContent: "center", alignItems: "center" },
+
+  /* Cockpit KPI Strip */
+  cockpitStrip: { flexDirection: "row", marginHorizontal: 16, marginBottom: 6, marginTop: 2,
+                  backgroundColor: "#fff", borderRadius: 13, paddingVertical: 10, paddingHorizontal: 8,
+                  borderWidth: 1.5, borderColor: "#E9EEF6",
+                  shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  cockpitItem:  { flex: 1, alignItems: "center", gap: 2 },
+  cockpitNum:   { fontSize: 17, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 },
+  cockpitLbl:   { fontSize: 9, color: "#94A3B8", fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  cockpitDiv:   { width: 1, backgroundColor: "#F1F5F9", alignSelf: "stretch" },
 
   /* Empty state */
   emptyState:   { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
