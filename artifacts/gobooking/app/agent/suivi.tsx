@@ -216,9 +216,13 @@ export default function SuiviScreen() {
   const [triggerBus,  setTriggerBus]  = useState<BusItem | null>(null);
   const [acting,      setActing]      = useState(false);
   const [cameraTrip,  setCameraTrip]  = useState<TripItem | null>(null);
+  const [lastSync,    setLastSync]    = useState<Date | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const hasAlerts = !!(data?.alerts?.length);
+  const hasAlerts    = !!(data?.alerts?.length);
+  const activeCamCount = data?.trips?.filter(t => t.cameraStatus === "connected").length ?? 0;
+  const hasCameras   = activeCamCount > 0;
 
   useEffect(() => {
     if (hasAlerts) {
@@ -238,19 +242,55 @@ export default function SuiviScreen() {
       const res = await fetch(`${BASE_URL}/agent/suivi/overview`, {
         headers: authHeader(token),
       });
-      if (res.ok) setData(await res.json());
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+        setLastSync(new Date());
+      }
     } catch {}
     setLoading(false);
     setRefreshing(false);
   }, [token]);
 
+  /* Dynamic polling: 10s when cameras active, 30s otherwise */
   useEffect(() => {
     load();
-    const interval = setInterval(() => load(true), 30000);
-    return () => clearInterval(interval);
   }, [load]);
 
+  useEffect(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const delay = hasCameras ? 10_000 : 30_000;
+    intervalRef.current = setInterval(() => load(true), delay);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [hasCameras, load]);
+
+  /* When watching a camera live, refresh its trip data every 8s to detect disconnect */
+  useEffect(() => {
+    if (!cameraTrip) return;
+    const iv = setInterval(async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${BASE_URL}/agent/suivi/trips/${cameraTrip.id}/camera`, {
+          headers: authHeader(token),
+        });
+        if (res.ok) {
+          const cam = await res.json();
+          if (cam.status !== "connected" || !cam.streamUrl) {
+            // Camera disconnected — close the player and refresh overview
+            setCameraTrip(null);
+            load(true);
+          }
+        }
+      } catch {}
+    }, 8_000);
+    return () => clearInterval(iv);
+  }, [cameraTrip, token, load]);
+
   const onRefresh = () => { setRefreshing(true); load(true); };
+
+  const syncLabel = lastSync
+    ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")}`
+    : "Synchronisation...";
 
   /* ── Trigger alert ── */
   const doTrigger = async (bus: BusItem, message?: string) => {
@@ -334,13 +374,31 @@ export default function SuiviScreen() {
         <View style={S.headerRow}>
           <View style={S.headerIcon}><Ionicons name="radio" size={22} color="#fff" /></View>
           <View>
-            <Text style={S.headerTitle}>Suivi & Alertes</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={S.headerTitle}>Tour de contrôle</Text>
+              {hasCameras && (
+                <View style={S.camBadge}>
+                  <Ionicons name="videocam" size={9} color="#22C55E" />
+                  <Text style={S.camBadgeTxt}>{activeCamCount} LIVE</Text>
+                </View>
+              )}
+            </View>
             <Text style={S.headerSub}>
-              {hasAlerts ? `${data!.alerts.length} alerte(s) active(s)` : "Surveillance en temps réel"}
+              {hasAlerts
+                ? `⚠ ${data!.alerts.length} alerte(s) active(s)`
+                : hasCameras
+                  ? `${activeCamCount} caméra${activeCamCount > 1 ? "s" : ""} active${activeCamCount > 1 ? "s" : ""} · sync 10s`
+                  : "Surveillance en temps réel · sync 30s"}
             </Text>
           </View>
         </View>
         <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          {lastSync && (
+            <View style={S.syncPill}>
+              <View style={S.syncDot} />
+              <Text style={S.syncTxt}>{syncLabel}</Text>
+            </View>
+          )}
           <TouchableOpacity onPress={() => load(true)} style={S.refreshBtn}>
             <Feather name="refresh-cw" size={14} color="#fff" />
           </TouchableOpacity>
@@ -623,6 +681,11 @@ const S = StyleSheet.create({
   headerSub:  { color: "rgba(255,255,255,0.8)", fontSize: 12, marginTop: 1 },
   refreshBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
   logoutBtn:  { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
+  camBadge:   { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#052E16", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  camBadgeTxt:{ color: "#22C55E", fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  syncPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  syncDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#22C55E" },
+  syncTxt:    { color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
 
   alarmBanner:{ backgroundColor: RED, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 14, borderRadius: 14, shadowColor: RED, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
   alarmTxt:   { color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
