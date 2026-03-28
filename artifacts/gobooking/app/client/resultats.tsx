@@ -121,7 +121,8 @@ export default function ResultatsScreen() {
     setUsingFallback(false);
     try {
       const url = `/trips/search?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}&date=${d}&passengers=${p}`;
-      const data = await apiFetch<Trip[]>(url);
+      const raw = await apiFetch<unknown>(url);
+      const data: Trip[] = Array.isArray(raw) ? (raw as Trip[]) : [];
       console.log("[Resultats] Trajets reçus:", data.length);
       if (data.length === 0) {
         const fallback = buildFallbackTrips(f, t, d);

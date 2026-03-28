@@ -332,17 +332,29 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.monCompte}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="user"   label={t.modifier}    onPress={() => {}} iconBg="#EEF4FF" iconColor="#1650D0" />
+          <MenuItem
+            icon="user"
+            label={t.modifier}
+            onPress={() => Alert.alert("Modifier le profil", "Contactez le support GoBooking pour modifier vos informations personnelles.", [{ text: "OK" }])}
+            iconBg="#EEF4FF"
+            iconColor="#1650D0"
+          />
           <View style={styles.menuDivider} />
-          <MenuItem icon="lock"   label={t.motDePasse}  onPress={() => {}} iconBg="#F0FDF4" iconColor="#059669" />
-        </View>
-      </View>
-
-      {/* Mes réservations */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t.mesReservations}</Text>
-        <View style={styles.menuCard}>
-          <MenuItem icon="bookmark" label={t.mesReservations} onPress={() => router.push("/(tabs)/bookings")} iconBg="#EEF4FF" iconColor="#1650D0" />
+          <MenuItem
+            icon="lock"
+            label={t.motDePasse}
+            onPress={() => Alert.alert("Changer le mot de passe", "Un email de réinitialisation sera envoyé à\n" + (user?.email ?? "votre adresse email") + ".", [{ text: "Annuler", style: "cancel" }, { text: "Envoyer", onPress: () => {} }])}
+            iconBg="#F0FDF4"
+            iconColor="#059669"
+          />
+          <View style={styles.menuDivider} />
+          <MenuItem
+            icon="bookmark"
+            label={t.mesReservations}
+            onPress={() => router.push("/(tabs)/bookings")}
+            iconBg="#EEF4FF"
+            iconColor="#1650D0"
+          />
         </View>
       </View>
 
@@ -375,14 +387,25 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-
       {/* Support */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.support}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="help-circle" label={t.aide}    onPress={() => {}} iconBg="#FFFBEB" iconColor="#D97706" />
+          <MenuItem
+            icon="help-circle"
+            label={t.aide}
+            onPress={() => Alert.alert("Aide & FAQ", "Pour toute assistance, contactez-nous :\n📧 support@gobooking.ci\n📞 +225 07 00 00 00\n\nOuvert 7j/7 de 6h à 22h.", [{ text: "OK" }])}
+            iconBg="#FFFBEB"
+            iconColor="#D97706"
+          />
           <View style={styles.menuDivider} />
-          <MenuItem icon="info"        label={t.apropos} onPress={() => {}} iconBg="#F5F3FF" iconColor="#7C3AED" />
+          <MenuItem
+            icon="info"
+            label={t.apropos}
+            onPress={() => Alert.alert("À propos de GoBooking", "GoBooking v2.0\nPlateforme de réservation de bus intercités en Côte d'Ivoire.\n\n© 2024 GoBooking CI\nTous droits réservés.", [{ text: "OK" }])}
+            iconBg="#F5F3FF"
+            iconColor="#7C3AED"
+          />
         </View>
       </View>
 

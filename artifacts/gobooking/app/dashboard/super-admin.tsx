@@ -181,7 +181,7 @@ const FILL_RATE_DATA = [
 
 type Tab = "apercu" | "entreprises" | "utilisateurs" | "trajets" | "reservations" | "statistiques" | "commission" | "factures" | "audit";
 interface AdminInvoice { id: string; companyId: string; companyName: string; period: string; totalGross: number; totalCommission: number; totalNet: number; transactionCount: number; status: string; paidAt: string | null; createdAt: string }
-interface AuditLogItem { id: string; userId: string; userRole: string; userName: string | null; action: string; targetId: string | null; targetType: string | null; metadata: Record<string, unknown> | null; ipAddress: string | null; flagged: boolean; createdAt: string }
+interface AuditLogItem { id: string; userId?: string | null; userRole: string; userName: string | null; action: string; targetId: string | null; targetType: string | null; metadata: Record<string, unknown> | null; ipAddress: string | null; flagged: boolean; createdAt: string }
 interface AuditStats { total: number; flagged: number; last24h: number; byAction: { action: string; count: number }[] }
 
 const SIDEBAR_W = 285;

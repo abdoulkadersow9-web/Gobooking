@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface Customer {
-  userId: string; name: string; email: string; phone: string;
+  userId?: string | null; name: string; email: string; phone: string;
   tripCount: number; totalSpent: number; lastTrip: string; segment: string;
 }
 interface SmsLog {
@@ -265,7 +265,7 @@ export default function SmsScreen() {
           ) : (
             <FlatList
               data={customers}
-              keyExtractor={c => c.userId}
+              keyExtractor={(c, i) => c.userId ?? c.email ?? String(i)}
               contentContainerStyle={{ padding: 16, gap: 10 }}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {

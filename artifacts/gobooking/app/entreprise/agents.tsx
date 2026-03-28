@@ -36,7 +36,7 @@ interface Agence {
 
 interface AgentItem {
   id: string;
-  userId: string;
+  userId?: string | null;
   name: string;
   email: string;
   phone: string;
