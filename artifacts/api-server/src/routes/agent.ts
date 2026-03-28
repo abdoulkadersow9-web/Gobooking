@@ -3026,13 +3026,17 @@ router.get("/suivi/overview", async (req, res) => {
         issue:           b.issue,
       })),
       trips: tripsRaw.map((t: any) => ({
-        id:            t.id,
-        from:          t.from,
-        to:            t.to,
-        departureTime: t.departure_time ?? t.departureTime,
-        status:        t.status,
-        busId:         t.bus_id ?? t.busId,
-        busName:       t.bus_name ?? t.busName,
+        id:                t.id,
+        from:              t.from_city ?? t.from,
+        to:                t.to_city   ?? t.to,
+        departureTime:     t.departure_time ?? t.departureTime,
+        status:            t.status,
+        busId:             t.bus_id ?? t.busId,
+        busName:           t.bus_name ?? t.busName,
+        cameraStreamUrl:   t.camera_stream_url  ?? null,
+        cameraStatus:      t.camera_status      ?? "disconnected",
+        cameraConnectedAt: t.camera_connected_at?.toISOString?.() ?? null,
+        cameraPosition:    t.camera_position    ?? "intérieur",
       })),
       alerts: alertsRaw.map((a: any) => ({
         id:               a.id,
@@ -3140,6 +3144,93 @@ router.post("/suivi/alerts/:id/confirm", async (req, res) => {
   } catch (err) {
     console.error("[suivi/alerts/confirm]", err);
     res.status(500).json({ error: "Erreur confirmation alerte" });
+  }
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   CAMÉRA EMBARQUÉE — Liaison caméra ↔ trajet (tour de contrôle)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── POST /suivi/trips/:tripId/camera/connect ─── */
+router.post("/suivi/trips/:tripId/camera/connect", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const { streamUrl, position } = req.body as { streamUrl: string; position?: string };
+    if (!streamUrl || !streamUrl.startsWith("http")) {
+      res.status(400).json({ error: "URL de flux invalide (doit commencer par http)" }); return;
+    }
+
+    const camPosition = position ?? "intérieur";
+
+    await db.execute(sql`
+      UPDATE trips
+      SET camera_stream_url   = ${streamUrl},
+          camera_status       = 'connected',
+          camera_connected_at = NOW(),
+          camera_position     = ${camPosition}
+      WHERE id = ${tripId}
+        AND (company_id = ${user.companyId ?? null} OR ${user.companyId === null})
+    `);
+
+    console.log(`[Caméra] Connexion trajet ${tripId} → ${streamUrl}`);
+    res.json({ success: true, tripId, streamUrl, status: "connected" });
+  } catch (err) {
+    console.error("[suivi/camera/connect]", err);
+    res.status(500).json({ error: "Erreur connexion caméra" });
+  }
+});
+
+/* ─── POST /suivi/trips/:tripId/camera/disconnect ─── */
+router.post("/suivi/trips/:tripId/camera/disconnect", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    await db.execute(sql`
+      UPDATE trips
+      SET camera_stream_url   = NULL,
+          camera_status       = 'disconnected',
+          camera_connected_at = NULL
+      WHERE id = ${tripId}
+        AND (company_id = ${user.companyId ?? null} OR ${user.companyId === null})
+    `);
+
+    console.log(`[Caméra] Déconnexion trajet ${tripId}`);
+    res.json({ success: true, tripId, status: "disconnected" });
+  } catch (err) {
+    console.error("[suivi/camera/disconnect]", err);
+    res.status(500).json({ error: "Erreur déconnexion caméra" });
+  }
+});
+
+/* ─── GET /suivi/trips/:tripId/camera — get camera status ─── */
+router.get("/suivi/trips/:tripId/camera", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { tripId } = req.params;
+    const rows = await db.execute(sql`
+      SELECT camera_stream_url, camera_status, camera_connected_at, camera_position
+      FROM trips WHERE id = ${tripId} LIMIT 1
+    `);
+    const row = rows.rows?.[0] as any;
+    if (!row) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+
+    res.json({
+      tripId,
+      streamUrl:   row.camera_stream_url ?? null,
+      status:      row.camera_status ?? "disconnected",
+      connectedAt: row.camera_connected_at ?? null,
+      position:    row.camera_position ?? "intérieur",
+    });
+  } catch (err) {
+    console.error("[suivi/camera/status]", err);
+    res.status(500).json({ error: "Erreur statut caméra" });
   }
 });
 

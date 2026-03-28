@@ -7,6 +7,7 @@
  * - Génération PDF après validation: Version Entreprise (montants) + Version Route (sans montants)
  */
 import { Feather, Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Print from "expo-print";
 import { router } from "expo-router";
 import * as Sharing from "expo-sharing";
@@ -15,6 +16,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   Modal,
   RefreshControl,
   ScrollView,
@@ -137,6 +139,15 @@ export default function AgentDepartureValidation() {
   // PDF generation
   const [pdfLoading, setPdfLoading] = useState<"entreprise" | "route" | null>(null);
 
+  // Caméra embarquée
+  const [cameraModal,     setCameraModal]     = useState(false);
+  const [cameraUrl,       setCameraUrl]       = useState("");
+  const [cameraPosition,  setCameraPosition]  = useState<"intérieur" | "avant" | "arrière">("intérieur");
+  const [cameraConnected, setCameraConnected] = useState(false);
+  const [cameraConnecting,setCameraConnecting]= useState(false);
+  const [qrScanMode,      setQrScanMode]      = useState(false);
+  const [camPermission,   requestCamPermission] = useCameraPermissions();
+
   /* ─ Load trips ─ */
   const loadTrips = useCallback(async () => {
     if (!token) { setTL(false); return; }
@@ -174,8 +185,74 @@ export default function AgentDepartureValidation() {
     setTrip(t);
     setValidated(t.isValidated);
     setTransitJoined(false);
+    setCameraConnected(false);
+    setCameraUrl("");
     setTab("bordereau");
     loadBordereau(t.id);
+    // Load camera status for this trip
+    fetch(`${API}/agent/suivi/trips/${t.id}/camera`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.json()).then(data => {
+      if (data.status === "connected" && data.streamUrl) {
+        setCameraConnected(true);
+        setCameraUrl(data.streamUrl);
+        setCameraPosition(data.position ?? "intérieur");
+      }
+    }).catch(() => {});
+  };
+
+  /* ── Camera connect / disconnect ── */
+  const connectCamera = async () => {
+    if (!selectedTrip) return;
+    const url = cameraUrl.trim();
+    if (!url.startsWith("http")) {
+      Alert.alert("URL invalide", "L'adresse du flux doit commencer par http:// ou https://"); return;
+    }
+    setCameraConnecting(true);
+    try {
+      const r = await fetch(`${API}/agent/suivi/trips/${selectedTrip.id}/camera/connect`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ streamUrl: url, position: cameraPosition }),
+      });
+      if (r.ok) {
+        setCameraConnected(true);
+        setCameraModal(false);
+        setQrScanMode(false);
+        Alert.alert("Caméra connectée ✓", `Flux actif · Position : ${cameraPosition}\nL'agent suivi peut maintenant voir le bus en direct.`);
+      } else {
+        const e = await r.json().catch(() => ({}));
+        Alert.alert("Erreur", e.error ?? "Connexion caméra impossible");
+      }
+    } catch { Alert.alert("Erreur réseau", "Impossible de contacter le serveur."); }
+    setCameraConnecting(false);
+  };
+
+  const disconnectCamera = async () => {
+    if (!selectedTrip) return;
+    Alert.alert("Déconnecter la caméra", "Le flux sera coupé pour l'agent suivi.", [
+      { text: "Annuler", style: "cancel" },
+      { text: "Déconnecter", style: "destructive", onPress: async () => {
+        try {
+          await fetch(`${API}/agent/suivi/trips/${selectedTrip.id}/camera/disconnect`, {
+            method: "POST", headers: { Authorization: `Bearer ${token}` },
+          });
+          setCameraConnected(false);
+          setCameraUrl("");
+        } catch {}
+      }},
+    ]);
+  };
+
+  const openCameraModal = async () => {
+    if (!camPermission?.granted) {
+      const { granted } = await requestCamPermission();
+      if (!granted) {
+        Alert.alert("Permission caméra refusée", "Activez la caméra dans les paramètres pour scanner le QR Code.");
+        setCameraModal(true); return;
+      }
+    }
+    setCameraModal(true);
   };
 
   /* ─ Join trip as transit agent ─ */
@@ -582,6 +659,52 @@ export default function AgentDepartureValidation() {
           )
         )}
 
+        {/* ── Caméra embarquée ─────────────────────────────────── */}
+        <View style={SL.camBox}>
+          <View style={SL.camBoxHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={[SL.camIconWrap, cameraConnected && { backgroundColor: "#052E16" }]}>
+                <Ionicons name="videocam" size={16} color={cameraConnected ? "#22C55E" : "#64748B"} />
+              </View>
+              <View>
+                <Text style={[SL.camTitle, cameraConnected && { color: "#16A34A" }]}>
+                  {cameraConnected ? "Caméra embarquée · ACTIVE" : "Caméra embarquée"}
+                </Text>
+                <Text style={SL.camSubtitle}>
+                  {cameraConnected
+                    ? `Flux en direct · ${cameraPosition}`
+                    : "Connectez la caméra du bus avant le départ"}
+                </Text>
+              </View>
+            </View>
+            {cameraConnected ? (
+              <View style={SL.camLivePill}>
+                <View style={SL.camLiveDot} />
+                <Text style={SL.camLiveTxt}>LIVE</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {cameraConnected ? (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <View style={[SL.camStatusPill, { flex: 1 }]}>
+                <Ionicons name="wifi" size={12} color="#22C55E" />
+                <Text style={SL.camStatusTxt}>Signal actif · Tour de contrôle connecté</Text>
+              </View>
+              <TouchableOpacity style={SL.camDisconnectBtn} onPress={disconnectCamera}>
+                <Ionicons name="close-circle" size={14} color="#DC2626" />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#DC2626" }}>Déconnecter</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={SL.camConnectBtn} onPress={openCameraModal} activeOpacity={0.82}>
+              <Ionicons name="qr-code" size={16} color="#fff" />
+              <Text style={SL.camConnectTxt}>Connecter la caméra</Text>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Summary cards row */}
         <View style={SL.statsRow}>
           <View style={[SL.statCard, { borderTopColor: GREEN }]}>
@@ -953,6 +1076,157 @@ export default function AgentDepartureValidation() {
   };
 
   /* ── Expense modal ── */
+  const renderCameraModal = () => (
+    <Modal visible={cameraModal} animationType="slide" transparent onRequestClose={() => { setCameraModal(false); setQrScanMode(false); }}>
+      <View style={SL.modalOverlay}>
+        <View style={[SL.modalCard, { maxHeight: "85%" }]}>
+          <View style={SL.modalHeader}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#0A0E1A", justifyContent: "center", alignItems: "center" }}>
+                <Ionicons name="videocam" size={18} color="#22C55E" />
+              </View>
+              <Text style={SL.modalTitle}>Connexion caméra embarquée</Text>
+            </View>
+            <TouchableOpacity onPress={() => { setCameraModal(false); setQrScanMode(false); }} hitSlop={8}>
+              <Feather name="x" size={22} color={GRAY} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Mode QR scan / Saisie manuelle */}
+          <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+            <TouchableOpacity
+              style={[SL.camModeBtn, !qrScanMode && SL.camModeBtnActive]}
+              onPress={() => setQrScanMode(false)}
+            >
+              <Ionicons name="create-outline" size={14} color={!qrScanMode ? "#fff" : GRAY} />
+              <Text style={[SL.camModeBtnTxt, !qrScanMode && { color: "#fff" }]}>Saisie manuelle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[SL.camModeBtn, qrScanMode && SL.camModeBtnActive]}
+              onPress={() => setQrScanMode(true)}
+            >
+              <Ionicons name="qr-code-outline" size={14} color={qrScanMode ? "#fff" : GRAY} />
+              <Text style={[SL.camModeBtnTxt, qrScanMode && { color: "#fff" }]}>Scanner QR Code</Text>
+            </TouchableOpacity>
+          </View>
+
+          {qrScanMode ? (
+            /* ── QR Scanner ── */
+            <View style={{ gap: 12 }}>
+              <View style={{ borderRadius: 16, overflow: "hidden", height: 250 }}>
+                {camPermission?.granted ? (
+                  <CameraView
+                    style={{ flex: 1 }}
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                    onBarcodeScanned={({ data }) => {
+                      if (data.startsWith("http")) {
+                        setCameraUrl(data);
+                        setQrScanMode(false);
+                      } else {
+                        Alert.alert("QR invalide", "Le QR Code doit contenir une URL de flux (http://...)");
+                      }
+                    }}
+                  />
+                ) : (
+                  <View style={{ flex: 1, backgroundColor: "#0A0E1A", justifyContent: "center", alignItems: "center", gap: 10 }}>
+                    <Ionicons name="camera-outline" size={44} color="#334155" />
+                    <Text style={{ color: "#64748B", fontSize: 13, textAlign: "center" }}>
+                      Permission caméra requise{"\n"}pour scanner le QR Code
+                    </Text>
+                    <TouchableOpacity style={{ backgroundColor: P, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 }} onPress={requestCamPermission}>
+                      <Text style={{ color: "#fff", fontWeight: "700" }}>Autoriser</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+              <Text style={{ fontSize: 12, color: GRAY, textAlign: "center" }}>
+                Pointez la caméra vers le QR Code affiché sur la caméra embarquée
+              </Text>
+              {cameraUrl.startsWith("http") && (
+                <View style={{ backgroundColor: "#F0FDF4", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: GREEN + "60" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: GREEN }}>✓ URL détectée :</Text>
+                  <Text style={{ fontSize: 11, color: "#065F46", marginTop: 2 }} numberOfLines={2}>{cameraUrl}</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            /* ── Saisie manuelle ── */
+            <View style={{ gap: 12 }}>
+              <View>
+                <Text style={SL.modalLabel}>Adresse du flux vidéo (URL HLS/HTTP)</Text>
+                <TextInput
+                  style={SL.camUrlInput}
+                  value={cameraUrl}
+                  onChangeText={setCameraUrl}
+                  placeholder="http://192.168.x.x:8080/stream.m3u8"
+                  placeholderTextColor="#94A3B8"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                />
+                <Text style={{ fontSize: 10, color: "#94A3B8", marginTop: 4 }}>
+                  Format supporté : HLS (.m3u8) via WiFi local ou internet
+                </Text>
+              </View>
+
+              <View>
+                <Text style={SL.modalLabel}>Position caméra dans le bus</Text>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {(["intérieur", "avant", "arrière"] as const).map(pos => (
+                    <TouchableOpacity
+                      key={pos}
+                      style={[SL.camPosBtn, cameraPosition === pos && SL.camPosBtnActive]}
+                      onPress={() => setCameraPosition(pos)}
+                    >
+                      <Text style={[SL.camPosBtnTxt, cameraPosition === pos && { color: P }]}>{pos}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Info box */}
+              <View style={{ backgroundColor: "#EFF6FF", borderRadius: 10, padding: 12, gap: 5, borderWidth: 1, borderColor: "#BFDBFE" }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#1D4ED8" }}>Comment obtenir l'URL ?</Text>
+                <Text style={{ fontSize: 11, color: "#3730A3", lineHeight: 16 }}>
+                  1. Allumez la caméra embarquée{"\n"}
+                  2. Connectez-la au WiFi du bus{"\n"}
+                  3. Scannez son QR Code ou saisissez son adresse IP{"\n"}
+                  4. L'URL ressemble à : http://192.168.1.x:8080/stream
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Actions */}
+          <View style={[SL.modalActions, { marginTop: 16 }]}>
+            <TouchableOpacity
+              style={[SL.modalActionBtn, { backgroundColor: "#F1F5F9" }]}
+              onPress={() => { setCameraModal(false); setQrScanMode(false); }}
+            >
+              <Text style={{ fontWeight: "700", color: GRAY }}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[SL.modalActionBtn, { backgroundColor: P, opacity: cameraConnecting || !cameraUrl.startsWith("http") ? 0.6 : 1 }]}
+              onPress={connectCamera}
+              disabled={cameraConnecting || !cameraUrl.startsWith("http")}
+            >
+              {cameraConnecting
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <>
+                    <Ionicons name="link" size={14} color="#fff" />
+                    <Text style={{ fontWeight: "800", color: "#fff" }}>Connecter</Text>
+                  </>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const renderExpModal = () => (
     <Modal visible={showExpModal} animationType="slide" transparent>
       <View style={SL.modalOverlay}>
@@ -1059,6 +1333,7 @@ export default function AgentDepartureValidation() {
         {tab === "departs" ? renderDeparts() : renderBordereau()}
       </View>
 
+      {renderCameraModal()}
       {renderExpModal()}
     </SafeAreaView>
   );
@@ -1150,4 +1425,30 @@ const SL = StyleSheet.create({
   pdfBtnIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.2)", justifyContent: "center", alignItems: "center" },
   pdfBtnLabel: { fontSize: 14, fontWeight: "800", color: "#fff" },
   pdfBtnSub: { fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 },
+
+  /* Caméra embarquée */
+  camBox:         { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  camBoxHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  camIconWrap:    { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F1F5F9", justifyContent: "center", alignItems: "center" },
+  camTitle:       { fontSize: 13, fontWeight: "800", color: "#0F172A" },
+  camSubtitle:    { fontSize: 11, color: GRAY, marginTop: 1 },
+  camLivePill:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  camLiveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  camLiveTxt:     { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  camConnectBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: P, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16 },
+  camConnectTxt:  { fontSize: 13, fontWeight: "800", color: "#fff", flex: 1, textAlign: "center" },
+  camStatusPill:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#BBF7D0" },
+  camStatusTxt:   { fontSize: 11, fontWeight: "600", color: "#15803D", flex: 1 },
+  camDisconnectBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF2F2", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#FECACA" },
+
+  /* Camera modal */
+  camModeBtn:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 9, borderWidth: 1.5, borderColor: "#E2E8F0", backgroundColor: "#F8FAFC" },
+  camModeBtnActive: { backgroundColor: P, borderColor: P },
+  camModeBtnTxt:    { fontSize: 12, fontWeight: "700", color: GRAY },
+  camUrlInput:      { backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 14, paddingVertical: 12, fontSize: 13, color: "#0F172A", fontFamily: "monospace" },
+  camPosBtn:        { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: "#E2E8F0", alignItems: "center", backgroundColor: "#F8FAFC" },
+  camPosBtnActive:  { borderColor: P, backgroundColor: "#EEF2FF" },
+  camPosBtnTxt:     { fontSize: 12, fontWeight: "700", color: GRAY },
+  modalActions:     { flexDirection: "row", gap: 10 },
+  modalActionBtn:   { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 14, borderRadius: 12 },
 });

@@ -1,0 +1,68 @@
+Amélioration stratégique du module "Suivi trajet" avec intégration de caméras embarquées (niveau professionnel).
+
+IMPORTANT :
+- Ne rien modifier dans la logique actuelle de l’application
+- Ne rien supprimer
+- Ajouter uniquement des extensions et améliorations
+- Respecter entièrement l’architecture existante
+
+Objectif :
+Mettre en place un système de surveillance en temps réel via caméras embarquées dans les bus, intégré à la page "Suivi trajet" (tour de contrôle).
+
+CLARIFICATION IMPORTANTE :
+- Ne PAS utiliser la caméra du téléphone de l’agent
+- L’agent route est occupé (scan tickets, ventes, gestion passagers)
+- La caméra mobile n’est pas stable ni fiable
+
+SOLUTION À METTRE EN PLACE :
+
+1. Intégration caméra embarquée (dans le bus) :
+- Caméras fixes installées à l’intérieur du véhicule
+- Angle large pour couvrir passagers + ambiance générale
+
+2. Connexion caméra → application :
+Prévoir système de connexion via :
+- WiFi
+- Bluetooth
+- QR Code (scan pour connecter rapidement)
+
+3. Rôle de l’agent route :
+- Lors du départ → connecter la caméra au trajet
+- Associer la caméra au trajet actif (liaison unique)
+- Vérifier que le flux est actif
+
+4. Flux vidéo en temps réel :
+- Transmettre les images vers la page "Suivi trajet"
+- Visualisation en direct côté :
+  • Agent suivi
+  • Entreprise (tour de contrôle)
+
+5. Intégration dans la page suivi :
+- Ajouter bloc "Caméra LIVE"
+- Lecture du flux vidéo en direct
+- Indicateur :
+  • Connecté / Non connecté
+  • Qualité du signal
+
+6. Logique métier :
+- Chaque trajet = possibilité d’avoir une caméra associée
+- La caméra se lie uniquement au trajet actif
+- Déconnexion automatique à la fin du trajet
+
+7. Sécurité et performance :
+- Ne pas impacter les performances globales de l’application
+- Charger la vidéo uniquement si activée
+- Prévoir fallback si caméra non disponible
+
+8. Architecture évolutive :
+- Préparer compatibilité avec plusieurs caméras (avant / arrière bus)
+- Prévoir stockage futur (historique vidéo)
+
+OBJECTIF FINAL :
+Créer un système de supervision avancé type “tour de contrôle” avec visibilité en temps réel sur les trajets, sans altérer la logique existante.
+
+Priorité :
+- Stabilité
+- Sécurité
+- Temps réel
+- Expérience professionnelle

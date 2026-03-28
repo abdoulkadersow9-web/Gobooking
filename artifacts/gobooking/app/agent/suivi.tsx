@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Dimensions,
   Easing,
   Modal,
   RefreshControl,
@@ -15,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { WebView } from "react-native-webview";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
@@ -24,6 +26,10 @@ const RED    = "#BE123C";
 const RED_D  = "#9F1239";
 const RED_L  = "#FFF1F2";
 const RED_M  = "#FDA4AF";
+const CAM_BG = "#0A0E1A";
+const CAM_GR = "#22C55E";
+
+const { width: SW } = Dimensions.get("window");
 
 function authHeader(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -42,12 +48,57 @@ const BUS_STATUS: Record<string, { label: string; color: string; bg: string; ico
   en_panne:   { label: "En panne",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
 };
 
+/* ── HLS video player HTML ─────────────────────────────────────── */
+function buildVideoHtml(streamUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
+    video{width:100%;height:100%;object-fit:contain;background:#000}
+    #err{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#FF4444;font-family:sans-serif;font-size:13px;text-align:center;padding:12px}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
+</head>
+<body>
+  <video id="v" autoplay muted playsinline controls></video>
+  <div id="err">⚠️ Flux non disponible<br>Vérifiez la connexion caméra</div>
+  <script>
+    var v = document.getElementById("v");
+    var err = document.getElementById("err");
+    var url = "${streamUrl.replace(/"/g, '\\"')}";
+    if (Hls.isSupported()) {
+      var hls = new Hls({ maxBufferLength:10, startFragPrefetch:true });
+      hls.loadSource(url);
+      hls.attachMedia(v);
+      hls.on(Hls.Events.ERROR, function(_,d){ if(d.fatal){ err.style.display="block"; v.style.display="none"; } });
+    } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
+      v.src = url;
+      v.addEventListener("error", function(){ err.style.display="block"; v.style.display="none"; });
+    } else {
+      err.style.display="block";
+      err.innerHTML = "Lecteur non compatible sur cet appareil";
+    }
+  </script>
+</body>
+</html>`;
+}
+
+/* ── Types ─────────────────────────────────────────────────────── */
 interface BusItem {
   id: string; busName: string; plateNumber: string;
   logisticStatus: string; currentLocation?: string; issue?: string;
+  currentTripId?: string;
 }
 interface TripItem {
-  id: string; from: string; to: string; departureTime: string; status: string; busId?: string; busName?: string;
+  id: string; from: string; to: string; departureTime: string; status: string;
+  busId?: string; busName?: string;
+  cameraStreamUrl?: string | null;
+  cameraStatus?: string;
+  cameraConnectedAt?: string | null;
+  cameraPosition?: string;
 }
 interface AlertItem {
   id: string; type: string; busId?: string; busName?: string;
@@ -59,6 +110,102 @@ interface AlertItem {
 interface Overview { buses: BusItem[]; trips: TripItem[]; alerts: AlertItem[] }
 
 /* ══════════════════════════════════════════════════════════════════
+   CAMÉRA LIVE — Lecteur vidéo embarqué
+   ══════════════════════════════════════════════════════════════════ */
+function CameraPlayer({ trip, onClose }: { trip: TripItem; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const streamUrl = trip.cameraStreamUrl!;
+
+  return (
+    <View style={CS.container}>
+      {/* Header */}
+      <View style={CS.header}>
+        <View style={CS.liveBadge}>
+          <View style={CS.liveDot} />
+          <Text style={CS.liveText}>LIVE</Text>
+        </View>
+        <Text style={CS.camTitle} numberOfLines={1}>
+          {trip.from} → {trip.to}  ·  {trip.cameraPosition ?? "intérieur"}
+        </Text>
+        <TouchableOpacity onPress={onClose} hitSlop={12} style={CS.closeBtn}>
+          <Ionicons name="close" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Video */}
+      <View style={CS.videoWrap}>
+        {loading && (
+          <View style={CS.videoLoader}>
+            <ActivityIndicator size="large" color={CAM_GR} />
+            <Text style={{ color: "#94A3B8", fontSize: 12, marginTop: 10 }}>Connexion au flux caméra...</Text>
+          </View>
+        )}
+        <WebView
+          source={{ html: buildVideoHtml(streamUrl) }}
+          style={CS.video}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          onLoadEnd={() => setLoading(false)}
+          scrollEnabled={false}
+          bounces={false}
+        />
+      </View>
+
+      {/* Footer info */}
+      <View style={CS.footer}>
+        <View style={CS.footerItem}>
+          <Ionicons name="wifi" size={13} color={CAM_GR} />
+          <Text style={CS.footerTxt}>Signal actif</Text>
+        </View>
+        <View style={CS.footerItem}>
+          <Ionicons name="videocam" size={13} color={CAM_GR} />
+          <Text style={CS.footerTxt}>Caméra embarquée</Text>
+        </View>
+        <View style={CS.footerItem}>
+          <Ionicons name="shield-checkmark" size={13} color={CAM_GR} />
+          <Text style={CS.footerTxt}>Flux sécurisé</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ── Camera status pill ─────────────────────────────────────────── */
+function CamPill({ trip, onView }: { trip: TripItem; onView: () => void }) {
+  const isConnected = trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
+  const dotPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isConnected) {
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(dotPulse, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+        Animated.timing(dotPulse, { toValue: 1,   duration: 700, useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => loop.stop();
+    }
+  }, [isConnected]);
+
+  if (!isConnected) {
+    return (
+      <View style={CP.pill}>
+        <View style={[CP.dot, { backgroundColor: "#94A3B8" }]} />
+        <Text style={CP.txt}>Caméra non connectée</Text>
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity style={[CP.pill, CP.pillActive]} onPress={onView} activeOpacity={0.8}>
+      <Animated.View style={[CP.dot, { backgroundColor: CAM_GR, opacity: dotPulse }]} />
+      <Text style={[CP.txt, { color: CAM_GR, fontWeight: "700" }]}>Caméra LIVE</Text>
+      <Ionicons name="play-circle" size={14} color={CAM_GR} />
+    </TouchableOpacity>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
    MAIN SCREEN
    ══════════════════════════════════════════════════════════════════ */
 export default function SuiviScreen() {
@@ -68,21 +215,19 @@ export default function SuiviScreen() {
   const [refreshing,  setRefreshing]  = useState(false);
   const [triggerBus,  setTriggerBus]  = useState<BusItem | null>(null);
   const [acting,      setActing]      = useState(false);
-
-  /* Alarm pulse animation */
+  const [cameraTrip,  setCameraTrip]  = useState<TripItem | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const hasAlerts = (data?.alerts?.length ?? 0) > 0;
+
+  const hasAlerts = !!(data?.alerts?.length);
 
   useEffect(() => {
     if (hasAlerts) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.08, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.ease) }),
-          Animated.timing(pulseAnim, { toValue: 1,    duration: 600, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
+      const loop = Animated.loop(Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]));
+      loop.start();
+      return () => { loop.stop(); pulseAnim.setValue(1); };
     }
   }, [hasAlerts]);
 
@@ -170,6 +315,16 @@ export default function SuiviScreen() {
     );
   }
 
+  /* ── Camera full-screen modal ── */
+  if (cameraTrip) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: CAM_BG }}>
+        <StatusBar barStyle="light-content" backgroundColor={CAM_BG} />
+        <CameraPlayer trip={cameraTrip} onClose={() => setCameraTrip(null)} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={RED_D} />
@@ -238,7 +393,7 @@ export default function SuiviScreen() {
                   <View style={S.alertTop}>
                     <View style={[S.alertTypeBadge, { backgroundColor: alert.type === "panne" ? "#FEE2E2" : RED_L }]}>
                       <Text style={[S.alertTypeTxt, { color: alert.type === "panne" ? "#DC2626" : RED }]}>
-                        {alert.type.toUpperCase()}
+                        {alert.type === "panne" ? "PANNE" : "ALERTE"}
                       </Text>
                     </View>
                     <Text style={S.alertBus}>{alert.busName ?? "Bus inconnu"}</Text>
@@ -247,53 +402,44 @@ export default function SuiviScreen() {
                     </Text>
                   </View>
 
-                  {/* Message */}
                   <Text style={S.alertMsg}>{alert.message}</Text>
-                  <Text style={S.alertAgent}>Par {alert.agentName ?? alert.agentId}</Text>
+                  <Text style={S.alertAgent}>Déclenché par : {alert.agentName ?? alert.agentId}</Text>
 
-                  {/* State indicators */}
+                  {/* Response */}
                   {hasResponse && responseOpt && (
                     <View style={[S.responsePill, { backgroundColor: responseOpt.bg }]}>
                       <Text style={[S.responseTxt, { color: responseOpt.color }]}>
-                        Réponse agent route : {responseOpt.label}
+                        Réponse : {responseOpt.label}
                       </Text>
                     </View>
                   )}
-                  {!hasResponse && reqRequested && (
+                  {reqRequested && !hasResponse && (
                     <View style={S.waitPill}>
                       <ActivityIndicator size="small" color="#D97706" />
-                      <Text style={S.waitTxt}>En attente de réponse — agent en route notifié</Text>
-                    </View>
-                  )}
-                  {!hasResponse && !reqRequested && (
-                    <View style={[S.waitPill, { backgroundColor: "#FFF1F2", borderColor: "#FECDD3" }]}>
-                      <Ionicons name="alert-circle-outline" size={14} color={RED} />
-                      <Text style={[S.waitTxt, { color: RED }]}>Aucune réponse — action requise</Text>
+                      <Text style={S.waitTxt}>Réponse en attente de l'agent...</Text>
                     </View>
                   )}
 
                   {/* Actions */}
                   <View style={S.alertActions}>
-                    {!hasResponse && !reqRequested && (
+                    {!reqRequested && (
                       <TouchableOpacity
-                        style={[S.alertBtn, { backgroundColor: "#FEF3C7", borderColor: "#FCD34D" }]}
+                        style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF" }]}
                         onPress={() => demanderReponse(alert.id)}
                         disabled={acting}
                       >
-                        <Ionicons name="send-outline" size={14} color="#D97706" />
-                        <Text style={[S.alertBtnTxt, { color: "#D97706" }]}>Demander réponse</Text>
+                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#1D4ED8" />
+                        <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
                       </TouchableOpacity>
                     )}
-                    {hasResponse && (
-                      <TouchableOpacity
-                        style={[S.alertBtn, { backgroundColor: "#DCFCE7", borderColor: "#4ADE80" }]}
-                        onPress={() => doConfirm(alert.id)}
-                        disabled={acting}
-                      >
-                        {acting ? <ActivityIndicator size="small" color="#166534" /> : <Ionicons name="checkmark-circle-outline" size={14} color="#166534" />}
-                        <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Confirmer résolution</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4" }]}
+                      onPress={() => doConfirm(alert.id)}
+                      disabled={acting}
+                    >
+                      {acting ? <ActivityIndicator size="small" color="#166534" /> : <Ionicons name="checkmark-circle-outline" size={14} color="#166534" />}
+                      <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Confirmer résolution</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               );
@@ -309,6 +455,8 @@ export default function SuiviScreen() {
             {data?.buses?.map(bus => {
               const st = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
               const trip = data.trips.find(t => t.busId === bus.id);
+              const camConnected = trip && trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
+
               return (
                 <View key={bus.id} style={S.busCard}>
                   <View style={S.busTop}>
@@ -327,6 +475,22 @@ export default function SuiviScreen() {
                     </View>
                   </View>
 
+                  {/* ── Caméra LIVE block ── */}
+                  {trip && (
+                    <View style={S.camBlock}>
+                      <View style={S.camBlockHeader}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Ionicons name="videocam" size={14} color={camConnected ? CAM_GR : "#94A3B8"} />
+                          <Text style={[S.camBlockTitle, camConnected && { color: CAM_GR }]}>
+                            Caméra embarquée
+                          </Text>
+                        </View>
+                        <Text style={S.camPos}>{trip.cameraPosition ?? "intérieur"}</Text>
+                      </View>
+                      <CamPill trip={trip} onView={() => setCameraTrip(trip)} />
+                    </View>
+                  )}
+
                   {/* Trigger alert button */}
                   <TouchableOpacity
                     style={S.triggerBtn}
@@ -340,6 +504,36 @@ export default function SuiviScreen() {
               );
             })}
           </View>
+
+          {/* ── TRIPS CAMERA SUMMARY ── */}
+          {data?.trips && data.trips.some(t => t.cameraStatus === "connected") && (
+            <View style={S.section}>
+              <Text style={S.sectionTitle}>Caméras actives ({data.trips.filter(t => t.cameraStatus === "connected").length})</Text>
+              {data.trips.filter(t => t.cameraStatus === "connected" && t.cameraStreamUrl).map(trip => (
+                <TouchableOpacity
+                  key={trip.id}
+                  style={S.camSummaryCard}
+                  onPress={() => setCameraTrip(trip)}
+                  activeOpacity={0.82}
+                >
+                  <View style={S.camSummaryLeft}>
+                    <View style={S.camThumb}>
+                      <Ionicons name="videocam" size={22} color={CAM_GR} />
+                    </View>
+                    <View>
+                      <Text style={S.camSummaryRoute}>{trip.from} → {trip.to}</Text>
+                      <Text style={S.camSummaryMeta}>{trip.cameraPosition ?? "intérieur"} · {trip.departureTime}</Text>
+                    </View>
+                  </View>
+                  <View style={S.camLivePill}>
+                    <View style={S.camLiveDot} />
+                    <Text style={S.camLiveTxt}>LIVE</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
         </ScrollView>
       )}
 
@@ -351,7 +545,6 @@ export default function SuiviScreen() {
             <Text style={S.modalSub}>Bus : {triggerBus?.busName} ({triggerBus?.plateNumber})</Text>
 
             <Text style={S.modalLabel}>Message (optionnel)</Text>
-            {/* Simple quick options */}
             {[
               "Arrêt anormal non prévu",
               "Bus immobilisé sur route",
@@ -394,6 +587,31 @@ export default function SuiviScreen() {
     </SafeAreaView>
   );
 }
+
+/* ── Camera Player Styles ─────────────────────────────────────── */
+const CS = StyleSheet.create({
+  container:  { flex: 1, backgroundColor: CAM_BG },
+  header:     { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 10, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
+  liveBadge:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  liveDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  liveText:   { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  camTitle:   { flex: 1, color: "#E2E8F0", fontSize: 13, fontWeight: "700" },
+  closeBtn:   { width: 32, height: 32, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.12)", justifyContent: "center", alignItems: "center" },
+  videoWrap:  { flex: 1, position: "relative" },
+  videoLoader:{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", zIndex: 10, backgroundColor: CAM_BG },
+  video:      { flex: 1, backgroundColor: "#000" },
+  footer:     { flexDirection: "row", justifyContent: "space-around", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
+  footerItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  footerTxt:  { color: "#64748B", fontSize: 11, fontWeight: "600" },
+});
+
+/* ── Camera Pill Styles ────────────────────────────────────────── */
+const CP = StyleSheet.create({
+  pill:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  pillActive: { backgroundColor: "#052E16", borderWidth: 1, borderColor: "#166534" },
+  dot:        { width: 7, height: 7, borderRadius: 4 },
+  txt:        { fontSize: 12, fontWeight: "600", color: "#94A3B8", flex: 1 },
+});
 
 /* ── Styles ───────────────────────────────────────────────────────── */
 const S = StyleSheet.create({
@@ -440,8 +658,23 @@ const S = StyleSheet.create({
   busIssue:  { fontSize: 11, color: "#DC2626", marginTop: 2, fontWeight: "600" },
   statusPill:{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: "flex-start" },
   statusTxt: { fontSize: 10, fontWeight: "700" },
-  triggerBtn:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: RED_M, backgroundColor: RED_L },
-  triggerBtnTxt:{ fontSize: 13, fontWeight: "700", color: RED },
+
+  camBlock:       { backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, gap: 8, borderWidth: 1, borderColor: "#E2E8F0" },
+  camBlockHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  camBlockTitle:  { fontSize: 12, fontWeight: "700", color: "#64748B" },
+  camPos:         { fontSize: 10, color: "#94A3B8", fontStyle: "italic" },
+
+  camSummaryCard: { backgroundColor: CAM_BG, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, borderWidth: 1, borderColor: "#1E293B" },
+  camSummaryLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  camThumb:       { width: 44, height: 44, borderRadius: 10, backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center" },
+  camSummaryRoute:{ fontSize: 13, fontWeight: "700", color: "#E2E8F0" },
+  camSummaryMeta: { fontSize: 11, color: "#64748B", marginTop: 2 },
+  camLivePill:    { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 5 },
+  camLiveDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
+  camLiveTxt:     { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+
+  triggerBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: RED_M, backgroundColor: RED_L },
+  triggerBtnTxt: { fontSize: 13, fontWeight: "700", color: RED },
 
   modalBg:   { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalBox:  { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
