@@ -575,24 +575,25 @@ export default function BookingsScreen() {
       </LinearGradient>
 
       {/* Filter tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterBarContent}
-      >
-        {FILTER_TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.filterTab, filter === tab.key && styles.filterTabActive]}
-            onPress={() => { Haptics.selectionAsync(); setFilter(tab.key); }}
-          >
-            <Text style={[styles.filterTabText, filter === tab.key && styles.filterTabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterBarContent}
+        >
+          {FILTER_TABS.map(tab => (
+            <Pressable
+              key={tab.key}
+              style={[styles.filterTab, filter === tab.key && styles.filterTabActive]}
+              onPress={() => { Haptics.selectionAsync(); setFilter(tab.key); }}
+            >
+              <Text style={[styles.filterTabText, filter === tab.key && styles.filterTabTextActive]} numberOfLines={1}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Network error banner */}
       {netError && !loading && (
@@ -666,11 +667,15 @@ const styles = StyleSheet.create({
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
   filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
-  filterBarContent:  { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row", alignItems: "center" },
-  filterTab:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22, backgroundColor: "#F4F6FF", borderWidth: 1.5, borderColor: "transparent" },
+  filterBarContent:  { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 8, flexDirection: "row" },
+  filterTab:         {
+    height: 36, paddingHorizontal: 16, borderRadius: 18,
+    backgroundColor: "#F0F3FF", borderWidth: 1.5, borderColor: "transparent",
+    justifyContent: "center", alignItems: "center", flexShrink: 0,
+  },
   filterTabActive:   { backgroundColor: "#1650D0", borderColor: "#1650D0" },
-  filterTabText:     { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#7A8FAA" },
-  filterTabTextActive: { color: "white", fontFamily: "Inter_700Bold" },
+  filterTabText:     { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#4A6080", lineHeight: 16 },
+  filterTabTextActive: { color: "white", fontFamily: "Inter_700Bold", lineHeight: 16 },
 
   card:         {
     backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 20,
