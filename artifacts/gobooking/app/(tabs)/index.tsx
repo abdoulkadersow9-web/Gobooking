@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -323,11 +322,9 @@ export default function HomeScreen() {
       >
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
-            <Image
-              source={require("../../assets/logo.png")}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
+            <View style={styles.headerLogo}>
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.5 }}>GB</Text>
+            </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.greeting} numberOfLines={1} ellipsizeMode="tail">
                 {firstName ? `Bonjour, ${firstName}` : "GoBooking"}
@@ -964,13 +961,13 @@ export default function HomeScreen() {
                 <Text style={styles.activityRef}>{latestParcel.trackingRef}</Text>
 
                 <View style={styles.activityRoute}>
-                  <Text style={styles.activityCity}>{latestParcel.fromCity}</Text>
+                  <Text style={styles.activityCity} numberOfLines={1}>{latestParcel.fromCity}</Text>
                   <View style={styles.routeLine}>
                     <View style={styles.routeDash} />
                     <Feather name="arrow-right" size={12} color={Colors.light.primary} />
                     <View style={styles.routeDash} />
                   </View>
-                  <Text style={styles.activityCity}>{latestParcel.toCity}</Text>
+                  <Text style={styles.activityCity} numberOfLines={1}>{latestParcel.toCity}</Text>
                 </View>
 
                 <View style={styles.activityFooter}>
@@ -1009,13 +1006,13 @@ export default function HomeScreen() {
                 </Text>
 
                 <View style={styles.activityRoute}>
-                  <Text style={styles.activityCity}>{upcomingBooking.from}</Text>
+                  <Text style={styles.activityCity} numberOfLines={1}>{upcomingBooking.from}</Text>
                   <View style={styles.routeLine}>
                     <View style={styles.routeDash} />
                     <Feather name="arrow-right" size={12} color={Colors.light.primary} />
                     <View style={styles.routeDash} />
                   </View>
-                  <Text style={styles.activityCity}>{upcomingBooking.to}</Text>
+                  <Text style={styles.activityCity} numberOfLines={1}>{upcomingBooking.to}</Text>
                 </View>
 
                 <View style={styles.activityFooter}>
@@ -1140,15 +1137,13 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Right: price + chevron */}
+            {/* Right: price + chevron inline */}
             <View style={styles.routeCardRight}>
               <View style={styles.routePriceBadge}>
                 <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()}</Text>
-                <Text style={styles.routePriceCurrency}> FCFA</Text>
+                <Text style={styles.routePriceCurrency}> F</Text>
               </View>
-              <View style={styles.routeChevron}>
-                <Feather name="chevron-right" size={16} color="white" />
-              </View>
+              <Feather name="chevron-right" size={18} color={Colors.light.primary} />
             </View>
           </Pressable>
         ))}
@@ -1166,7 +1161,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 36 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 12 },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
-  headerLogo: { width: 42, height: 42, borderRadius: 13, flexShrink: 0 },
+  headerLogo: { width: 42, height: 42, borderRadius: 13, flexShrink: 0, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
   greeting: { fontSize: 22, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
   headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
   adminBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.28)", flexShrink: 0 },
@@ -1190,11 +1185,11 @@ const styles = StyleSheet.create({
   routeLabel: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 6 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   routeLabelText: { fontSize: 10, fontFamily: "Inter_700Bold", color: Colors.light.textSecondary, letterSpacing: 1.2, textTransform: "uppercase" },
-  routeInput: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: "#06101F", borderBottomWidth: 2, borderBottomColor: "#C7D2FE", paddingBottom: 9 },
+  routeInput: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: "#06101F", borderBottomWidth: 2, borderBottomColor: "#C7D2FE", paddingBottom: 9, ...(Platform.OS === "web" ? { outlineWidth: 0 } as any : {}) },
   swapBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", marginTop: 16, borderWidth: 1.5, borderColor: "#BFD0FF" },
   bottomRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   dateWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F4F6FC", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#DDE2F0" },
-  dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#06101F" },
+  dateInput: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#06101F", ...(Platform.OS === "web" ? { outlineWidth: 0 } as any : {}) },
   paxWrap: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F4F6FC", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#DDE2F0" },
   paxBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center" },
   paxCount: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", minWidth: 18, textAlign: "center" },
@@ -1286,9 +1281,9 @@ const styles = StyleSheet.create({
   activityLabel: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#94A3B8", textTransform: "uppercase", letterSpacing: 1.2 },
   activityRef: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.3 },
   activityRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
-  routeLine: { flex: 1, flexDirection: "row", alignItems: "center", gap: 2 },
-  routeDash: { flex: 1, height: 1.5, backgroundColor: "#E2E8F0" },
-  activityCity: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#1E293B" },
+  routeLine: { flexDirection: "row", alignItems: "center", gap: 2, flexShrink: 0, minWidth: 36 },
+  routeDash: { flex: 1, height: 1.5, backgroundColor: "#E2E8F0", maxWidth: 12 },
+  activityCity: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#1E293B", flex: 1, minWidth: 0 },
   activityFooter: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#F1F3FA" },
   activityAction: { fontSize: 12, fontFamily: "Inter_700Bold", color: Colors.light.primary },
   emptyCardDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 },
@@ -1334,12 +1329,12 @@ const styles = StyleSheet.create({
   routeTo: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3, flexShrink: 1, minWidth: 0 },
   routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   routeCardMeta: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
-  routeCardRight: { flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0 },
+  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   routePriceBadge: {
-    backgroundColor: "#EEF4FF", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: "#EEF4FF", borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
     alignItems: "center", flexDirection: "row", gap: 2,
   },
-  routeCardPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.4 },
+  routeCardPrice: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.4 },
   routePriceCurrency: { fontSize: 11, fontFamily: "Inter_700Bold", color: Colors.light.primary },
-  routeChevron: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#1650D0", justifyContent: "center", alignItems: "center", alignSelf: "flex-end" },
+  routeChevron: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#1650D0", justifyContent: "center", alignItems: "center" },
 });
