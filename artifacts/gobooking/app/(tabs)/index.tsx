@@ -495,9 +495,8 @@ export default function HomeScreen() {
         transform: [{ translateY: sectionAnims[0].interpolate({ inputRange: [0,1], outputRange: [20,0] }) }],
       }}>
       <View style={styles.ctaRow}>
-        <TouchableOpacity
-          style={[styles.ctaBtn, styles.ctaBtnPrimary]}
-          activeOpacity={0.85}
+        <Pressable
+          style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnPrimary, pressed && { transform: [{ scale: 0.97 }], opacity: 0.93 }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push("/client/resultats" as never);
@@ -511,11 +510,10 @@ export default function HomeScreen() {
             <Text style={styles.ctaSub}>Bus interurbains CI</Text>
           </View>
           <Feather name="chevron-right" size={16} color={Colors.light.primary} />
-        </TouchableOpacity>
+        </Pressable>
 
-        <TouchableOpacity
-          style={[styles.ctaBtn, styles.ctaBtnGreen]}
-          activeOpacity={0.85}
+        <Pressable
+          style={({ pressed }) => [styles.ctaBtn, styles.ctaBtnGreen, pressed && { transform: [{ scale: 0.97 }], opacity: 0.93 }]}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/parcel/send"); }}
         >
           <View style={[styles.ctaIcon, { backgroundColor: "#DCFCE7" }]}>
@@ -526,13 +524,12 @@ export default function HomeScreen() {
             <Text style={[styles.ctaSub, { color: "#065F46" }]}>Livraison sécurisée</Text>
           </View>
           <Feather name="chevron-right" size={16} color="#059669" />
-        </TouchableOpacity>
+        </Pressable>
 
         {/* ── Live tracking CTA ── */}
-        <TouchableOpacity
-          activeOpacity={0.85}
+        <Pressable
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push("/live-tracking"); }}
-          style={styles.liveTrackingBtn}
+          style={({ pressed }) => [styles.liveTrackingBtn, pressed && { transform: [{ scale: 0.97 }], opacity: 0.95 }]}
         >
           <View style={styles.liveTrackingLeft}>
             <View style={styles.liveTrackingIcon}>
@@ -547,7 +544,7 @@ export default function HomeScreen() {
             <View style={styles.liveDot2} />
             <Text style={styles.livePillText}>LIVE</Text>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </View>
       </Animated.View>
 

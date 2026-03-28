@@ -38,12 +38,14 @@ export default function ProfileScreen() {
 
   const [wallet, setWallet] = useState<WalletData | null>(null);
   const [copied, setCopied] = useState(false);
+  const copyScaleAnim = useRef(new Animated.Value(1)).current;
 
-  const avatarScale = useRef(new Animated.Value(0.7)).current;
-  const avatarOpacity = useRef(new Animated.Value(0)).current;
-  const statsSlide = useRef(new Animated.Value(30)).current;
-  const statsOpacity = useRef(new Animated.Value(0)).current;
+  const avatarScale    = useRef(new Animated.Value(0.7)).current;
+  const avatarOpacity  = useRef(new Animated.Value(0)).current;
+  const statsSlide     = useRef(new Animated.Value(30)).current;
+  const statsOpacity   = useRef(new Animated.Value(0)).current;
   const contentOpacity = useRef(new Animated.Value(0)).current;
+  const loyaltyBarAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -75,6 +77,15 @@ export default function ProfileScreen() {
   const loyaltyLevel = loyaltyTrips >= 30 ? "Or" : loyaltyTrips >= 10 ? "Argent" : "Bronze";
   const loyaltyColor = loyaltyTrips >= 30 ? "#D97706" : loyaltyTrips >= 10 ? "#64748B" : "#B45309";
 
+  useEffect(() => {
+    const pct = Math.min(100, ((loyaltyTrips % 10) / 10) * 100);
+    Animated.timing(loyaltyBarAnim, {
+      toValue: pct,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+  }, [loyaltyTrips]);
+
   const refCode = wallet?.referralCode ?? user?.referralCode ?? "";
 
   const copyReferral = async () => {
@@ -82,7 +93,11 @@ export default function ProfileScreen() {
     await Clipboard.setStringAsync(refCode);
     setCopied(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => setCopied(false), 2000);
+    Animated.sequence([
+      Animated.spring(copyScaleAnim, { toValue: 1.15, speed: 30, bounciness: 8, useNativeDriver: true }),
+      Animated.spring(copyScaleAnim, { toValue: 1,    speed: 20, bounciness: 4, useNativeDriver: true }),
+    ]).start();
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const shareReferral = async () => {
@@ -119,21 +134,25 @@ export default function ProfileScreen() {
     label,
     onPress,
     danger,
+    iconBg,
+    iconColor,
   }: {
     icon: string;
     label: string;
     onPress: () => void;
     danger?: boolean;
+    iconBg?: string;
+    iconColor?: string;
   }) => (
     <Pressable
-      style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+      style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: "#F8FAFC", transform: [{ scale: 0.99 }] }]}
       onPress={onPress}
     >
-      <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-        <Feather name={icon as never} size={18} color={danger ? Colors.light.error : Colors.light.primary} />
+      <View style={[styles.menuIcon, danger && styles.menuIconDanger, iconBg ? { backgroundColor: iconBg } : {}]}>
+        <Feather name={icon as never} size={18} color={danger ? Colors.light.error : (iconColor ?? Colors.light.primary)} />
       </View>
       <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]}>{label}</Text>
-      {!danger && <Feather name="chevron-right" size={16} color={Colors.light.textMuted} />}
+      {!danger && <Feather name="chevron-right" size={16} color="#CBD5E1" />}
     </Pressable>
   );
 
@@ -196,21 +215,31 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Mon portefeuille</Text>
         <LinearGradient colors={["#059669", "#047857", "#065F46"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.walletCard}>
+          {/* Decorative circles */}
+          <View style={styles.walletDecor1} />
+          <View style={styles.walletDecor2} />
           <View style={styles.walletTop}>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.walletLabel}>Solde disponible</Text>
               <Text style={styles.walletAmount}>
-                {(wallet?.walletBalance ?? user?.walletBalance ?? 0).toLocaleString()} FCFA
+                {(wallet?.walletBalance ?? user?.walletBalance ?? 0).toLocaleString()} <Text style={{ fontSize: 16, opacity: 0.85 }}>FCFA</Text>
               </Text>
             </View>
             <View style={styles.walletIconWrap}>
-              <Feather name="credit-card" size={24} color="rgba(255,255,255,0.8)" />
+              <Feather name="credit-card" size={26} color="rgba(255,255,255,0.9)" />
             </View>
           </View>
+          <View style={styles.walletSeparator} />
           <View style={styles.walletRow}>
             <View style={styles.walletStat}>
-              <Feather name="award" size={14} color="rgba(255,255,255,0.7)" />
+              <Feather name="award" size={14} color="rgba(255,255,255,0.75)" />
               <Text style={styles.walletStatText}>+500 FCFA par voyage confirmé</Text>
+            </View>
+            <View style={[styles.walletStat, { marginLeft: "auto" }]}>
+              <Feather name="trending-up" size={13} color="rgba(255,255,255,0.6)" />
+              <Text style={[styles.walletStatText, { color: "rgba(255,255,255,0.6)" }]}>
+                {wallet?.totalTrips ?? user?.totalTrips ?? 0} voyages
+              </Text>
             </View>
           </View>
         </LinearGradient>
@@ -230,7 +259,10 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <View style={styles.loyaltyBar}>
-            <View style={[styles.loyaltyProgress, { width: `${Math.min(100, ((loyaltyTrips % 10) / 10) * 100)}%` as any, backgroundColor: loyaltyColor }]} />
+            <Animated.View style={[styles.loyaltyProgress, {
+              width: loyaltyBarAnim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }),
+              backgroundColor: loyaltyColor,
+            }]} />
           </View>
           <Text style={styles.loyaltyHint}>
             {tripsToNextReward === 0
@@ -258,10 +290,16 @@ export default function ProfileScreen() {
               </View>
               <Pressable
                 onPress={copyReferral}
-                style={[styles.referralBtn, { backgroundColor: copied ? "#059669" : Colors.light.primary }]}
+                style={{ borderRadius: 10, overflow: "hidden" }}
               >
-                <Feather name={copied ? "check" : "copy"} size={14} color="white" />
-                <Text style={styles.referralBtnText}>{copied ? "Copié !" : "Copier"}</Text>
+                <Animated.View style={[
+                  styles.referralBtn,
+                  { backgroundColor: copied ? "#059669" : Colors.light.primary },
+                  { transform: [{ scale: copyScaleAnim }] },
+                ]}>
+                  <Feather name={copied ? "check" : "copy"} size={14} color="white" />
+                  <Text style={styles.referralBtnText}>{copied ? "Copié !" : "Copier"}</Text>
+                </Animated.View>
               </Pressable>
               <Pressable onPress={shareReferral} style={[styles.referralBtn, { backgroundColor: "#7C3AED" }]}>
                 <Feather name="share-2" size={14} color="white" />
@@ -285,9 +323,9 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.monCompte}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="user" label={t.modifier} onPress={() => {}} />
+          <MenuItem icon="user"   label={t.modifier}    onPress={() => {}} iconBg="#EEF4FF" iconColor="#1650D0" />
           <View style={styles.menuDivider} />
-          <MenuItem icon="lock" label={t.motDePasse} onPress={() => {}} />
+          <MenuItem icon="lock"   label={t.motDePasse}  onPress={() => {}} iconBg="#F0FDF4" iconColor="#059669" />
         </View>
       </View>
 
@@ -295,7 +333,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.mesReservations}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="bookmark" label={t.mesReservations} onPress={() => router.push("/(tabs)/bookings")} />
+          <MenuItem icon="bookmark" label={t.mesReservations} onPress={() => router.push("/(tabs)/bookings")} iconBg="#EEF4FF" iconColor="#1650D0" />
         </View>
       </View>
 
@@ -333,9 +371,9 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t.support}</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="help-circle" label={t.aide} onPress={() => {}} />
+          <MenuItem icon="help-circle" label={t.aide}    onPress={() => {}} iconBg="#FFFBEB" iconColor="#D97706" />
           <View style={styles.menuDivider} />
-          <MenuItem icon="info" label={t.apropos} onPress={() => {}} />
+          <MenuItem icon="info"        label={t.apropos} onPress={() => {}} iconBg="#F5F3FF" iconColor="#7C3AED" />
         </View>
       </View>
 
@@ -444,23 +482,49 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.border,
   },
   section: {
-    paddingHorizontal: 16,
-    paddingTop: 26,
+    paddingHorizontal: 18,
+    paddingTop: 28,
   },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
-    color: Colors.light.textMuted,
-    marginBottom: 12,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
+    color: "#0F172A",
+    letterSpacing: -0.3,
+    borderLeftWidth: 4,
+    borderLeftColor: "#1650D0",
+    paddingLeft: 10,
+    marginBottom: 16,
   },
 
   // Wallet card
   walletCard: {
-    borderRadius: 16,
-    padding: 20,
-    gap: 16,
+    borderRadius: 22,
+    padding: 22,
+    gap: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  walletDecor1: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.07)",
+  },
+  walletDecor2: {
+    position: "absolute",
+    bottom: -20,
+    left: 60,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   walletTop: {
     flexDirection: "row",
@@ -468,26 +532,35 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   walletLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.75)",
-    marginBottom: 4,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.70)",
+    marginBottom: 5,
+    letterSpacing: 0.3,
   },
   walletAmount: {
-    fontSize: 28,
+    fontSize: 30,
     fontFamily: "Inter_700Bold",
     color: "white",
+    letterSpacing: -0.5,
   },
   walletIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.18)",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  walletSeparator: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
   },
   walletRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   walletStat: {
@@ -498,20 +571,22 @@ const styles = StyleSheet.create({
   walletStatText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.8)",
+    color: "rgba(255,255,255,0.82)",
   },
 
   // Loyalty card
   loyaltyCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 22,
+    padding: 18,
     gap: 12,
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: "#ECEEF8",
   },
   loyaltyTop: {
     flexDirection: "row",
@@ -540,9 +615,9 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   loyaltyBar: {
-    height: 8,
+    height: 10,
     backgroundColor: "#F1F5F9",
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: "hidden",
   },
   loyaltyProgress: {
@@ -637,15 +712,15 @@ const styles = StyleSheet.create({
   // Menu items
   menuCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowRadius: 20,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: "#ECEEF8",
   },
   menuItem: {
     flexDirection: "row",
