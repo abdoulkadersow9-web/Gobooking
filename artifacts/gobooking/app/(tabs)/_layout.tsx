@@ -66,7 +66,7 @@ export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const { bottom: bottomInset } = useSafeAreaInsets();
 
-  const tabBarHeight = Platform.OS === "web" ? 72 : 60 + bottomInset;
+  const tabBarHeight = Platform.OS === "web" ? 82 : 68 + bottomInset;
 
   return (
     <Tabs
@@ -74,7 +74,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarActiveTintColor: "white",
-        tabBarInactiveTintColor: "#7A8FAA",
+        tabBarInactiveTintColor: "#94A3B8",
         tabBarStyle: {
           position: "absolute",
           bottom: 0,
@@ -82,14 +82,14 @@ export default function TabLayout() {
           right: 0,
           backgroundColor: isIOS ? "transparent" : "white",
           borderTopWidth: 1,
-          borderTopColor: "#E8EDFF",
-          elevation: 20,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
+          borderTopColor: "#DDE4F5",
+          elevation: 24,
+          shadowColor: "#1650D0",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.10,
+          shadowRadius: 16,
           height: tabBarHeight,
-          paddingBottom: Platform.OS === "web" ? 8 : bottomInset,
+          paddingBottom: Platform.OS === "web" ? 10 : bottomInset + 2,
           zIndex: 1000,
         },
         tabBarBackground: () =>
@@ -163,13 +163,14 @@ const styles = StyleSheet.create({
   tabItem: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingTop: 4,
+    gap: 5,
+    paddingTop: 6,
+    minWidth: 56,
   },
   iconPill: {
-    width: 60,
-    height: 36,
-    borderRadius: 18,
+    width: 64,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
@@ -177,15 +178,15 @@ const styles = StyleSheet.create({
   iconPillActive: {
     backgroundColor: "#1650D0",
     shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    elevation: 9,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
     textAlign: "center",
   },
 });

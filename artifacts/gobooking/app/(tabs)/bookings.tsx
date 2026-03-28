@@ -136,14 +136,14 @@ function BookingTimeline({ state }: { state: DisplayState }) {
 }
 
 const tl = StyleSheet.create({
-  row:       { flexDirection: "row", alignItems: "flex-start", marginBottom: 20, paddingTop: 12 },
-  step:      { alignItems: "center", width: 56 },
-  dot:       { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
+  row:       { flexDirection: "row", alignItems: "flex-start", marginBottom: 26, paddingTop: 14 },
+  step:      { alignItems: "center", width: 60 },
+  dot:       { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
   dotActive: { borderWidth: 3 },
-  line:      { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 9 },
-  label:     { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", marginTop: 5, textAlign: "center" },
-  bonBadge:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: "#DDD6FE" },
-  bonLabel:  { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
+  line:      { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 10 },
+  label:     { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#94A3B8", marginTop: 6, textAlign: "center" },
+  bonBadge:  { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "#F5F3FF", borderRadius: 14, paddingHorizontal: 18, paddingVertical: 12, borderWidth: 1.5, borderColor: "#DDD6FE" },
+  bonLabel:  { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
 });
 
 // ─── Countdown helper ─────────────────────────────────────────────────────────
@@ -191,12 +191,12 @@ function CountdownBadge({ minsLeft }: { minsLeft: number | null }) {
 }
 
 const cd = StyleSheet.create({
-  badgeAmber:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFBEB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FDE68A", marginTop: 12 },
-  badgeOrange: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFF7ED", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FED7AA", marginTop: 12 },
-  badgeRed:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FECACA", marginTop: 12 },
-  textAmber:   { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#B45309" },
-  textOrange:  { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#EA580C" },
-  textRed:     { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#DC2626" },
+  badgeAmber:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFBEB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "#FDE68A", marginTop: 14 },
+  badgeOrange: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFF7ED", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "#FED7AA", marginTop: 14 },
+  badgeRed:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "#FECACA", marginTop: 14 },
+  textAmber:   { fontSize: 13, fontFamily: "Inter_700Bold", color: "#B45309" },
+  textOrange:  { fontSize: 13, fontFamily: "Inter_700Bold", color: "#EA580C" },
+  textRed:     { fontSize: 13, fontFamily: "Inter_700Bold", color: "#DC2626" },
 });
 
 // ─── Baggage badge ────────────────────────────────────────────────────────────
@@ -659,41 +659,41 @@ const styles = StyleSheet.create({
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
   card:         {
-    backgroundColor: "white", borderRadius: 28, padding: 26, marginBottom: 20,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.11, shadowRadius: 32, elevation: 9,
+    backgroundColor: "white", borderRadius: 28, padding: 26, marginBottom: 24,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 34, elevation: 10,
     borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 5,
   },
   cardPressed:  { transform: [{ scale: 0.982 }], opacity: 0.95 },
   cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
   cardCancelled:{ borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
-  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
-  refText:      { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7A8FAA", marginTop: 4 },
-  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 22 },
-  statusText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
+  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 26 },
+  refText:      { fontSize: 17, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
+  dateText:     { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 5 },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 26, maxWidth: 160 },
+  statusText:   { fontSize: 13, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 26, paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 28, paddingBottom: 28, borderBottomWidth: 1.5, borderBottomColor: "#ECEEF8" },
   cityBlock:    { flex: 1 },
   timeText:     { fontSize: 36, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -2 },
-  cityText:     { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 8 },
+  cityText:     { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#7A8FAA", marginTop: 9 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
   routeLine:    { width: 32, height: 2, backgroundColor: "#DDE2F0" },
 
-  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EFF6FF", borderRadius: 14, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#BFDBFE" },
-  rule45Text:   { fontSize: 12, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1, lineHeight: 18 },
+  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EFF6FF", borderRadius: 14, padding: 16, marginTop: 16, borderWidth: 1, borderColor: "#BFDBFE" },
+  rule45Text:   { fontSize: 12, fontFamily: "Inter_500Medium", color: "#1D4ED8", flex: 1, lineHeight: 20 },
 
-  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 20 },
-  methodRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 5 },
-  methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#A4B4C6" },
-  seatRow:      { flexDirection: "row", alignItems: "center", gap: 5 },
-  seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: "#7A8FAA" },
-  amountBadge:  { paddingHorizontal: 20, paddingVertical: 13, borderRadius: 20 },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 22, borderTopWidth: 1, borderTopColor: "#F1F4FA" },
+  methodRow:    { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  methodText:   { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
+  seatRow:      { flexDirection: "row", alignItems: "center", gap: 6 },
+  seatText:     { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7A8FAA" },
+  amountBadge:  { paddingHorizontal: 22, paddingVertical: 14, borderRadius: 22 },
   amountText:   { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -1 },
 
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 18, borderRadius: 18, paddingVertical: 17, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 20, borderRadius: 18, paddingVertical: 18, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
-  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16, borderRadius: 14, padding: 16 },
-  waitingText:  { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 18 },
+  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 18, borderRadius: 16, padding: 18 },
+  waitingText:  { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 20 },
 
   empty:        { alignItems: "center", paddingTop: 80, gap: 16 },
   emptyIconWrap:{ width: 96, height: 96, borderRadius: 28, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 6, borderWidth: 1, borderColor: "#C7D2FE" },

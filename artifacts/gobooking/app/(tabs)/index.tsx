@@ -1111,28 +1111,34 @@ export default function HomeScreen() {
               router.push({ pathname: "/client/resultats", params: { from: route.from, to: route.to, date, passengers: "1" } } as never);
             }}
           >
+            {/* Left: icon + cities + meta */}
             <View style={styles.routeCardLeft}>
               <View style={styles.routeCardIcon}>
                 <Feather name="navigation" size={18} color={Colors.light.primary} />
               </View>
-              <View style={{ gap: 6 }}>
+              <View style={{ flex: 1, gap: 8 }}>
                 <View style={styles.routeCities}>
-                  <Text style={styles.routeFrom}>{route.from}</Text>
-                  <Feather name="arrow-right" size={13} color="#94A3B8" />
-                  <Text style={styles.routeTo}>{route.to}</Text>
+                  <Text style={styles.routeFrom} numberOfLines={1}>{route.from}</Text>
+                  <View style={styles.routeArrowWrap}>
+                    <Feather name="arrow-right" size={12} color="#94A3B8" />
+                  </View>
+                  <Text style={styles.routeTo} numberOfLines={1}>{route.to}</Text>
                 </View>
-                <Text style={styles.routeCardMeta}>
-                  <Feather name="clock" size={10} color="#A4B4C6" />{" "}{route.duration}
-                </Text>
+                <View style={styles.routeMetaRow}>
+                  <Feather name="clock" size={11} color="#A4B4C6" />
+                  <Text style={styles.routeCardMeta}>{route.duration}</Text>
+                </View>
               </View>
             </View>
+
+            {/* Right: price + chevron */}
             <View style={styles.routeCardRight}>
               <View style={styles.routePriceBadge}>
                 <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()}</Text>
-                <Text style={styles.routePriceCurrency}>F</Text>
+                <Text style={styles.routePriceCurrency}> FCFA</Text>
               </View>
               <View style={styles.routeChevron}>
-                <Feather name="chevron-right" size={15} color={Colors.light.primary} />
+                <Feather name="chevron-right" size={16} color="white" />
               </View>
             </View>
           </Pressable>
@@ -1300,20 +1306,25 @@ const styles = StyleSheet.create({
   // Popular routes
   routeCard: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "white", borderRadius: 28, paddingVertical: 20, paddingHorizontal: 22, marginBottom: 18,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.11, shadowRadius: 28, elevation: 8,
+    backgroundColor: "white", borderRadius: 28, paddingVertical: 22, paddingHorizontal: 22, marginBottom: 22,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 30, elevation: 9,
     borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 5, borderLeftColor: "#1650D0",
   },
-  routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.982 }] },
-  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1 },
-  routeCardIcon: { width: 52, height: 52, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#C7D9FF" },
-  routeCities: { flexDirection: "row", alignItems: "center", gap: 8 },
-  routeFrom: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.2 },
-  routeTo: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.2 },
+  routeCardPressed: { opacity: 0.80, transform: [{ scale: 0.978 }] },
+  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1, paddingRight: 12 },
+  routeCardIcon: { width: 54, height: 54, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "#C7D9FF", flexShrink: 0 },
+  routeCities: { flexDirection: "row", alignItems: "center", gap: 6 },
+  routeArrowWrap: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F4F6FF", justifyContent: "center", alignItems: "center" },
+  routeFrom: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3, flexShrink: 1 },
+  routeTo: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3, flexShrink: 1 },
+  routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   routeCardMeta: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
-  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  routePriceBadge: { alignItems: "flex-end" },
-  routeCardPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.5 },
-  routePriceCurrency: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary, marginTop: 2 },
-  routeChevron: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
+  routeCardRight: { flexDirection: "column", alignItems: "flex-end", gap: 10, flexShrink: 0 },
+  routePriceBadge: {
+    backgroundColor: "#EEF4FF", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8,
+    alignItems: "center", flexDirection: "row", gap: 2,
+  },
+  routeCardPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.4 },
+  routePriceCurrency: { fontSize: 11, fontFamily: "Inter_700Bold", color: Colors.light.primary },
+  routeChevron: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#1650D0", justifyContent: "center", alignItems: "center", alignSelf: "flex-end" },
 });
