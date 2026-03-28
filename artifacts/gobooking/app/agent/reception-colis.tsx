@@ -116,12 +116,13 @@ export default function ReceptionColisScreen() {
           <TouchableOpacity
             style={styles.logoutBtn}
             hitSlop={8}
-            onPress={() =>
+            onPress={() => {
+              if (Platform.OS === "web") { logout(); return; }
               Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
                 { text: "Annuler", style: "cancel" },
                 { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
-              ])
-            }
+              ]);
+            }}
           >
             <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>

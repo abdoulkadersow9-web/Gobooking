@@ -254,10 +254,13 @@ export default function VenteScreen() {
           <TouchableOpacity
             style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" }}
             hitSlop={8}
-            onPress={() => Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
-              { text: "Annuler", style: "cancel" },
-              { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
-            ])}
+            onPress={() => {
+              if (Platform.OS === "web") { logout(); return; }
+              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+                { text: "Annuler", style: "cancel" },
+                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
+              ]);
+            }}
           >
             <Ionicons name="log-out-outline" size={18} color="#fff" />
           </TouchableOpacity>

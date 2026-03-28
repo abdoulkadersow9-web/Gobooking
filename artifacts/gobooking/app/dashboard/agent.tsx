@@ -477,6 +477,7 @@ export default function AgentDashboard() {
   const { token, logout } = useAuth();
 
   const handleLogout = () => {
+    if (Platform.OS === "web") { logout(); return; }
     Alert.alert(
       "Déconnexion",
       "Voulez-vous vous déconnecter ?",

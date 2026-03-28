@@ -273,6 +273,7 @@ export default function CompanyDashboard() {
   const { token, logout, user } = useAuth();
 
   const handleLogout = () => {
+    if (Platform.OS === "web") { logout(); return; }
     Alert.alert(
       "Déconnexion",
       "Voulez-vous vous déconnecter ?",

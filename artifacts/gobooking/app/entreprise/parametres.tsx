@@ -333,7 +333,8 @@ export default function ParametresScreen() {
             <Text style={S.logoutSectionTitle}>Compte</Text>
             <Pressable
               style={({ pressed }) => [S.logoutBtn, pressed && { opacity: 0.8 }]}
-              onPress={() =>
+              onPress={() => {
+                if (Platform.OS === "web") { logout(); return; }
                 Alert.alert(
                   "Déconnexion",
                   "Voulez-vous vraiment vous déconnecter de votre compte ?",
@@ -345,8 +346,8 @@ export default function ParametresScreen() {
                       onPress: () => logout(),
                     },
                   ],
-                )
-              }
+                );
+              }}
             >
               <Feather name="log-out" size={18} color="#DC2626" />
               <Text style={S.logoutBtnTxt}>Se déconnecter</Text>
