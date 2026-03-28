@@ -1,0 +1,80 @@
+La section "Trajets populaires" n’est toujours pas propre ni fluide. Le rendu reste mélangé et pas au niveau d’une application professionnelle.
+
+Faire une correction complète et haut de gamme de cette section.
+
+PROBLÈMES ACTUELS
+
+1. Les noms de villes sont mal affichés (Abidj..., Korho..., Yamous...)
+→ Ce n’est pas acceptable visuellement
+
+2. Alignement interne des cartes incorrect :
+- textes mal positionnés
+- durée mal alignée
+- prix mal équilibré
+
+3. Les cartes manquent de hiérarchie visuelle
+→ tout semble au même niveau, pas de structure claire
+
+4. Expérience utilisateur non fluide :
+- aucun feedback au clic
+- aucune animation
+- sensation d’interface statique
+
+CORRECTIONS OBLIGATOIRES
+
+1. NOMS DES VILLES
+- Afficher correctement les noms complets si possible
+- Sinon utiliser ellipsis propre (max 1 ligne, propre et centré)
+- Jamais de rendu cassé ou coupé brutalement
+
+2. STRUCTURE CARTE
+Repenser chaque carte avec structure claire :
+
+GAUCHE :
+- icône dans un cercle propre
+- alignée verticalement
+
+CENTRE :
+- ligne 1 : ville départ → ville arrivée (bien lisible)
+- ligne 2 : durée (petit texte discret)
+
+DROITE :
+- prix bien aligné
+- flèche ou action propre
+
+3. ALIGNEMENT PARFAIT
+- Tous les éléments doivent être parfaitement alignés horizontalement
+- Espacement cohérent entre chaque bloc
+- Padding interne uniforme (16px minimum)
+
+4. DESIGN PREMIUM
+- Ajouter légère ombre (shadow)
+- Coins arrondis homogènes
+- Meilleure hiérarchie typographique :
+  - villes = plus visibles
+  - durée = secondaire
+  - prix = important
+
+5. INTERACTION
+- Ajouter effet au clic (press / highlight)
+- Ajouter micro-animation (léger feedback visuel)
+- Rendre la navigation fluide
+
+6. ESPACEMENT
+- Espacement vertical uniforme entre cartes
+- Aucun effet "collé" ou "vide mal équilibré"
+
+7. QUALITÉ FINALE
+Objectif :
+- rendu propre
+- lisible en 1 seconde
+- fluide
+- moderne
+- niveau application transport professionnelle
+
+IMPORTANT
+- Vérifier le rendu réel mobile
+- Pas seulement canvas
+- Ne rien casser dans la logique
+
+Faire une amélioration forte, pas un simple ajustement.
