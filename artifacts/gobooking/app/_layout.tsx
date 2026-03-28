@@ -157,9 +157,18 @@ function RootLayoutNav() {
     <View style={{ flex: 1 }}>
       <GlobalNetworkMonitor />
       <AuthGuard />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: "slide_from_right",
+          animationDuration: 260,
+          gestureEnabled: true,
+          gestureDirection: "horizontal",
+        }}
+      >
+        <Stack.Screen name="index" options={{ animation: "fade" }} />
+        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom" }} />
+        <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
       </Stack>
     </View>
   );

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
+import { SkeletonBookingCard } from "@/components/SkeletonCard";
 
 interface Booking {
   id: string;
@@ -425,14 +426,18 @@ function AnimatedBookingCard({ item, index, reviewed, token, onVoucherRequest }:
 }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1, duration: 360, delay: Math.min(index * 55, 300), useNativeDriver: true,
+    Animated.spring(anim, {
+      toValue: 1,
+      delay: Math.min(index * 70, 350),
+      speed: 14,
+      bounciness: 4,
+      useNativeDriver: true,
     }).start();
   }, []);
   return (
     <Animated.View style={{
       opacity: anim,
-      transform: [{ translateY: anim.interpolate({ inputRange: [0,1], outputRange: [24, 0] }) }],
+      transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) }],
     }}>
       <BookingCard item={item} reviewed={reviewed} token={token} onVoucherRequest={onVoucherRequest} />
     </Animated.View>
@@ -560,9 +565,9 @@ export default function BookingsScreen() {
       </ScrollView>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-        </View>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          {[0, 1, 2].map(i => <SkeletonBookingCard key={i} />)}
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredBookings}

@@ -1,8 +1,8 @@
 import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import React from "react";
-import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 import Colors from "@/constants/colors";
 
@@ -17,8 +17,27 @@ function TabIcon({
   color: string;
   label: string;
 }) {
+  const scaleAnim = useRef(new Animated.Value(focused ? 1 : 0.92)).current;
+  const opacityAnim = useRef(new Animated.Value(focused ? 1 : 0.6)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: focused ? 1 : 0.92,
+        speed: 20,
+        bounciness: 6,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: focused ? 1 : 0.6,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
   return (
-    <View style={styles.tabItem}>
+    <Animated.View style={[styles.tabItem, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
       <View
         style={[
           styles.iconPill,
@@ -36,7 +55,7 @@ function TabIcon({
       >
         {label}
       </Text>
-    </View>
+    </Animated.View>
   );
 }
 

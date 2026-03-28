@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   Platform,
   Pressable,
@@ -20,6 +21,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { apiFetch } from "@/utils/api";
+import { SkeletonParcelCard } from "@/components/SkeletonCard";
 
 interface Parcel {
   id: string;
@@ -161,6 +163,27 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
   );
 }
 
+function AnimatedParcelRow({ item, index, onPress }: { item: Parcel; index: number; onPress: () => void }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: 1,
+      delay: Math.min(index * 70, 350),
+      speed: 14,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+  return (
+    <Animated.View style={{
+      opacity: anim,
+      transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+    }}>
+      <ParcelRow item={item} onPress={onPress} />
+    </Animated.View>
+  );
+}
+
 export default function ColisScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -267,16 +290,15 @@ export default function ColisScreen() {
 
       {/* Body */}
       {loading && token ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={styles.loadingText}>{t.chargement}</Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          {[0, 1, 2, 3].map(i => <SkeletonParcelCard key={i} />)}
+        </ScrollView>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ParcelRow item={item} onPress={() => openSuivi(item)} />
+          renderItem={({ item, index }) => (
+            <AnimatedParcelRow item={item} index={index} onPress={() => openSuivi(item)} />
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}

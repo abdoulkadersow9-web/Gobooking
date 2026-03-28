@@ -145,14 +145,20 @@ export default function HomeScreen() {
   const firstName = user?.name?.split(" ")[0] || "";
 
   const fadeAnim  = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(18)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
   const scrollRef = useRef<ScrollView>(null);
+
+  const sectionAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 640, useNativeDriver: false }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 640, useNativeDriver: false }),
+      Animated.spring(fadeAnim,  { toValue: 1, speed: 18, bounciness: 0, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, speed: 18, bounciness: 2, useNativeDriver: true }),
     ]).start();
+
+    Animated.stagger(90, sectionAnims.map(a =>
+      Animated.spring(a, { toValue: 1, speed: 16, bounciness: 3, useNativeDriver: true })
+    )).start();
   }, []);
 
   const [mode, setMode] = useState<Mode>("trajet");
@@ -484,6 +490,10 @@ export default function HomeScreen() {
       </LinearGradient>
 
       {/* ── Quick CTAs ── */}
+      <Animated.View style={{
+        opacity: sectionAnims[0],
+        transform: [{ translateY: sectionAnims[0].interpolate({ inputRange: [0,1], outputRange: [20,0] }) }],
+      }}>
       <View style={styles.ctaRow}>
         <TouchableOpacity
           style={[styles.ctaBtn, styles.ctaBtnPrimary]}
@@ -539,6 +549,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
       </View>
+      </Animated.View>
 
       {/* ── Matching intelligent ── */}
       {(matchLoading || nearestBuses.length > 0) && (
@@ -897,6 +908,10 @@ export default function HomeScreen() {
         </View>
       )}
 
+      <Animated.View style={{
+        opacity: sectionAnims[1],
+        transform: [{ translateY: sectionAnims[1].interpolate({ inputRange: [0,1], outputRange: [20,0] }) }],
+      }}>
       <View style={styles.sectionDivider} />
 
       {/* ── Activity section ── */}
@@ -911,8 +926,12 @@ export default function HomeScreen() {
         </View>
 
         {loadingActivity ? (
-          <View style={styles.activityLoading}>
-            <ActivityIndicator color={Colors.light.primary} />
+          <View style={styles.activityGrid}>
+            {[0, 1].map(i => (
+              <View key={i} style={styles.activityCard}>
+                <ActivityIndicator color={Colors.light.primary} size="small" style={{ marginVertical: 24 }} />
+              </View>
+            ))}
           </View>
         ) : (
           <View style={styles.activityGrid}>
@@ -1111,6 +1130,7 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </View>
+      </Animated.View>
     </ScrollView>
     </Animated.View>
   );
