@@ -479,16 +479,16 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 26,
     fontFamily: "Inter_700Bold",
     color: Colors.light.primary,
-    letterSpacing: -0.5,
+    letterSpacing: -0.7,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: "#64748B",
-    marginTop: 1,
+    marginTop: 2,
   },
   statDivider: {
     width: 1,
@@ -496,17 +496,18 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 36,
+    paddingBottom: 4,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: "#0F172A",
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
     borderLeftWidth: 4,
     borderLeftColor: "#1650D0",
-    paddingLeft: 10,
-    marginBottom: 18,
+    paddingLeft: 12,
+    marginBottom: 20,
   },
 
   // Wallet card
@@ -547,15 +548,16 @@ const styles = StyleSheet.create({
   walletLabel: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: "rgba(255,255,255,0.70)",
-    marginBottom: 5,
-    letterSpacing: 0.3,
+    color: "rgba(255,255,255,0.72)",
+    marginBottom: 6,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
   },
   walletAmount: {
-    fontSize: 30,
+    fontSize: 36,
     fontFamily: "Inter_700Bold",
     color: "white",
-    letterSpacing: -0.5,
+    letterSpacing: -1,
   },
   walletIconWrap: {
     width: 52,
