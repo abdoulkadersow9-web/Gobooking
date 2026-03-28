@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
@@ -23,6 +23,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 import { SkeletonBookingCard } from "@/components/SkeletonCard";
+import { Toast, useToast } from "@/components/Toast";
 
 interface Booking {
   id: string;
@@ -455,7 +456,9 @@ export default function BookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [reviewed,   setReviewed]   = useState<Set<string>>(new Set());
   const [filter,     setFilter]     = useState<FilterKey>("tous");
+  const [netError,   setNetError]   = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { toast, show: showToast } = useToast();
 
   const loadData = useCallback(async (silent = false) => {
     if (!token) { setLoading(false); return; }
@@ -467,7 +470,10 @@ export default function BookingsScreen() {
       ]);
       setBookings(data ?? []);
       setReviewed(new Set(reviewedIds));
-    } catch { /* ignore */ }
+      setNetError(false);
+    } catch {
+      if (!silent) setNetError(true);
+    }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
@@ -476,6 +482,12 @@ export default function BookingsScreen() {
     pollingRef.current = setInterval(() => loadData(true), 30_000);
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData(true);
+    }, [loadData])
+  );
 
   const onRefresh = () => { setRefreshing(true); loadData(true); };
 
@@ -521,6 +533,9 @@ export default function BookingsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      {/* Toast */}
+      <Toast {...toast} />
+
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
@@ -563,6 +578,18 @@ export default function BookingsScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Network error banner */}
+      {netError && !loading && (
+        <Pressable
+          style={styles.errorBanner}
+          onPress={() => { setNetError(false); loadData(); }}
+        >
+          <Feather name="wifi-off" size={15} color="#DC2626" />
+          <Text style={styles.errorText}>Connexion impossible — Appuyez pour réessayer</Text>
+          <Feather name="refresh-cw" size={13} color="#DC2626" />
+        </Pressable>
+      )}
 
       {loading ? (
         <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
@@ -674,4 +701,7 @@ const styles = StyleSheet.create({
   emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20 },
   bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 16, paddingHorizontal: 28, paddingVertical: 15, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4 },
   bookNowText:  { color: "white", fontSize: 15, fontFamily: "Inter_700Bold" },
+
+  errorBanner:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA", borderRadius: 12, marginHorizontal: 18, marginTop: 10, paddingHorizontal: 14, paddingVertical: 11 },
+  errorText:    { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#DC2626" },
 });

@@ -98,6 +98,15 @@ const STEPS = [
 ];
 const MAX_PARCEL_PHOTOS = 6;
 
+const STEP_HINTS = [
+  "Sélectionnez une ville de départ et d'arrivée différentes",
+  "Renseignez le nom et le numéro de téléphone de l'expéditeur",
+  "Renseignez le nom et le numéro de téléphone du destinataire",
+  "Choisissez le type de colis et indiquez le poids",
+  "Ajoutez au moins une photo du colis",
+  "Choisissez le mode de livraison",
+];
+
 export default function ParcelSendScreen() {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -546,6 +555,15 @@ export default function ParcelSendScreen() {
               <Text style={styles.pricePreviewValue}>{(price ?? 0).toLocaleString()} FCFA</Text>
             </View>
           )}
+
+          {/* Validation hint — only shown when Next is disabled */}
+          {!canNext() && (
+            <View style={styles.stepHint}>
+              <Feather name="alert-circle" size={12} color="#6366F1" />
+              <Text style={styles.stepHintText}>{STEP_HINTS[step]}</Text>
+            </View>
+          )}
+
           <Pressable
             style={({ pressed }) => [
               styles.nextBtn,
@@ -914,6 +932,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "white",
+  },
+
+  stepHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  stepHintText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#4F46E5",
+    flex: 1,
+    lineHeight: 16,
   },
 
   infoBannerAmber: { backgroundColor: "#FFFBEB", borderWidth: 1, borderColor: "#FDE68A" },

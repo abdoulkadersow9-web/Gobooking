@@ -22,6 +22,7 @@ Iterative development. Detailed explanations. Mobile icons: Ionicons or Feather 
     - **Dynamic En-Route Boarding**: Passengers can request to board a moving bus via a live map, with agent acceptance and QR code generation.
     - **Offline Mode**: Supports offline operations for agent tasks (boarding, sales, parcel handling) with queuing and synchronization mechanisms using `@react-native-community/netinfo`.
     - **Animated Splash Screen**: Custom animated splash screen at app startup.
+    - **Functional Robustness** (added 2026-03-28): Network error banners in Bookings + Colis tabs (tap to retry), `useFocusEffect` auto-refresh when returning to a tab, Toast notification system (`components/Toast.tsx` + `useToast` hook), step-specific validation hints in the Parcel send form (shown only when Next is disabled), silent `catch {}` blocks replaced with proper error state management.
 
 ### Backend
 - **Framework**: Express.js API server.

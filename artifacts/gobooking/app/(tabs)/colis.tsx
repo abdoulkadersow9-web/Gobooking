@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { apiFetch } from "@/utils/api";
 import { SkeletonParcelCard } from "@/components/SkeletonCard";
+import { Toast, useToast } from "@/components/Toast";
 
 interface Parcel {
   id: string;
@@ -190,22 +191,35 @@ export default function ColisScreen() {
   const { t } = useLanguage();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  const [parcels, setParcels] = useState<Parcel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [parcels,    setParcels]    = useState<Parcel[]>([]);
+  const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<Filter>("tous");
+  const [filter,     setFilter]     = useState<Filter>("tous");
+  const [netError,   setNetError]   = useState(false);
+  const { toast } = useToast();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!token) { setLoading(false); return; }
+    if (!silent) setLoading(true);
     try {
       const data = await apiFetch<Parcel[]>("/parcels", { token });
-      setParcels(data);
-    } catch { /* ignore */ }
+      setParcels(data ?? []);
+      setNetError(false);
+    } catch {
+      if (!silent) setNetError(true);
+    }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
-  const onRefresh = () => { setRefreshing(true); load(); };
+
+  useFocusEffect(
+    useCallback(() => {
+      load(true);
+    }, [load])
+  );
+
+  const onRefresh = () => { setRefreshing(true); load(true); };
 
   // Use real data when logged in, demo data when not
   const source = token ? parcels : DEMO_PARCELS;
@@ -233,6 +247,9 @@ export default function ColisScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topPad }]}>
+      {/* Toast */}
+      <Toast {...toast} />
+
       {/* Header */}
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
@@ -287,6 +304,19 @@ export default function ColisScreen() {
           })}
         </ScrollView>
       </View>
+
+      {/* Network error banner */}
+      {netError && !loading && token && (
+        <TouchableOpacity
+          style={styles.errorBanner}
+          activeOpacity={0.8}
+          onPress={() => { setNetError(false); load(); }}
+        >
+          <Feather name="wifi-off" size={14} color="#DC2626" />
+          <Text style={styles.errorBannerText}>Connexion impossible — Appuyez pour réessayer</Text>
+          <Feather name="refresh-cw" size={13} color="#DC2626" />
+        </TouchableOpacity>
+      )}
 
       {/* Body */}
       {loading && token ? (
@@ -540,4 +570,12 @@ const styles = StyleSheet.create({
   },
   remoteBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0E7490" },
   remoteBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#06B6D4", marginTop: 2 },
+
+  errorBanner: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA",
+    borderRadius: 12, marginHorizontal: 18, marginTop: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
+  },
+  errorBannerText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#DC2626" },
 });
