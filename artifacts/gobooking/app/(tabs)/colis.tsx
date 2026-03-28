@@ -127,13 +127,17 @@ function ParcelRow({ item, onPress }: { item: Parcel; onPress: () => void }) {
 
         {/* Route */}
         <View style={styles.routeRow}>
-          <Text style={styles.city}>{item.fromCity}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.city} numberOfLines={1}>{item.fromCity}</Text>
+          </View>
           <View style={styles.routeConnector}>
             <View style={styles.routeDash} />
             <Feather name="arrow-right" size={14} color={Colors.light.primary} />
             <View style={styles.routeDash} />
           </View>
-          <Text style={styles.city}>{item.toCity}</Text>
+          <View style={{ flex: 1, alignItems: "flex-end" }}>
+            <Text style={styles.city} numberOfLines={1}>{item.toCity}</Text>
+          </View>
         </View>
 
         {/* Montant + statut paiement + action */}
@@ -246,7 +250,7 @@ export default function ColisScreen() {
     router.push({ pathname: "/client/colis-suivi", params: { ref: item.trackingRef } });
 
   return (
-    <View style={[styles.container, { paddingTop: topPad }]}>
+    <View style={styles.container}>
       {/* Toast */}
       <Toast {...toast} />
 
@@ -254,7 +258,7 @@ export default function ColisScreen() {
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: topPad + 18 }]}
       >
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>{t.mesColis}</Text>
@@ -396,9 +400,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 22,
+    paddingHorizontal: 22,
+    paddingBottom: 24,
     gap: 14,
   },
   headerLeft: { flex: 1 },
@@ -485,7 +488,7 @@ const styles = StyleSheet.create({
 
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   city: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.3 },
-  routeConnector: { flex: 1, flexDirection: "row", alignItems: "center", gap: 3 },
+  routeConnector: { width: 60, flexDirection: "row", alignItems: "center", gap: 3 },
   routeDash: { flex: 1, height: 2, backgroundColor: "#E2E8F0" },
 
   rowBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

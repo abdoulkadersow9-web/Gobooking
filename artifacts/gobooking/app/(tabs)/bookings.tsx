@@ -275,8 +275,8 @@ function BookingCard({
       {/* Route */}
       <View style={styles.routeRow}>
         <View style={styles.cityBlock}>
-          <Text style={styles.timeText}>{item.trip?.departureTime ?? "—"}</Text>
-          <Text style={styles.cityText}>{item.trip?.from ?? "—"}</Text>
+          <Text style={styles.timeText} numberOfLines={1}>{item.trip?.departureTime ?? "—"}</Text>
+          <Text style={styles.cityText} numberOfLines={1}>{item.trip?.from ?? "—"}</Text>
         </View>
         <View style={styles.routeMiddle}>
           <View style={styles.routeLine} />
@@ -284,8 +284,8 @@ function BookingCard({
           <View style={styles.routeLine} />
         </View>
         <View style={[styles.cityBlock, { alignItems: "flex-end" }]}>
-          <Text style={styles.timeText}>{item.trip?.arrivalTime ?? "—"}</Text>
-          <Text style={styles.cityText}>{item.trip?.to ?? "—"}</Text>
+          <Text style={styles.timeText} numberOfLines={1}>{item.trip?.arrivalTime ?? "—"}</Text>
+          <Text style={styles.cityText} numberOfLines={1}>{item.trip?.to ?? "—"}</Text>
         </View>
       </View>
 
@@ -532,14 +532,14 @@ export default function BookingsScreen() {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: topPad }]}>
+    <View style={styles.container}>
       {/* Toast */}
       <Toast {...toast} />
 
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: topPad + 18 }]}
       >
         <View>
           <Text style={styles.headerTitle}>Mes Réservations</Text>
@@ -644,7 +644,7 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 22, paddingBottom: 22, paddingTop: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  header:       { paddingHorizontal: 22, paddingBottom: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerTitle:  { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
   headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
   historyBtn:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },

@@ -246,11 +246,11 @@ export default function SuiviScreen() {
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={[styles.container, { paddingTop: topPad }]}>
+      <View style={styles.container}>
         {/* Header */}
         <LinearGradient
           colors={[Colors.light.primary, Colors.light.primaryDark]}
-          style={styles.header}
+          style={[styles.header, { paddingTop: topPad + 16 }]}
         >
           <View style={styles.headerIcon}>
             <Feather name="map-pin" size={20} color="white" />
@@ -656,9 +656,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 22,
   },
   headerIcon: {
     width: 40,

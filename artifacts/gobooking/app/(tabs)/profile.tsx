@@ -160,7 +160,7 @@ export default function ProfileScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{
-        paddingTop: topPad,
+        paddingTop: 0,
         paddingBottom: Platform.OS === "web" ? 100 : insets.bottom + 100,
       }}
       showsVerticalScrollIndicator={false}
@@ -169,7 +169,7 @@ export default function ProfileScreen() {
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={styles.profileHeader}
+        style={[styles.profileHeader, { paddingTop: topPad + 28 }]}
       >
         <Animated.View style={[styles.avatarRing, { transform: [{ scale: avatarScale }], opacity: avatarOpacity }]}>
           <LinearGradient colors={["rgba(255,255,255,0.40)", "rgba(255,255,255,0.12)"]} style={styles.avatar}>
@@ -403,7 +403,6 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 28,
     paddingBottom: 44,
   },
   avatarRing: {
