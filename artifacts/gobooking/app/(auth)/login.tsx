@@ -61,18 +61,18 @@ const ROLE_STYLES: Record<string, RoleStyle> = {
   admin:              { label: "Super Admin",     icon: "shield",       color: "#6D28D9", bg: "#F5F3FF", order: 0  },
   compagnie:          { label: "Compagnie",       icon: "briefcase",    color: "#1D4ED8", bg: "#EEF2FF", order: 1  },
   chef_agence:        { label: "Chef Agence",     icon: "star",         color: "#3730A3", bg: "#E0E7FF", order: 2  },
-  /* Guichet = vente physique en gare */
   agent_guichet:      { label: "Agent Guichet",   icon: "tag",          color: "#B45309", bg: "#FEF3C7", order: 3  },
-  /* Réservation = gestion des réservations en ligne */
   agent_reservation:  { label: "Réservation",     icon: "calendar",     color: "#0369A1", bg: "#E0F2FE", order: 4  },
   agent_embarquement: { label: "Embarquement",    icon: "check-circle", color: "#15803D", bg: "#DCFCE7", order: 5  },
   agent_colis:        { label: "Agent Colis",     icon: "package",      color: "#5B21B6", bg: "#EDE9FE", order: 6  },
-  agent_route:        { label: "Agent Route",     icon: "navigation",   color: "#92400E", bg: "#FFF7ED", order: 7  },
-  validation_depart:  { label: "Validation",      icon: "check-square", color: "#0E7490", bg: "#ECFEFF", order: 8  },
-  logistique:         { label: "Logistique",      icon: "truck",        color: "#166534", bg: "#D1FAE5", order: 9  },
-  suivi:              { label: "Suivi",           icon: "map-pin",      color: "#9A3412", bg: "#FEF3C7", order: 10 },
-  client:             { label: "Client",          icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 11 },
-  user:               { label: "Client",          icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 11 },
+  agent_bagage:       { label: "Agent Bagage",    icon: "briefcase",    color: "#92400E", bg: "#FFF7ED", order: 7  },
+  bagage:             { label: "Agent Bagage",    icon: "briefcase",    color: "#92400E", bg: "#FFF7ED", order: 7  },
+  agent_route:        { label: "Agent Route",     icon: "navigation",   color: "#78350F", bg: "#FFFBEB", order: 8  },
+  validation_depart:  { label: "Validation",      icon: "check-square", color: "#0E7490", bg: "#ECFEFF", order: 9  },
+  logistique:         { label: "Logistique",      icon: "truck",        color: "#166534", bg: "#D1FAE5", order: 10 },
+  suivi:              { label: "Suivi",           icon: "map-pin",      color: "#9A3412", bg: "#FEF3C7", order: 11 },
+  client:             { label: "Client",          icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 12 },
+  user:               { label: "Client",          icon: "user",         color: "#0891B2", bg: "#F0F9FF", order: 12 },
 };
 
 function getRoleStyle(userRole: string, agentRole: string | null): RoleStyle {

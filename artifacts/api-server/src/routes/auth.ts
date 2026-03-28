@@ -358,6 +358,7 @@ router.get("/demo-roles", async (_req, res) => {
       "reservation@test.com":           "test123",       /* réservation en ligne */
       "embarquement@test.com":          "test123",
       "colis@test.com":                 "test123",
+      "bagage@test.com":                "test123",       /* agent bagage */
       "validepart@test.com":            "test123",
       "logistique@test.com":            "test123",
       "suivi@test.com":                 "test123",

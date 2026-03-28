@@ -1,0 +1,135 @@
+Bonjour,
+
+Après plusieurs vérifications complètes de l’application, plusieurs problèmes critiques ont été identifiés au niveau des rôles (agents), de la navigation et de la cohérence globale.
+
+Merci de corriger immédiatement tous les points suivants sans casser la logique existante.
+
+---
+
+1. Restaurer TOUS les rôles (OBLIGATOIRE)
+
+Les rôles suivants doivent être présents, visibles et fonctionnels sans exception :
+
+- Super Admin  
+- Compagnie  
+- Chef d’agence  
+- Agent guichet  
+- Agent réservation  
+- Agent embarquement  
+- Agent colis  
+- Agent route  
+- Agent logistique  
+- Agent suivi  
+- Agent bagage  
+- Client  
+
+Problème actuel :
+Certains agents ne sont pas visibles (ex : Agent bagage, Agent GC, etc.).
+
+Action demandée :
+- Réafficher tous les agents correctement  
+- Aucun rôle ne doit disparaître  
+- Aucun mélange entre les rôles  
+
+---
+
+2. Stabilité des rôles
+
+- Chaque rôle doit avoir son espace propre  
+- Aucun bug d’affichage ou disparition  
+- Tous les rôles doivent rester visibles après chaque mise à jour  
+
+---
+
+3. Accès et affichage des agents
+
+- Tous les agents doivent apparaître clairement dans l’espace agent  
+- Accès rapide par rôle (comme prévu dans la logique initiale)  
+- Navigation fluide entre les rôles  
+
+---
+
+4. Connexion avec les données
+
+Chaque rôle doit être correctement connecté à :
+
+- Réservations  
+- Colis  
+- Trajets  
+- Statuts (en attente, validé, embarqué, etc.)
+
+Toutes les actions doivent être synchronisées dans toute l’application.
+
+---
+
+5. Module Agent Bagage (PRIORITÉ)
+
+- Restaurer complètement Agent Bagage  
+- Ne rien modifier dans sa logique d’origine  
+- Connecter avec :
+  - Colis  
+  - Réservations  
+  - Statuts  
+- Permettre :
+  - Voir bagages en attente  
+  - Valider bagages  
+  - Suivre statut (chargé, embarqué)
+
+---
+
+6. Navigation (GO_BACK)
+
+Le problème “GO_BACK was not handled” doit être totalement corrigé :
+
+- Vérifier navigation.canGoBack()  
+- Ajouter redirection par défaut (Home / Dashboard)  
+- Aucun bouton retour ne doit provoquer d’erreur  
+
+---
+
+7. UI / Alignement (IMPORTANT)
+
+Problèmes observés :
+
+- Trajets populaires mal alignés  
+- Cartes désorganisées  
+- Badges mal positionnés  
+- Boutons header trop petits  
+- Bottom navigation peu visible  
+
+Corrections demandées :
+
+- Aligner parfaitement tous les éléments  
+- Ajouter espacements cohérents  
+- Améliorer lisibilité et contraste  
+- Agrandir icônes et boutons  
+- Rendre l’interface moderne et structurée  
+
+---
+
+8. Page de démonstration
+
+- Ajouter tous les rôles dans les pages de test  
+- Permettre de tester chaque rôle facilement  
+- Simulation complète et réaliste  
+
+---
+
+OBJECTIF FINAL :
+
+Une application :
+
+- complète  
+- stable  
+- sans disparition de rôles  
+- parfaitement alignée  
+- moderne et professionnelle  
+
+---
+
+IMPORTANT :
+
+- Ne rien casser  
+- Ne pas modifier la logique métier existante  
+- Corriger uniquement les problèmes identifiés  
+- Garantir stabilité totale après correction
