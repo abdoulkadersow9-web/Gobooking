@@ -6,10 +6,10 @@ const accentLight  = "#FFF4EB";
 
 export default {
   light: {
-    text: "#0F172A",
-    textSecondary: "#64748B",
-    textMuted: "#94A3B8",
-    background: "#EDEEF5",
+    text: "#06101F",
+    textSecondary: "#7A8FAA",
+    textMuted: "#A4B4C6",
+    background: "#E5E8F5",
     backgroundSecondary: "#FFFFFF",
     tint: primary,
     primary,
@@ -17,13 +17,13 @@ export default {
     primaryLight,
     accent,
     accentLight,
-    tabIconDefault: "#94A3B8",
+    tabIconDefault: "#A4B4C6",
     tabIconSelected: primary,
-    border: "#E2E8F0",
+    border: "#D8DCF0",
     success: "#10B981",
     warning: "#F59E0B",
     error: "#EF4444",
     card: "#FFFFFF",
-    shadow: "rgba(22, 80, 208, 0.08)",
+    shadow: "rgba(22, 80, 208, 0.10)",
   },
 };
