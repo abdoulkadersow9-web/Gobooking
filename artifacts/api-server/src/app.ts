@@ -79,6 +79,11 @@ app.get("/api/trajets", async (_req: Request, res: Response) => {
   }
 });
 
+/* ── Preview route (visual test, no auth) ──────────────────── */
+app.get("/api/suivi-preview", (_req: Request, res: Response) => {
+  res.sendFile(join(__dirname, "../public/suivi-preview.html"));
+});
+
 /* ── Main router ────────────────────────────────────────────── */
 app.use("/api", router);
 
