@@ -336,7 +336,7 @@ export default function ColisScreen() {
           )}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
           refreshControl={
             token
               ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
@@ -394,38 +394,40 @@ export default function ColisScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { flex: 1, backgroundColor: Colors.light.background },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 22,
-    paddingBottom: 24,
+    paddingBottom: 28,
     gap: 14,
   },
   headerLeft: { flex: 1 },
-  headerTitle: { fontSize: 24, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 3 },
+  headerTitle: { fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.6 },
+  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 5 },
   sendBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
     backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
   },
   sendBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
 
   filterBar: {
     backgroundColor: "white",
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: "#ECEEF8",
   },
   filterScroll: {
     flexDirection: "row",
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 13,
     gap: 10,
   },
@@ -433,12 +435,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: "#E2E8F0",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#F4F6FF",
   },
   chipActive: {
     borderColor: Colors.light.primary,
@@ -456,24 +458,25 @@ const styles = StyleSheet.create({
   chipCountText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#64748B" },
   chipCountTextActive: { color: "white" },
 
-  list: { padding: 18, paddingTop: 14, paddingBottom: 110 },
+  list: { padding: 20, paddingTop: 16, paddingBottom: 110 },
   listEmpty: { flex: 1 },
 
   row: {
     flexDirection: "row",
     backgroundColor: "white",
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.09,
-    shadowRadius: 22,
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
     elevation: 7,
     borderWidth: 1,
     borderColor: "#ECEEF8",
+    marginBottom: 2,
   },
   strip: { width: 6 },
-  rowBody: { flex: 1, padding: 18, gap: 14 },
+  rowBody: { flex: 1, padding: 20, gap: 16 },
 
   rowTop: {
     flexDirection: "row",
@@ -481,13 +484,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8,
   },
-  refRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  refText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#475569", letterSpacing: 0.5 },
-  badge: { borderRadius: 20, paddingHorizontal: 11, paddingVertical: 5 },
+  refRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  refText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#475569", letterSpacing: 0.6 },
+  badge: { borderRadius: 22, paddingHorizontal: 12, paddingVertical: 6 },
   badgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
 
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  city: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.3 },
+  city: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.5 },
   routeConnector: { width: 60, flexDirection: "row", alignItems: "center", gap: 3 },
   routeDash: { flex: 1, height: 2, backgroundColor: "#E2E8F0" },
 
@@ -497,40 +500,40 @@ const styles = StyleSheet.create({
   payPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 22,
   },
   payPillText: {
     fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_700Bold",
   },
   amountText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
     color: "#0F172A",
   },
   detailBtn: {
-    flexDirection: "row", alignItems: "center", gap: 4,
-    backgroundColor: Colors.light.primary, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 7,
+    flexDirection: "row", alignItems: "center", gap: 5,
+    backgroundColor: Colors.light.primary, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 9,
   },
-  detailBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "white" },
+  detailBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
 
-  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 14, padding: 32 },
   emptyIcon: {
-    width: 80, height: 80, borderRadius: 24,
+    width: 88, height: 88, borderRadius: 28,
     backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 4,
   },
-  emptyTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  emptyDesc: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center" },
+  emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.3 },
+  emptyDesc: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "center", lineHeight: 20 },
   loadingText: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 8 },
   loginBtn: {
-    backgroundColor: Colors.light.primary, borderRadius: 12,
-    paddingHorizontal: 28, paddingVertical: 13, marginTop: 4,
+    backgroundColor: Colors.light.primary, borderRadius: 16,
+    paddingHorizontal: 30, paddingVertical: 15, marginTop: 6,
   },
-  loginBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "white" },
+  loginBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
   ctaBtn: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: Colors.light.primary, borderRadius: 12,
@@ -561,18 +564,20 @@ const styles = StyleSheet.create({
   loginBannerBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
 
   remoteBanner: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#ECFEFF", borderRadius: 14,
-    padding: 14, marginBottom: 12,
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: "#ECFEFF", borderRadius: 20,
+    padding: 16, marginBottom: 16,
     borderWidth: 1.5, borderColor: "#A5F3FC",
+    shadowColor: "#0E7490", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
   remoteBannerIcon: {
-    width: 50, height: 50, borderRadius: 14, backgroundColor: "#fff",
+    width: 54, height: 54, borderRadius: 16, backgroundColor: "white",
     justifyContent: "center", alignItems: "center",
     borderWidth: 1, borderColor: "#A5F3FC",
   },
-  remoteBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0E7490" },
-  remoteBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#06B6D4", marginTop: 2 },
+  remoteBannerTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0E7490", letterSpacing: -0.2 },
+  remoteBannerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#06B6D4", marginTop: 3, lineHeight: 18 },
 
   errorBanner: {
     flexDirection: "row", alignItems: "center", gap: 8,

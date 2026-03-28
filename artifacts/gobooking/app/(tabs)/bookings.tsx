@@ -608,7 +608,7 @@ export default function BookingsScreen() {
               onVoucherRequest={handleVoucherRequest}
             />
           )}
-          contentContainerStyle={{ padding: 18, paddingBottom: bottomPad }}
+          contentContainerStyle={{ padding: 20, paddingBottom: bottomPad }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -644,64 +644,64 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 22, paddingBottom: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle:  { fontSize: 24, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
-  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
-  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
-  historyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
+  header:       { paddingHorizontal: 22, paddingBottom: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  headerTitle:  { fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.6 },
+  headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 5 },
+  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 22, paddingHorizontal: 13, paddingVertical: 9, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  historyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  filterBar:         { backgroundColor: Colors.light.card, borderBottomWidth: 1, borderBottomColor: Colors.light.border, maxHeight: 60 },
-  filterBarContent:  { paddingHorizontal: 18, paddingVertical: 14, gap: 10, flexDirection: "row", alignItems: "center" },
-  filterTab:         { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "transparent" },
+  filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 62 },
+  filterBarContent:  { paddingHorizontal: 20, paddingVertical: 13, gap: 10, flexDirection: "row", alignItems: "center" },
+  filterTab:         { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 22, backgroundColor: "#F4F6FF", borderWidth: 1.5, borderColor: "transparent" },
   filterTabActive:   { backgroundColor: "#EEF4FF", borderColor: "#1650D0" },
-  filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary },
+  filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: "#64748B" },
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
   card:         {
-    backgroundColor: Colors.light.card, borderRadius: 22, padding: 20, marginBottom: 16,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 22, elevation: 7,
+    backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 18,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 24, elevation: 7,
     borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5,
   },
   cardPressed:  { transform: [{ scale: 0.982 }], opacity: 0.95 },
-  cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
-  cardCancelled:{ borderColor: "#FECACA", backgroundColor: "#FFF9F9" },
-  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  refText:      { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.2 },
-  dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 2 },
-  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
+  cardCancelled:{ borderColor: "#FECACA", backgroundColor: "#FFFAFA" },
+  cardHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  refText:      { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
+  dateText:     { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 3 },
+  statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 22 },
   statusText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.light.border },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 18, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
   cityBlock:    { flex: 1 },
-  timeText:     { fontSize: 26, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -1 },
-  cityText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.light.textSecondary, marginTop: 4 },
+  timeText:     { fontSize: 28, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -1.2 },
+  cityText:     { fontSize: 14, fontFamily: "Inter_500Medium", color: "#64748B", marginTop: 5 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
-  routeLine:    { width: 30, height: 1.5, backgroundColor: Colors.light.border },
+  routeLine:    { width: 32, height: 1.5, backgroundColor: "#E2E8F0" },
 
   rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 5, backgroundColor: "#EFF6FF", borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: "#BFDBFE" },
   rule45Text:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1, lineHeight: 16 },
 
-  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  methodRow:    { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
-  methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textMuted },
-  seatRow:      { flexDirection: "row", alignItems: "center", gap: 4 },
-  seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary },
-  amountBadge:  { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
-  amountText:   { fontSize: 20, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 4 },
+  methodRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+  methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8" },
+  seatRow:      { flexDirection: "row", alignItems: "center", gap: 5 },
+  seatText:     { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B" },
+  amountBadge:  { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16 },
+  amountText:   { fontSize: 21, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
 
-  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 14, borderRadius: 16, paddingVertical: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 4 },
+  ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 16, borderRadius: 18, paddingVertical: 17, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 5 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
-  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, borderRadius: 10, padding: 10 },
-  waitingText:  { fontSize: 11, fontFamily: "Inter_500Medium", flex: 1 },
+  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 10, borderRadius: 12, padding: 12 },
+  waitingText:  { fontSize: 11, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 16 },
 
-  empty:        { alignItems: "center", paddingTop: 80, gap: 14 },
-  emptyIconWrap:{ width: 90, height: 90, borderRadius: 26, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 4, borderWidth: 1, borderColor: "#C7D2FE" },
-  emptyTitle:   { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.light.text, letterSpacing: -0.3 },
-  emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20 },
-  bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 16, paddingHorizontal: 28, paddingVertical: 15, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4 },
+  empty:        { alignItems: "center", paddingTop: 80, gap: 16 },
+  emptyIconWrap:{ width: 96, height: 96, borderRadius: 28, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 6, borderWidth: 1, borderColor: "#C7D2FE" },
+  emptyTitle:   { fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.4 },
+  emptySubtitle:{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#64748B", textAlign: "center", lineHeight: 22 },
+  bookNowBtn:   { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: Colors.light.primary, borderRadius: 18, paddingHorizontal: 30, paddingVertical: 16, marginTop: 8, shadowColor: Colors.light.primary, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 5 },
   bookNowText:  { color: "white", fontSize: 15, fontFamily: "Inter_700Bold" },
 
-  errorBanner:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA", borderRadius: 12, marginHorizontal: 18, marginTop: 10, paddingHorizontal: 14, paddingVertical: 11 },
+  errorBanner:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA", borderRadius: 14, marginHorizontal: 20, marginTop: 10, paddingHorizontal: 16, paddingVertical: 12 },
   errorText:    { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium", color: "#DC2626" },
 });

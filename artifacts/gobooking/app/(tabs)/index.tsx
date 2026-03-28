@@ -1134,16 +1134,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#EDEEF5" },
+  container: { flex: 1, backgroundColor: Colors.light.background },
 
   // Header
-  header: { paddingHorizontal: 20, paddingBottom: 36 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
-  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  headerLogo: { width: 46, height: 46, borderRadius: 12 },
-  greeting: { fontSize: 19, fontFamily: "Inter_700Bold", color: "white" },
-  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", marginTop: 2 },
-  adminBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  header: { paddingHorizontal: 22, paddingBottom: 40 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
+  headerLogo: { width: 46, height: 46, borderRadius: 14 },
+  greeting: { fontSize: 20, fontFamily: "Inter_700Bold", color: "white" },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.78)", marginTop: 3 },
+  adminBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
 
   // Mode selector
   modeSelector: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 14, padding: 4, marginBottom: 16, gap: 4 },
@@ -1154,8 +1154,8 @@ const styles = StyleSheet.create({
 
   // Search card
   searchCard: {
-    backgroundColor: "white", borderRadius: 26, padding: 22,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 30, elevation: 10,
+    backgroundColor: "white", borderRadius: 28, padding: 24,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.11, shadowRadius: 32, elevation: 10,
     borderTopWidth: 4, borderTopColor: "#1650D0",
   },
   routeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 },
@@ -1217,13 +1217,13 @@ const styles = StyleSheet.create({
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Section divider
-  sectionDivider: { height: 12, backgroundColor: "#E8EAF4", marginVertical: 4 },
+  sectionDivider: { height: 10, backgroundColor: "#E4E6F2", marginVertical: 6 },
 
   // Activity section
-  section: { paddingHorizontal: 18, paddingTop: 30, paddingBottom: 14 },
+  section: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 12 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
   sectionTitle: {
-    fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.5,
+    fontSize: 19, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.5,
     borderLeftWidth: 4, borderLeftColor: "#1650D0", paddingLeft: 10,
   },
   sectionLink: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
@@ -1233,21 +1233,21 @@ const styles = StyleSheet.create({
   activityCard: {
     flex: 1,
     backgroundColor: "white",
-    borderRadius: 22,
-    padding: 18,
-    gap: 10,
+    borderRadius: 24,
+    padding: 20,
+    gap: 11,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.10,
-    shadowRadius: 22,
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
     elevation: 6,
     borderWidth: 1,
-    borderColor: "#EEF4FF",
+    borderColor: "#ECEEF8",
     overflow: "hidden",
   },
   activityCardEmpty: { justifyContent: "center", alignItems: "flex-start" },
-  activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
-  activityIconWrap: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
+  activityCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
+  activityIconWrap: { width: 46, height: 46, borderRadius: 16, justifyContent: "center", alignItems: "center" },
 
   statusPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
@@ -1267,15 +1267,15 @@ const styles = StyleSheet.create({
   demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
 
   // Quick actions grid
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 18, paddingTop: 26 },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 14, padding: 20, paddingTop: 24 },
   quickCard: {
-    width: "47%", backgroundColor: "white", borderRadius: 22, padding: 18, gap: 10,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 18, elevation: 5,
-    borderWidth: 1, borderColor: "#ECEEF8", borderTopWidth: 3,
+    width: "47%", backgroundColor: "white", borderRadius: 24, padding: 20, gap: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 20, elevation: 5,
+    borderWidth: 1, borderColor: "#ECEEF8", borderTopWidth: 4,
   },
-  quickIcon: { width: 54, height: 54, borderRadius: 18, justifyContent: "center", alignItems: "center" },
-  quickLabel: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, lineHeight: 17 },
+  quickIcon: { width: 56, height: 56, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+  quickLabel: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
+  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, lineHeight: 18 },
 
   // Dashboard shortcut cards
   dashCard: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "white", borderRadius: 20, padding: 18, marginBottom: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 14, elevation: 4, borderWidth: 1, borderColor: "#ECEEF8" },
@@ -1289,15 +1289,15 @@ const styles = StyleSheet.create({
   // Popular routes
   routeCard: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "white", borderRadius: 20, padding: 18, marginBottom: 12,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
+    backgroundColor: "white", borderRadius: 22, padding: 20, marginBottom: 12,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.07, shadowRadius: 18, elevation: 4,
     borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 5, borderLeftColor: "#1650D0",
   },
   routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
   routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
-  routeCardIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
-  routeCardRoute: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  routeCardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 3 },
+  routeCardIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
+  routeCardRoute: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
+  routeCardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.light.textSecondary, marginTop: 4 },
   routeCardRight: { flexDirection: "row", alignItems: "center", gap: 8 },
   routeCardPrice: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.light.primary },
 });

@@ -9,7 +9,7 @@ export default {
     text: "#0F172A",
     textSecondary: "#64748B",
     textMuted: "#94A3B8",
-    background: "#F8FAFC",
+    background: "#EDEEF5",
     backgroundSecondary: "#FFFFFF",
     tint: primary,
     primary,
