@@ -1118,30 +1118,45 @@ export default function HomeScreen() {
               router.push({ pathname: "/client/resultats", params: { from: route.from, to: route.to, date, passengers: "1" } } as never);
             }}
           >
-            {/* Left icon */}
+            {/* Left: icon */}
             <View style={styles.routeCardIcon}>
-              <Feather name="map-pin" size={18} color={Colors.light.primary} />
+              <Feather name="navigation" size={16} color={Colors.light.primary} />
             </View>
 
-            {/* Center: vertical city layout + duration */}
+            {/* Center: cities inline + duration below */}
             <View style={styles.routeCardCenter}>
-              <Text style={styles.routeFrom} numberOfLines={1}>{route.from}</Text>
-              <View style={styles.routeToRow}>
-                <View style={styles.routeArrowDot} />
-                <Text style={styles.routeTo} numberOfLines={1}>{route.to}</Text>
+              <View style={styles.routeCitiesRow}>
+                <Text
+                  style={styles.routeFrom}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {route.from}
+                </Text>
+                <View style={styles.routeArrowWrap}>
+                  <Feather name="arrow-right" size={10} color="#94A3B8" />
+                </View>
+                <Text
+                  style={styles.routeTo}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                >
+                  {route.to}
+                </Text>
               </View>
               <View style={styles.routeMetaRow}>
-                <Feather name="clock" size={10} color="#A4B4C6" />
+                <Feather name="clock" size={10} color="#BBCADC" />
                 <Text style={styles.routeCardMeta}>{route.duration}</Text>
               </View>
             </View>
 
-            {/* Right: price stacked + blue chevron circle */}
+            {/* Right: price + chevron */}
             <View style={styles.routeCardRight}>
-              <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()}</Text>
-              <Text style={styles.routePriceCurrency}>FCFA</Text>
+              <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()} F</Text>
               <View style={styles.routeChevronCircle}>
-                <Feather name="chevron-right" size={15} color="white" />
+                <Feather name="chevron-right" size={14} color="white" />
               </View>
             </View>
           </Pressable>
@@ -1313,33 +1328,32 @@ const styles = StyleSheet.create({
 
   // Popular routes
   routeCard: {
-    flexDirection: "row", alignItems: "center", gap: 16,
-    backgroundColor: "white", borderRadius: 22,
-    paddingVertical: 18, paddingHorizontal: 18, marginBottom: 12,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.09, shadowRadius: 20, elevation: 6,
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: "white", borderRadius: 18,
+    paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07, shadowRadius: 14, elevation: 4,
     borderWidth: 1, borderColor: "#ECEEF8",
-    ..._ws("0 6px 20px rgba(22,80,208,0.09)"),
+    ..._ws("0 4px 14px rgba(22,80,208,0.07)"),
   },
-  routeCardPressed: { opacity: 0.88, transform: [{ scale: 0.975 }] },
+  routeCardPressed: { opacity: 0.85, transform: [{ scale: 0.972 }] },
   routeCardIcon: {
-    width: 48, height: 48, borderRadius: 16,
+    width: 42, height: 42, borderRadius: 13,
     backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center",
-    borderWidth: 1.5, borderColor: "#C7D9FF", flexShrink: 0,
+    borderWidth: 1, borderColor: "#C7D9FF", flexShrink: 0,
   },
-  routeCardCenter: { flex: 1, minWidth: 0, gap: 3 },
-  routeFrom: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  routeToRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  routeArrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#C7D9FF", flexShrink: 0 },
-  routeTo: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.light.primary, flex: 1, minWidth: 0 },
-  routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  routeCardCenter: { flex: 1, minWidth: 0, gap: 5 },
+  routeCitiesRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  routeFrom: { flex: 1, fontSize: 14, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.2, minWidth: 0 },
+  routeArrowWrap: { flexShrink: 0, paddingHorizontal: 2 },
+  routeTo: { flex: 1, fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.2, minWidth: 0 },
+  routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   routeCardMeta: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
-  routeCardRight: { alignItems: "center", gap: 2, flexShrink: 0 },
-  routeCardPrice: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.4 },
-  routePriceCurrency: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
+  routeCardRight: { alignItems: "flex-end", gap: 6, flexShrink: 0 },
+  routeCardPrice: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3 },
   routeChevronCircle: {
-    width: 32, height: 32, borderRadius: 16,
+    width: 28, height: 28, borderRadius: 14,
     backgroundColor: Colors.light.primary,
-    justifyContent: "center", alignItems: "center", marginTop: 6,
+    justifyContent: "center", alignItems: "center",
   },
 });

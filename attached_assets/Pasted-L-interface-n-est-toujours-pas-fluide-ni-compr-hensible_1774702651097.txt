@@ -1,0 +1,106 @@
+L’interface n’est toujours pas fluide ni compréhensible, surtout dans "Mes Réservations" et "Trajets populaires". Il y a encore des problèmes graves de lisibilité, structure et UX.
+
+Corriger immédiatement avec une approche orientée utilisateur réel (pas seulement design technique).
+
+PROBLÈMES MAJEURS
+
+1. TRAJETS POPULAIRES
+- Les cartes sont mal proportionnées (trop verticales)
+- Le prix est mal placé (en haut → mauvaise hiérarchie)
+- Le contenu est mal équilibré (trop d’espace vide)
+- Lecture difficile du trajet
+
+CORRECTIONS :
+- Revenir à une carte horizontale propre
+- Structure claire :
+  gauche : icône
+  centre : trajet + durée
+  droite : prix + flèche
+- Réduire hauteur des cartes
+- Supprimer les espaces inutiles
+- Rendre lisible en 1 seconde
+
+---
+
+2. MES RÉSERVATIONS (CRITIQUE)
+
+A. ONGLETS EN HAUT
+- Actuellement incompréhensibles
+- Texte non visible / coupé / absent
+- Impossible de comprendre les filtres
+
+CORRECTIONS :
+- Afficher clairement les labels (ex: Tous / Payé / En attente / Annulé)
+- Texte toujours visible
+- Onglet actif bien mis en évidence
+- Taille correcte (lisible immédiatement)
+- Supprimer les bulles vides
+
+---
+
+B. STRUCTURE PAGE
+- Trop d’éléments mélangés
+- Mauvaise hiérarchie visuelle
+
+CORRECTIONS :
+- Réorganiser :
+  1. header
+  2. onglets
+  3. liste
+- Ajouter espace clair entre sections
+- Améliorer lisibilité globale
+
+---
+
+C. CARTE RÉSERVATION
+- Trop chargée visuellement
+- Lecture difficile
+
+CORRECTIONS :
+- Séparer clairement :
+  - trajet
+  - statut
+  - messages
+  - timeline
+  - prix
+- Ajouter respiration (espaces)
+- Simplifier visuellement
+
+---
+
+D. TIMELINE
+- Pas assez lisible
+
+CORRECTIONS :
+- Clarifier étapes
+- Meilleur alignement
+- Plus visible
+
+---
+
+3. FLUIDITÉ
+- L’interface ne donne pas une sensation fluide
+- UX pas naturelle
+
+CORRECTIONS :
+- Ajouter feedback au clic
+- Navigation instantanée
+- Transitions légères
+- Supprimer toute sensation de blocage
+
+---
+
+4. OBJECTIF FINAL
+Obtenir :
+- interface claire
+- compréhension immédiate
+- navigation fluide
+- rendu moderne
+- niveau application transport professionnelle
+
+IMPORTANT :
+- Tester sur mobile réel
+- Corriger le rendu réel (pas canvas)
+- Ne rien casser dans la logique
+
+Faire une correction forte UX + UI, pas un simple ajustement.

@@ -454,7 +454,7 @@ function AnimatedBookingCard({ item, index, reviewed, token, onVoucherRequest }:
   );
 }
 
-type FilterKey = "tous" | "en_cours" | "terminés";
+type FilterKey = "tous" | "en_cours" | "terminés" | "annulés";
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function BookingsScreen() {
@@ -528,15 +528,17 @@ export default function BookingsScreen() {
   const bottomPad = Platform.OS === "web" ? 120 : insets.bottom + 120;
 
   const FILTER_TABS: { key: FilterKey; label: string }[] = [
-    { key: "tous",    label: `Tous${bookings.length ? ` (${bookings.length})` : ""}` },
+    { key: "tous",     label: `Tout (${bookings.length})` },
     { key: "en_cours", label: `En cours (${bookings.filter(b => ["en_attente","confirmé"].includes(computeState(b))).length})` },
-    { key: "terminés", label: `Terminés (${bookings.filter(b => ["embarqué","bon_emis","payé"].includes(computeState(b))).length})` },
+    { key: "terminés", label: `Payé (${bookings.filter(b => ["embarqué","bon_emis","payé"].includes(computeState(b))).length})` },
+    { key: "annulés",  label: `Annulé (${bookings.filter(b => ["expiré","annulé"].includes(computeState(b))).length})` },
   ];
 
   const filteredBookings = bookings.filter(b => {
     const st = computeState(b);
     if (filter === "en_cours") return ["en_attente", "confirmé"].includes(st);
-    if (filter === "terminés") return ["payé", "embarqué", "bon_emis", "expiré", "annulé"].includes(st);
+    if (filter === "terminés") return ["payé", "embarqué", "bon_emis"].includes(st);
+    if (filter === "annulés")  return ["expiré", "annulé"].includes(st);
     return true;
   });
 
@@ -663,12 +665,12 @@ const styles = StyleSheet.create({
   iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.20)", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 70 },
-  filterBarContent:  { paddingHorizontal: 20, paddingVertical: 15, gap: 12, flexDirection: "row", alignItems: "center" },
-  filterTab:         { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 28, backgroundColor: "#F4F6FF", borderWidth: 2, borderColor: "transparent" },
-  filterTabActive:   { backgroundColor: "#EEF4FF", borderColor: "#1650D0" },
-  filterTabText:     { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#7A8FAA" },
-  filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
+  filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
+  filterBarContent:  { paddingHorizontal: 16, paddingVertical: 12, gap: 8, flexDirection: "row", alignItems: "center" },
+  filterTab:         { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 22, backgroundColor: "#F4F6FF", borderWidth: 1.5, borderColor: "transparent" },
+  filterTabActive:   { backgroundColor: "#1650D0", borderColor: "#1650D0" },
+  filterTabText:     { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#7A8FAA" },
+  filterTabTextActive: { color: "white", fontFamily: "Inter_700Bold" },
 
   card:         {
     backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 20,
