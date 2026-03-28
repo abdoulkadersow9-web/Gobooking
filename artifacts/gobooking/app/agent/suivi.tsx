@@ -94,6 +94,8 @@ interface BusItem {
 }
 interface TripItem {
   id: string; from: string; to: string; departureTime: string; status: string;
+  arrivalTime?: string | null; etaTime?: string | null;
+  passengerCount?: number | null; seatCount?: number | null;
   busId?: string; busName?: string;
   cameraStreamUrl?: string | null;
   cameraStatus?: string;
@@ -504,19 +506,33 @@ export default function SuiviScreen() {
             })}
           </View>
 
-          {/* ── BUS LIST ── */}
+          {/* ── BUS LIST — Tour de contrôle ── */}
           <View style={S.section}>
-            <Text style={S.sectionTitle}>Bus en temps réel ({data?.buses?.length ?? 0})</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={S.sectionTitle}>Bus en temps réel ({data?.buses?.length ?? 0})</Text>
+              {hasCameras && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CAM_GR }} />
+                  <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "800" }}>{activeCamCount} CAM LIVE</Text>
+                </View>
+              )}
+            </View>
             {!data?.buses?.length && (
-              <View style={S.empty}><Text style={S.emptyTxt}>Aucun bus trouvé</Text></View>
+              <View style={S.empty}><Ionicons name="bus-outline" size={32} color="#CBD5E1" />
+                <Text style={S.emptyTxt}>Aucun bus trouvé</Text>
+              </View>
             )}
             {data?.buses?.map(bus => {
-              const st = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
+              const st   = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
               const trip = data.trips.find(t => t.busId === bus.id);
-              const camConnected = trip && trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
+              const busAlerts = data.alerts.filter(a => a.busId === bus.id);
+              const camOk = !!(trip && trip.cameraStatus === "connected" && trip.cameraStreamUrl);
+              const eta   = trip?.etaTime ?? trip?.arrivalTime;
 
               return (
-                <View key={bus.id} style={S.busCard}>
+                <View key={bus.id} style={[S.busCard, busAlerts.length > 0 && { borderLeftWidth: 3, borderLeftColor: RED }]}>
+
+                  {/* ── Header row ── */}
                   <View style={S.busTop}>
                     <View style={[S.busStatus, { backgroundColor: st.bg }]}>
                       <Ionicons name={st.icon as any} size={20} color={st.color} />
@@ -524,37 +540,111 @@ export default function SuiviScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={S.busName}>{bus.busName}</Text>
                       <Text style={S.busPlate}>{bus.plateNumber}</Text>
-                      {bus.currentLocation && <Text style={S.busLoc}>{bus.currentLocation}</Text>}
-                      {trip && <Text style={S.busTrip}>{trip.from} → {trip.to} · {trip.departureTime}</Text>}
-                      {bus.issue && <Text style={S.busIssue}>{bus.issue}</Text>}
                     </View>
                     <View style={[S.statusPill, { backgroundColor: st.bg }]}>
                       <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
                     </View>
                   </View>
 
-                  {/* ── Caméra LIVE block ── */}
+                  {/* ── Route + GPS row ── */}
                   {trip && (
-                    <View style={S.camBlock}>
-                      <View style={S.camBlockHeader}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Ionicons name="videocam" size={14} color={camConnected ? CAM_GR : "#94A3B8"} />
-                          <Text style={[S.camBlockTitle, camConnected && { color: CAM_GR }]}>
-                            Caméra embarquée
-                          </Text>
-                        </View>
-                        <Text style={S.camPos}>{trip.cameraPosition ?? "intérieur"}</Text>
+                    <View style={S.tcRouteRow}>
+                      <View style={S.tcRouteInner}>
+                        <Ionicons name="navigate" size={13} color="#1D4ED8" />
+                        <Text style={S.tcRoute}>{trip.from}</Text>
+                        <Ionicons name="arrow-forward" size={12} color="#94A3B8" />
+                        <Text style={S.tcRoute}>{trip.to}</Text>
                       </View>
-                      <CamPill trip={trip} onView={() => setCameraTrip(trip)} />
+                      <View style={{ flexDirection: "row", gap: 10 }}>
+                        <View style={S.tcChip}>
+                          <Ionicons name="time-outline" size={11} color="#64748B" />
+                          <Text style={S.tcChipTxt}>{trip.departureTime}</Text>
+                        </View>
+                        {eta && (
+                          <View style={[S.tcChip, { backgroundColor: "#F0FDF4" }]}>
+                            <Ionicons name="flag-outline" size={11} color="#15803D" />
+                            <Text style={[S.tcChipTxt, { color: "#15803D" }]}>{eta}</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   )}
 
-                  {/* Trigger alert button */}
-                  <TouchableOpacity
-                    style={S.triggerBtn}
-                    onPress={() => setTriggerBus(bus)}
-                    activeOpacity={0.8}
-                  >
+                  {/* GPS location */}
+                  {bus.currentLocation && (
+                    <View style={S.tcGpsRow}>
+                      <Ionicons name="location" size={13} color="#7C3AED" />
+                      <Text style={S.tcGpsTxt}>{bus.currentLocation}</Text>
+                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR, marginLeft: 4 }} />
+                      <Text style={{ fontSize: 10, color: CAM_GR, fontWeight: "700" }}>GPS actif</Text>
+                    </View>
+                  )}
+
+                  {/* ── CAMÉRA LIVE PANEL — always visible ── */}
+                  <View style={[S.tcCamPanel, camOk && S.tcCamPanelActive]}>
+                    <View style={S.tcCamPanelLeft}>
+                      <View style={[S.tcCamIconWrap, camOk && { backgroundColor: "rgba(34,197,94,0.15)" }]}>
+                        <Ionicons name="videocam" size={22} color={camOk ? CAM_GR : "#334155"} />
+                        {camOk && <View style={S.tcCamLiveDot} />}
+                      </View>
+                      <View>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={[S.tcCamLabel, camOk && { color: CAM_GR }]}>
+                            {camOk ? "CAMÉRA EMBARQUÉE · EN DIRECT" : "CAMÉRA EMBARQUÉE"}
+                          </Text>
+                          {camOk && (
+                            <View style={S.tcLiveBadge}>
+                              <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#fff" }} />
+                              <Text style={S.tcLiveTxt}>LIVE</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={S.tcCamSub}>
+                          {camOk
+                            ? `Position : ${trip?.cameraPosition ?? "intérieur"} · Flux HLS actif`
+                            : trip
+                              ? `Position prévue : ${trip.cameraPosition ?? "intérieur"} · Non connectée`
+                              : "Aucun trajet actif · Caméra en veille"}
+                        </Text>
+                      </View>
+                    </View>
+                    {camOk && trip ? (
+                      <TouchableOpacity style={S.tcWatchBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.82}>
+                        <Ionicons name="play-circle" size={14} color={CAM_GR} />
+                        <Text style={S.tcWatchTxt}>Voir</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={S.tcCamOffPill}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#475569" }} />
+                        <Text style={S.tcCamOffTxt}>Hors ligne</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* ── Inline alert (if any) ── */}
+                  {busAlerts.length > 0 && (
+                    <View style={S.tcAlertInline}>
+                      <Ionicons name="warning" size={14} color={RED} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={S.tcAlertTxt} numberOfLines={2}>{busAlerts[0].message}</Text>
+                        <Text style={S.tcAlertTime}>
+                          {new Date(busAlerts[0].createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {busAlerts.length > 1 ? ` · +${busAlerts.length - 1} alerte(s)` : ""}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Issue */}
+                  {bus.issue && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", borderRadius: 8, padding: 8 }}>
+                      <Ionicons name="alert-circle" size={14} color="#DC2626" />
+                      <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "600", flex: 1 }}>{bus.issue}</Text>
+                    </View>
+                  )}
+
+                  {/* ── Action button ── */}
+                  <TouchableOpacity style={S.triggerBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
                     <Ionicons name="warning-outline" size={14} color={RED} />
                     <Text style={S.triggerBtnTxt}>Déclencher une alerte</Text>
                   </TouchableOpacity>
@@ -562,35 +652,6 @@ export default function SuiviScreen() {
               );
             })}
           </View>
-
-          {/* ── TRIPS CAMERA SUMMARY ── */}
-          {data?.trips && data.trips.some(t => t.cameraStatus === "connected") && (
-            <View style={S.section}>
-              <Text style={S.sectionTitle}>Caméras actives ({data.trips.filter(t => t.cameraStatus === "connected").length})</Text>
-              {data.trips.filter(t => t.cameraStatus === "connected" && t.cameraStreamUrl).map(trip => (
-                <TouchableOpacity
-                  key={trip.id}
-                  style={S.camSummaryCard}
-                  onPress={() => setCameraTrip(trip)}
-                  activeOpacity={0.82}
-                >
-                  <View style={S.camSummaryLeft}>
-                    <View style={S.camThumb}>
-                      <Ionicons name="videocam" size={22} color={CAM_GR} />
-                    </View>
-                    <View>
-                      <Text style={S.camSummaryRoute}>{trip.from} → {trip.to}</Text>
-                      <Text style={S.camSummaryMeta}>{trip.cameraPosition ?? "intérieur"} · {trip.departureTime}</Text>
-                    </View>
-                  </View>
-                  <View style={S.camLivePill}>
-                    <View style={S.camLiveDot} />
-                    <Text style={S.camLiveTxt}>LIVE</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
 
         </ScrollView>
       )}
@@ -738,6 +799,35 @@ const S = StyleSheet.create({
 
   triggerBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: RED_M, backgroundColor: RED_L },
   triggerBtnTxt: { fontSize: 13, fontWeight: "700", color: RED },
+
+  /* ── Tour de Contrôle — new card elements ── */
+  tcRouteRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
+  tcRouteInner:   { flexDirection: "row", alignItems: "center", gap: 5, flex: 1 },
+  tcRoute:        { fontSize: 13, fontWeight: "800", color: "#0F172A" },
+  tcChip:         { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#E2E8F0", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
+  tcChipTxt:      { fontSize: 11, fontWeight: "700", color: "#475569" },
+  tcGpsRow:       { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4 },
+  tcGpsTxt:       { fontSize: 12, color: "#7C3AED", fontWeight: "600", flex: 1 },
+
+  /* Camera panel */
+  tcCamPanel:     { backgroundColor: CAM_BG, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, borderWidth: 1, borderColor: "#1E293B" },
+  tcCamPanelActive:{ borderColor: "#166534" },
+  tcCamPanelLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  tcCamIconWrap:  { width: 44, height: 44, borderRadius: 10, backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center", position: "relative" },
+  tcCamLiveDot:   { position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: CAM_GR, borderWidth: 1.5, borderColor: CAM_BG },
+  tcCamLabel:     { fontSize: 11, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.3 },
+  tcCamSub:       { fontSize: 10, color: "#475569", marginTop: 2, fontWeight: "500" },
+  tcLiveBadge:    { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#DC2626", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  tcLiveTxt:      { color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
+  tcWatchBtn:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(34,197,94,0.12)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: "#166534" },
+  tcWatchTxt:     { color: CAM_GR, fontSize: 12, fontWeight: "800" },
+  tcCamOffPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#1E293B", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  tcCamOffTxt:    { color: "#475569", fontSize: 11, fontWeight: "600" },
+
+  /* Inline alert */
+  tcAlertInline:  { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FFF1F2", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: RED_M },
+  tcAlertTxt:     { fontSize: 12, color: RED_D, fontWeight: "700", lineHeight: 16 },
+  tcAlertTime:    { fontSize: 10, color: RED, marginTop: 2 },
 
   modalBg:   { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalBox:  { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
