@@ -258,7 +258,7 @@ export default function ColisScreen() {
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: topPad + 18 }]}
+        style={[styles.header, { paddingTop: topPad + 22 }]}
       >
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>{t.mesColis}</Text>
@@ -324,7 +324,7 @@ export default function ColisScreen() {
 
       {/* Body */}
       {loading && token ? (
-        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 120 }]} showsVerticalScrollIndicator={false}>
           {[0, 1, 2, 3].map(i => <SkeletonParcelCard key={i} />)}
         </ScrollView>
       ) : (
@@ -334,9 +334,9 @@ export default function ColisScreen() {
           renderItem={({ item, index }) => (
             <AnimatedParcelRow item={item} index={index} onPress={() => openSuivi(item)} />
           )}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 120 }]}
           showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+          ItemSeparatorComponent={() => <View style={{ height: 20 }} />}
           refreshControl={
             token
               ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.light.primary} />
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   chipCountText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#64748B" },
   chipCountTextActive: { color: "white" },
 
-  list: { padding: 20, paddingTop: 16, paddingBottom: 110 },
+  list: { padding: 20, paddingTop: 16, paddingBottom: 130 },
   listEmpty: { flex: 1 },
 
   row: {

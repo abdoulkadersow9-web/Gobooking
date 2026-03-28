@@ -161,7 +161,7 @@ export default function ProfileScreen() {
       style={styles.container}
       contentContainerStyle={{
         paddingTop: 0,
-        paddingBottom: Platform.OS === "web" ? 100 : insets.bottom + 100,
+        paddingBottom: Platform.OS === "web" ? 120 : insets.bottom + 120,
       }}
       showsVerticalScrollIndicator={false}
     >

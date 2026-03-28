@@ -250,7 +250,7 @@ export default function SuiviScreen() {
         {/* Header */}
         <LinearGradient
           colors={[Colors.light.primary, Colors.light.primaryDark]}
-          style={[styles.header, { paddingTop: topPad + 16 }]}
+          style={[styles.header, { paddingTop: topPad + 22 }]}
         >
           <View style={styles.headerIcon}>
             <Feather name="map-pin" size={20} color="white" />
@@ -306,7 +306,7 @@ export default function SuiviScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingBottom: bottomPad + 100 },
+            { paddingBottom: bottomPad + 120 },
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

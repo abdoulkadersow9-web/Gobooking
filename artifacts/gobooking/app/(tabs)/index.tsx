@@ -311,13 +311,13 @@ export default function HomeScreen() {
     <ScrollView
       ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Header ── */}
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
-        style={[styles.header, { paddingTop: topPad + 16 }]}
+        style={[styles.header, { paddingTop: topPad + 24 }]}
       >
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
@@ -1217,11 +1217,11 @@ const styles = StyleSheet.create({
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Section divider
-  sectionDivider: { height: 20, backgroundColor: "#CDD2EB", marginVertical: 4 },
+  sectionDivider: { height: 20, backgroundColor: "#CDD2EB", marginVertical: 0 },
 
   // Activity section
   section: { paddingHorizontal: 20, paddingTop: 44, paddingBottom: 18 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 28 },
   sectionTitle: {
     fontSize: 22, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.7,
     borderLeftWidth: 4, borderLeftColor: "#1650D0", paddingLeft: 12,

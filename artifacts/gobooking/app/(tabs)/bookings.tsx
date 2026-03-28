@@ -136,13 +136,13 @@ function BookingTimeline({ state }: { state: DisplayState }) {
 }
 
 const tl = StyleSheet.create({
-  row:       { flexDirection: "row", alignItems: "flex-start", marginBottom: 12, paddingTop: 4 },
+  row:       { flexDirection: "row", alignItems: "flex-start", marginBottom: 20, paddingTop: 12 },
   step:      { alignItems: "center", width: 56 },
-  dot:       { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
+  dot:       { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: "#CBD5E1", backgroundColor: "white", alignItems: "center", justifyContent: "center" },
   dotActive: { borderWidth: 3 },
-  line:      { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 8 },
-  label:     { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", marginTop: 3, textAlign: "center" },
-  bonBadge:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: "#DDD6FE" },
+  line:      { flex: 1, height: 2, backgroundColor: "#E2E8F0", marginTop: 9 },
+  label:     { fontSize: 10, fontFamily: "Inter_500Medium", color: "#94A3B8", marginTop: 5, textAlign: "center" },
+  bonBadge:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: "#DDD6FE" },
   bonLabel:  { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
 });
 
@@ -191,12 +191,12 @@ function CountdownBadge({ minsLeft }: { minsLeft: number | null }) {
 }
 
 const cd = StyleSheet.create({
-  badgeAmber:  { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFFBEB", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#FDE68A", marginTop: 6 },
-  badgeOrange: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#FED7AA", marginTop: 6 },
-  badgeRed:    { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF2F2", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#FECACA", marginTop: 6 },
-  textAmber:   { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#B45309" },
-  textOrange:  { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#EA580C" },
-  textRed:     { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#DC2626" },
+  badgeAmber:  { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFBEB", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FDE68A", marginTop: 12 },
+  badgeOrange: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFF7ED", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FED7AA", marginTop: 12 },
+  badgeRed:    { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#FECACA", marginTop: 12 },
+  textAmber:   { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#B45309" },
+  textOrange:  { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#EA580C" },
+  textRed:     { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#DC2626" },
 });
 
 // ─── Baggage badge ────────────────────────────────────────────────────────────
@@ -204,16 +204,16 @@ function BaggageBadge({ status }: { status?: string | null }) {
   if (!status || status === "accepté") return null;
   if (status === "en_attente") {
     return (
-      <View style={[cd.badgeAmber, { marginTop: 4 }]}>
-        <Feather name="briefcase" size={10} color="#B45309" />
+      <View style={[cd.badgeAmber, { marginTop: 12 }]}>
+        <Feather name="briefcase" size={11} color="#B45309" />
         <Text style={cd.textAmber}>Bagages en attente de validation</Text>
       </View>
     );
   }
   if (status === "refusé") {
     return (
-      <View style={[cd.badgeRed, { marginTop: 4 }]}>
-        <Feather name="briefcase" size={10} color="#DC2626" />
+      <View style={[cd.badgeRed, { marginTop: 12 }]}>
+        <Feather name="briefcase" size={11} color="#DC2626" />
         <Text style={cd.textRed}>Bagages refusés — à régulariser en gare</Text>
       </View>
     );
@@ -516,7 +516,7 @@ export default function BookingsScreen() {
   };
 
   const topPad    = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 100 : insets.bottom + 100;
+  const bottomPad = Platform.OS === "web" ? 120 : insets.bottom + 120;
 
   const FILTER_TABS: { key: FilterKey; label: string }[] = [
     { key: "tous",    label: `Tous${bookings.length ? ` (${bookings.length})` : ""}` },
@@ -539,7 +539,7 @@ export default function BookingsScreen() {
       <LinearGradient
         colors={["#1650D0", "#1030B4", "#0A1C84"]}
         start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: topPad + 18 }]}
+        style={[styles.header, { paddingTop: topPad + 22 }]}
       >
         <View>
           <Text style={styles.headerTitle}>Mes Réservations</Text>
@@ -672,17 +672,17 @@ const styles = StyleSheet.create({
   statusBadge:  { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 22 },
   statusText:   { fontSize: 12, fontFamily: "Inter_700Bold" },
 
-  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 22, paddingBottom: 22, borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
+  routeRow:     { flexDirection: "row", alignItems: "center", marginBottom: 26, paddingBottom: 26, borderBottomWidth: 1, borderBottomColor: "#ECEEF8" },
   cityBlock:    { flex: 1 },
   timeText:     { fontSize: 36, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -2 },
-  cityText:     { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 7 },
+  cityText:     { fontSize: 14, fontFamily: "Inter_500Medium", color: "#7A8FAA", marginTop: 8 },
   routeMiddle:  { flexDirection: "row", alignItems: "center", gap: 4 },
   routeLine:    { width: 32, height: 2, backgroundColor: "#DDE2F0" },
 
-  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 5, backgroundColor: "#EFF6FF", borderRadius: 12, padding: 11, marginTop: 8, borderWidth: 1, borderColor: "#BFDBFE" },
-  rule45Text:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1, lineHeight: 16 },
+  rule45Banner: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#EFF6FF", borderRadius: 14, padding: 14, marginTop: 14, borderWidth: 1, borderColor: "#BFDBFE" },
+  rule45Text:   { fontSize: 12, fontFamily: "Inter_400Regular", color: "#1D4ED8", flex: 1, lineHeight: 18 },
 
-  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8 },
+  cardFooter:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 20 },
   methodRow:    { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 5 },
   methodText:   { fontSize: 11, fontFamily: "Inter_400Regular", color: "#A4B4C6" },
   seatRow:      { flexDirection: "row", alignItems: "center", gap: 5 },
@@ -692,8 +692,8 @@ const styles = StyleSheet.create({
 
   ctaBtn:       { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 18, borderRadius: 18, paddingVertical: 17, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 14, elevation: 6 },
   ctaText:      { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
-  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 10, borderRadius: 12, padding: 12 },
-  waitingText:  { fontSize: 11, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 16 },
+  waitingRow:   { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16, borderRadius: 14, padding: 16 },
+  waitingText:  { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1, lineHeight: 18 },
 
   empty:        { alignItems: "center", paddingTop: 80, gap: 16 },
   emptyIconWrap:{ width: 96, height: 96, borderRadius: 28, backgroundColor: "#EEF2FF", justifyContent: "center", alignItems: "center", marginBottom: 6, borderWidth: 1, borderColor: "#C7D2FE" },
