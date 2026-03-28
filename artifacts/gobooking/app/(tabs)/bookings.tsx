@@ -592,7 +592,7 @@ export default function BookingsScreen() {
       )}
 
       {loading ? (
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
           {[0, 1, 2].map(i => <SkeletonBookingCard key={i} />)}
         </ScrollView>
       ) : (

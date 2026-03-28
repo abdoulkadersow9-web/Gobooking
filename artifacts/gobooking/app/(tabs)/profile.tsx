@@ -286,7 +286,14 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.referralCodeRow}>
               <View style={styles.referralCodeBox}>
-                <Text style={styles.referralCode}>{refCode}</Text>
+                <Text
+                  style={styles.referralCode}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                >
+                  {refCode}
+                </Text>
               </View>
               <Pressable
                 onPress={copyReferral}
@@ -676,10 +683,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   referralCode: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: "#7C3AED",
-    letterSpacing: 3,
+    letterSpacing: 1.5,
   },
   referralBtn: {
     flexDirection: "row",

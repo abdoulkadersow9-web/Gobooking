@@ -320,7 +320,7 @@ export default function ColisScreen() {
 
       {/* Body */}
       {loading && token ? (
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]} showsVerticalScrollIndicator={false}>
           {[0, 1, 2, 3].map(i => <SkeletonParcelCard key={i} />)}
         </ScrollView>
       ) : (
@@ -330,7 +330,7 @@ export default function ColisScreen() {
           renderItem={({ item, index }) => (
             <AnimatedParcelRow item={item} index={index} onPress={() => openSuivi(item)} />
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: 14 }} />}
           refreshControl={
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   chipCountText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#64748B" },
   chipCountTextActive: { color: "white" },
 
-  list: { padding: 18, paddingTop: 14, paddingBottom: 130 },
+  list: { padding: 18, paddingTop: 14, paddingBottom: 110 },
   listEmpty: { flex: 1 },
 
   row: {

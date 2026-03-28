@@ -311,7 +311,7 @@ export default function HomeScreen() {
     <ScrollView
       ref={scrollRef}
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
       showsVerticalScrollIndicator={false}
     >
       {/* ── Header ── */}
