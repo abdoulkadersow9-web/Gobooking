@@ -1099,7 +1099,7 @@ export default function HomeScreen() {
 
       {/* ── Popular routes ── */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Trajets populaires</Text>
+        <Text style={[styles.sectionTitle, { marginBottom: 28 }]}>Trajets populaires</Text>
         {POPULAR_ROUTES.map((route, i) => (
           <Pressable
             key={i}
@@ -1113,16 +1113,27 @@ export default function HomeScreen() {
           >
             <View style={styles.routeCardLeft}>
               <View style={styles.routeCardIcon}>
-                <Feather name="map-pin" size={14} color={Colors.light.primary} />
+                <Feather name="navigation" size={18} color={Colors.light.primary} />
               </View>
-              <View>
-                <Text style={styles.routeCardRoute}>{route.from} → {route.to}</Text>
-                <Text style={styles.routeCardMeta}>{route.duration}</Text>
+              <View style={{ gap: 6 }}>
+                <View style={styles.routeCities}>
+                  <Text style={styles.routeFrom}>{route.from}</Text>
+                  <Feather name="arrow-right" size={13} color="#94A3B8" />
+                  <Text style={styles.routeTo}>{route.to}</Text>
+                </View>
+                <Text style={styles.routeCardMeta}>
+                  <Feather name="clock" size={10} color="#A4B4C6" />{" "}{route.duration}
+                </Text>
               </View>
             </View>
             <View style={styles.routeCardRight}>
-              <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()} FCFA</Text>
-              <Feather name="chevron-right" size={16} color={Colors.light.textMuted} />
+              <View style={styles.routePriceBadge}>
+                <Text style={styles.routeCardPrice}>{(route.price ?? 0).toLocaleString()}</Text>
+                <Text style={styles.routePriceCurrency}>F</Text>
+              </View>
+              <View style={styles.routeChevron}>
+                <Feather name="chevron-right" size={15} color={Colors.light.primary} />
+              </View>
             </View>
           </Pressable>
         ))}
@@ -1289,15 +1300,20 @@ const styles = StyleSheet.create({
   // Popular routes
   routeCard: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
-    backgroundColor: "white", borderRadius: 24, padding: 22, marginBottom: 14,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 24, elevation: 6,
+    backgroundColor: "white", borderRadius: 28, paddingVertical: 20, paddingHorizontal: 22, marginBottom: 18,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.11, shadowRadius: 28, elevation: 8,
     borderWidth: 1, borderColor: "#E8ECFA", borderLeftWidth: 5, borderLeftColor: "#1650D0",
   },
-  routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.985 }] },
-  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 16 },
-  routeCardIcon: { width: 50, height: 50, borderRadius: 18, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
-  routeCardRoute: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  routeCardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7A8FAA", marginTop: 4 },
-  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  routeCardPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary },
+  routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.982 }] },
+  routeCardLeft: { flexDirection: "row", alignItems: "center", gap: 16, flex: 1 },
+  routeCardIcon: { width: 52, height: 52, borderRadius: 20, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "#C7D9FF" },
+  routeCities: { flexDirection: "row", alignItems: "center", gap: 8 },
+  routeFrom: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.2 },
+  routeTo: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.2 },
+  routeCardMeta: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
+  routeCardRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  routePriceBadge: { alignItems: "flex-end" },
+  routeCardPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.5 },
+  routePriceCurrency: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.light.primary, marginTop: 2 },
+  routeChevron: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center" },
 });

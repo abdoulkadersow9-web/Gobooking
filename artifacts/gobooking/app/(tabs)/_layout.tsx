@@ -45,12 +45,12 @@ function TabIcon({
           focused && styles.iconPillActive,
         ]}
       >
-        <Feather name={name} size={20} color={color} />
+        <Feather name={name} size={22} color={color} />
       </View>
       <Text
         style={[
           styles.tabLabel,
-          { color: focused ? Colors.light.primary : "#64748B" },
+          { color: focused ? Colors.light.primary : "#94A3B8" },
         ]}
         numberOfLines={1}
       >
@@ -73,6 +73,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
+        tabBarActiveTintColor: "white",
+        tabBarInactiveTintColor: "#7A8FAA",
         tabBarStyle: {
           position: "absolute",
           bottom: 0,
@@ -161,24 +163,29 @@ const styles = StyleSheet.create({
   tabItem: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: 4,
     paddingTop: 4,
   },
   iconPill: {
-    width: 52,
-    height: 30,
-    borderRadius: 15,
+    width: 60,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
   },
   iconPillActive: {
-    backgroundColor: "#DBEAFE",
+    backgroundColor: "#1650D0",
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.15,
+    letterSpacing: 0.1,
     textAlign: "center",
   },
 });

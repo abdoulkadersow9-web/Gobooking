@@ -644,18 +644,18 @@ export default function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container:    { flex: 1, backgroundColor: Colors.light.background },
-  header:       { paddingHorizontal: 22, paddingBottom: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  header:       { paddingHorizontal: 22, paddingBottom: 32, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   headerTitle:  { fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.6 },
   headerSub:    { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 5 },
-  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 22, paddingHorizontal: 13, paddingVertical: 9, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
-  historyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
+  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.28)", borderRadius: 30, paddingHorizontal: 18, paddingVertical: 13, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.22)" },
+  historyBtnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
-  filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 62 },
-  filterBarContent:  { paddingHorizontal: 20, paddingVertical: 13, gap: 10, flexDirection: "row", alignItems: "center" },
-  filterTab:         { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 22, backgroundColor: "#F4F6FF", borderWidth: 1.5, borderColor: "transparent" },
+  filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 70 },
+  filterBarContent:  { paddingHorizontal: 20, paddingVertical: 15, gap: 12, flexDirection: "row", alignItems: "center" },
+  filterTab:         { paddingHorizontal: 22, paddingVertical: 11, borderRadius: 28, backgroundColor: "#F4F6FF", borderWidth: 2, borderColor: "transparent" },
   filterTabActive:   { backgroundColor: "#EEF4FF", borderColor: "#1650D0" },
-  filterTabText:     { fontSize: 13, fontFamily: "Inter_500Medium", color: "#64748B" },
+  filterTabText:     { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#7A8FAA" },
   filterTabTextActive: { color: "#1650D0", fontFamily: "Inter_700Bold" },
 
   card:         {
