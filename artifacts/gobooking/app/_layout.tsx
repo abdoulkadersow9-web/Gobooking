@@ -10,7 +10,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { BackHandler, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -152,11 +152,31 @@ function GlobalNetworkMonitor() {
   );
 }
 
+/** Intercepts Android hardware back button globally.
+ *  If there is a valid screen to go back to → go back.
+ *  Otherwise → redirect to the tab home (never crash with GO_BACK unhandled). */
+function BackHandlerGuard() {
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (router.canGoBack()) {
+        router.back();
+        return true;
+      }
+      router.replace("/(tabs)");
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <View style={{ flex: 1 }}>
       <GlobalNetworkMonitor />
       <AuthGuard />
+      <BackHandlerGuard />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -166,9 +186,10 @@ function RootLayoutNav() {
           gestureDirection: "horizontal",
         }}
       >
-        <Stack.Screen name="index" options={{ animation: "fade" }} />
-        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom" }} />
-        <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
+        {/* Root screens — no previous screen exists, swipe-back must be disabled */}
+        <Stack.Screen name="index" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ animation: "fade", gestureEnabled: false }} />
       </Stack>
     </View>
   );
