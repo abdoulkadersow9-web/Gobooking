@@ -86,6 +86,23 @@ function getRoleStyle(userRole: string, agentRole: string | null): RoleStyle {
   };
 }
 
+/* ── Données démo statiques — affichées instantanément, sans attente API ── */
+const STATIC_DEMO_ROLES: DemoRole[] = [
+  { email: "admin@test.com",          password: "test123",  userRole: "admin",    agentRole: null               },
+  { email: "compagnie@test.com",      password: "test123",  userRole: "compagnie", agentRole: null              },
+  { email: "chef.test@gobooking.ci",  password: "chef1234", userRole: "agent",    agentRole: "chef_agence"      },
+  { email: "agent@test.com",          password: "test123",  userRole: "agent",    agentRole: "agent_guichet"    },
+  { email: "reservation@test.com",    password: "test123",  userRole: "agent",    agentRole: "agent_reservation" },
+  { email: "embarquement@test.com",   password: "test123",  userRole: "agent",    agentRole: "agent_embarquement" },
+  { email: "colis@test.com",          password: "test123",  userRole: "agent",    agentRole: "agent_colis"      },
+  { email: "bagage@test.com",         password: "test123",  userRole: "agent",    agentRole: "agent_bagage"     },
+  { email: "validepart@test.com",     password: "test123",  userRole: "agent",    agentRole: "validation_depart" },
+  { email: "logistique@test.com",     password: "test123",  userRole: "agent",    agentRole: "logistique"       },
+  { email: "suivi@test.com",          password: "test123",  userRole: "agent",    agentRole: "suivi"            },
+  { email: "route@test.com",          password: "test123",  userRole: "agent",    agentRole: "agent_route"      },
+  { email: "user@test.com",           password: "test123",  userRole: "client",   agentRole: null               },
+];
+
 /* ── Composant principal ────────────────────────────────────────── */
 const VISIBLE = 3; /* nombre de cartes visibles simultanément */
 
@@ -103,9 +120,10 @@ export default function LoginScreen() {
   const [serverError, setServerError]   = useState("");
   const [carouselPage, setCarouselPage] = useState(0);
 
-  /* Rôles démo chargés dynamiquement depuis la DB via API */
-  const [demoRoles, setDemoRoles]        = useState<DemoRole[]>([]);
-  const [demoRolesLoading, setDRLoading] = useState(true);
+  /* Rôles démo — initialisés avec les données statiques pour un affichage immédiat.
+     L'API met à jour en arrière-plan (sans bloquer l'affichage). */
+  const [demoRoles, setDemoRoles]        = useState<DemoRole[]>(STATIC_DEMO_ROLES);
+  const [demoRolesLoading, setDRLoading] = useState(false);
 
   /* Largeur d'une carte = (zone utile) / VISIBLE
      Zone utile = largeur écran − padding formCard (24×2) − gaps internes */
@@ -117,6 +135,7 @@ export default function LoginScreen() {
   const totalPages    = Math.ceil(demoRoles.length / VISIBLE);
 
   useEffect(() => {
+    /* Background sync: update demo roles from API without blocking the UI */
     apiFetch<DemoRole[]>("/auth/demo-roles")
       .then(data => {
         const sorted = [...data].sort((a, b) => {
@@ -124,10 +143,9 @@ export default function LoginScreen() {
           const oB = getRoleStyle(b.userRole, b.agentRole).order;
           return oA - oB;
         });
-        setDemoRoles(sorted);
+        if (sorted.length > 0) setDemoRoles(sorted);
       })
-      .catch(() => {/* silently ignore — user can still log in manually */})
-      .finally(() => setDRLoading(false));
+      .catch(() => {/* silently ignore — static fallback already visible */});
   }, []);
 
   /* ── Connexion ─────────────────────────────────────────────── */
