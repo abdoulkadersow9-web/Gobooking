@@ -2372,13 +2372,40 @@ export default function RouteScreen() {
                 )}
 
                 {camSim === "linked" && (
-                  <View style={SC.linkedBanner}>
-                    <Ionicons name="checkmark-circle" size={22} color="#22C55E" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: "#166534", fontSize: 14, fontWeight: "800" }}>Caméra associée</Text>
-                      <Text style={{ color: "#4B5563", fontSize: 12, marginTop: 2 }}>
-                        Flux transmis à l'agent suivi · Tour de contrôle actif
-                      </Text>
+                  <View style={[SC.linkedBanner, { backgroundColor: "#052E16", borderColor: "#166534", flexDirection: "column", gap: 10 }]}>
+                    {/* Top row */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#22C55E", opacity: camBlink }} />
+                      <Text style={{ color: "#22C55E", fontSize: 13, fontWeight: "900", letterSpacing: 0.5 }}>FLUX LIVE ACTIF</Text>
+                      <View style={{ flex: 1 }} />
+                      <Text style={{ color: "#4ADE80", fontSize: 11, fontWeight: "700" }}>{camDevice ?? "CAM-SIM"}</Text>
+                    </View>
+                    {/* Metrics strip */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <Ionicons name="film-outline" size={13} color="#4ADE80" />
+                        <Text style={{ color: "#4ADE80", fontSize: 12, fontWeight: "800", fontFamily: "monospace" }}>▲ {camFrameCount}</Text>
+                        <Text style={{ color: "#52525B", fontSize: 10 }}>img</Text>
+                      </View>
+                      <View style={{ width: 1, height: 14, backgroundColor: "#1E3A1E" }} />
+                      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+                        {[1,2,3,4].map(b => {
+                          const filled = b <= Math.ceil((camSignal / 100) * 4);
+                          const barColor = camSignal >= 80 ? "#22C55E" : camSignal >= 60 ? "#FCD34D" : "#EF4444";
+                          return <View key={b} style={{ width: 4, height: 4 + b * 3, borderRadius: 1, backgroundColor: filled ? barColor : "#1E293B" }} />;
+                        })}
+                        <Text style={{ color: camSignal >= 80 ? "#22C55E" : camSignal >= 60 ? "#FCD34D" : "#EF4444", fontSize: 11, fontWeight: "800", marginLeft: 4 }}>{camSignal}%</Text>
+                      </View>
+                      <View style={{ width: 1, height: 14, backgroundColor: "#1E3A1E" }} />
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="shield-checkmark" size={12} color="#4ADE80" />
+                        <Text style={{ color: "#52525B", fontSize: 11, fontWeight: "600" }}>1280×720 · HLS</Text>
+                      </View>
+                    </View>
+                    {/* Footer */}
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="radio" size={11} color="#4ADE80" />
+                      <Text style={{ color: "#4B5563", fontSize: 11 }}>Transmis au Tour de Contrôle · Agent suivi notifié</Text>
                     </View>
                   </View>
                 )}
@@ -2912,7 +2939,8 @@ const SC = StyleSheet.create({
   connGrid: { flexDirection: "row", gap: 8, marginBottom: 20 },
   connBtn:  { flex: 1, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 6,
               alignItems: "center", gap: 8, borderWidth: 1.5, borderColor: "#E2E8F0",
-              shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+              shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
+              ...(Platform.OS === "web" ? { boxShadow: "0 2px 8px rgba(0,0,0,0.06)" } : {}) },
   connBtnDim: { opacity: 0.4 },
   connIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
   connLabel: { fontSize: 11, fontWeight: "700", color: "#374151", textAlign: "center", lineHeight: 15 },

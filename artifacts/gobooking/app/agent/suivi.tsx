@@ -8,6 +8,7 @@ import {
   Dimensions,
   Easing,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -401,19 +402,33 @@ export default function SuiviScreen() {
     }
   }, [hasAlerts]);
 
+  const [loadError, setLoadError] = useState(false);
+
+  const hasDataRef = useRef(false);
+
   const load = useCallback(async (silent = false) => {
     if (!token) { setLoading(false); return; }
     if (!silent) setLoading(true);
-    try {
-      const res = await fetch(`${BASE_URL}/agent/suivi/overview`, {
-        headers: authHeader(token),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
-        setLastSync(new Date());
+    let success = false;
+    for (let i = 0; i < 3; i++) {
+      try {
+        const res = await fetch(`${BASE_URL}/agent/suivi/overview`, {
+          headers: authHeader(token),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+          setLastSync(new Date());
+          setLoadError(false);
+          hasDataRef.current = true;
+          success = true;
+          break;
+        }
+      } catch {
+        if (i < 2) await new Promise(r => setTimeout(r, 800 * (i + 1)));
       }
-    } catch {}
+    }
+    if (!success && !hasDataRef.current) setLoadError(true);
     setLoading(false);
     setRefreshing(false);
   }, [token]);
@@ -612,9 +627,28 @@ export default function SuiviScreen() {
       </View>
 
       {loading && !data ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 12, padding: 32 }}>
           <ActivityIndicator size="large" color={RED} />
-          <Text style={{ marginTop: 12, color: "#64748B" }}>Chargement...</Text>
+          <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 4 }}>Chargement du tableau de bord…</Text>
+          <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>Connexion au serveur GoBooking en cours</Text>
+        </View>
+      ) : loadError && !data ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 40 }}>
+          <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: "#FFF1F2", justifyContent: "center", alignItems: "center" }}>
+            <Ionicons name="wifi-outline" size={34} color={RED} />
+          </View>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>Connexion indisponible</Text>
+          <Text style={{ fontSize: 13, color: "#64748B", textAlign: "center", lineHeight: 19 }}>
+            Impossible de joindre le serveur.{"\n"}Vérifiez votre connexion réseau et réessayez.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: RED_D, borderRadius: 14, paddingHorizontal: 32, paddingVertical: 14, flexDirection: "row", alignItems: "center", gap: 8 }}
+            onPress={() => { setLoadError(false); load(); }}
+          >
+            <Feather name="refresh-cw" size={15} color="#fff" />
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "800" }}>Réessayer</Text>
+          </TouchableOpacity>
+          <Text style={{ fontSize: 11, color: "#CBD5E1" }}>GoBooking · Tour de Contrôle</Text>
         </View>
       ) : (
         <ScrollView
@@ -753,12 +787,23 @@ export default function SuiviScreen() {
               <View style={S.cockpitSyncRow}>
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: syncSec < 4 ? CAM_GR : syncSec < 8 ? "#FCD34D" : "#94A3B8" }} />
                 <Text style={S.cockpitSyncTxt}>
-                  {syncSec < 2 ? "Synchronisé" : `Prochain sync dans ${Math.max(0, 5 - syncSec)}s`}
+                  {syncSec < 2
+                    ? "Sync OK"
+                    : syncSec <= 5
+                      ? `Next sync  ${Math.max(0, 5 - syncSec)}s`
+                      : "En attente…"}
                   {" · "}{syncLabel}
                 </Text>
-                <Text style={{ color: "#22C55E", fontSize: 9, fontWeight: "900", marginLeft: "auto" }}>
-                  {hasCameras ? `${activeCamCount} flux actif${activeCamCount > 1 ? "s" : ""}` : ""}
-                </Text>
+                <View style={{ flex: 1 }} />
+                {hasCameras && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: "#22C55E",
+                      opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                    <Text style={{ color: "#22C55E", fontSize: 9, fontWeight: "900" }}>
+                      {activeCamCount} FLUX ACTIF{activeCamCount > 1 ? "S" : ""}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           )}
@@ -1214,7 +1259,8 @@ const S = StyleSheet.create({
 
   statsRow:   { flexDirection: "row", gap: 10 },
   statCard:   { flex: 1, backgroundColor: "#fff", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10,
-                borderLeftWidth: 3, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+                borderLeftWidth: 3, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+                ...(Platform.OS === "web" ? { boxShadow: "0 1px 6px rgba(0,0,0,0.07)" } : {}) },
   statNum:    { fontSize: 22, fontWeight: "900", color: "#0F172A", lineHeight: 26 },
   statLabel:  { fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 1 },
 

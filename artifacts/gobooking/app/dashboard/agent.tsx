@@ -1754,7 +1754,7 @@ const SC = StyleSheet.create({
   camera: { flex: 1 },
   cameraOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: "center", alignItems: "center" },
   scanFrame: { width: 220, height: 220, borderWidth: 3, borderColor: "white", borderRadius: 20, marginBottom: 16, opacity: 0.9 },
-  scanHint: { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold", textShadowColor: "rgba(0,0,0,0.5)", textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  scanHint: { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold" },
   cameraLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", gap: 12 },
   cameraLoadingText: { color: "white", fontSize: 14, fontFamily: "Inter_600SemiBold" },
   cancelScanBtn: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
