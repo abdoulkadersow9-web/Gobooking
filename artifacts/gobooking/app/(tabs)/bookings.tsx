@@ -551,19 +551,23 @@ export default function BookingsScreen() {
         style={[styles.header, { paddingTop: topPad + 22 }]}
       >
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.headerTitle} numberOfLines={1}>Mes Réservations</Text>
-          {bookings.length > 0 && (
-            <Text style={styles.headerSub} numberOfLines={1}>{bookings.length} trajet{bookings.length > 1 ? "s" : ""} au total</Text>
-          )}
+          <Text style={styles.headerTitle}>Mes Réservations</Text>
+          <Text style={styles.headerSub}>
+            {bookings.length > 0 ? `${bookings.length} trajet${bookings.length > 1 ? "s" : ""} au total` : "Vos billets de voyage"}
+          </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: 8, flexShrink: 0 }}>
-          <Pressable style={styles.historyBtn} onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}>
-            <Feather name="gift" size={15} color="white" />
-            <Text style={styles.historyBtnText}>Bons</Text>
+        <View style={{ flexDirection: "row", gap: 10, flexShrink: 0 }}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => { Haptics.selectionAsync(); router.push("/client/bons" as any); }}
+          >
+            <Feather name="gift" size={18} color="white" />
           </Pressable>
-          <Pressable style={styles.historyBtn} onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}>
-            <Feather name="clock" size={15} color="white" />
-            <Text style={styles.historyBtnText}>Paiements</Text>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => { Haptics.selectionAsync(); router.push("/payment/history"); }}
+          >
+            <Feather name="clock" size={18} color="white" />
           </Pressable>
         </View>
       </LinearGradient>
@@ -656,8 +660,7 @@ const styles = StyleSheet.create({
   header:       { paddingHorizontal: 20, paddingBottom: 24, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   headerTitle:  { fontSize: 22, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 },
   headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 4 },
-  historyBtn:   { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 26, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.20)" },
-  historyBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "white" },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.20)", justifyContent: "center", alignItems: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)" },
   center:       { flex: 1, justifyContent: "center", alignItems: "center" },
 
   filterBar:         { backgroundColor: "white", borderBottomWidth: 1, borderBottomColor: "#ECEEF8", maxHeight: 70 },

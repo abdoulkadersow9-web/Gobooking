@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
@@ -63,7 +65,7 @@ export default function PaymentHistoryScreen() {
   const [payments, setPayments] = useState<PaymentItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = Platform.OS === "web" ? 24 : insets.top;
 
   const load = useCallback(async (silent = false) => {
     if (!token) return;
@@ -141,28 +143,36 @@ export default function PaymentHistoryScreen() {
   };
 
   return (
-    <View style={[ss.flex, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={ss.header}>
-        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings")} style={ss.backBtn}>
-          <Feather name="arrow-left" size={22} color="#0B3C5D" />
+    <View style={ss.flex}>
+      {/* Gradient header */}
+      <LinearGradient
+        colors={["#1650D0", "#1030B4", "#0A1C84"]}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={[ss.header, { paddingTop: topPad + 16 }]}
+      >
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); router.canGoBack() ? router.back() : router.replace("/(tabs)/bookings"); }}
+          style={ss.backBtn}
+        >
+          <Feather name="arrow-left" size={18} color="white" />
         </Pressable>
-        <View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={ss.headerTitle}>Historique des paiements</Text>
-          {!loading && (
-            <Text style={ss.headerSub}>{payments.length} paiement{payments.length !== 1 ? "s" : ""}</Text>
-          )}
+          <Text style={ss.headerSub}>
+            {!loading ? `${payments.length} paiement${payments.length !== 1 ? "s" : ""}` : "Chargement..."}
+          </Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {loading ? (
         <View style={[ss.flex, ss.center]}>
-          <ActivityIndicator size="large" color="#0B3C5D" />
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: "#94A3B8", marginTop: 12 }}>Chargement...</Text>
         </View>
       ) : payments.length === 0 ? (
-        <View style={[ss.flex, ss.center]}>
+        <View style={[ss.flex, ss.center, { paddingHorizontal: 32 }]}>
           <View style={ss.emptyIcon}>
-            <Feather name="credit-card" size={32} color="#94A3B8" />
+            <Feather name="credit-card" size={32} color={Colors.light.primary} />
           </View>
           <Text style={ss.emptyTitle}>Aucun paiement</Text>
           <Text style={ss.emptySub}>Vos paiements apparaîtront ici après confirmation.</Text>
@@ -186,13 +196,13 @@ export default function PaymentHistoryScreen() {
 }
 
 const ss = StyleSheet.create({
-  flex:         { flex: 1, backgroundColor: "#FFF" },
+  flex:         { flex: 1, backgroundColor: Colors.light.background },
   center:       { alignItems: "center", justifyContent: "center", gap: 10 },
-  header:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 14, paddingTop: 8, borderBottomWidth: 1, borderBottomColor: "#E2E8F0", gap: 12, backgroundColor: "#FFF" },
-  backBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: "#F1F5F9", alignItems: "center", justifyContent: "center" },
-  headerTitle:  { fontSize: 18, fontFamily: "Inter_700Bold", color: "#0B3C5D" },
-  headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 1 },
-  card:         { flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#E2E8F0" },
+  header:       { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 22, gap: 16 },
+  backBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)", flexShrink: 0 },
+  headerTitle:  { fontSize: 20, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.4 },
+  headerSub:    { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 3 },
+  card:         { flexDirection: "row", alignItems: "center", backgroundColor: "white", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#E8ECFA" },
   cardLeft:     { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   methodIcon:   { width: 48, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   route:        { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#1E293B", marginBottom: 2 },
