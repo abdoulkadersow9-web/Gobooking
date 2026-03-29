@@ -875,6 +875,69 @@ async function updateTripPositionIntelligence() {
 
 // ─── Point d'entrée ───────────────────────────────────────────────────────────
 
+/* ─── Auto-annulation réservations 45 min avant départ ─────────────────────
+   Toutes les réservations non payées (paymentStatus=pending ou status=reserved)
+   sont automatiquement annulées 45 minutes avant le départ.
+   Les sièges réservés sont libérés.
+────────────────────────────────────────────────────────────────────────────── */
+async function autoCancel45MinReservations() {
+  try {
+    // Get upcoming trips (within next 2 hours, still scheduled/boarding)
+    const now = new Date();
+
+    const upcomingTrips = await db.select({
+      id: tripsTable.id,
+      date: tripsTable.date,
+      departureTime: tripsTable.departureTime,
+    }).from(tripsTable).where(
+      inArray(tripsTable.status, ["scheduled", "boarding"])
+    );
+
+    for (const trip of upcomingTrips) {
+      const deptDate = new Date(`${trip.date}T${trip.departureTime}:00`);
+      const minsUntil = (deptDate.getTime() - now.getTime()) / 60_000;
+
+      // Cancel pending reservations if departure is between 0 and 45 min away
+      if (minsUntil >= 0 && minsUntil <= 45) {
+        const pendingBookings = await db.select().from(bookingsTable).where(
+          and(
+            eq(bookingsTable.tripId, trip.id),
+            inArray(bookingsTable.status, ["reserved", "pending"]),
+          )
+        );
+
+        for (const booking of pendingBookings) {
+          // Free seats
+          const seatIds: string[] = Array.isArray(booking.seatIds) ? (booking.seatIds as string[]) : [];
+          for (const seatId of seatIds) {
+            await db.update(seatsTable).set({ status: "available" }).where(eq(seatsTable.id, seatId));
+          }
+
+          // Cancel the booking
+          await db.update(bookingsTable)
+            .set({ status: "cancelled", paymentStatus: "cancelled" } as any)
+            .where(eq(bookingsTable.id, booking.id));
+
+          // Notify the passenger if possible
+          if (booking.userId) {
+            sendExpoPush(booking.userId, {
+              title: "⚠️ Réservation annulée",
+              body: `Votre réservation ${booking.bookingRef} a été annulée automatiquement (départ dans moins de 45 minutes sans paiement).`,
+              data: { type: "reservation_auto_cancelled", bookingId: booking.id },
+            }).catch(() => {});
+          }
+        }
+
+        if (pendingBookings.length > 0) {
+          console.log(`[Scheduler] Auto-annulation: ${pendingBookings.length} réservation(s) annulées pour le trajet ${trip.id} (départ dans ${Math.round(minsUntil)} min)`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Scheduler] Erreur auto-annulation 45min:", err);
+  }
+}
+
 export function startScheduler(intervalMs = 30_000) {
   console.log(`[Scheduler] ⚙️  Démarré — vérification toutes les ${intervalMs / 1000}s`);
 
@@ -896,6 +959,7 @@ export function startScheduler(intervalMs = 30_000) {
         sendPreAlightingNotifications(),
         sendDelayNotifications(),
         updateTripPositionIntelligence(),
+        autoCancel45MinReservations(),
       ]);
     } catch (err) {
       console.error("[Scheduler] Erreur générale:", err);

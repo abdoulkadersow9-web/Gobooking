@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, StatusBar, ActivityIndicator, Alert, Pressable,
+  StyleSheet, StatusBar, ActivityIndicator, Alert, Pressable, Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
@@ -14,6 +18,7 @@ const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
 const G_DARK  = "#065F46";
 
+/* ─── Types ────────────────────────────────────────────────────────────────── */
 interface Trip {
   id: string;
   from: string;
@@ -27,6 +32,55 @@ interface Trip {
   status?: string;
   stops?: string[];
   allCities?: string[];
+  tripType?: string;
+}
+
+interface Passenger {
+  bookingId: string;
+  bookingRef: string;
+  name: string;
+  phone: string;
+  seatNumbers: string[];
+  status: "payé" | "à_bord" | "réservé" | "sp";
+  paymentStatus: string;
+  source: string;
+  boardingCity: string | null;
+  alightingCity: string | null;
+  amount: number;
+  createdAt: string;
+}
+
+interface TripDashboard {
+  trip: {
+    id: string; from: string; to: string; date: string;
+    departureTime: string; price: number; status: string;
+    tripType: string; busName: string; plateNumber: string; busType: string;
+    stops: string[]; allCities: string[];
+  };
+  seats: {
+    total: number; guichetTotal: number; onlineTotal: number;
+    usedGuichet: number; usedOnline: number; usedSP: number;
+    reserved: number; availGuichet: number; availOnline: number; availTotal: number;
+  };
+  passengers: Passenger[];
+  totals: {
+    passengersCount: number; payéCount: number; réservéCount: number; spCount: number; revenue: number;
+  };
+}
+
+interface TicketData {
+  bookingRef: string; bookingId: string;
+  passengerName: string; phone: string;
+  seatNumbers: string[]; seatCount: number;
+  amount: number; paymentMethod: string; paymentStatus: string;
+  status: string; source: string;
+  boardingCity: string | null; alightingCity: string | null;
+  createdAt: string;
+  trip: {
+    id: string; from: string; to: string; date: string;
+    departureTime: string; price: number; busName: string;
+    plateNumber: string; busType: string; tripType: string;
+  };
 }
 
 const PAYMENT_METHODS = [
@@ -35,34 +89,139 @@ const PAYMENT_METHODS = [
   { id: "card",         label: "Carte",         icon: "card-outline"           as const },
 ];
 
+/* ─── Status helpers ───────────────────────────────────────────────────────── */
+function statusColor(s: string) {
+  if (s === "payé" || s === "à_bord") return G;
+  if (s === "sp")    return "#7C3AED";
+  if (s === "réservé") return "#D97706";
+  return "#9CA3AF";
+}
+function statusLabel(s: string) {
+  if (s === "payé")    return "Payé";
+  if (s === "à_bord")  return "À bord";
+  if (s === "sp")      return "SP";
+  if (s === "réservé") return "Réservé";
+  return s;
+}
+function statusBg(s: string) {
+  if (s === "payé" || s === "à_bord") return "#D1FAE5";
+  if (s === "sp")    return "#EDE9FE";
+  if (s === "réservé") return "#FEF3C7";
+  return "#F3F4F6";
+}
+function sourceBadge(s: string) {
+  if (s === "online" || s === "mobile") return { label: "En ligne", color: "#2563EB", bg: "#EFF6FF" };
+  if (s === "voucher") return { label: "BON", color: "#7C3AED", bg: "#EDE9FE" };
+  if (s === "sp") return { label: "SP", color: "#7C3AED", bg: "#EDE9FE" };
+  return { label: "Guichet", color: G, bg: G_LIGHT };
+}
+function tripTypeLabel(t: string) {
+  if (t === "vip")     return "VIP";
+  if (t === "vip_plus") return "VIP+";
+  return "Standard";
+}
+
+/* ─── Ticket HTML for print ─────────────────────────────────────────────────*/
+function buildTicketHtml(ticket: TicketData): string {
+  const spStr = ticket.paymentStatus === "sp" ? " (SP — Sans Payer)" : "";
+  const seatStr = ticket.seatNumbers.length > 0 ? ticket.seatNumbers.join(", ") : "Auto";
+  const amountStr = ticket.paymentStatus === "sp" ? "0 FCFA (SP)" : `${(ticket.amount ?? 0).toLocaleString()} FCFA`;
+  const pmLabel = ticket.paymentMethod === "sp" ? "SP" :
+    ticket.paymentMethod === "cash" ? "Espèces" :
+    ticket.paymentMethod === "mobile_money" ? "Mobile Money" :
+    ticket.paymentMethod === "card" ? "Carte" : ticket.paymentMethod;
+
+  return `<!DOCTYPE html><html><head>
+    <meta charset="utf-8"/>
+    <style>
+      body{font-family:Arial,sans-serif;margin:0;padding:20px;color:#111}
+      .header{background:#065F46;color:#fff;padding:16px;border-radius:8px;margin-bottom:20px;text-align:center}
+      h1{margin:0;font-size:22px}
+      .sub{font-size:13px;opacity:.8;margin-top:4px}
+      .ref{font-size:28px;font-weight:bold;color:#059669;text-align:center;margin:20px 0;letter-spacing:3px}
+      .section{background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:12px}
+      .row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E5E7EB}
+      .row:last-child{border-bottom:none;font-weight:bold}
+      .label{color:#6B7280;font-size:13px}
+      .value{font-size:13px;font-weight:600;color:#111}
+      .sp-badge{background:#EDE9FE;color:#7C3AED;padding:4px 10px;border-radius:12px;font-size:12px;display:inline-block}
+      .footer{text-align:center;color:#9CA3AF;font-size:11px;margin-top:20px}
+    </style>
+  </head><body>
+    <div class="header">
+      <h1>GoBooking</h1>
+      <div class="sub">Billet de transport intercité</div>
+    </div>
+    <div class="ref">${ticket.bookingRef}${ticket.paymentStatus === "sp" ? ' <span class="sp-badge">SP</span>' : ""}</div>
+    <div class="section">
+      <div class="row"><span class="label">Passager</span><span class="value">${ticket.passengerName}</span></div>
+      <div class="row"><span class="label">Téléphone</span><span class="value">${ticket.phone || "—"}</span></div>
+      <div class="row"><span class="label">Siège(s)</span><span class="value">${seatStr}</span></div>
+    </div>
+    <div class="section">
+      <div class="row"><span class="label">Trajet</span><span class="value">${ticket.trip.from} → ${ticket.trip.to}</span></div>
+      ${ticket.boardingCity ? `<div class="row"><span class="label">Monte à</span><span class="value">${ticket.boardingCity}</span></div>` : ""}
+      ${ticket.alightingCity ? `<div class="row"><span class="label">Descend à</span><span class="value">${ticket.alightingCity}</span></div>` : ""}
+      <div class="row"><span class="label">Date</span><span class="value">${ticket.trip.date} à ${ticket.trip.departureTime}</span></div>
+      <div class="row"><span class="label">Bus</span><span class="value">${ticket.trip.busName || "—"} (${ticket.trip.plateNumber || "—"})</span></div>
+    </div>
+    <div class="section">
+      <div class="row"><span class="label">Mode de paiement</span><span class="value">${pmLabel}</span></div>
+      <div class="row"><span class="label">Montant total</span><span class="value" style="color:#059669;font-size:16px">${amountStr}${spStr}</span></div>
+    </div>
+    <div class="footer">Billet généré par GoBooking · ${new Date().toLocaleString("fr-FR")}<br/>Présentez ce billet à l'agent d'embarquement</div>
+  </body></html>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPOSANT PRINCIPAL
+═══════════════════════════════════════════════════════════════════════════ */
 export default function VenteScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
 
-  const [trips, setTrips]               = useState<Trip[]>([]);
-  const [loadingTrips, setLoadingTrips] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  /* View state */
+  const [view, setView] = useState<"trips" | "detail" | "form">("trips");
 
+  /* Trips list */
+  const [trips, setTrips]             = useState<Trip[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState(false);
+
+  /* Selected trip + dashboard */
+  const [selectedTrip, setSelectedTrip]       = useState<Trip | null>(null);
+  const [dashboard, setDashboard]              = useState<TripDashboard | null>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(false);
+
+  /* Sale form */
+  const [showForm, setShowForm] = useState(false);
   const [passengerName,  setPassengerName]  = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
   const [passengerCount, setPassengerCount] = useState("1");
   const [paymentMethod,  setPaymentMethod]  = useState("cash");
-
-  // Villes montée / descente
-  const [boardingCity,  setBoardingCity]  = useState("");
-  const [alightingCity, setAlightingCity] = useState("");
-
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmed, setConfirmed]   = useState<{
-    bookingRef: string; total: number;
-    seatNumbers?: string[]; boardingCity?: string; alightingCity?: string;
+  const [isSP,           setIsSP]           = useState(false);
+  const [boardingCity,   setBoardingCity]   = useState("");
+  const [alightingCity,  setAlightingCity]  = useState("");
+  const [submitting,     setSubmitting]     = useState(false);
+  const [confirmed, setConfirmed] = useState<{
+    bookingRef: string; total: number; seatNumbers?: string[];
+    boardingCity?: string; alightingCity?: string; isSP?: boolean;
   } | null>(null);
 
-  const fetchTrips = async () => {
+  /* Reprint modal */
+  const [reprintModal, setReprintModal]       = useState(false);
+  const [reprintTicket, setReprintTicket]     = useState<TicketData | null>(null);
+  const [loadingReprint, setLoadingReprint]   = useState(false);
+  const [printingTicket, setPrintingTicket]   = useState(false);
+
+  /* Passenger filter */
+  const [passengerFilter, setPassengerFilter] = useState<"all" | "payé" | "réservé" | "sp">("all");
+
+  /* ── Fetch trips list ── */
+  const fetchTrips = useCallback(async () => {
     setLoadingTrips(true);
     try {
       const res = await apiFetch<Trip[]>("/agent/trips", { token: token ?? undefined });
-      const all  = Array.isArray(res) ? res : [];
+      const all = Array.isArray(res) ? res : [];
       const today = new Date().toISOString().split("T")[0];
       const yest  = new Date(Date.now() - 86_400_000).toISOString().split("T")[0];
       const tmrw  = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
@@ -76,31 +235,53 @@ export default function VenteScreen() {
     } finally {
       setLoadingTrips(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => { fetchTrips(); }, []);
+  /* ── Fetch trip dashboard ── */
+  const fetchDashboard = useCallback(async (tripId: string) => {
+    setLoadingDashboard(true);
+    try {
+      const res = await apiFetch<TripDashboard>(`/agent/guichet/trip/${tripId}`, { token: token ?? undefined });
+      setDashboard(res);
+    } catch {
+      setDashboard(null);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, [token]);
 
-  // Quand le trajet change, réinitialiser les villes
+  /* Auto-refresh on focus */
+  useFocusEffect(useCallback(() => {
+    fetchTrips();
+    if (selectedTrip) fetchDashboard(selectedTrip.id);
+  }, [fetchTrips, fetchDashboard, selectedTrip]));
+
+  /* ── Select trip → go to detail view ── */
   const selectTrip = (trip: Trip) => {
     setSelectedTrip(trip);
     const cities = trip.allCities ?? [trip.fromCity ?? trip.from, trip.toCity ?? trip.to];
     setBoardingCity(cities[0] ?? "");
     setAlightingCity(cities[cities.length - 1] ?? "");
+    setView("detail");
+    fetchDashboard(trip.id);
   };
 
-  if (user && user.role !== "agent") {
-    return (
-      <SafeAreaView style={s.denied}>
-        <Ionicons name="lock-closed" size={48} color="#EF4444" />
-        <Text style={s.deniedText}>Accès réservé aux agents</Text>
-      </SafeAreaView>
-    );
-  }
+  /* ── Open sale form ── */
+  const openForm = () => {
+    setConfirmed(null);
+    setPassengerName("");
+    setPassengerPhone("");
+    setPassengerCount("1");
+    setPaymentMethod("cash");
+    setIsSP(false);
+    setShowForm(true);
+  };
 
+  /* ── Submit sale ── */
   const handleSubmit = async () => {
-    if (!selectedTrip)       { Alert.alert("Erreur", "Sélectionnez un trajet."); return; }
+    if (!selectedTrip) return;
     if (!passengerName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
-    if (!passengerPhone.trim()) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
+    if (!passengerPhone.trim() && !isSP) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
     const count = parseInt(passengerCount) || 1;
     if (count < 1 || count > 10) { Alert.alert("Erreur", "Nombre de passagers invalide (1-10)."); return; }
 
@@ -110,17 +291,21 @@ export default function VenteScreen() {
         const offlineRef = `OFFLINE-${Date.now().toString(36).toUpperCase()}`;
         await saveOffline({
           type: "reservation",
-          payload: { tripId: selectedTrip.id, passengerName: passengerName.trim(),
-            passengerPhone: passengerPhone.trim(), passengerCount: count, paymentMethod } as any,
+          payload: {
+            tripId: selectedTrip.id, passengerName: passengerName.trim(),
+            passengerPhone: passengerPhone.trim(), passengerCount: count,
+            paymentMethod: isSP ? "sp" : paymentMethod, isSP,
+          } as any,
           token: token ?? "",
           createdAt: Date.now(),
         });
-        setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count });
+        setConfirmed({ bookingRef: `OFFLINE-${Date.now()}`, total: isSP ? 0 : selectedTrip.price * count, isSP });
         return;
       }
+
       const res = await apiFetch<{
-        bookingRef?: string; id?: string;
-        seatNumbers?: string[]; boardingCity?: string; alightingCity?: string;
+        bookingRef?: string; id?: string; seatNumbers?: string[];
+        boardingCity?: string; alightingCity?: string;
       }>("/agent/reservations", {
         token: token ?? undefined,
         method: "POST",
@@ -129,18 +314,24 @@ export default function VenteScreen() {
           clientName:    passengerName.trim(),
           clientPhone:   passengerPhone.trim(),
           seatCount:     count,
-          paymentMethod,
+          paymentMethod: isSP ? "sp" : paymentMethod,
           boardingCity:  boardingCity  || (selectedTrip.fromCity ?? selectedTrip.from),
           alightingCity: alightingCity || (selectedTrip.toCity   ?? selectedTrip.to),
+          isSP,
         },
       });
+
       setConfirmed({
         bookingRef:   res.bookingRef ?? res.id ?? "—",
-        total:        selectedTrip.price * count,
+        total:        isSP ? 0 : selectedTrip.price * count,
         seatNumbers:  res.seatNumbers,
         boardingCity: res.boardingCity,
         alightingCity: res.alightingCity,
+        isSP,
       });
+
+      // Refresh dashboard
+      fetchDashboard(selectedTrip.id);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation");
     } finally {
@@ -148,370 +339,706 @@ export default function VenteScreen() {
     }
   };
 
-  const reset = () => {
-    setConfirmed(null);
-    setSelectedTrip(null);
-    setPassengerName("");
-    setPassengerPhone("");
-    setPassengerCount("1");
-    setPaymentMethod("cash");
-    setBoardingCity("");
-    setAlightingCity("");
+  /* ── Reprint ticket ── */
+  const handleReprint = async (bookingId: string) => {
+    setLoadingReprint(true);
+    setReprintTicket(null);
+    setReprintModal(true);
+    try {
+      const data = await apiFetch<TicketData>(`/agent/booking/${bookingId}/ticket-data`, {
+        token: token ?? undefined,
+      });
+      setReprintTicket(data);
+    } catch {
+      Alert.alert("Erreur", "Impossible de charger les données du billet");
+      setReprintModal(false);
+    } finally {
+      setLoadingReprint(false);
+    }
   };
 
-  /* ─── Succès ──────────────────────────────────────────────────────── */
-  if (confirmed) {
+  const printTicket = async () => {
+    if (!reprintTicket) return;
+    setPrintingTicket(true);
+    try {
+      const html = buildTicketHtml(reprintTicket);
+      if (Platform.OS === "web") {
+        Alert.alert("Impression", "Impression non disponible sur le web. Exportez en PDF.");
+        return;
+      }
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri, { UTI: ".pdf", mimeType: "application/pdf" });
+    } catch {
+      Alert.alert("Erreur", "Impossible d'imprimer le billet");
+    } finally {
+      setPrintingTicket(false);
+    }
+  };
+
+  /* ── Convert online booking to voucher ── */
+  const handleToVoucher = async (passenger: Passenger) => {
+    Alert.alert(
+      "Convertir en BON",
+      `Convertir la réservation de ${passenger.name} (${passenger.bookingRef}) en BON de transport ?`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Convertir",
+          onPress: async () => {
+            try {
+              await apiFetch(`/agent/guichet/booking/${passenger.bookingId}/to-voucher`, {
+                token: token ?? undefined, method: "POST", body: {},
+              });
+              fetchDashboard(selectedTrip!.id);
+              Alert.alert("Succès", "Réservation convertie en BON.");
+            } catch (e: any) {
+              Alert.alert("Erreur", e?.message ?? "Impossible de convertir en BON");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /* ── Cancel guichet ticket (chef/company only) ── */
+  const handleCancelGuichet = async (passenger: Passenger) => {
+    Alert.alert(
+      "Annuler le billet",
+      `Annuler le billet de ${passenger.name} (${passenger.bookingRef}) ? La place sera libérée et le montant remis à zéro.`,
+      [
+        { text: "Non", style: "cancel" },
+        {
+          text: "Annuler le billet",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiFetch(`/agent/guichet/booking/${passenger.bookingId}/cancel`, {
+                token: token ?? undefined, method: "POST", body: { reason: "Annulé par chef d'agence" },
+              });
+              fetchDashboard(selectedTrip!.id);
+              Alert.alert("Succès", "Billet annulé — place libérée.");
+            } catch (e: any) {
+              Alert.alert("Erreur", e?.message ?? "Impossible d'annuler le billet");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /* ── Access control ── */
+  if (user && user.role !== "agent") {
+    return (
+      <SafeAreaView style={s.denied}>
+        <Ionicons name="lock-closed" size={48} color="#EF4444" />
+        <Text style={s.deniedText}>Accès réservé aux agents</Text>
+      </SafeAreaView>
+    );
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     HEADER commun
+  ──────────────────────────────────────────────────────────────── */
+  const Header = ({ backFn }: { backFn?: () => void }) => (
+    <View style={s.header}>
+      <View style={s.headerRow}>
+        {backFn ? (
+          <TouchableOpacity onPress={backFn} style={s.headerBack} hitSlop={10}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+        ) : (
+          <View style={s.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
+        )}
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>
+            {view === "trips" ? "Espace Vente" : view === "detail" ? `${selectedTrip?.from} → ${selectedTrip?.to}` : "Nouvelle vente"}
+          </Text>
+          <Text style={s.headerSub}>
+            {view === "trips" ? "Sélectionnez un départ" :
+             view === "detail" ? `${selectedTrip?.departureTime} · ${selectedTrip?.date}` :
+             "Enregistrement passager"}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={s.headerLogout} hitSlop={8}
+          onPress={() => {
+            if (Platform.OS === "web") { logout(); return; }
+            Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+              { text: "Annuler", style: "cancel" },
+              { text: "Se déconnecter", style: "destructive", onPress: logout },
+            ]);
+          }}
+        >
+          <Ionicons name="log-out-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  /* ═══════════════════════════════════════════════════════
+     VUE 1 — LISTE DES TRAJETS
+  ═══════════════════════════════════════════════════════ */
+  if (view === "trips") {
     return (
       <SafeAreaView style={s.safe} edges={["top"]}>
         <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
-        <View style={s.header}>
-          <View style={s.headerRow}>
-            <View style={s.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
-            <View><Text style={s.headerTitle}>Espace Vente</Text><Text style={s.headerSub}>Vente de billets</Text></View>
-          </View>
-        </View>
-        <ScrollView style={s.scroll} contentContainerStyle={[s.content, { alignItems: "center", paddingTop: 40 }]}>
-          <View style={{ marginBottom: 16 }}>
-            <Ionicons name="checkmark-circle" size={72} color={G} />
-          </View>
-          <Text style={s.successTitle}>Réservation créée !</Text>
-          <Text style={s.successRef}>Réf: {confirmed.bookingRef}</Text>
-          <Text style={s.successTotal}>Total encaissé: {(confirmed.total ?? 0).toLocaleString()} FCFA</Text>
-
-          {/* Sièges assignés */}
-          {confirmed.seatNumbers && confirmed.seatNumbers.length > 0 && (
-            <View style={{ backgroundColor: G_LIGHT, borderRadius: 12, padding: 14, marginTop: 12, width: "100%", borderWidth: 1, borderColor: "#A7F3D0" }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <Ionicons name="grid-outline" size={16} color={G} />
-                <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK }}>Sièges attribués</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-                {confirmed.seatNumbers.map(sn => (
-                  <View key={sn} style={{ backgroundColor: G, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
-                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>{sn}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Villes montée / descente */}
-          {(confirmed.boardingCity || confirmed.alightingCity) && (
-            <View style={{ backgroundColor: "#EFF6FF", borderRadius: 12, padding: 14, marginTop: 10, width: "100%", borderWidth: 1, borderColor: "#BFDBFE" }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <View style={{ alignItems: "center", flex: 1 }}>
-                  <Ionicons name="log-in-outline" size={16} color="#2563EB" />
-                  <Text style={{ fontSize: 10, color: "#2563EB", marginTop: 2 }}>Monte à</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#1D4ED8", marginTop: 2 }}>{confirmed.boardingCity}</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={18} color="#94A3B8" style={{ marginTop: 10 }} />
-                <View style={{ alignItems: "center", flex: 1 }}>
-                  <Ionicons name="log-out-outline" size={16} color="#DC2626" />
-                  <Text style={{ fontSize: 10, color: "#DC2626", marginTop: 2 }}>Descend à</Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#DC2626", marginTop: 2 }}>{confirmed.alightingCity}</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {confirmed.bookingRef.startsWith("OFFLINE-") ? (
-            <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, padding: 12, marginTop: 14, flexDirection: "row", alignItems: "center", gap: 8, width: "100%" }}>
-              <Ionicons name="cloud-offline-outline" size={18} color="#D97706" />
-              <Text style={{ color: "#92400E", fontSize: 12, flex: 1, lineHeight: 18 }}>
-                Sauvegardé hors ligne — sera synchronisé automatiquement dès le retour de la connexion.
+        <OfflineBanner status={networkStatus} />
+        <Header />
+        <ScrollView style={s.scroll} contentContainerStyle={s.content}>
+          <View style={s.card}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={s.cardTitle}>
+                <Ionicons name="bus-outline" size={15} color={G} /> Départs disponibles
               </Text>
+              <TouchableOpacity onPress={fetchTrips} hitSlop={8}>
+                <Ionicons name="refresh" size={18} color={G} />
+              </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={s.successSub}>Imprimez ou envoyez le billet au client</Text>
-          )}
-          <TouchableOpacity style={[s.submitBtn, { marginTop: 24, width: "100%" }]} onPress={reset}>
-            <Ionicons name="add-circle-outline" size={20} color="#fff" />
-            <Text style={s.submitBtnText}>Nouvelle vente</Text>
-          </TouchableOpacity>
+
+            {loadingTrips ? (
+              <ActivityIndicator color={G} style={{ padding: 20 }} />
+            ) : trips.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Ionicons name="bus-outline" size={40} color="#D1FAE5" />
+                <Text style={s.emptyText}>Aucun départ disponible</Text>
+                <TouchableOpacity onPress={fetchTrips}>
+                  <Text style={{ color: G, fontSize: 13, marginTop: 4 }}>Actualiser</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              trips.map(trip => {
+                const isTransit = trip.status === "en_route" || trip.status === "in_progress";
+                const isBoarding = trip.status === "boarding";
+                return (
+                  <TouchableOpacity
+                    key={trip.id}
+                    style={[s.tripCard, isBoarding && { borderColor: "#F59E0B", borderLeftWidth: 4 }]}
+                    onPress={() => selectTrip(trip)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
+                        <Text style={s.tripRoute}>{trip.from} → {trip.to}</Text>
+                        {isBoarding && (
+                          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>Embarquement</Text>
+                          </View>
+                        )}
+                        {isTransit && (
+                          <View style={{ backgroundColor: G_LIGHT, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: G }}>En transit</Text>
+                          </View>
+                        )}
+                        {trip.tripType && trip.tripType !== "standard" && (
+                          <View style={{ backgroundColor: "#EDE9FE", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: "#7C3AED" }}>{tripTypeLabel(trip.tripType)}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.tripMeta}>{trip.departureTime} · {trip.date}</Text>
+                      {trip.availableSeats !== undefined && (
+                        <Text style={[s.tripMeta, { color: trip.availableSeats <= 5 ? "#EF4444" : G, fontWeight: "600" }]}>
+                          {trip.availableSeats} place{trip.availableSeats !== 1 ? "s" : ""} dispo.
+                        </Text>
+                      )}
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 6 }}>
+                      <Text style={s.tripPrice}>{trip.price?.toLocaleString()} <Text style={{ fontSize: 11, fontWeight: "400" }}>FCFA</Text></Text>
+                      <Ionicons name="chevron-forward" size={18} color="#D1FAE5" />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
-  /* ─── Formulaire principal ──────────────────────────────────────────── */
-  const cityList = selectedTrip?.allCities ?? (selectedTrip
-    ? [selectedTrip.fromCity ?? selectedTrip.from, selectedTrip.toCity ?? selectedTrip.to]
-    : []);
-  const hasWaypoints = cityList.length > 2;
+  /* ═══════════════════════════════════════════════════════
+     VUE 2 — DÉTAIL DU DÉPART + LISTE PASSAGERS
+  ═══════════════════════════════════════════════════════ */
+  if (view === "detail") {
+    const d = dashboard;
+    const filteredPax = d
+      ? (passengerFilter === "all" ? d.passengers : d.passengers.filter(p => p.status === passengerFilter))
+      : [];
 
-  return (
-    <SafeAreaView style={s.safe} edges={["top"]}>
-      <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
-      <OfflineBanner status={networkStatus} />
+    return (
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
+        <OfflineBanner status={networkStatus} />
+        <Header backFn={() => { setView("trips"); setDashboard(null); setSelectedTrip(null); }} />
 
-      <View style={s.header}>
-        <View style={s.headerRow}>
-          <View style={s.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.headerTitle}>Espace Vente</Text>
-            <Text style={s.headerSub}>{networkStatus.isOnline ? "Vente de billets en gare" : "Mode hors ligne actif"}</Text>
-          </View>
-          <TouchableOpacity
-            style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" }}
-            hitSlop={8}
-            onPress={() => {
-              if (Platform.OS === "web") { logout(); return; }
-              Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
-                { text: "Annuler", style: "cancel" },
-                { text: "Se déconnecter", style: "destructive", onPress: () => logout() },
-              ]);
-            }}
-          >
-            <Ionicons name="log-out-outline" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+        <ScrollView style={s.scroll} contentContainerStyle={s.content}>
 
-      <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-
-        {/* ── Sélection trajet ── */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}><Ionicons name="bus-outline" size={15} color={G} /> Sélectionner un trajet</Text>
-          {loadingTrips ? <ActivityIndicator color={G} /> : trips.length === 0 ? (
-            <View style={s.emptyTrips}>
-              <Text style={s.emptyTripsText}>Aucun trajet disponible</Text>
-              <TouchableOpacity onPress={fetchTrips}><Text style={{ color: G, fontSize: 13 }}>Actualiser</Text></TouchableOpacity>
+          {/* ── Infos trajet ── */}
+          {d && (
+            <View style={[s.card, { gap: 10 }]}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#111827" }}>
+                    {d.trip.from} → {d.trip.to}
+                  </Text>
+                  <Text style={{ color: "#6B7280", fontSize: 13, marginTop: 2 }}>
+                    {d.trip.date} · {d.trip.departureTime}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => fetchDashboard(selectedTrip!.id)} hitSlop={8}>
+                  <Ionicons name="refresh" size={18} color={G} />
+                </TouchableOpacity>
+              </View>
+              {d.trip.busName && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Ionicons name="bus" size={14} color={G} />
+                  <Text style={{ fontSize: 13, color: "#374151" }}>
+                    {d.trip.busName} · {d.trip.plateNumber || "—"} · {d.trip.busType || "—"}
+                  </Text>
+                </View>
+              )}
+              {/* Seat stats bar */}
+              <View style={s.statsGrid}>
+                <View style={s.statBox}>
+                  <Text style={s.statNum}>{d.seats.total}</Text>
+                  <Text style={s.statLbl}>Places totales</Text>
+                </View>
+                <View style={[s.statBox, { backgroundColor: G_LIGHT }]}>
+                  <Text style={[s.statNum, { color: G }]}>{d.seats.availGuichet}</Text>
+                  <Text style={[s.statLbl, { color: G }]}>Dispo guichet</Text>
+                </View>
+                <View style={[s.statBox, { backgroundColor: "#EFF6FF" }]}>
+                  <Text style={[s.statNum, { color: "#2563EB" }]}>{d.seats.usedOnline}</Text>
+                  <Text style={[s.statLbl, { color: "#2563EB" }]}>En ligne</Text>
+                </View>
+                <View style={[s.statBox, { backgroundColor: "#EDE9FE" }]}>
+                  <Text style={[s.statNum, { color: "#7C3AED" }]}>{d.seats.usedSP}</Text>
+                  <Text style={[s.statLbl, { color: "#7C3AED" }]}>SP</Text>
+                </View>
+              </View>
             </View>
-          ) : (
-            trips.map(trip => {
-              const isTransit = trip.status === "en_route" || trip.status === "in_progress";
-              return (
-                <TouchableOpacity
-                  key={trip.id}
-                  style={[s.tripItem, selectedTrip?.id === trip.id && s.tripItemSelected, isTransit && { borderLeftWidth: 3, borderLeftColor: G }]}
-                  onPress={() => selectTrip(trip)}
-                >
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                      <Text style={s.tripRoute}>{trip.from} → {trip.to}</Text>
-                      {isTransit && (
-                        <View style={{ backgroundColor: G + "22", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, fontWeight: "700", color: G }}>En transit</Text>
+          )}
+
+          {/* ── Bouton Nouvelle Vente ── */}
+          <TouchableOpacity style={s.newSaleBtn} onPress={openForm} activeOpacity={0.85}>
+            <Ionicons name="add-circle" size={22} color="#fff" />
+            <Text style={s.newSaleBtnText}>Nouvelle vente / Billet SP</Text>
+          </TouchableOpacity>
+
+          {/* ── Liste passagers ── */}
+          <View style={s.card}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <Text style={s.cardTitle}>
+                <Ionicons name="people-outline" size={15} color={G} /> Passagers
+                {d ? ` (${d.totals.passengersCount})` : ""}
+              </Text>
+              {loadingDashboard && <ActivityIndicator color={G} size="small" />}
+            </View>
+
+            {/* Filter chips */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {[
+                  { id: "all" as const, label: `Tous (${d?.totals.passengersCount ?? 0})` },
+                  { id: "payé" as const, label: `Payé (${d?.totals.payéCount ?? 0})` },
+                  { id: "réservé" as const, label: `Réservé (${d?.totals.réservéCount ?? 0})` },
+                  { id: "sp" as const, label: `SP (${d?.totals.spCount ?? 0})` },
+                ].map(f => (
+                  <TouchableOpacity
+                    key={f.id}
+                    style={[s.filterChip, passengerFilter === f.id && s.filterChipActive]}
+                    onPress={() => setPassengerFilter(f.id)}
+                  >
+                    <Text style={[s.filterChipText, passengerFilter === f.id && s.filterChipTextActive]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            {/* Passenger rows */}
+            {loadingDashboard && !d ? (
+              <ActivityIndicator color={G} style={{ padding: 20 }} />
+            ) : filteredPax.length === 0 ? (
+              <View style={s.emptyBox}>
+                <Ionicons name="person-outline" size={32} color="#D1FAE5" />
+                <Text style={s.emptyText}>Aucun passager</Text>
+              </View>
+            ) : (
+              filteredPax.map((p, idx) => {
+                const srcBadge = sourceBadge(p.source);
+                const isOnline = p.source === "online" || p.source === "mobile";
+                return (
+                  <View key={`${p.bookingId}-${idx}`} style={s.paxRow}>
+                    {/* Left: avatar + status */}
+                    <View style={[s.paxAvatar, { backgroundColor: statusBg(p.status) }]}>
+                      <Ionicons
+                        name={p.status === "à_bord" ? "checkmark-circle" : p.status === "sp" ? "star" : "person"}
+                        size={18}
+                        color={statusColor(p.status)}
+                      />
+                    </View>
+
+                    {/* Center: info */}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Text style={s.paxName}>{p.name || "—"}</Text>
+                        {/* Status badge */}
+                        <View style={{ backgroundColor: statusBg(p.status), paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: statusColor(p.status) }}>
+                            {statusLabel(p.status)}
+                          </Text>
                         </View>
+                        {/* Source badge */}
+                        <View style={{ backgroundColor: srcBadge.bg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "600", color: srcBadge.color }}>{srcBadge.label}</Text>
+                        </View>
+                      </View>
+                      <Text style={s.paxPhone}>{p.phone || "—"}</Text>
+                      <Text style={s.paxRef}>{p.bookingRef}</Text>
+                      {p.seatNumbers.length > 0 && (
+                        <Text style={{ fontSize: 11, color: G, fontWeight: "600", marginTop: 1 }}>
+                          Siège{p.seatNumbers.length > 1 ? "s" : ""}: {p.seatNumbers.join(", ")}
+                        </Text>
                       )}
-                      {(trip.stops?.length ?? 0) > 0 && (
-                        <View style={{ backgroundColor: "#EFF6FF", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 10, fontWeight: "600", color: "#2563EB" }}>{trip.stops!.length} escale{trip.stops!.length > 1 ? "s" : ""}</Text>
-                        </View>
+                      <Text style={{ fontSize: 12, color: "#374151", marginTop: 1, fontWeight: "600" }}>
+                        {p.status === "sp" ? "SP — Gratuit" : `${(p.amount ?? 0).toLocaleString()} FCFA`}
+                      </Text>
+                    </View>
+
+                    {/* Right: actions */}
+                    <View style={{ gap: 6, alignItems: "flex-end" }}>
+                      {/* Reprint */}
+                      <TouchableOpacity
+                        style={s.paxActionBtn}
+                        onPress={() => handleReprint(p.bookingId)}
+                        hitSlop={6}
+                      >
+                        <Ionicons name="print-outline" size={16} color={G} />
+                      </TouchableOpacity>
+                      {/* Convert to voucher (online only, not boarded) */}
+                      {isOnline && p.status !== "à_bord" && (
+                        <TouchableOpacity
+                          style={[s.paxActionBtn, { borderColor: "#7C3AED" }]}
+                          onPress={() => handleToVoucher(p)}
+                          hitSlop={6}
+                        >
+                          <Ionicons name="gift-outline" size={16} color="#7C3AED" />
+                        </TouchableOpacity>
+                      )}
+                      {/* Cancel guichet (chef/company only) */}
+                      {!isOnline && p.status !== "à_bord" && (
+                        <TouchableOpacity
+                          style={[s.paxActionBtn, { borderColor: "#EF4444" }]}
+                          onPress={() => handleCancelGuichet(p)}
+                          hitSlop={6}
+                        >
+                          <Ionicons name="close-circle-outline" size={16} color="#EF4444" />
+                        </TouchableOpacity>
                       )}
                     </View>
-                    <Text style={s.tripTime}>{trip.departureTime} · {trip.date}</Text>
-                    {trip.availableSeats !== undefined && (
-                      <Text style={s.tripSeats}>{trip.availableSeats} places dispo.</Text>
-                    )}
                   </View>
-                  <View style={s.tripPrice}>
-                    <Text style={s.tripPriceText}>{trip.price?.toLocaleString()}</Text>
-                    <Text style={s.tripPriceSub}>FCFA</Text>
-                  </View>
-                  {selectedTrip?.id === trip.id && <Ionicons name="checkmark-circle" size={20} color={G} />}
+                );
+              })
+            )}
+          </View>
+
+          {/* Revenue summary */}
+          {d && (
+            <View style={s.revCard}>
+              <View style={s.revRow}>
+                <Text style={s.revKey}>Total passagers</Text>
+                <Text style={s.revVal}>{d.totals.passengersCount}</Text>
+              </View>
+              <View style={s.revRow}>
+                <Text style={s.revKey}>Recette guichet</Text>
+                <Text style={[s.revVal, { color: G, fontWeight: "800" }]}>{(d.totals.revenue ?? 0).toLocaleString()} FCFA</Text>
+              </View>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* ─── Sale Form Modal ─── */}
+        <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: G_DARK }} edges={["top"]}>
+            <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
+            <View style={s.header}>
+              <View style={s.headerRow}>
+                <TouchableOpacity onPress={() => { setShowForm(false); setConfirmed(null); }} style={s.headerBack} hitSlop={10}>
+                  <Ionicons name="close" size={22} color="#fff" />
                 </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-
-        {/* ── Villes de montée et descente (si escales disponibles) ── */}
-        {selectedTrip && cityList.length >= 2 && (
-          <View style={s.card}>
-            <Text style={s.cardTitle}><Ionicons name="map-outline" size={15} color={G} /> Trajet du passager</Text>
-            {hasWaypoints ? (
-              <>
-                <Text style={s.label}>Ville de montée</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {cityList.slice(0, -1).map((city, i) => (
-                      <Pressable
-                        key={`boarding-${i}-${city}`}
-                        style={[s.cityChip, boardingCity === city && s.cityChipActive]}
-                        onPress={() => {
-                          setBoardingCity(city);
-                          // Si la ville de descente est avant ou égale à la montée, la réinitialiser
-                          const bIdx = cityList.indexOf(city);
-                          const aIdx = cityList.indexOf(alightingCity);
-                          if (aIdx <= bIdx) setAlightingCity(cityList[bIdx + 1] ?? "");
-                        }}
-                      >
-                        <Ionicons name="log-in-outline" size={13} color={boardingCity === city ? "#fff" : "#374151"} />
-                        <Text style={[s.cityChipText, boardingCity === city && s.cityChipTextActive]}>{city}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
-
-                <Text style={s.label}>Ville de descente</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {cityList.slice(1).map((city, i) => {
-                      const bIdx = cityList.indexOf(boardingCity);
-                      const cIdx = cityList.indexOf(city);
-                      const disabled = cIdx <= bIdx;
-                      return (
-                        <Pressable
-                          key={`alighting-${i}-${city}`}
-                          style={[s.cityChip, alightingCity === city && s.cityChipActiveRed, disabled && s.cityChipDisabled]}
-                          onPress={() => !disabled && setAlightingCity(city)}
-                        >
-                          <Ionicons name="log-out-outline" size={13} color={alightingCity === city ? "#fff" : disabled ? "#9CA3AF" : "#374151"} />
-                          <Text style={[s.cityChipText, alightingCity === city && s.cityChipTextActive, disabled && { color: "#9CA3AF" }]}>{city}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
-              </>
-            ) : (
-              /* Trajet direct sans escale — afficher simplement */
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: G_LIGHT, borderRadius: 10, padding: 12 }}>
-                <View style={{ alignItems: "center", flex: 1 }}>
-                  <Text style={{ fontSize: 10, color: G, fontWeight: "600" }}>Monte à</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: G_DARK, marginTop: 2 }}>{cityList[0]}</Text>
-                </View>
-                <Ionicons name="arrow-forward" size={16} color="#9CA3AF" />
-                <View style={{ alignItems: "center", flex: 1 }}>
-                  <Text style={{ fontSize: 10, color: "#DC2626", fontWeight: "600" }}>Descend à</Text>
-                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#DC2626", marginTop: 2 }}>{cityList[cityList.length - 1]}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.headerTitle}>Nouvelle vente</Text>
+                  <Text style={s.headerSub}>{selectedTrip?.from} → {selectedTrip?.to} · {selectedTrip?.departureTime}</Text>
                 </View>
               </View>
-            )}
-
-            {/* Prix calculé selon le segment */}
-            {hasWaypoints && boardingCity && alightingCity && (
-              <View style={{ backgroundColor: "#FEF9C3", borderRadius: 8, padding: 8, marginTop: 4, flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons name="information-circle-outline" size={14} color="#D97706" />
-                <Text style={{ fontSize: 12, color: "#92400E" }}>
-                  Segment {boardingCity} → {alightingCity} · Tarif plein appliqué
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* ── Infos passager ── */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}><Ionicons name="person-outline" size={15} color={G} /> Informations passager</Text>
-          <Text style={s.label}>Nom complet *</Text>
-          <TextInput style={s.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
-          <Text style={s.label}>Téléphone *</Text>
-          <TextInput style={s.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone} onChangeText={setPassengerPhone} keyboardType="phone-pad" />
-          <Text style={s.label}>Nombre de passagers</Text>
-          <View style={s.countRow}>
-            <TouchableOpacity style={s.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
-              <Ionicons name="remove" size={18} color={G} />
-            </TouchableOpacity>
-            <TextInput style={s.countInput} value={passengerCount} onChangeText={setPassengerCount} keyboardType="number-pad" textAlign="center" />
-            <TouchableOpacity style={s.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
-              <Ionicons name="add" size={18} color={G} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ── Mode paiement ── */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}><Ionicons name="wallet-outline" size={15} color={G} /> Mode de paiement</Text>
-          <View style={s.paymentGrid}>
-            {PAYMENT_METHODS.map(pm => (
-              <TouchableOpacity key={pm.id} style={[s.paymentItem, paymentMethod === pm.id && s.paymentItemSelected]} onPress={() => setPaymentMethod(pm.id)}>
-                <Ionicons name={pm.icon} size={22} color={paymentMethod === pm.id ? G : "#9CA3AF"} />
-                <Text style={[s.paymentLabel, paymentMethod === pm.id && s.paymentLabelSelected]}>{pm.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* ── Récapitulatif ── */}
-        {selectedTrip && (
-          <View style={s.summaryCard}>
-            <Text style={s.summaryTitle}>Récapitulatif</Text>
-            <View style={s.summaryRow}>
-              <Text style={s.summaryKey}>Trajet</Text>
-              <Text style={s.summaryVal}>{selectedTrip.from} → {selectedTrip.to}</Text>
             </View>
-            {boardingCity && boardingCity !== selectedTrip.from && (
-              <View style={s.summaryRow}>
-                <Text style={s.summaryKey}>Monte à</Text>
-                <Text style={[s.summaryVal, { color: "#2563EB" }]}>{boardingCity}</Text>
+
+            <ScrollView style={s.scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+              {confirmed ? (
+                /* ── Confirmation ── */
+                <View style={{ alignItems: "center", paddingTop: 24, gap: 16 }}>
+                  <Ionicons name={confirmed.isSP ? "star-circle" : "checkmark-circle"} size={72} color={confirmed.isSP ? "#7C3AED" : G} />
+                  <Text style={s.successTitle}>{confirmed.isSP ? "Ticket SP créé !" : "Vente enregistrée !"}</Text>
+                  <Text style={s.successRef}>Réf: {confirmed.bookingRef}</Text>
+                  {confirmed.isSP ? (
+                    <View style={{ backgroundColor: "#EDE9FE", borderRadius: 12, padding: 14, width: "100%", alignItems: "center" }}>
+                      <Ionicons name="star" size={20} color="#7C3AED" />
+                      <Text style={{ color: "#7C3AED", fontWeight: "700", fontSize: 15, marginTop: 4 }}>Sans Payer (SP)</Text>
+                      <Text style={{ color: "#6D28D9", fontSize: 13, marginTop: 2 }}>Place occupée · Montant = 0 FCFA</Text>
+                    </View>
+                  ) : (
+                    <Text style={s.successTotal}>Total: {(confirmed.total ?? 0).toLocaleString()} FCFA</Text>
+                  )}
+                  {confirmed.seatNumbers && confirmed.seatNumbers.length > 0 && (
+                    <View style={{ backgroundColor: G_LIGHT, borderRadius: 12, padding: 14, width: "100%", borderWidth: 1, borderColor: "#A7F3D0" }}>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: G_DARK, marginBottom: 6 }}>Sièges attribués</Text>
+                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                        {confirmed.seatNumbers.map(sn => (
+                          <View key={sn} style={{ backgroundColor: G, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+                            <Text style={{ color: "#fff", fontWeight: "800" }}>{sn}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+                  <TouchableOpacity style={[s.submitBtn, { width: "100%" }]} onPress={() => { setConfirmed(null); openForm(); }}>
+                    <Ionicons name="add-circle-outline" size={20} color="#fff" />
+                    <Text style={s.submitBtnText}>Nouvelle vente</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.submitBtn, { width: "100%", backgroundColor: G_DARK }]} onPress={() => { setShowForm(false); setConfirmed(null); }}>
+                    <Ionicons name="list-outline" size={20} color="#fff" />
+                    <Text style={s.submitBtnText}>Retour à la liste</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* ── Form ── */
+                <>
+                  {/* SP toggle */}
+                  <TouchableOpacity
+                    style={[s.spToggle, isSP && s.spToggleActive]}
+                    onPress={() => setIsSP(v => !v)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <Ionicons name={isSP ? "star" : "star-outline"} size={22} color={isSP ? "#fff" : "#7C3AED"} />
+                      <View>
+                        <Text style={[s.spToggleLabel, isSP && { color: "#fff" }]}>Ticket SP (Sans Payer)</Text>
+                        <Text style={[s.spToggleSub, isSP && { color: "#C4B5FD" }]}>Montant = 0 · Place occupée · Visible partout</Text>
+                      </View>
+                    </View>
+                    <View style={[s.spCheckBox, isSP && s.spCheckBoxActive]}>
+                      {isSP && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Infos passager */}
+                  <View style={s.card}>
+                    <Text style={s.cardTitle}><Ionicons name="person-outline" size={15} color={G} /> Informations passager</Text>
+                    <Text style={s.label}>Nom complet *</Text>
+                    <TextInput style={s.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
+                    <Text style={s.label}>Téléphone {isSP ? "" : "*"}</Text>
+                    <TextInput style={s.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone} onChangeText={setPassengerPhone} keyboardType="phone-pad" />
+                    <Text style={s.label}>Nombre de passagers</Text>
+                    <View style={s.countRow}>
+                      <TouchableOpacity style={s.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
+                        <Ionicons name="remove" size={18} color={G} />
+                      </TouchableOpacity>
+                      <TextInput style={s.countInput} value={passengerCount} onChangeText={setPassengerCount} keyboardType="number-pad" textAlign="center" />
+                      <TouchableOpacity style={s.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
+                        <Ionicons name="add" size={18} color={G} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Mode paiement (masqué si SP) */}
+                  {!isSP && (
+                    <View style={s.card}>
+                      <Text style={s.cardTitle}><Ionicons name="wallet-outline" size={15} color={G} /> Mode de paiement</Text>
+                      <View style={s.paymentGrid}>
+                        {PAYMENT_METHODS.map(pm => (
+                          <TouchableOpacity
+                            key={pm.id}
+                            style={[s.paymentItem, paymentMethod === pm.id && s.paymentItemSelected]}
+                            onPress={() => setPaymentMethod(pm.id)}
+                          >
+                            <Ionicons name={pm.icon} size={22} color={paymentMethod === pm.id ? G : "#9CA3AF"} />
+                            <Text style={[s.paymentLabel, paymentMethod === pm.id && s.paymentLabelSelected]}>{pm.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Récapitulatif */}
+                  <View style={[s.summaryCard, isSP && { backgroundColor: "#EDE9FE", borderColor: "#C4B5FD" }]}>
+                    <Text style={[s.summaryTitle, isSP && { color: "#7C3AED" }]}>Récapitulatif</Text>
+                    <View style={s.summaryRow}>
+                      <Text style={s.summaryKey}>Trajet</Text>
+                      <Text style={s.summaryVal}>{selectedTrip?.from} → {selectedTrip?.to}</Text>
+                    </View>
+                    <View style={s.summaryRow}>
+                      <Text style={s.summaryKey}>Passagers</Text>
+                      <Text style={s.summaryVal}>{passengerCount}</Text>
+                    </View>
+                    <View style={[s.summaryRow, { borderTopWidth: 1, borderColor: isSP ? "#C4B5FD" : "#D1FAE5", paddingTop: 10, marginTop: 4 }]}>
+                      <Text style={[s.summaryKey, { fontWeight: "700", color: "#111827" }]}>Total</Text>
+                      <Text style={[s.summaryVal, { fontWeight: "800", fontSize: 16, color: isSP ? "#7C3AED" : G }]}>
+                        {isSP ? "0 FCFA (SP)" : `${((selectedTrip?.price ?? 0) * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[s.submitBtn, submitting && s.submitBtnDisabled, isSP && { backgroundColor: "#7C3AED" }]}
+                    onPress={handleSubmit}
+                    disabled={submitting}
+                  >
+                    {submitting ? <ActivityIndicator color="#fff" /> : (
+                      <>
+                        <Ionicons name={isSP ? "star-outline" : "checkmark-circle-outline"} size={22} color="#fff" />
+                        <Text style={s.submitBtnText}>{isSP ? "Créer ticket SP" : "Valider la vente"}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* ─── Reprint Modal ─── */}
+        <Modal visible={reprintModal} animationType="fade" transparent onRequestClose={() => setReprintModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={s.reprintModal}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }}>Réimpression billet</Text>
+                <TouchableOpacity onPress={() => setReprintModal(false)} hitSlop={10}>
+                  <Ionicons name="close" size={22} color="#9CA3AF" />
+                </TouchableOpacity>
               </View>
-            )}
-            {alightingCity && alightingCity !== selectedTrip.to && (
-              <View style={s.summaryRow}>
-                <Text style={s.summaryKey}>Descend à</Text>
-                <Text style={[s.summaryVal, { color: "#DC2626" }]}>{alightingCity}</Text>
-              </View>
-            )}
-            <View style={s.summaryRow}>
-              <Text style={s.summaryKey}>Passagers</Text>
-              <Text style={s.summaryVal}>{passengerCount}</Text>
-            </View>
-            <View style={[s.summaryRow, { borderTopWidth: 1, borderColor: "#D1FAE5", paddingTop: 10, marginTop: 4 }]}>
-              <Text style={[s.summaryKey, { fontWeight: "700", color: "#111827" }]}>Total</Text>
-              <Text style={[s.summaryVal, { fontWeight: "800", color: G, fontSize: 16 }]}>
-                {(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA
-              </Text>
+
+              {loadingReprint ? (
+                <ActivityIndicator color={G} style={{ padding: 20 }} />
+              ) : reprintTicket ? (
+                <>
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 10, padding: 14, gap: 6, marginBottom: 14 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 12, color: "#6B7280" }}>Référence</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: G }}>{reprintTicket.bookingRef}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 12, color: "#6B7280" }}>Passager</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>{reprintTicket.passengerName}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 12, color: "#6B7280" }}>Trajet</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: "#111827" }}>{reprintTicket.trip.from} → {reprintTicket.trip.to}</Text>
+                    </View>
+                    {reprintTicket.seatNumbers.length > 0 && (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ fontSize: 12, color: "#6B7280" }}>Siège(s)</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: G }}>{reprintTicket.seatNumbers.join(", ")}</Text>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 12, color: "#6B7280" }}>Montant</Text>
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: reprintTicket.paymentStatus === "sp" ? "#7C3AED" : G }}>
+                        {reprintTicket.paymentStatus === "sp" ? "SP — 0 FCFA" : `${(reprintTicket.amount ?? 0).toLocaleString()} FCFA`}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[s.submitBtn, printingTicket && s.submitBtnDisabled]}
+                    onPress={printTicket}
+                    disabled={printingTicket}
+                  >
+                    {printingTicket ? <ActivityIndicator color="#fff" /> : (
+                      <>
+                        <Ionicons name="print-outline" size={20} color="#fff" />
+                        <Text style={s.submitBtnText}>Imprimer / Partager PDF</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : null}
             </View>
           </View>
-        )}
+        </Modal>
+      </SafeAreaView>
+    );
+  }
 
-        <TouchableOpacity style={[s.submitBtn, submitting && s.submitBtnDisabled]} onPress={handleSubmit} disabled={submitting}>
-          {submitting ? <ActivityIndicator color="#fff" /> : (
-            <>
-              <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
-              <Text style={s.submitBtnText}>Valider la vente</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return null;
 }
 
+/* ─── Styles ─────────────────────────────────────────────────────────────── */
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: G_DARK },
   denied:      { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, backgroundColor: "#fff" },
   deniedText:  { fontSize: 16, color: "#EF4444", fontWeight: "600" },
 
-  header:     { backgroundColor: G_DARK, paddingHorizontal: 20, paddingVertical: 16 },
-  headerRow:  { flexDirection: "row", alignItems: "center", gap: 12 },
-  headerIcon: { backgroundColor: G, borderRadius: 10, padding: 8 },
-  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
-  headerSub:   { color: "#A7F3D0", fontSize: 13, marginTop: 1 },
+  header:      { backgroundColor: G_DARK, paddingHorizontal: 20, paddingVertical: 14 },
+  headerRow:   { flexDirection: "row", alignItems: "center", gap: 12 },
+  headerIcon:  { backgroundColor: G, borderRadius: 10, padding: 8 },
+  headerBack:  { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
+  headerLogout:{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center" },
+  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  headerSub:   { color: "#A7F3D0", fontSize: 12, marginTop: 1 },
 
-  scroll:  { flex: 1, backgroundColor: "#F9FAFB" },
-  content: { padding: 16, gap: 16, paddingBottom: 30 },
+  scroll:   { flex: 1, backgroundColor: "#F9FAFB" },
+  content:  { padding: 16, gap: 14, paddingBottom: 40 },
 
-  card:      { backgroundColor: "#fff", borderRadius: 14, padding: 18, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, gap: 10 },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827", marginBottom: 4 },
+  card:      { backgroundColor: "#fff", borderRadius: 14, padding: 16, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
+  cardTitle: { fontSize: 14, fontWeight: "700", color: "#111827" },
 
-  emptyTrips:     { alignItems: "center", gap: 6, padding: 12 },
-  emptyTripsText: { color: "#9CA3AF", fontSize: 14 },
+  tripCard:  { borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10, backgroundColor: "#fff" },
+  tripRoute: { fontSize: 15, fontWeight: "800", color: "#111827" },
+  tripMeta:  { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  tripPrice: { fontSize: 16, fontWeight: "800", color: G },
 
-  tripItem:         { borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  tripItemSelected: { borderColor: G, backgroundColor: G_LIGHT },
-  tripRoute:        { fontSize: 14, fontWeight: "700", color: "#111827" },
-  tripTime:         { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  tripSeats:        { fontSize: 12, color: G, marginTop: 2 },
-  tripPrice:        { alignItems: "flex-end" },
-  tripPriceText:    { fontSize: 15, fontWeight: "800", color: G },
-  tripPriceSub:     { fontSize: 11, color: "#9CA3AF" },
+  emptyBox:  { alignItems: "center", gap: 8, padding: 24 },
+  emptyText: { fontSize: 14, color: "#9CA3AF" },
 
-  label: { fontSize: 13, fontWeight: "500", color: "#374151" },
-  input: { borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: G_LIGHT },
+  statsGrid: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  statBox:   { flex: 1, minWidth: 70, backgroundColor: "#F9FAFB", borderRadius: 10, padding: 10, alignItems: "center", gap: 2 },
+  statNum:   { fontSize: 20, fontWeight: "800", color: "#111827" },
+  statLbl:   { fontSize: 10, color: "#6B7280", textAlign: "center" },
 
-  cityChip:         { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: "#F9FAFB", borderWidth: 1.5, borderColor: "#E5E7EB" },
-  cityChipActive:   { backgroundColor: G, borderColor: G },
-  cityChipActiveRed:{ backgroundColor: "#DC2626", borderColor: "#DC2626" },
-  cityChipDisabled: { opacity: 0.4 },
-  cityChipText:     { fontSize: 13, fontWeight: "600", color: "#374151" },
-  cityChipTextActive: { color: "#fff" },
+  newSaleBtn:     { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, padding: 16, borderRadius: 12 },
+  newSaleBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  filterChip:         { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: "#F3F4F6", borderWidth: 1.5, borderColor: "#E5E7EB" },
+  filterChipActive:   { backgroundColor: G_LIGHT, borderColor: G },
+  filterChipText:     { fontSize: 12, fontWeight: "600", color: "#6B7280" },
+  filterChipTextActive: { color: G },
+
+  paxRow:    { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 12, borderBottomWidth: 1, borderColor: "#F3F4F6" },
+  paxAvatar: { width: 38, height: 38, borderRadius: 19, justifyContent: "center", alignItems: "center" },
+  paxName:   { fontSize: 14, fontWeight: "700", color: "#111827" },
+  paxPhone:  { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  paxRef:    { fontSize: 11, color: "#9CA3AF", marginTop: 1, letterSpacing: 0.5 },
+  paxActionBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1.5, borderColor: G, justifyContent: "center", alignItems: "center" },
+
+  revCard: { backgroundColor: G_LIGHT, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#D1FAE5", gap: 8 },
+  revRow:  { flexDirection: "row", justifyContent: "space-between" },
+  revKey:  { fontSize: 13, color: "#6B7280" },
+  revVal:  { fontSize: 13, fontWeight: "600", color: "#111827" },
+
+  spToggle:      { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#EDE9FE", borderRadius: 12, padding: 14, borderWidth: 2, borderColor: "#C4B5FD" },
+  spToggleActive:{ backgroundColor: "#7C3AED", borderColor: "#7C3AED" },
+  spToggleLabel: { fontSize: 14, fontWeight: "700", color: "#7C3AED" },
+  spToggleSub:   { fontSize: 11, color: "#6D28D9", marginTop: 2 },
+  spCheckBox:     { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: "#C4B5FD", justifyContent: "center", alignItems: "center" },
+  spCheckBoxActive: { backgroundColor: "#fff", borderColor: "#fff" },
+
+  label:      { fontSize: 13, fontWeight: "500", color: "#374151", marginBottom: 4 },
+  input:      { borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, backgroundColor: G_LIGHT, marginBottom: 10 },
 
   countRow:   { flexDirection: "row", alignItems: "center", gap: 12 },
   countBtn:   { width: 36, height: 36, borderRadius: 8, borderWidth: 1.5, borderColor: G, alignItems: "center", justifyContent: "center" },
-  countInput: { borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 8, width: 64, paddingVertical: 8, fontSize: 16, fontWeight: "700", color: "#111827", backgroundColor: G_LIGHT },
+  countInput: { borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 8, width: 64, paddingVertical: 8, fontSize: 16, fontWeight: "700", color: "#111827", backgroundColor: G_LIGHT, textAlign: "center" },
 
   paymentGrid:         { flexDirection: "row", gap: 10 },
   paymentItem:         { flex: 1, borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, alignItems: "center", gap: 6 },
@@ -532,5 +1059,7 @@ const s = StyleSheet.create({
   successTitle: { fontSize: 22, fontWeight: "800", color: "#111827" },
   successRef:   { fontSize: 15, fontWeight: "600", color: G, marginTop: 4 },
   successTotal: { fontSize: 15, color: "#374151", marginTop: 4 },
-  successSub:   { fontSize: 13, color: "#6B7280", marginTop: 8 },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  reprintModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
 });

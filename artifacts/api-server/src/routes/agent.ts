@@ -677,10 +677,10 @@ router.post("/reservations", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { clientName, clientPhone, tripId, seatCount, paymentMethod, boardingCity, alightingCity } = req.body as {
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod, boardingCity, alightingCity, isSP } = req.body as {
       clientName: string; clientPhone: string; tripId: string;
       seatCount: number; paymentMethod: string;
-      boardingCity?: string; alightingCity?: string;
+      boardingCity?: string; alightingCity?: string; isSP?: boolean;
     };
 
     if (!clientName?.trim() || !tripId || !seatCount) {
@@ -733,8 +733,8 @@ router.post("/reservations", async (req, res) => {
       }
     }
 
-    const amount = trip.price * count;
-    const ref    = "GB" + Math.random().toString(36).toUpperCase().substr(2, 8);
+    const amount = isSP ? 0 : trip.price * count;
+    const ref    = (isSP ? "SP" : "GB") + Math.random().toString(36).toUpperCase().substr(2, 8);
     const id     = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const passengers = Array.from({ length: count }, (_, i) =>
       i === 0 ? { name: clientName.trim() } : { name: `Passager ${i + 1}` }
@@ -770,8 +770,8 @@ router.post("/reservations", async (req, res) => {
       seatIds:          assignedSeatIds,
       seatNumbers:      assignedSeatNumbers,
       totalAmount:      amount,
-      paymentMethod:    paymentMethod || "cash",
-      paymentStatus:    "paid",
+      paymentMethod:    isSP ? "sp" : (paymentMethod || "cash"),
+      paymentStatus:    isSP ? "sp" : "paid",
       status:           "confirmed",
       contactPhone:     clientPhone || "",
       contactEmail:     "",
@@ -1002,6 +1002,303 @@ router.post("/online-bookings/:id/cancel", async (req, res) => {
   } catch (err) {
     console.error("cancel online-booking error:", err);
     res.status(500).json({ error: "Erreur annulation réservation" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AGENT GUICHET — TABLEAU DE BORD DÉPART
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* GET /agent/guichet/trip/:tripId — full guichet dashboard for one departure */
+router.get("/guichet/trip/:tripId", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const tripId = req.params.tripId;
+
+    // Fetch trip + bus info
+    const tripRows = await db.execute(sql`
+      SELECT t.*, b.bus_name, b.plate_number, b.bus_type, b.capacity
+      FROM trips t
+      LEFT JOIN buses b ON b.id = t.bus_id
+      WHERE t.id = ${tripId}
+      LIMIT 1
+    `);
+    if (!tripRows.rows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows.rows[0] as any;
+
+    // All bookings for this trip (non-cancelled)
+    const allBookings = await db.select().from(bookingsTable).where(
+      and(
+        eq(bookingsTable.tripId, tripId),
+        inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé", "reserved", "sp"])
+      )
+    );
+
+    // Build passenger list
+    const passengers: Array<{
+      bookingId: string; bookingRef: string;
+      name: string; phone: string; seatNumbers: string[];
+      status: string; paymentStatus: string; source: string;
+      boardingCity: string | null; alightingCity: string | null;
+      amount: number; createdAt: string;
+    }> = [];
+
+    for (const b of allBookings) {
+      const pList = Array.isArray(b.passengers) ? (b.passengers as any[]) : [];
+      const seatNums = Array.isArray(b.seatNumbers) ? (b.seatNumbers as string[]) : [];
+      const seatCount = seatNums.length || 1;
+
+      if (pList.length > 0) {
+        pList.forEach((p: any, i: number) => {
+          const displayStatus =
+            (b.paymentStatus as string) === "sp" ? "sp" :
+            ["boarded", "validated"].includes(b.status as string) ? "à_bord" :
+            (b.paymentStatus as string) === "paid" ? "payé" : "réservé";
+
+          passengers.push({
+            bookingId:   b.id,
+            bookingRef:  b.bookingRef ?? "",
+            name:        p.name ?? `Passager ${i + 1}`,
+            phone:       i === 0 ? (b.contactPhone ?? "") : "",
+            seatNumbers: i === 0 ? seatNums : [],
+            status:      displayStatus,
+            paymentStatus: b.paymentStatus ?? "paid",
+            source:      b.bookingSource ?? "guichet",
+            boardingCity:  b.boardingCity as string | null,
+            alightingCity: b.alightingCity as string | null,
+            amount:      i === 0 ? (b.totalAmount ?? 0) : 0,
+            createdAt:   b.createdAt?.toISOString() ?? "",
+          });
+        });
+      } else {
+        const displayStatus =
+          (b.paymentStatus as string) === "sp" ? "sp" :
+          ["boarded", "validated"].includes(b.status as string) ? "à_bord" :
+          (b.paymentStatus as string) === "paid" ? "payé" : "réservé";
+
+        passengers.push({
+          bookingId:   b.id,
+          bookingRef:  b.bookingRef ?? "",
+          name:        b.contactPhone ? "Passager" : "Passager",
+          phone:       b.contactPhone ?? "",
+          seatNumbers: seatNums,
+          status:      displayStatus,
+          paymentStatus: b.paymentStatus ?? "paid",
+          source:      b.bookingSource ?? "guichet",
+          boardingCity:  b.boardingCity as string | null,
+          alightingCity: b.alightingCity as string | null,
+          amount:      b.totalAmount ?? 0,
+          createdAt:   b.createdAt?.toISOString() ?? "",
+        });
+      }
+    }
+
+    // Seat stats
+    const guichetBookings = allBookings.filter(b => b.bookingSource === "guichet" || !b.bookingSource);
+    const onlineBookings  = allBookings.filter(b => b.bookingSource === "online" || b.bookingSource === "mobile");
+    const spBookings      = allBookings.filter(b => (b.paymentStatus as string) === "sp");
+    const reservedBookings = allBookings.filter(b => b.paymentStatus === "pending" || b.status === "reserved");
+
+    const usedGuichet = guichetBookings.reduce((a, b) => a + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+    const usedOnline  = onlineBookings.reduce((a, b) => a + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+    const usedSP      = spBookings.reduce((a, b) => a + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+    const reserved    = reservedBookings.reduce((a, b) => a + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length || 1 : 1), 0);
+
+    const totalSeats    = trip.total_seats ?? trip.totalSeats ?? 0;
+    const guichetSeats  = trip.guichet_seats ?? trip.guichetSeats ?? 0;
+    const onlineSeats   = trip.online_seats  ?? trip.onlineSeats  ?? 0;
+    const availGuichet  = Math.max(0, guichetSeats - usedGuichet);
+    const availOnline   = Math.max(0, onlineSeats  - usedOnline);
+
+    res.json({
+      trip: {
+        id:            trip.id,
+        from:          trip.from_city ?? trip.from,
+        to:            trip.to_city   ?? trip.to,
+        date:          trip.date,
+        departureTime: trip.departure_time ?? trip.departureTime,
+        price:         trip.price,
+        status:        trip.status,
+        tripType:      trip.trip_type ?? trip.tripType ?? "standard",
+        busName:       trip.bus_name  ?? trip.busName,
+        plateNumber:   trip.plate_number ?? trip.plateNumber,
+        busType:       trip.bus_type  ?? trip.busType,
+        stops:         trip.stops ?? [],
+        allCities:     trip.all_cities ?? trip.allCities ?? [],
+      },
+      seats: {
+        total:         totalSeats,
+        guichetTotal:  guichetSeats,
+        onlineTotal:   onlineSeats,
+        usedGuichet,
+        usedOnline,
+        usedSP,
+        reserved,
+        availGuichet,
+        availOnline,
+        availTotal:    availGuichet + availOnline,
+      },
+      passengers: passengers.sort((a, b) => {
+        const order = { "à_bord": 0, "payé": 1, "sp": 2, "réservé": 3 };
+        return (order[a.status as keyof typeof order] ?? 9) - (order[b.status as keyof typeof order] ?? 9);
+      }),
+      totals: {
+        passengersCount: passengers.length,
+        payéCount:    passengers.filter(p => p.status === "payé" || p.status === "à_bord").length,
+        réservéCount: passengers.filter(p => p.status === "réservé").length,
+        spCount:      passengers.filter(p => p.status === "sp").length,
+        revenue:      allBookings.reduce((a, b) => a + (b.totalAmount ?? 0), 0),
+      },
+    });
+  } catch (err) {
+    console.error("[guichet/trip/:tripId]", err);
+    res.status(500).json({ error: "Erreur chargement dashboard départ" });
+  }
+});
+
+/* GET /agent/booking/:bookingId/ticket-data — ticket data for reprinting */
+router.get("/booking/:bookingId/ticket-data", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bookingId = req.params.bookingId;
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+
+    const tripRows = await db.execute(sql`
+      SELECT t.*, b.bus_name, b.plate_number, b.bus_type
+      FROM trips t
+      LEFT JOIN buses b ON b.id = t.bus_id
+      WHERE t.id = ${booking.tripId}
+      LIMIT 1
+    `);
+    const trip = tripRows.rows[0] as any ?? {};
+
+    const passengers = Array.isArray(booking.passengers) ? booking.passengers : [];
+    const seatNumbers = Array.isArray(booking.seatNumbers) ? (booking.seatNumbers as string[]) : [];
+    const spStatus = (booking.paymentStatus as string) === "sp";
+
+    res.json({
+      bookingRef:    booking.bookingRef,
+      bookingId:     booking.id,
+      passengerName: (passengers[0] as any)?.name ?? "Passager",
+      phone:         booking.contactPhone ?? "",
+      seatNumbers,
+      seatCount:     seatNumbers.length || 1,
+      amount:        spStatus ? 0 : (booking.totalAmount ?? 0),
+      paymentMethod: booking.paymentMethod ?? "cash",
+      paymentStatus: booking.paymentStatus ?? "paid",
+      status:        spStatus ? "SP" : (booking.status ?? "confirmed"),
+      source:        booking.bookingSource ?? "guichet",
+      boardingCity:  booking.boardingCity,
+      alightingCity: booking.alightingCity,
+      createdAt:     booking.createdAt?.toISOString(),
+      trip: {
+        id:            trip.id,
+        from:          trip.from_city ?? trip.from,
+        to:            trip.to_city   ?? trip.to,
+        date:          trip.date,
+        departureTime: trip.departure_time ?? trip.departureTime,
+        price:         trip.price,
+        busName:       trip.bus_name,
+        plateNumber:   trip.plate_number,
+        busType:       trip.bus_type,
+        tripType:      trip.trip_type ?? "standard",
+      },
+    });
+  } catch (err) {
+    console.error("[booking/ticket-data]", err);
+    res.status(500).json({ error: "Erreur récupération billet" });
+  }
+});
+
+/* POST /agent/guichet/booking/:bookingId/to-voucher — convert online booking → BON */
+router.post("/guichet/booking/:bookingId/to-voucher", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const bookingId = req.params.bookingId;
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+
+    if (!["online", "mobile"].includes(booking.bookingSource ?? "")) {
+      res.status(400).json({ error: "Seules les réservations en ligne peuvent être converties en BON" });
+      return;
+    }
+    if (["cancelled", "boarded"].includes(booking.status ?? "")) {
+      res.status(400).json({ error: "Cette réservation ne peut pas être convertie" });
+      return;
+    }
+
+    const [updated] = await db.update(bookingsTable)
+      .set({ bookingSource: "voucher", status: "confirmed", paymentStatus: "voucher" } as any)
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CREATE, bookingId, "booking",
+      { action: "to_voucher", bookingRef: booking.bookingRef }).catch(() => {});
+
+    res.json({ id: updated.id, bookingRef: updated.bookingRef, status: "voucher", message: "Réservation convertie en BON" });
+  } catch (err) {
+    console.error("[guichet/booking/to-voucher]", err);
+    res.status(500).json({ error: "Erreur conversion en BON" });
+  }
+});
+
+/* POST /agent/guichet/booking/:bookingId/cancel — cancel guichet ticket (chef/company only) */
+router.post("/guichet/booking/:bookingId/cancel", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    // Only chef_agence or company roles can cancel guichet tickets
+    const allowedRoles = ["chef_agence", "company_admin", "agent_chef", "admin"];
+    if (!allowedRoles.includes(user.role)) {
+      res.status(403).json({ error: "Seul le chef d'agence ou la compagnie peut annuler un ticket guichet" });
+      return;
+    }
+
+    const bookingId = req.params.bookingId;
+    const { reason } = req.body as { reason?: string };
+
+    const rows = await db.select().from(bookingsTable).where(eq(bookingsTable.id, bookingId)).limit(1);
+    if (!rows.length) { res.status(404).json({ error: "Réservation introuvable" }); return; }
+    const booking = rows[0];
+
+    if (["boarded", "cancelled"].includes(booking.status ?? "")) {
+      res.status(400).json({ error: "Ce billet ne peut pas être annulé dans son état actuel" });
+      return;
+    }
+
+    // Free the seats
+    const seatIds: string[] = Array.isArray(booking.seatIds) ? (booking.seatIds as string[]) : [];
+    for (const seatId of seatIds) {
+      await db.update(seatsTable).set({ status: "available" }).where(eq(seatsTable.id, seatId));
+    }
+
+    const [updated] = await db.update(bookingsTable)
+      .set({ status: "cancelled", totalAmount: 0, paymentStatus: "cancelled" } as any)
+      .where(eq(bookingsTable.id, bookingId))
+      .returning();
+
+    auditLog({ userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CREATE, bookingId, "booking",
+      { action: "cancel_guichet", bookingRef: booking.bookingRef, reason }).catch(() => {});
+
+    res.json({
+      id: updated.id, bookingRef: updated.bookingRef,
+      status: "cancelled", message: "Billet annulé avec succès — place libérée",
+    });
+  } catch (err) {
+    console.error("[guichet/booking/cancel]", err);
+    res.status(500).json({ error: "Erreur annulation billet" });
   }
 });
 
