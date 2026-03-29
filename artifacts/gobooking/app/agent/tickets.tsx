@@ -253,7 +253,7 @@ export default function TicketsScreen() {
 
   /* ── SP & Seat Map state ── */
   const [isSP, setIsSP]                       = useState(false);
-  const [showSeatMap, setShowSeatMap]         = useState(false);
+  const [showSeatMap, setShowSeatMap]         = useState(true);
   const [seatMapData, setSeatMapData]         = useState<any[]>([]);
   const [loadingSeatMap, setLoadingSeatMap]   = useState(false);
   const [clickedSeat, setClickedSeat]         = useState<any | null>(null);
@@ -498,6 +498,14 @@ export default function TicketsScreen() {
     if (activeTab === "depart" && fleetBuses.length === 0) fetchFleetBuses();
     if (activeTab === "impression") fetchImpTrips();
   }, [activeTab]);
+
+  /* ── Auto-fetch seat map quand un trajet est sélectionné ── */
+  useEffect(() => {
+    if (selectedTrip) {
+      setSeatMapData([]);
+      fetchSeatMap(selectedTrip.id);
+    }
+  }, [selectedTrip?.id]);
 
   /* ── Polling seat map (15s) when plan is visible ── */
   useEffect(() => {
@@ -840,7 +848,8 @@ export default function TicketsScreen() {
           {/* SEAT MAP TOGGLE + GRID */}
           {selectedTrip && (
             <View style={S.card}>
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              {/* Toggle Passagers / Plan sièges */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
                 <TouchableOpacity
                   style={[S.viewToggleBtn, !showSeatMap && S.viewToggleBtnActive]}
                   onPress={() => setShowSeatMap(false)}>
@@ -849,10 +858,7 @@ export default function TicketsScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[S.viewToggleBtn, showSeatMap && S.viewToggleBtnActive]}
-                  onPress={() => {
-                    setShowSeatMap(true);
-                    if (seatMapData.length === 0) fetchSeatMap(selectedTrip.id);
-                  }}>
+                  onPress={() => setShowSeatMap(true)}>
                   <Ionicons name="grid-outline" size={14} color={showSeatMap ? G_DARK : "#9CA3AF"} />
                   <Text style={[S.viewToggleTxt, showSeatMap && S.viewToggleTxtActive]}>Plan sièges</Text>
                 </TouchableOpacity>
@@ -860,13 +866,13 @@ export default function TicketsScreen() {
 
               {showSeatMap && (
                 <>
-                  {/* Légende */}
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                  {/* Légende couleurs */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
                     {SEAT_LEGEND.map(item => {
                       const c = getSeatColor(item.status);
                       return (
                         <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                          <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
+                          <View style={{ width: 13, height: 13, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
                           <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
                         </View>
                       );
@@ -874,56 +880,101 @@ export default function TicketsScreen() {
                   </View>
 
                   {loadingSeatMap ? (
-                    <ActivityIndicator color={G} style={{ marginVertical: 16 }} />
+                    <ActivityIndicator color={G} style={{ marginVertical: 20 }} />
                   ) : seatMapData.length === 0 ? (
-                    <View style={{ alignItems: "center", padding: 16, gap: 8 }}>
-                      <Ionicons name="grid-outline" size={32} color="#D1D5DB" />
+                    <View style={{ alignItems: "center", padding: 20, gap: 10 }}>
+                      <Ionicons name="bus-outline" size={40} color="#D1D5DB" />
                       <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Plan de sièges non disponible</Text>
                       <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)}>
                         <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
                       </TouchableOpacity>
                     </View>
-                  ) : (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={{ gap: 6 }}>
-                        {(() => {
-                          const maxRow = Math.max(...seatMapData.map((s: any) => s.row ?? 1));
-                          const maxCol = Math.max(...seatMapData.map((s: any) => s.column ?? 1));
-                          return Array.from({ length: maxRow }, (_, ri) => (
-                            <View key={ri} style={{ flexDirection: "row", gap: 6 }}>
-                              {ri === 0 && <View style={{ width: 22 }} />}
+                  ) : (() => {
+                    const maxRow = Math.max(...seatMapData.map((s: any) => s.row ?? 1));
+                    const maxCol = Math.max(...seatMapData.map((s: any) => s.column ?? 1));
+                    const SEAT = 48;
+                    const GAP = 6;
+                    const AISLE = 18;
+                    const aisleAfterCol = maxCol >= 4 ? 2 : maxCol === 3 ? 2 : 0;
+                    return (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={{ alignItems: "flex-start", paddingBottom: 6 }}>
+                          {/* Cabine chauffeur */}
+                          <View style={{
+                            flexDirection: "row", alignItems: "center", justifyContent: "center",
+                            gap: 8, marginBottom: 12, marginLeft: 32,
+                            paddingVertical: 10, paddingHorizontal: 20,
+                            backgroundColor: "#F0FDF4", borderRadius: 12,
+                            borderWidth: 2, borderColor: "#86EFAC",
+                            alignSelf: "stretch",
+                          }}>
+                            <Ionicons name="bus-outline" size={18} color="#16A34A" />
+                            <Text style={{ fontSize: 12, fontWeight: "800", color: "#16A34A", letterSpacing: 0.5 }}>CHAUFFEUR</Text>
+                          </View>
+
+                          {/* Rangées de sièges */}
+                          {Array.from({ length: maxRow }, (_, ri) => (
+                            <View key={ri} style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: GAP }}>
+                              {/* Numéro de rangée */}
+                              <View style={{ width: 26, alignItems: "center" }}>
+                                <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700" }}>{ri + 1}</Text>
+                              </View>
+
                               {Array.from({ length: maxCol }, (_, ci) => {
                                 const seat = seatMapData.find((s: any) => s.row === ri + 1 && s.column === ci + 1);
-                                if (!seat) return <View key={ci} style={{ width: 40, height: 40 }} />;
-                                const st = seat.status;
-                                const c = getSeatColor(st);
-                                const isFree = st === "available";
+                                const st = seat?.status ?? null;
+                                const c = st ? getSeatColor(st) : null;
+                                const initials = seat?.clientName
+                                  ? seat.clientName.trim().split(/\s+/).map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase()
+                                  : null;
                                 return (
-                                  <TouchableOpacity
-                                    key={ci}
-                                    style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border, alignItems: "center", justifyContent: "center" }}
-                                    disabled={!isFree}
-                                    onPress={() => {
-                                      if (!isFree) return;
-                                      setClickedSeat(seat);
-                                      setSeatActionType("vendre");
-                                      setSeatPaxName(""); setSeatPaxPhone("");
-                                      setShowSeatModal(true);
-                                    }}>
-                                    <Text style={{ fontSize: 11, fontWeight: "700", color: c.text }}>{seat.number}</Text>
-                                  </TouchableOpacity>
+                                  <React.Fragment key={ci}>
+                                    {ci === aisleAfterCol && aisleAfterCol > 0 && (
+                                      <View style={{ width: AISLE, alignItems: "center", justifyContent: "center" }}>
+                                        <View style={{ width: 2, height: SEAT * 0.7, backgroundColor: "#E5E7EB", borderRadius: 2 }} />
+                                      </View>
+                                    )}
+                                    {!seat ? (
+                                      <View style={{ width: SEAT, height: SEAT }} />
+                                    ) : (
+                                      <TouchableOpacity
+                                        style={{
+                                          width: SEAT, height: SEAT, borderRadius: 10,
+                                          backgroundColor: c!.bg, borderWidth: 2, borderColor: c!.border,
+                                          alignItems: "center", justifyContent: "center",
+                                          shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
+                                        }}
+                                        activeOpacity={0.75}
+                                        onPress={() => {
+                                          setClickedSeat(seat);
+                                          setSeatActionType("vendre");
+                                          setSeatPaxName(seat.status === "available" ? "" : (seat.clientName ?? ""));
+                                          setSeatPaxPhone(seat.status === "available" ? "" : (seat.clientPhone ?? ""));
+                                          setShowSeatModal(true);
+                                        }}>
+                                        <Text style={{ fontSize: 10, fontWeight: "800", color: c!.text, lineHeight: 13 }}>{seat.number}</Text>
+                                        {initials && (
+                                          <Text style={{ fontSize: 9, fontWeight: "600", color: c!.text, opacity: 0.85, lineHeight: 11 }}>{initials}</Text>
+                                        )}
+                                      </TouchableOpacity>
+                                    )}
+                                  </React.Fragment>
                                 );
                               })}
                             </View>
-                          ));
-                        })()}
-                      </View>
-                    </ScrollView>
-                  )}
-                  <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
-                    <Ionicons name="refresh-outline" size={14} color={G} />
-                    <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Actualiser le plan</Text>
-                  </TouchableOpacity>
+                          ))}
+
+                          {/* Actualiser */}
+                          <TouchableOpacity
+                            onPress={() => fetchSeatMap(selectedTrip.id)}
+                            style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, marginLeft: 32 }}>
+                            <Ionicons name="refresh-outline" size={13} color={G} />
+                            <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Actualiser le plan</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </ScrollView>
+                    );
+                  })()}
                 </>
               )}
             </View>
@@ -1767,83 +1818,152 @@ export default function TicketsScreen() {
       {/* ── Modal: action sur siège ── */}
       <Modal visible={showSeatModal} transparent animationType="slide" onRequestClose={() => setShowSeatModal(false)}>
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, gap: 14 }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 44, gap: 14 }}>
+            {/* En-tête */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>
-                Siège {clickedSeat?.number}
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                {clickedSeat && (() => {
+                  const c = getSeatColor(clickedSeat.status);
+                  return (
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: c.bg, borderWidth: 2, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: c.text }}>{clickedSeat.number}</Text>
+                    </View>
+                  );
+                })()}
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>Siège {clickedSeat?.number}</Text>
+                  <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>
+                    {clickedSeat?.status === "available"   ? "Disponible"
+                     : clickedSeat?.status === "reserved"  ? "Réservé"
+                     : clickedSeat?.status === "occupied"  ? "Vendu"
+                     : clickedSeat?.status === "sp"        ? "Siège de courtoisie (SP)"
+                     : clickedSeat?.status}
+                  </Text>
+                </View>
+              </View>
               <TouchableOpacity onPress={() => setShowSeatModal(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            {/* Action type */}
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {[
-                { v: "vendre",   label: "Vendre",    color: G,         darkColor: G_DARK },
-                { v: "réserver", label: "Réserver",  color: "#1D4ED8",  darkColor: "#1E3A8A" },
-                { v: "sp",       label: "SP",         color: "#7C3AED",  darkColor: "#5B21B6" },
-              ].map(act => {
-                const sel = seatActionType === act.v;
-                return (
-                  <TouchableOpacity key={act.v}
-                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 2,
-                      borderColor: sel ? act.color : "#E5E7EB",
-                      backgroundColor: sel ? act.color : "#F9FAFB",
-                      alignItems: "center" }}
-                    onPress={() => setSeatActionType(act.v as any)}>
-                    <Text style={{ fontSize: 13, fontWeight: "700", color: sel ? "#fff" : "#6B7280" }}>
-                      {act.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            {/* ── Siège NON disponible : afficher infos passager ── */}
+            {clickedSeat && clickedSeat.status !== "available" ? (
+              <>
+                {/* Infos passager */}
+                <View style={{ backgroundColor: "#F9FAFB", borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: "#E5E7EB" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="person-circle-outline" size={20} color="#6B7280" />
+                    <View>
+                      <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Passager</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>{clickedSeat.clientName ?? "—"}</Text>
+                    </View>
+                  </View>
+                  {!!clickedSeat.clientPhone && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="call-outline" size={18} color="#6B7280" />
+                      <Text style={{ fontSize: 14, color: "#374151" }}>{clickedSeat.clientPhone}</Text>
+                    </View>
+                  )}
+                  {!!clickedSeat.bookingRef && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="receipt-outline" size={18} color="#6B7280" />
+                      <Text style={{ fontSize: 13, color: "#374151", fontFamily: "monospace" }}>{clickedSeat.bookingRef}</Text>
+                    </View>
+                  )}
+                  {!!clickedSeat.paymentMethod && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Ionicons name="card-outline" size={18} color="#6B7280" />
+                      <Text style={{ fontSize: 13, color: "#374151", textTransform: "capitalize" }}>{clickedSeat.paymentMethod}</Text>
+                    </View>
+                  )}
+                </View>
 
-            {seatActionType === "sp" && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, padding: 10 }}>
-                <Ionicons name="shield-checkmark-outline" size={14} color="#7C3AED" />
-                <Text style={{ fontSize: 12, color: "#5B21B6", fontWeight: "600" }}>Billet de courtoisie — 0 FCFA</Text>
-              </View>
+                {clickedSeat.status === "sp" && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#F5F3FF", borderRadius: 10, padding: 12 }}>
+                    <Ionicons name="shield-checkmark" size={18} color="#7C3AED" />
+                    <Text style={{ fontSize: 13, color: "#5B21B6", fontWeight: "600" }}>Billet de courtoisie — gratuit</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={{ backgroundColor: "#F3F4F6", borderRadius: 12, paddingVertical: 13, alignItems: "center" }}
+                  onPress={() => setShowSeatModal(false)}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: "#374151" }}>Fermer</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              /* ── Siège disponible : formulaire de vente/réservation/SP ── */
+              <>
+                {/* Action type */}
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {[
+                    { v: "vendre",   label: "Vendre",   color: G,         icon: "cash-outline" },
+                    { v: "réserver", label: "Réserver", color: "#1D4ED8", icon: "bookmark-outline" },
+                    { v: "sp",       label: "SP",        color: "#7C3AED", icon: "shield-checkmark-outline" },
+                  ].map(act => {
+                    const sel = seatActionType === act.v;
+                    return (
+                      <TouchableOpacity key={act.v}
+                        style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 2,
+                          borderColor: sel ? act.color : "#E5E7EB",
+                          backgroundColor: sel ? act.color : "#F9FAFB",
+                          alignItems: "center", gap: 4 }}
+                        onPress={() => setSeatActionType(act.v as any)}>
+                        <Ionicons name={act.icon as any} size={15} color={sel ? "#fff" : "#6B7280"} />
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: sel ? "#fff" : "#6B7280" }}>
+                          {act.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {seatActionType === "sp" && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, padding: 10 }}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color="#7C3AED" />
+                    <Text style={{ fontSize: 12, color: "#5B21B6", fontWeight: "600" }}>Billet de courtoisie — 0 FCFA</Text>
+                  </View>
+                )}
+
+                <View style={{ gap: 6 }}>
+                  <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Nom passager *</Text>
+                  <TextInput
+                    style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
+                    placeholder="Ex: Kouamé Jean"
+                    value={seatPaxName}
+                    onChangeText={setSeatPaxName}
+                  />
+                </View>
+                {seatActionType !== "sp" && (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Téléphone</Text>
+                    <TextInput
+                      style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
+                      placeholder="Ex: 07 12 34 56 78"
+                      value={seatPaxPhone}
+                      onChangeText={setSeatPaxPhone}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={{ backgroundColor: seatActionType === "sp" ? "#7C3AED" : seatActionType === "réserver" ? "#1D4ED8" : G,
+                    borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8,
+                    opacity: seatSubmitting ? 0.6 : 1 }}
+                  onPress={handleSeatSale} disabled={seatSubmitting}>
+                  {seatSubmitting
+                    ? <ActivityIndicator color="#fff" />
+                    : <>
+                      <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                      <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                        {seatActionType === "sp" ? "Émettre SP" : seatActionType === "réserver" ? "Réserver" : "Confirmer la vente"}
+                      </Text>
+                    </>
+                  }
+                </TouchableOpacity>
+              </>
             )}
-
-            <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Nom passager *</Text>
-              <TextInput
-                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
-                placeholder="Ex: Kouamé Jean"
-                value={seatPaxName}
-                onChangeText={setSeatPaxName}
-              />
-            </View>
-            {seatActionType !== "sp" && (
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Téléphone</Text>
-                <TextInput
-                  style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
-                  placeholder="Ex: 07 12 34 56 78"
-                  value={seatPaxPhone}
-                  onChangeText={setSeatPaxPhone}
-                  keyboardType="phone-pad"
-                />
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={{ backgroundColor: seatActionType === "sp" ? "#7C3AED" : seatActionType === "réserver" ? "#1D4ED8" : G,
-                borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8,
-                opacity: seatSubmitting ? 0.6 : 1 }}
-              onPress={handleSeatSale} disabled={seatSubmitting}>
-              {seatSubmitting
-                ? <ActivityIndicator color="#fff" />
-                : <>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-                    {seatActionType === "sp" ? "Émettre SP" : seatActionType === "réserver" ? "Réserver" : "Confirmer la vente"}
-                  </Text>
-                </>
-              }
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

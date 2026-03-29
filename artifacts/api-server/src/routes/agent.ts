@@ -1542,29 +1542,57 @@ router.get("/seats/:tripId", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const [seats, spBookings] = await Promise.all([
+    const [seats, allBookings] = await Promise.all([
       db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId)),
-      db.select({ seatNumbers: bookingsTable.seatNumbers })
+      db.select({
+        seatNumbers:   bookingsTable.seatNumbers,
+        clientName:    bookingsTable.clientName,
+        clientPhone:   bookingsTable.clientPhone,
+        bookingRef:    bookingsTable.bookingRef,
+        paymentStatus: bookingsTable.paymentStatus,
+        status:        bookingsTable.status,
+        paymentMethod: bookingsTable.paymentMethod,
+      })
         .from(bookingsTable)
         .where(and(
           eq(bookingsTable.tripId, req.params.tripId),
-          eq(bookingsTable.paymentStatus, "sp"),
           eq(bookingsTable.status, "confirmed"),
         )),
     ]);
 
-    const spNums = new Set<string>(
-      spBookings.flatMap(b =>
-        Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers] : [])
-      ).filter(Boolean)
-    );
+    const spNums = new Set<string>();
+    const seatInfoMap = new Map<string, { clientName: string; clientPhone: string; bookingRef: string; paymentMethod: string; isSP: boolean }>();
 
-    const enriched = seats.map(seat => ({
-      ...seat,
-      status: seat.status === "occupied" && spNums.has(seat.number as string)
-        ? "sp"
-        : seat.status,
-    }));
+    for (const b of allBookings) {
+      const nums: string[] = Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers as string] : []);
+      const isSP = b.paymentStatus === "sp";
+      if (isSP) nums.forEach(n => spNums.add(n));
+      for (const n of nums) {
+        if (!seatInfoMap.has(n)) {
+          seatInfoMap.set(n, {
+            clientName:    b.clientName ?? "—",
+            clientPhone:   b.clientPhone ?? "",
+            bookingRef:    b.bookingRef ?? "",
+            paymentMethod: b.paymentMethod ?? "",
+            isSP,
+          });
+        }
+      }
+    }
+
+    const enriched = seats.map(seat => {
+      const num = seat.number as string;
+      const isSP = spNums.has(num);
+      const info = seatInfoMap.get(num);
+      return {
+        ...seat,
+        status: seat.status === "occupied" && isSP ? "sp" : seat.status,
+        clientName:    info?.clientName    ?? null,
+        clientPhone:   info?.clientPhone   ?? null,
+        bookingRef:    info?.bookingRef    ?? null,
+        paymentMethod: info?.paymentMethod ?? null,
+      };
+    });
 
     res.json(enriched);
   } catch (err) {
