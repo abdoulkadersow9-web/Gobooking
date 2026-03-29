@@ -303,22 +303,47 @@ function LiveCamView({
 }: {
   signal: number; route: string; busId: string;
 }) {
-  const scanAnim  = useRef(new Animated.Value(0)).current;
-  const [ts,     setTs]     = useState(() => new Date().toLocaleTimeString("fr-FR"));
-  const [coords, setCoords] = useState(() => ({
+  const scanAnim    = useRef(new Animated.Value(0)).current;
+  const glitchAnim  = useRef(new Animated.Value(0)).current;
+
+  const [ts,      setTs]      = useState(() => new Date().toLocaleTimeString("fr-FR"));
+  const [frames,  setFrames]  = useState(() => 1000 + Math.floor(Math.random() * 8000));
+  const [coords,  setCoords]  = useState(() => ({
     lat: (5.35 + Math.random() * 0.08).toFixed(4),
     lon: (3.95 + Math.random() * 0.06).toFixed(4),
   }));
-  const [speed,  setSpeed]  = useState(() => 65 + Math.floor(Math.random() * 30));
+  const [speed,   setSpeed]   = useState(() => 65 + Math.floor(Math.random() * 30));
+  const [bw,      setBw]      = useState(() => (1.8 + Math.random() * 1.4).toFixed(1));
+  const [heading, setHeading] = useState(() => 45 + Math.floor(Math.random() * 270));
+  const [noise,   setNoise]   = useState(() => [
+    { x: 20, y: 25, w: 18, h: 5 },
+    { x: 60, y: 48, w: 12, h: 3 },
+    { x: 35, y: 70, w: 22, h: 4 },
+  ]);
 
   useEffect(() => {
-    const loop = Animated.loop(
+    const scanLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scanAnim, { toValue: 1, duration: 2600, useNativeDriver: true, easing: Easing.linear }),
-        Animated.timing(scanAnim, { toValue: 0, duration: 0,    useNativeDriver: true }),
+        Animated.timing(scanAnim, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.linear }),
+        Animated.timing(scanAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
       ])
     );
-    loop.start();
+    scanLoop.start();
+
+    const glitchLoop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(3000 + Math.random() * 4000),
+        Animated.timing(glitchAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+        Animated.timing(glitchAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
+        Animated.timing(glitchAnim, { toValue: 0.5, duration: 60, useNativeDriver: true }),
+        Animated.timing(glitchAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
+      ])
+    );
+    glitchLoop.start();
+
+    const frameInterval = setInterval(() => {
+      setFrames(f => f + 2 + Math.floor(Math.random() * 3));
+    }, 80);
 
     const tInterval = setInterval(() => {
       setTs(new Date().toLocaleTimeString("fr-FR"));
@@ -326,92 +351,174 @@ function LiveCamView({
 
     const dataInterval = setInterval(() => {
       setCoords(c => ({
-        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.0012).toFixed(4),
-        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.0008).toFixed(4),
+        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.0014).toFixed(4),
+        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.001).toFixed(4),
       }));
-      setSpeed(s => Math.max(40, Math.min(110, s + Math.floor((Math.random() - 0.45) * 8))));
-    }, 2200);
+      setSpeed(s => Math.max(38, Math.min(115, s + Math.floor((Math.random() - 0.42) * 9))));
+      setBw(((1.8 + Math.random() * 1.4)).toFixed(1));
+      setHeading(h => (h + Math.floor((Math.random() - 0.5) * 6) + 360) % 360);
+      setNoise([
+        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 10 + Math.floor(Math.random() * 25), h: 3 + Math.floor(Math.random() * 5) },
+        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 8 + Math.floor(Math.random() * 20), h: 2 + Math.floor(Math.random() * 4) },
+        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 14 + Math.floor(Math.random() * 30), h: 3 + Math.floor(Math.random() * 6) },
+      ]);
+    }, 1800);
 
-    return () => { loop.stop(); clearInterval(tInterval); clearInterval(dataInterval); };
+    return () => {
+      scanLoop.stop(); glitchLoop.stop();
+      clearInterval(frameInterval); clearInterval(tInterval); clearInterval(dataInterval);
+    };
   }, [busId]);
 
   const sigBars  = Math.max(1, Math.ceil((signal / 100) * 4));
   const sigColor = signal >= 75 ? CAM_GR : signal >= 50 ? "#FCD34D" : "#EF4444";
-  const CARD_H   = 90;
+  const CARD_H   = 128;
+  const headingStr = `${heading.toString().padStart(3,"0")}°`;
 
   return (
-    <View style={{ height: CARD_H, backgroundColor: "#010508", overflow: "hidden" }}>
-      {/* Static horizontal scan lines (CRT effect) */}
-      {Array.from({ length: 9 }).map((_, i) => (
+    <View style={{ height: CARD_H, backgroundColor: "#010306", overflow: "hidden" }}>
+
+      {/* ── Subtle green tint overlay (night-vision feel) */}
+      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:0,
+        backgroundColor:"rgba(0,30,10,0.38)" }} />
+
+      {/* ── CRT scan lines */}
+      {Array.from({ length: 13 }).map((_, i) => (
         <View key={i} style={{
-          position: "absolute", left: 0, right: 0,
-          top: 10 + i * 9, height: 1,
-          backgroundColor: "rgba(34,197,94,0.035)",
+          position:"absolute", left:0, right:0,
+          top: i * 10, height: 1,
+          backgroundColor:"rgba(0,0,0,0.22)",
         }} />
       ))}
 
-      {/* Moving scan line */}
+      {/* ── Video compression noise artifacts */}
+      {noise.map((n, i) => (
+        <View key={i} style={{
+          position:"absolute", left:n.x, top:n.y, width:n.w, height:n.h,
+          backgroundColor:"rgba(34,197,94,0.07)",
+          opacity: 0.5 + Math.random() * 0.5,
+        }} />
+      ))}
+
+      {/* ── Glitch horizontal bar */}
       <Animated.View style={{
-        position: "absolute", left: 0, right: 0, height: 2,
-        backgroundColor: "rgba(34,197,94,0.5)",
-        transform: [{ translateY: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CARD_H] }) }],
-        ...(Platform.OS === "web" ? { boxShadow: "0 0 6px rgba(34,197,94,0.7)" } : {}),
+        position:"absolute", left:0, right:0, height:3,
+        top: 40 + Math.floor(Math.random() * 60),
+        backgroundColor:"rgba(34,197,94,0.15)",
+        opacity: glitchAnim,
       }} />
 
-      {/* Corner brackets */}
-      {/* TL */}
-      <View style={{ position:"absolute", top:5, left:6, width:10, height:10,
-        borderTopWidth:1.5, borderLeftWidth:1.5, borderColor: CAM_GR }} />
-      {/* TR */}
-      <View style={{ position:"absolute", top:5, right:6, width:10, height:10,
-        borderTopWidth:1.5, borderRightWidth:1.5, borderColor: CAM_GR }} />
-      {/* BL */}
-      <View style={{ position:"absolute", bottom:5, left:6, width:10, height:10,
-        borderBottomWidth:1.5, borderLeftWidth:1.5, borderColor: CAM_GR }} />
-      {/* BR */}
-      <View style={{ position:"absolute", bottom:5, right:6, width:10, height:10,
-        borderBottomWidth:1.5, borderRightWidth:1.5, borderColor: CAM_GR }} />
+      {/* ── Moving scan line */}
+      <Animated.View style={{
+        position:"absolute", left:0, right:0, height:1.5,
+        backgroundColor:"rgba(34,197,94,0.55)",
+        transform:[{ translateY: scanAnim.interpolate({ inputRange:[0,1], outputRange:[0, CARD_H] }) }],
+        ...(Platform.OS==="web" ? { boxShadow:"0 0 8px rgba(34,197,94,0.8)" } : {}),
+      }} />
 
-      {/* Top overlay: GPS + speed */}
-      <View style={{ position:"absolute", top:7, left:18, right:18,
-        flexDirection:"row", justifyContent:"space-between", alignItems:"center" }}>
-        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.3, opacity:0.9 }}>
-          {coords.lat}°N {coords.lon}°W
+      {/* ── Corner brackets (targeting system) */}
+      <View style={{ position:"absolute", top:6, left:7, width:12, height:12,
+        borderTopWidth:1.5, borderLeftWidth:1.5, borderColor:CAM_GR }} />
+      <View style={{ position:"absolute", top:6, right:7, width:12, height:12,
+        borderTopWidth:1.5, borderRightWidth:1.5, borderColor:CAM_GR }} />
+      <View style={{ position:"absolute", bottom:18, left:7, width:12, height:12,
+        borderBottomWidth:1.5, borderLeftWidth:1.5, borderColor:CAM_GR }} />
+      <View style={{ position:"absolute", bottom:18, right:7, width:12, height:12,
+        borderBottomWidth:1.5, borderRightWidth:1.5, borderColor:CAM_GR }} />
+
+      {/* ── TOP LEFT: GPS */}
+      <View style={{ position:"absolute", top:10, left:22 }}>
+        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.4, opacity:0.92 }}>
+          {coords.lat}°N
         </Text>
-        <Text style={{ color:"#FCD34D", fontSize:7, fontWeight:"900" }}>{speed}km/h</Text>
+        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.4, opacity:0.92 }}>
+          {coords.lon}°W
+        </Text>
       </View>
 
-      {/* Center crosshair */}
-      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:0,
+      {/* ── TOP RIGHT: heading + speed */}
+      <View style={{ position:"absolute", top:10, right:22, alignItems:"flex-end" }}>
+        <Text style={{ color:"#FCD34D", fontSize:7.5, fontWeight:"900", letterSpacing:0.3 }}>
+          {speed} km/h
+        </Text>
+        <Text style={{ color:"rgba(252,211,77,0.65)", fontSize:6, fontWeight:"700" }}>
+          CAP {headingStr}
+        </Text>
+      </View>
+
+      {/* ── CENTER: crosshair */}
+      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:18,
         justifyContent:"center", alignItems:"center" }}>
-        <View style={{ position:"absolute", width:18, height:1,
-          backgroundColor:"rgba(34,197,94,0.45)" }} />
-        <View style={{ position:"absolute", width:1, height:18,
-          backgroundColor:"rgba(34,197,94,0.45)" }} />
-        <View style={{ width:4, height:4, borderRadius:2,
-          borderWidth:1, borderColor:"rgba(34,197,94,0.6)" }} />
+        <View style={{ position:"absolute", width:22, height:1,
+          backgroundColor:"rgba(34,197,94,0.5)" }} />
+        <View style={{ position:"absolute", width:1, height:22,
+          backgroundColor:"rgba(34,197,94,0.5)" }} />
+        <View style={{ width:5, height:5, borderRadius:2.5,
+          borderWidth:1, borderColor:"rgba(34,197,94,0.75)",
+          backgroundColor:"transparent" }} />
       </View>
 
-      {/* Signal bars (right side, vertical center) */}
-      <View style={{ position:"absolute", right:18, bottom:22,
-        flexDirection:"row", alignItems:"flex-end", gap:1.5 }}>
-        {[1,2,3,4].map(b => (
-          <View key={b} style={{ width:2.5, height:3 + b * 2.5, borderRadius:1,
-            backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.08)" }} />
-        ))}
-      </View>
-
-      {/* Bottom overlay: route + timestamp */}
-      <View style={{ position:"absolute", bottom:0, left:0, right:0,
-        backgroundColor:"rgba(0,0,0,0.72)", paddingHorizontal:10, paddingVertical:4,
-        flexDirection:"row", justifyContent:"space-between" }}>
-        <Text style={{ color:"rgba(255,255,255,0.45)", fontSize:6.5, fontWeight:"600" }} numberOfLines={1}>
-          {route}
-        </Text>
-        <Text style={{ color:"rgba(34,197,94,0.85)", fontSize:6.5, fontWeight:"700", letterSpacing:0.3 }}>
+      {/* ── BOTTOM BAR: data overlay */}
+      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:18,
+        backgroundColor:"rgba(0,0,0,0.82)",
+        flexDirection:"row", alignItems:"center",
+        paddingHorizontal:8, gap:8 }}>
+        {/* timestamp */}
+        <Text style={{ color:CAM_GR, fontSize:7, fontWeight:"800", letterSpacing:0.4 }}>
           {ts}
         </Text>
+        <View style={{ width:1, height:8, backgroundColor:"rgba(34,197,94,0.25)" }} />
+        {/* frame counter */}
+        <Text style={{ color:"rgba(34,197,94,0.7)", fontSize:6.5, fontWeight:"700" }}>
+          F:{frames.toString().padStart(5,"0")}
+        </Text>
+        <View style={{ flex:1 }} />
+        {/* bandwidth */}
+        <Text style={{ color:"rgba(148,163,184,0.8)", fontSize:6.5, fontWeight:"700" }}>
+          {bw} Mbps
+        </Text>
+        <View style={{ width:1, height:8, backgroundColor:"rgba(34,197,94,0.2)" }} />
+        {/* signal bars */}
+        <View style={{ flexDirection:"row", alignItems:"flex-end", gap:1.5 }}>
+          {[1,2,3,4].map(b => (
+            <View key={b} style={{ width:2.5, height:3 + b * 2, borderRadius:1,
+              backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.1)" }} />
+          ))}
+        </View>
       </View>
+    </View>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUS HEARTBEAT — mini waveform indicator sur les cartes bus
+   ══════════════════════════════════════════════════════════════════ */
+function BusHeartbeat({ color, active }: { color: string; active: boolean }) {
+  const [bars, setBars] = useState<number[]>(() =>
+    Array.from({ length: 10 }, () => 2 + Math.random() * 5)
+  );
+
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => {
+      setBars(prev => {
+        const next = [...prev.slice(1), 2 + Math.random() * 5];
+        return next;
+      });
+    }, 280);
+    return () => clearInterval(id);
+  }, [active]);
+
+  return (
+    <View style={{ flexDirection:"row", alignItems:"flex-end", gap:1.5,
+      height:8, marginTop:4 }}>
+      {bars.map((h, i) => (
+        <View key={i} style={{
+          flex:1, height:h, borderRadius:1,
+          backgroundColor: active ? color : "rgba(255,255,255,0.08)",
+          opacity: active ? 0.5 + (i / 10) * 0.5 : 0.3,
+        }} />
+      ))}
     </View>
   );
 }
@@ -734,7 +841,12 @@ export default function SuiviScreen() {
             </View>
             <View style={{ flex: 1, overflow: "hidden" }}>
               <Text style={S.headerTitle} numberOfLines={1}>{user?.name ?? "Agent Suivi"}</Text>
-              <Text style={S.headerSub}>Tour de contrôle · GoBooking</Text>
+              <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
+                <Animated.View style={{ width:5, height:5, borderRadius:3,
+                  backgroundColor: CAM_GR,
+                  opacity: pulseAnim.interpolate({ inputRange:[1,1.04], outputRange:[1,0.1] }) }} />
+                <Text style={S.headerSub}>SYSTÈME EN LIGNE · {new Date().toLocaleDateString("fr-FR")}</Text>
+              </View>
             </View>
           </View>
           <View style={S.headerRight}>
@@ -918,6 +1030,11 @@ export default function SuiviScreen() {
                       <Text style={S.gridCamTxt}>LIVE</Text>
                     </View>
                   )}
+                  {/* Heartbeat waveform */}
+                  <BusHeartbeat
+                    color={st.color}
+                    active={bus.status === "en_route" || bus.status === "en_route_alerte"}
+                  />
                 </View>
               );
             }}
@@ -1417,7 +1534,7 @@ const S = StyleSheet.create({
   camStripCard:   { width: 170, borderRadius: 10, overflow: "hidden",
                     backgroundColor: "#060A12",
                     borderWidth: 1, borderColor: "#162032" },
-  camStripMonitor:{ height: 90 },
+  camStripMonitor:{ height: 128 },
   camStripBadgeRow:{ flexDirection: "row", alignItems: "center", gap: 4,
                     paddingHorizontal: 8, paddingVertical: 5,
                     backgroundColor: "#0B1220", maxWidth: 170 },
