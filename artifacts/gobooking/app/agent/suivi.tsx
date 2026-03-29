@@ -459,9 +459,19 @@ function AlertDetailModal({
 }) {
   const [acting, setActing] = useState(false);
   const alType    = alert.type?.toLowerCase() ?? "";
-  const isUrgent  = alType === "urgence" || alType === "sos";
-  const typeColor = isUrgent ? "#EF4444" : alType === "panne" ? "#F59E0B" : "#EF4444";
-  const typeLabel = (alert.type ?? "ALERTE").toUpperCase();
+  const TYPE_META: Record<string, { color: string; label: string }> = {
+    urgence:          { color: "#EF4444", label: "URGENCE" },
+    sos:              { color: "#DC2626", label: "SOS" },
+    panne:            { color: "#F59E0B", label: "PANNE" },
+    controle:         { color: "#3B82F6", label: "CONTRÔLE" },
+    bus_offline:      { color: "#EF4444", label: "HORS LIGNE" },
+    bus_arret:        { color: "#F59E0B", label: "ARRÊT ANORMAL" },
+    vitesse_anormale: { color: "#EF4444", label: "EXCÈS VITESSE" },
+    alerte:           { color: "#EF4444", label: "ALERTE" },
+  };
+  const meta      = TYPE_META[alType] ?? { color: "#EF4444", label: (alert.type ?? "ALERTE").toUpperCase() };
+  const typeColor = meta.color;
+  const typeLabel = meta.label;
   const responded = !!alert.response;
   const waiting   = alert.responseRequested && !responded;
   const respInfo  = alert.response ? RESP_INFO[alert.response] : null;
@@ -1467,6 +1477,14 @@ export default function SuiviScreen() {
                   const flowStep  = alert.response ? "validate" : alert.responseRequested ? "waiting" : "new";
                   const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
                   const btnLabel  = flowStep === "validate" ? "VALIDER" : "TRAITER";
+                  const alTypeLow = alert.type?.toLowerCase() ?? "";
+                  const TYPE_MAP: Record<string, { color: string; label: string }> = {
+                    urgence: { color: "#EF4444", label: "URGENCE" }, sos: { color: "#DC2626", label: "SOS" },
+                    panne: { color: "#F59E0B", label: "PANNE" }, controle: { color: "#3B82F6", label: "CONTRÔLE" },
+                    bus_offline: { color: "#EF4444", label: "HORS LIGNE" }, bus_arret: { color: "#F59E0B", label: "ARRÊT" },
+                    vitesse_anormale: { color: "#EF4444", label: "VITESSE" }, alerte: { color: "#EF4444", label: "ALERTE" },
+                  };
+                  const typeMeta = TYPE_MAP[alTypeLow] ?? { color: "#EF4444", label: (alert.type ?? "ALERTE").toUpperCase() };
                   const aTrip     = data?.trips.find(t =>
                     (alert.busId && t.busId === alert.busId) ||
                     (alert.busName && t.busName === alert.busName)
@@ -1478,7 +1496,7 @@ export default function SuiviScreen() {
                   return (
                     <View key={alert.id} style={[S.alertCard, { borderColor: `${stepColor}35` }]}>
 
-                      {/* ── Ligne 1 : badge + temps ── */}
+                      {/* ── Ligne 1 : badge + type + temps ── */}
                       <View style={S.alertCardRow1}>
                         <View style={[S.alertBadge, { backgroundColor: `${stepColor}15`, borderColor: `${stepColor}30` }]}>
                           <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: stepColor, flexShrink: 0,
@@ -1487,7 +1505,12 @@ export default function SuiviScreen() {
                             {flowStep === "validate" ? "Réponse reçue" : flowStep === "waiting" ? "En attente" : "Action requise"}
                           </Text>
                         </View>
-                        <Text style={S.alertTimeTxt}>{timeAgo < 1 ? "À l'instant" : `${timeAgo} min`}</Text>
+                        <View style={{ backgroundColor: `${typeMeta.color}18`, borderRadius: 6, borderWidth: 1, borderColor: `${typeMeta.color}30`, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: typeMeta.color, letterSpacing: 0.5 }}>
+                            {typeMeta.label}
+                          </Text>
+                        </View>
+                        <Text style={[S.alertTimeTxt, { marginLeft: "auto" }]}>{timeAgo < 1 ? "À l'instant" : `${timeAgo} min`}</Text>
                       </View>
 
                       {/* ── Ligne 2 : Nom bus ── */}

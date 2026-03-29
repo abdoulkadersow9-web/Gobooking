@@ -19,8 +19,10 @@ import {
   notificationsTable,
   agentsTable,
   busPositionsTable,
+  agentAlertsTable,
+  busesTable,
 } from "@workspace/db";
-import { eq, and, inArray, isNotNull, sql } from "drizzle-orm";
+import { eq, and, inArray, isNotNull, sql, ne } from "drizzle-orm";
 import { sendExpoPush } from "./pushService";
 import { locationStore } from "./locationStore";
 
@@ -804,6 +806,21 @@ async function sendDelayNotifications() {
     lastDelayPerTrip.set(trip.id, delay);
     if (passengers.rows.length > 0)
       console.log(`[Scheduler] ⏱️  Alerte retard +${delay} min → trajet ${trip.id} (${passengers.rows.length} pax notifiés)`);
+
+    // ✅ Alerte persistante dans agent_alerts → visible dans tous les dashboards
+    if (delay >= 10) {
+      const busInfo = await db.execute(sql`
+        SELECT t.bus_id, t.bus_name, t.company_id FROM trips t WHERE t.id = ${trip.id} LIMIT 1
+      `);
+      const b = (busInfo.rows as any[])[0];
+      if (b?.company_id) {
+        await createSystemAlert({
+          tripId: trip.id, busId: b.bus_id ?? null, busName: b.bus_name ?? `${trip.from_city}→${trip.to_city}`,
+          companyId: b.company_id, type: "alerte",
+          message: `Retard de ${delay} min — ${b.bus_name ?? ""} (${trip.from_city}→${trip.to_city})${trip.delay_reason ? " : " + trip.delay_reason : ""}.`,
+        });
+      }
+    }
   }
 }
 
@@ -894,52 +911,107 @@ export function startScheduler(intervalMs = 30_000) {
    - Bus hors-ligne : pas de mise à jour GPS depuis > 30 s → notif compagnie
 ────────────────────────────────────────────────────────────────────────────── */
 
-const stoppedSince   = new Map<string, number>(); // tripId → timestamp du premier speed=0
-const sentStopAlert  = new Set<string>();          // tripId déjà alerté (arrêt)
-const sentOffline    = new Set<string>();          // tripId déjà alerté (hors-ligne)
+/* ─── État interne — anomalies bus ───────────────────────────────────────── */
+const stoppedSince    = new Map<string, number>(); // tripId → timestamp du premier speed=0
+const sentStopAlert   = new Set<string>();          // tripId déjà alerté (arrêt) — push notif
+const sentOffline     = new Set<string>();          // tripId déjà alerté (hors-ligne) — push notif
+const dbAlertIds      = new Map<string, string>();  // `${tripId}:${type}` → agent_alert.id (pour resolve)
+
+/* Helper : crée une alerte dans agent_alerts — vérifie d'abord en DB pour éviter les doublons */
+async function createSystemAlert(opts: {
+  tripId: string; busId: string | null; busName: string; companyId: string;
+  type: string; message: string; dedupeKey?: string;
+}) {
+  const key = opts.dedupeKey ?? `${opts.tripId}:${opts.type}`;
+  if (dbAlertIds.has(key)) return; // déjà en mémoire
+
+  // Vérification en base — évite les doublons après redémarrage
+  const existing = await db.execute(sql`
+    SELECT id FROM agent_alerts
+    WHERE trip_id = ${opts.tripId} AND type = ${opts.type}
+      AND agent_id = 'system' AND status = 'active'
+    LIMIT 1
+  `);
+  if ((existing.rows as any[]).length > 0) {
+    dbAlertIds.set(key, (existing.rows as any[])[0].id);
+    return;
+  }
+
+  const id = nanoid();
+  await db.insert(agentAlertsTable).values({
+    id, type: opts.type,
+    agentId:   "system",
+    agentName: "Système GoBooking",
+    companyId: opts.companyId,
+    tripId:    opts.tripId,
+    busId:     opts.busId ?? undefined,
+    busName:   opts.busName,
+    message:   opts.message,
+    status:    "active",
+  });
+  dbAlertIds.set(key, id);
+  console.log(`[Scheduler] 🔔 Alerte DB créée [${opts.type}] → ${opts.busName} | ${opts.message}`);
+}
+
+/* Helper : résout une alerte système quand le problème disparaît */
+async function resolveSystemAlert(tripId: string, type: string) {
+  const key = `${tripId}:${type}`;
+  const id  = dbAlertIds.get(key);
+  if (!id) return;
+  await db.execute(sql`
+    UPDATE agent_alerts SET status = 'resolue', resolved_at = NOW(), resolved_by = 'system'
+    WHERE id = ${id} AND status = 'active'
+  `);
+  dbAlertIds.delete(key);
+  console.log(`[Scheduler] ✅ Alerte résolue [${type}] → trajet ${tripId}`);
+}
 
 async function checkBusAnomalies() {
   const now = Date.now();
 
-  /* 1. Récupère tous les trajets en_route */
+  /* 1. Récupère tous les trajets en_route avec info bus */
   const activeTrips = await db.select({
     id:        tripsTable.id,
     from:      tripsTable.from,
     to:        tripsTable.to,
     companyId: tripsTable.companyId,
+    busId:     tripsTable.busId,
+    busName:   tripsTable.busName,
   }).from(tripsTable).where(eq(tripsTable.status, "en_route"));
 
   if (!activeTrips.length) return;
 
-  /* 2. Récupère les positions DB pour les trajets sans entrée mémoire */
+  /* 2. Récupère les positions DB */
   const dbPositions = await db.select().from(busPositionsTable)
     .where(inArray(busPositionsTable.tripId, activeTrips.map(t => t.id)));
   const dbPosMap = new Map(dbPositions.map(p => [p.tripId, p]));
 
-  /* 3. Récupère les agents liés aux compagnies des trajets actifs */
+  /* 3. Récupère les agents/admins compagnie pour push notifs */
   const companyIds = [...new Set(activeTrips.map(t => t.companyId).filter(Boolean) as string[])];
   const companyAgentRows = companyIds.length > 0
     ? await db.select({ userId: agentsTable.userId, companyId: agentsTable.companyId })
-        .from(agentsTable)
-        .where(inArray(agentsTable.companyId, companyIds))
+        .from(agentsTable).where(inArray(agentsTable.companyId, companyIds))
     : [];
-
-  /* 4. Récupère les pushTokens des utilisateurs admins compagnie */
   const agentUserIds = [...new Set(companyAgentRows.map(a => a.userId))];
   const adminUsers = agentUserIds.length > 0
-    ? await db.select({ id: usersTable.id, pushToken: usersTable.pushToken, role: usersTable.role })
-        .from(usersTable)
-        .where(and(
+    ? await db.select({ id: usersTable.id, pushToken: usersTable.pushToken })
+        .from(usersTable).where(and(
           inArray(usersTable.id, agentUserIds),
           inArray(usersTable.role, ["compagnie", "company_admin"]),
         ))
     : [];
-
-  /* helper: trouver les admins d'une compagnie */
-  const adminsForCompany = (companyId: string) => {
-    const userIds = new Set(companyAgentRows.filter(a => a.companyId === companyId).map(a => a.userId));
-    return adminUsers.filter(u => userIds.has(u.id));
+  const adminsForCompany = (cid: string) => {
+    const uids = new Set(companyAgentRows.filter(a => a.companyId === cid).map(a => a.userId));
+    return adminUsers.filter(u => uids.has(u.id));
   };
+
+  /* 4. Récupère les limites de vitesse des bus */
+  const busIds = activeTrips.map(t => t.busId).filter(Boolean) as string[];
+  const busRows = busIds.length > 0
+    ? await db.select({ id: busesTable.id, maxSpeedKmh: busesTable.maxSpeedKmh })
+        .from(busesTable).where(inArray(busesTable.id, busIds))
+    : [];
+  const busSpeedLimit = new Map(busRows.map(b => [b.id, b.maxSpeedKmh ?? 120]));
 
   for (const trip of activeTrips) {
     if (!trip.companyId) continue;
@@ -948,53 +1020,85 @@ async function checkBusAnomalies() {
 
     const lastUpdated = memPos?.updatedAt ?? dbPos?.updatedAt?.getTime() ?? null;
     const speed       = memPos?.speed ?? dbPos?.speed ?? null;
+    const busName     = trip.busName ?? `Bus ${trip.from}→${trip.to}`;
+    const speedLimit  = trip.busId ? (busSpeedLimit.get(trip.busId) ?? 120) : 120;
 
-    /* Hors-ligne : pas de mise à jour depuis > 30 s */
+    /* ── Bus hors-ligne : pas de mise à jour depuis > 30 s ── */
     if (!lastUpdated || (now - lastUpdated) > 30_000) {
       if (!sentOffline.has(trip.id)) {
         sentOffline.add(trip.id);
+        // Push notif
         for (const admin of adminsForCompany(trip.companyId)) {
-          if (admin.pushToken) {
-            await sendExpoPush(admin.pushToken, "🚌 Bus hors ligne", `Bus ${trip.from}→${trip.to} ne répond plus`);
-          }
+          if (admin.pushToken) await sendExpoPush(admin.pushToken, "🚌 Bus hors ligne", `${busName} ne répond plus`);
           await db.insert(notificationsTable).values({
             id: nanoid(), userId: admin.id, type: "bus_offline",
             title: "Bus hors ligne",
-            message: `Bus ${trip.from}→${trip.to} : pas de signal GPS depuis plus de 30 secondes.`,
+            message: `${busName} : pas de signal GPS depuis plus de 30 secondes.`,
             refId: trip.id, refType: "trip",
           });
         }
-        console.log(`[Scheduler] 📡 Bus hors-ligne : trajet ${trip.id}`);
+        // ✅ Alerte persistante dans agent_alerts → visible partout
+        await createSystemAlert({
+          tripId: trip.id, busId: trip.busId, busName,
+          companyId: trip.companyId, type: "bus_offline",
+          message: `${busName} hors ligne — pas de signal GPS depuis plus de 30 secondes.`,
+        });
+        console.log(`[Scheduler] 📡 Bus hors-ligne : ${busName}`);
       }
       stoppedSince.delete(trip.id);
       continue;
     }
 
-    /* Bus en ligne → reset alerte hors-ligne */
-    sentOffline.delete(trip.id);
+    /* Bus revenu en ligne → résoudre l'alerte hors-ligne */
+    if (sentOffline.has(trip.id)) {
+      sentOffline.delete(trip.id);
+      await resolveSystemAlert(trip.id, "bus_offline");
+    }
 
-    /* Bus arrêté : vitesse == 0 */
+    /* ── Bus arrêté : vitesse == 0 pendant ≥ 2 min ── */
     if (speed === 0) {
       if (!stoppedSince.has(trip.id)) stoppedSince.set(trip.id, now);
       const stoppedMs = now - (stoppedSince.get(trip.id) ?? now);
       if (stoppedMs >= 2 * 60_000 && !sentStopAlert.has(trip.id)) {
         sentStopAlert.add(trip.id);
         for (const admin of adminsForCompany(trip.companyId)) {
-          if (admin.pushToken) {
-            await sendExpoPush(admin.pushToken, "🛑 Bus arrêté", `Bus ${trip.from}→${trip.to} immobile depuis 2 min`);
-          }
+          if (admin.pushToken) await sendExpoPush(admin.pushToken, "🛑 Bus arrêté", `${busName} immobile depuis 2 min`);
           await db.insert(notificationsTable).values({
             id: nanoid(), userId: admin.id, type: "bus_stopped",
             title: "Bus arrêté",
-            message: `Bus ${trip.from}→${trip.to} est immobile depuis plus de 2 minutes.`,
+            message: `${busName} est immobile depuis plus de 2 minutes.`,
             refId: trip.id, refType: "trip",
           });
         }
-        console.log(`[Scheduler] 🛑 Bus arrêté : trajet ${trip.id}`);
+        // ✅ Alerte persistante dans agent_alerts
+        await createSystemAlert({
+          tripId: trip.id, busId: trip.busId, busName,
+          companyId: trip.companyId, type: "bus_arret",
+          message: `Arrêt anormal — ${busName} est immobile depuis plus de 2 minutes sur la route ${trip.from}→${trip.to}.`,
+        });
+        console.log(`[Scheduler] 🛑 Bus arrêté : ${busName}`);
       }
     } else {
-      stoppedSince.delete(trip.id);
-      sentStopAlert.delete(trip.id);
+      /* Bus repart → résoudre l'alerte arrêt */
+      if (stoppedSince.has(trip.id)) {
+        stoppedSince.delete(trip.id);
+        if (sentStopAlert.has(trip.id)) {
+          sentStopAlert.delete(trip.id);
+          await resolveSystemAlert(trip.id, "bus_arret");
+        }
+      }
+    }
+
+    /* ── Vitesse excessive ── */
+    if (speed !== null && speed > speedLimit) {
+      await createSystemAlert({
+        tripId: trip.id, busId: trip.busId, busName,
+        companyId: trip.companyId, type: "vitesse_anormale",
+        message: `Excès de vitesse — ${busName} roule à ${Math.round(speed)} km/h (limite : ${speedLimit} km/h) sur ${trip.from}→${trip.to}.`,
+      });
+    } else if (speed !== null && speed <= speedLimit) {
+      // Vitesse revenue normale → résoudre
+      await resolveSystemAlert(trip.id, "vitesse_anormale");
     }
   }
 }
