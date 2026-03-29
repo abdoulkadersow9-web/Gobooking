@@ -467,6 +467,7 @@ export default function EmbarquementScreen() {
           to:       res.passenger?.to,
           ref:      res.bookingRef,
         });
+        if (activeTripId) loadEnRoute(activeTripId);
       }
     } catch (e: any) {
       setScanBusy(false);
@@ -585,6 +586,7 @@ export default function EmbarquementScreen() {
       });
       setValidated(true);
       setFound(prev => prev ? { ...prev, status: "confirmed" } : prev);
+      if (activeTripId) loadEnRoute(activeTripId);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de valider l'embarquement");
     } finally {

@@ -237,6 +237,9 @@ export default function ChefTrips() {
         `L'escale "${waypointCity}" a été marquée. Les sièges des passagers qui y descendent sont maintenant libérés.`);
       setShowWaypoint(false);
       load();
+      if (showSeats && seatsTrip?.id === waypointTrip.id) {
+        refreshSeats(waypointTrip.id);
+      }
     } catch (e: any) {
       Alert.alert("Erreur", e.message ?? "Impossible d'enregistrer l'escale");
     } finally {
@@ -415,6 +418,9 @@ export default function ChefTrips() {
         `Ancien car : ${r.oldBus?.name ?? "—"}\nNouveau car : ${r.newBus?.name ?? "—"} (${r.newBus?.plate})\n\n${r.passengersNotified} passagers notifiés par SMS/push.\n${r.colisTransferred} colis conservés.`
       );
       load();
+      if (showSeats && seatsTrip?.id === transferTripId) {
+        refreshSeats(transferTripId);
+      }
     } catch (e: any) {
       Alert.alert("Erreur transfert", e.message ?? "Une erreur s'est produite.");
     } finally {
