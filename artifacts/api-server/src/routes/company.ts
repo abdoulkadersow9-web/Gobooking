@@ -47,14 +47,13 @@ router.get("/stats", async (req, res) => {
       db.select().from(busesTable).where(eq(busesTable.companyId, companyId)),
       db.select().from(agentsTable).where(eq(agentsTable.companyId, companyId)),
       db.select().from(tripsTable).where(eq(tripsTable.companyId, companyId)),
-      db.select().from(bookingsTable),
-      db.select().from(parcelsTable),
+      db.select().from(bookingsTable).where(eq(bookingsTable.companyId, companyId)),
+      db.select().from(parcelsTable).where(eq(parcelsTable.companyId, companyId)),
     ]);
 
-    const tripIds = new Set(trips.map(t => t.id));
-    const companyBookings = bookings.filter(b => tripIds.has(b.tripId));
+    const companyBookings = bookings;
     const revenue = companyBookings.filter(b => b.status !== "cancelled").reduce((s, b) => s + b.totalAmount, 0)
-      + parcels.reduce((s, p) => s + p.amount, 0);
+      + parcels.filter(p => p.paymentStatus === "paid").reduce((s, p) => s + (p.amount ?? 0), 0);
 
     res.json({
       totalBuses: buses.length,
@@ -1317,6 +1316,7 @@ router.post("/reservations", async (req, res) => {
       bookingRef:    ref,
       userId:        user.id,
       tripId,
+      companyId:     trip.companyId,
       passengers,
       seatIds:       [],
       seatNumbers:   [],

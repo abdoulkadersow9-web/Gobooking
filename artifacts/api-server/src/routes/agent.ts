@@ -183,15 +183,20 @@ router.get("/boarding", async (req, res) => {
 
     const agents = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
     const agentRecord = agents[0];
+    const agentCompanyId = agentRecord?.companyId ?? null;
 
     let bookings;
     if (agentRecord?.tripId) {
       bookings = await db.select().from(bookingsTable)
         .where(eq(bookingsTable.tripId, agentRecord.tripId))
         .orderBy(desc(bookingsTable.createdAt));
-    } else {
+    } else if (agentCompanyId) {
       bookings = await db.select().from(bookingsTable)
-        .orderBy(desc(bookingsTable.createdAt));
+        .where(eq(bookingsTable.companyId, agentCompanyId))
+        .orderBy(desc(bookingsTable.createdAt))
+        .limit(100);
+    } else {
+      bookings = [];
     }
 
     res.json(bookings.map(b => ({
@@ -686,6 +691,11 @@ router.post("/reservations", async (req, res) => {
     if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
     const trip = trips[0];
 
+    // Récupérer la compagnie de l'agent pour l'isolation des données
+    const agentCompanyRows = await db.select({ companyId: agentsTable.companyId })
+      .from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentCompanyId = agentCompanyRows[0]?.companyId ?? trip.companyId ?? null;
+
     const count = Math.max(1, Math.min(10, Number(seatCount) || 1));
 
     /* ── Segment-aware capacity check ───────────────────────────────────── */
@@ -755,6 +765,7 @@ router.post("/reservations", async (req, res) => {
       bookingRef:       ref,
       userId:           user.id,
       tripId,
+      companyId:        agentCompanyId,
       passengers,
       seatIds:          assignedSeatIds,
       seatNumbers:      assignedSeatNumbers,
@@ -1227,12 +1238,11 @@ router.get("/trips", async (req, res) => {
     const agentRecord = agentRows[0];
     const companyId = agentRecord?.companyId ?? null;
 
-    const trips = companyId
-      ? await db.select().from(tripsTable)
-          .where(and(eq(tripsTable.companyId, companyId)))
-          .orderBy(desc(tripsTable.date))
-      : await db.select().from(tripsTable)
-          .orderBy(desc(tripsTable.date));
+    if (!companyId) { res.status(403).json({ error: "Agent non affilié à une compagnie" }); return; }
+
+    const trips = await db.select().from(tripsTable)
+        .where(and(eq(tripsTable.companyId, companyId)))
+        .orderBy(desc(tripsTable.date));
 
     const enriched = await Promise.all(trips.map(async (trip) => {
       const availableCount = await db.select().from(seatsTable)
@@ -1287,15 +1297,13 @@ router.get("/trips/today", async (req, res) => {
     const today = new Date().toISOString().split("T")[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
 
+    if (!companyId) { res.status(403).json({ error: "Agent non affilié à une compagnie" }); return; }
+
     /* Include today + yesterday (for late departures) */
-    let trips = companyId
-      ? await db.select().from(tripsTable)
-          .where(and(eq(tripsTable.companyId, companyId)))
-          .orderBy(desc(tripsTable.date))
-          .limit(30)
-      : await db.select().from(tripsTable)
-          .orderBy(desc(tripsTable.date))
-          .limit(20);
+    let trips = await db.select().from(tripsTable)
+        .where(and(eq(tripsTable.companyId, companyId)))
+        .orderBy(desc(tripsTable.date))
+        .limit(30);
 
     /* Filter client-side to today/yesterday + only actionable statuses */
     trips = trips.filter(t =>
@@ -2765,22 +2773,25 @@ router.get("/logistique/overview", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
+    const agentLRows = await db.select({ companyId: agentsTable.companyId }).from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const logCompanyId = agentLRows[0]?.companyId ?? null;
+
     const today = new Date().toISOString().slice(0, 10);
 
     // Buses — filter by company if agent has one
-    const busesList = user.companyId
-      ? await db.select().from(busesTable).where(eq(busesTable.companyId, user.companyId))
+    const busesList = logCompanyId
+      ? await db.select().from(busesTable).where(eq(busesTable.companyId, logCompanyId))
       : await db.select().from(busesTable).limit(100);
 
     // Trips today — filter by company
-    const tripsRaw = user.companyId
-      ? await db.select().from(tripsTable).where(and(eq(tripsTable.companyId, user.companyId), eq(tripsTable.date, today)))
+    const tripsRaw = logCompanyId
+      ? await db.select().from(tripsTable).where(and(eq(tripsTable.companyId, logCompanyId), eq(tripsTable.date, today)))
       : await db.select().from(tripsTable).where(eq(tripsTable.date, today)).limit(50);
 
     // Parcels stats — pending/undelivered
     const allParcels = await db.execute(sql`
       SELECT status FROM parcels
-      ${user.companyId ? sql`WHERE company_id = ${user.companyId}` : sql``}
+      ${logCompanyId ? sql`WHERE company_id = ${logCompanyId}` : sql``}
     `);
     const parcelsRows = (allParcels as any).rows ?? allParcels;
     const pendingParcels = parcelsRows.filter((p: any) =>
@@ -2792,7 +2803,7 @@ router.get("/logistique/overview", async (req, res) => {
       SELECT COUNT(*) as cnt FROM bookings
       WHERE DATE(created_at) = ${today}::date
       AND status = 'confirmed'
-      ${user.companyId ? sql`AND company_id = ${user.companyId}` : sql``}
+      ${logCompanyId ? sql`AND company_id = ${logCompanyId}` : sql``}
     `);
     const ticketsTodayCount = Number(((ticketsToday as any).rows?.[0] ?? ticketsToday[0])?.cnt ?? 0);
 
@@ -2800,7 +2811,7 @@ router.get("/logistique/overview", async (req, res) => {
     const alertsRaw = await db.select().from(agentAlertsTable)
       .where(and(
         eq(agentAlertsTable.status, "active"),
-        user.companyId ? eq(agentAlertsTable.companyId, user.companyId) : sql`1=1`
+        logCompanyId ? eq(agentAlertsTable.companyId, logCompanyId) : sql`1=1`
       ))
       .orderBy(desc(agentAlertsTable.createdAt))
       .limit(10);
@@ -3000,14 +3011,17 @@ router.get("/suivi/overview", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const busesList = user.companyId
-      ? await db.select().from(busesTable).where(eq(busesTable.companyId, user.companyId))
+    const agentRows = await db.select({ companyId: agentsTable.companyId }).from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
+    const agentCompanyId = agentRows[0]?.companyId ?? null;
+
+    const busesList = agentCompanyId
+      ? await db.select().from(busesTable).where(eq(busesTable.companyId, agentCompanyId))
       : await db.select().from(busesTable).limit(100);
 
     const alertsRaw = await db.select().from(agentAlertsTable)
       .where(and(
         eq(agentAlertsTable.status, "active"),
-        user.companyId ? eq(agentAlertsTable.companyId, user.companyId) : sql`1=1`
+        agentCompanyId ? eq(agentAlertsTable.companyId, agentCompanyId) : sql`1=1`
       ))
       .orderBy(desc(agentAlertsTable.createdAt))
       .limit(20);
