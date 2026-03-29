@@ -1433,8 +1433,11 @@ export default function SuiviScreen() {
                             :                           "Action requise";
             const btnLabel  = flowStep === "validate" ? "VALIDER ET CLORE" : "TRAITER L'ALERTE";
             const others    = sorted.slice(1);
-            /* Caméra du bus en alerte */
-            const alertTrip  = data?.trips.find(t => t.busId === top.busId);
+            /* Caméra du bus en alerte — double matching: busId puis busName */
+            const alertTrip  = data?.trips.find(t =>
+              (top.busId && t.busId === top.busId) ||
+              (top.busName && t.busName === top.busName)
+            );
             const alertCamOk = !!(alertTrip?.cameraStatus === "connected" && alertTrip?.cameraStreamUrl);
             const alertLive  = alertTrip ? liveFrames[alertTrip.id] : undefined;
             return (
@@ -1473,17 +1476,18 @@ export default function SuiviScreen() {
                           {alertTrip.from} → {alertTrip.to}
                         </Text>
                       </View>
-                      {/* Flux vidéo */}
+                      {/* Flux vidéo — tappable pour ouvrir vue plein écran */}
                       <TouchableOpacity
                         onPress={() => setCameraTrip(alertTrip)}
                         activeOpacity={0.9}
-                        style={{ position: "relative" }}
                       >
-                        <LiveCamView
-                          signal={alertLive?.signal ?? 80}
-                          route={`${alertTrip.from} → ${alertTrip.to}`}
-                          busId={top.busId}
-                        />
+                        <View style={{ height: 160, backgroundColor: "#060810", overflow: "hidden" }}>
+                          <LiveCamView
+                            signal={alertLive?.signal ?? 80}
+                            route={`${alertTrip.from} → ${alertTrip.to}`}
+                            busId={top.busId ?? alertTrip.busId ?? ""}
+                          />
+                        </View>
                         {/* Overlay "Appuyer pour agrandir" */}
                         <View style={S.focusCamOverlay}>
                           <Ionicons name="expand-outline" size={16} color="rgba(255,255,255,0.7)" />
