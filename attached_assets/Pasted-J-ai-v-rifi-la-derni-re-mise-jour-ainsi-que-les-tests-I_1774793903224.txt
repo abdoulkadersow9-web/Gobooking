@@ -1,0 +1,152 @@
+J’ai vérifié la dernière mise à jour ainsi que les tests.
+
+Il y a un point très important à corriger dans la logique de programmation des départs.
+
+Actuellement, le système est trop basique et ne respecte pas la logique réelle du transport.
+
+---
+
+1. PROBLÈME ACTUEL
+
+Aujourd’hui :
+
+- on sélectionne simplement une ville de départ  
+- une ville d’arrivée  
+
+Mais le système ne prend pas en compte :
+
+- les villes intermédiaires  
+- la logique réelle du trajet  
+- la grille tarifaire complète  
+
+Résultat :
+
+Le système est confus et ne permet pas un fonctionnement professionnel.
+
+---
+
+2. LOGIQUE ATTENDUE (OBLIGATOIRE)
+
+Quand on programme un trajet, par exemple :
+
+Abidjan → Ferkessédougou  
+
+Le système doit automatiquement comprendre :
+
+- toutes les villes traversées  
+- toutes les escales du trajet  
+
+Exemple :
+
+Abidjan → Yamoussoukro → Bouaké → Katiola → Niakara → Ferkessédougou  
+
+Toutes ces villes doivent être intégrées dans le trajet.
+
+---
+
+3. GESTION DES PRIX (TRÈS IMPORTANT)
+
+Le système doit être intelligent :
+
+Les prix ne doivent pas être saisis manuellement à chaque fois.
+
+Ils doivent venir automatiquement de la grille tarifaire.
+
+---
+
+Exemple :
+
+Si dans la grille tarifaire on a :
+
+- Abidjan → Ferkessédougou = 10 000  
+- Abidjan → Bouaké = 7 000  
+- Bouaké → Ferkessédougou = 5 000  
+
+Alors :
+
+Quand on crée un trajet Abidjan → Ferkessédougou :
+
+Le système doit automatiquement appliquer les bons prix selon :
+
+- la ville de montée  
+- la ville de descente  
+
+---
+
+4. TYPES DE DÉPART (STANDARD / VIP)
+
+Le système doit aussi prendre en compte :
+
+- départ standard  
+- départ VIP  
+
+Et appliquer automatiquement :
+
+- les prix correspondants à chaque type  
+
+---
+
+5. SÉLECTION DES VILLES (CRITIQUE)
+
+Actuellement, la sélection des villes n’est pas adaptée.
+
+---
+
+EXIGENCE :
+
+Remplacer la liste actuelle par un système avec :
+
+- moteur de recherche  
+- toutes les villes de Côte d’Ivoire disponibles  
+
+Exemple :
+
+- recherche "Ferké" → Ferkessédougou  
+- recherche "Ouangolo" → Ouangolodougou  
+- recherche "Bouaké" → Bouaké  
+
+---
+
+6. AUTOMATISATION DU TRAJET
+
+Quand on sélectionne :
+
+- ville départ  
+- ville arrivée  
+
+Le système doit être capable de :
+
+- reconstruire automatiquement le trajet complet  
+- inclure toutes les villes intermédiaires  
+- lier les prix depuis la grille tarifaire  
+
+---
+
+7. OBJECTIF
+
+Créer un système intelligent qui :
+
+- comprend les trajets  
+- gère automatiquement les villes intermédiaires  
+- applique automatiquement les prix  
+- évite les erreurs manuelles  
+
+---
+
+IMPORTANT :
+
+Le système ne doit pas rester basique.
+
+Il doit fonctionner comme un vrai système de transport professionnel.
+
+---
+
+PRIORITÉ :
+
+Corriger :
+
+- la logique des trajets  
+- la gestion des villes  
+- la liaison avec la grille tarifaire  
+
+Avant de continuer les autres développements.

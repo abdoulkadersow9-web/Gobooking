@@ -38,10 +38,10 @@ function setLiveCache(key: string, data: unknown[], ttlMs = 30_000) {
    (sans paramètres)         →  { grid: PRICE_GRID, cities: ALL_CITIES }
 ──────────────────────────────────────────────────────────────────────────── */
 router.get("/price-grid", (req, res) => {
-  const { from, to } = req.query as { from?: string; to?: string };
+  const { from, to, tripType } = req.query as { from?: string; to?: string; tripType?: string };
   if (from && to) {
-    const price = getTicketPrice(from, to);
-    res.json({ from, to, price });
+    const price = getTicketPrice(from, to, tripType ?? "standard");
+    res.json({ from, to, tripType: tripType ?? "standard", price });
     return;
   }
   res.json({ grid: PRICE_GRID, cities: ALL_CITIES });

@@ -3832,14 +3832,37 @@ router.post("/guichet/departures", async (req, res) => {
     const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
     const agent = agentRows[0];
 
-    const { busId, from, to, date, departureTime, price, guichetSeats, onlineSeats, chauffeurNom, agentRouteNom } = req.body as {
+    const {
+      busId, from, to, date, departureTime,
+      price: rawPrice,
+      guichetSeats, onlineSeats,
+      chauffeurNom, agentRouteNom,
+      stops: rawStops,
+      tripType: rawTripType,
+    } = req.body as {
       busId?: string; from: string; to: string; date: string;
-      departureTime: string; price: number; guichetSeats?: number;
+      departureTime: string; price?: number; guichetSeats?: number;
       onlineSeats?: number; chauffeurNom?: string; agentRouteNom?: string;
+      stops?: string[]; tripType?: string;
     };
 
-    if (!from || !to || !date || !departureTime || !price) {
-      res.status(400).json({ error: "Champs requis : from, to, date, departureTime, price" }); return;
+    if (!from || !to || !date || !departureTime) {
+      res.status(400).json({ error: "Champs requis : from, to, date, departureTime" }); return;
+    }
+
+    const tripType = rawTripType ?? "standard";
+
+    /* ── Auto-calcul du prix depuis la grille tarifaire ── */
+    const { getTicketPrice } = await import("../lib/priceGrid");
+    let finalPrice: number;
+    if (rawPrice && Number(rawPrice) > 0) {
+      finalPrice = Number(rawPrice);
+    } else {
+      const gridPrice = getTicketPrice(from.trim(), to.trim(), tripType);
+      if (!gridPrice) {
+        res.status(400).json({ error: `Prix introuvable dans la grille tarifaire pour ${from} → ${to}. Veuillez saisir un prix manuellement.` }); return;
+      }
+      finalPrice = gridPrice;
     }
 
     const busRows = busId ? await db.select().from(busesTable).where(eq(busesTable.id, busId)).limit(1) : [];
@@ -3853,28 +3876,53 @@ router.post("/guichet/departures", async (req, res) => {
       res.status(400).json({ error: `Total places (${gSeats + oSeats}) dépasse la capacité du bus (${bus.capacity})` }); return;
     }
 
+    /* ── Villes intermédiaires (stops) ── */
+    const stops: string[] = Array.isArray(rawStops) ? rawStops.filter(Boolean) : [];
+    const allCities: string[] = [from.trim(), ...stops, to.trim()];
+
+    /* ── Estimation de l'heure d'arrivée selon le nombre d'étapes ── */
+    const [hh, mm] = departureTime.trim().split(":").map(Number);
+    const depMinutes = (hh || 0) * 60 + (mm || 0);
+    const distanceMinutes = 45 + allCities.length * 45;
+    const arrMinutes = depMinutes + distanceMinutes;
+    const arrHH = Math.floor(arrMinutes / 60) % 24;
+    const arrMM = arrMinutes % 60;
+    const arrivalTime = `${String(arrHH).padStart(2, "0")}:${String(arrMM).padStart(2, "0")}`;
+
+    /* ── Type de bus selon tripType ── */
+    const resolvedBusType = tripType === "vip" ? "VIP" : tripType === "vip_plus" ? "VIP+" : (bus?.busType ?? "Standard");
+
     const id = `trip_${Date.now()}${Math.random().toString(36).substr(2, 6)}`;
     await db.insert(tripsTable).values({
       id,
-      from: from.trim(),
-      to: to.trim(),
-      date: date.trim(),
+      from:          from.trim(),
+      to:            to.trim(),
+      date:          date.trim(),
       departureTime: departureTime.trim(),
-      arrivalTime: "—",
-      price: parseFloat(String(price)),
-      busType: bus?.busType ?? "Standard",
-      busName: bus?.busName ?? (chauffeurNom ?? "—"),
+      arrivalTime,
+      price:         finalPrice,
+      busType:       resolvedBusType,
+      busName:       bus?.busName ?? (chauffeurNom ?? "—"),
       totalSeats,
-      guichetSeats: gSeats,
-      onlineSeats: oSeats,
-      busId: busId ?? null,
-      companyId: agent?.companyId ?? null,
-      agentId: agent?.id ?? null,
-      status: "scheduled",
-      duration: "—",
-    });
+      guichetSeats:  gSeats,
+      onlineSeats:   oSeats,
+      busId:         busId ?? null,
+      companyId:     agent?.companyId ?? null,
+      agentId:       agent?.id ?? null,
+      status:        "scheduled",
+      duration:      "—",
+      stops:         allCities as any,
+    } as any);
 
-    res.status(201).json({ success: true, id, message: "Départ programmé avec succès" });
+    res.status(201).json({
+      success:  true,
+      id,
+      message:  "Départ programmé avec succès",
+      price:    finalPrice,
+      stops,
+      allCities,
+      tripType,
+    });
   } catch (err) {
     console.error("[guichet/departures POST]", err);
     res.status(500).json({ error: "Erreur création départ" });

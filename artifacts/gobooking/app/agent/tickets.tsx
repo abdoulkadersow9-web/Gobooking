@@ -22,6 +22,7 @@ import {
   type BordereauData as PdfBordereauData,
   type AuditItem,
 } from "@/utils/bordereau-pdf";
+import { getRouteStops, getRouteAllCities, searchCities, ALL_CI_CITIES } from "@/utils/routeGraph";
 
 const G       = "#D97706";
 const G_DARK  = "#92400E";
@@ -263,20 +264,28 @@ export default function TicketsScreen() {
   const [seatSubmitting, setSeatSubmitting]   = useState(false);
 
   /* ── Créer départ state ── */
-  const [fleetBuses, setFleetBuses]       = useState<BusFleet[]>([]);
-  const [loadingBuses, setLoadingBuses]   = useState(false);
-  const [selectedBus, setSelectedBus]     = useState<BusFleet | null>(null);
-  const [dFrom, setDFrom]                 = useState("");
-  const [dTo, setDTo]                     = useState("");
-  const [dDate, setDDate]                 = useState(todayStr());
-  const [dHeure, setDHeure]               = useState("08:00");
-  const [dPrix, setDPrix]                 = useState("");
-  const [dGuichet, setDGuichet]           = useState("20");
-  const [dOnline, setDOnline]             = useState("24");
-  const [dChauffeur, setDChauffeur]       = useState("");
-  const [dAgentRoute, setDAgentRoute]     = useState("");
-  const [creatingDep, setCreatingDep]     = useState(false);
-  const [depSuccess, setDepSuccess]       = useState<string | null>(null);
+  const [fleetBuses, setFleetBuses]         = useState<BusFleet[]>([]);
+  const [loadingBuses, setLoadingBuses]     = useState(false);
+  const [selectedBus, setSelectedBus]       = useState<BusFleet | null>(null);
+  const [dFrom, setDFrom]                   = useState("");
+  const [dTo, setDTo]                       = useState("");
+  const [dDate, setDDate]                   = useState(todayStr());
+  const [dHeure, setDHeure]                 = useState("08:00");
+  const [dTripType, setDTripType]           = useState<"standard" | "vip">("standard");
+  const [dRouteStops, setDRouteStops]       = useState<string[]>([]);
+  const [dAutoPrice, setDAutoPrice]         = useState<number | null>(null);
+  const [dPriceOverride, setDPriceOverride] = useState("");
+  const [dPriceLoading, setDPriceLoading]   = useState(false);
+  const [dGuichet, setDGuichet]             = useState("20");
+  const [dOnline, setDOnline]               = useState("24");
+  const [dChauffeur, setDChauffeur]         = useState("");
+  const [dAgentRoute, setDAgentRoute]       = useState("");
+  const [creatingDep, setCreatingDep]       = useState(false);
+  const [depSuccess, setDepSuccess]         = useState<string | null>(null);
+  /* ── City picker modal ── */
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [cityPickerFor, setCityPickerFor]   = useState<"from" | "to">("from");
+  const [citySearch, setCitySearch]         = useState("");
 
   /* ── Impression Départ state ── */
   const [impTrips, setImpTrips]           = useState<TripSummary[]>([]);
@@ -325,6 +334,35 @@ export default function TicketsScreen() {
       setLoadingBuses(false);
     }
   };
+
+  /* ── Auto-détection des étapes du trajet ── */
+  useEffect(() => {
+    if (dFrom && dTo && dFrom !== dTo) {
+      const stops = getRouteStops(dFrom, dTo);
+      setDRouteStops(stops);
+    } else {
+      setDRouteStops([]);
+    }
+  }, [dFrom, dTo]);
+
+  /* ── Auto-calcul du prix depuis la grille tarifaire ── */
+  useEffect(() => {
+    if (!dFrom || !dTo || dFrom === dTo) { setDAutoPrice(null); return; }
+    const timer = setTimeout(async () => {
+      setDPriceLoading(true);
+      try {
+        const enc = encodeURIComponent;
+        const res = await apiFetch<{ price: number | null }>(`/trips/price-grid?from=${enc(dFrom)}&to=${enc(dTo)}&tripType=${dTripType}`);
+        setDAutoPrice(res?.price ?? null);
+        if (res?.price) setDPriceOverride("");
+      } catch {
+        setDAutoPrice(null);
+      } finally {
+        setDPriceLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [dFrom, dTo, dTripType]);
 
   /* ── Fetch seat map ── */
   const fetchSeatMap = useCallback(async (tripId: string) => {
@@ -534,11 +572,18 @@ export default function TicketsScreen() {
 
   /* ── Créer départ submit ── */
   const handleCreateDeparture = async () => {
-    if (!dFrom.trim()) { Alert.alert("Erreur", "Saisissez la ville de départ."); return; }
-    if (!dTo.trim()) { Alert.alert("Erreur", "Saisissez la ville d'arrivée."); return; }
+    if (!dFrom.trim()) { Alert.alert("Erreur", "Sélectionnez la ville de départ."); return; }
+    if (!dTo.trim())   { Alert.alert("Erreur", "Sélectionnez la ville d'arrivée."); return; }
+    if (dFrom.trim() === dTo.trim()) { Alert.alert("Erreur", "Départ et arrivée doivent être différents."); return; }
     if (!dDate.trim()) { Alert.alert("Erreur", "Saisissez la date."); return; }
     if (!dHeure.trim()) { Alert.alert("Erreur", "Saisissez l'heure de départ."); return; }
-    if (!dPrix.trim() || isNaN(parseFloat(dPrix))) { Alert.alert("Erreur", "Saisissez un prix valide."); return; }
+
+    const finalPrice = dAutoPrice ?? (dPriceOverride ? parseFloat(dPriceOverride) : null);
+    if (!finalPrice || isNaN(finalPrice) || finalPrice <= 0) {
+      Alert.alert("Erreur", "Prix introuvable dans la grille tarifaire. Saisissez un prix manuellement.");
+      return;
+    }
+
     const gSeats = parseInt(dGuichet) || 0;
     const oSeats = parseInt(dOnline) || 0;
     if (gSeats + oSeats === 0) { Alert.alert("Erreur", "Saisissez au moins une place guichet ou en ligne."); return; }
@@ -549,15 +594,20 @@ export default function TicketsScreen() {
 
     setCreatingDep(true);
     try {
-      const res = await apiFetch<{ success: boolean; id: string; message: string }>("/agent/guichet/departures", {
+      const res = await apiFetch<{ success: boolean; id: string; message: string; price: number }>("/agent/guichet/departures", {
         token: token ?? undefined, method: "POST",
         body: {
-          busId: selectedBus?.id,
-          from: dFrom.trim(), to: dTo.trim(),
-          date: dDate.trim(), departureTime: dHeure.trim(),
-          price: parseFloat(dPrix),
-          guichetSeats: gSeats, onlineSeats: oSeats,
-          chauffeurNom: dChauffeur.trim() || undefined,
+          busId:         selectedBus?.id,
+          from:          dFrom.trim(),
+          to:            dTo.trim(),
+          date:          dDate.trim(),
+          departureTime: dHeure.trim(),
+          price:         finalPrice,
+          tripType:      dTripType,
+          stops:         dRouteStops,
+          guichetSeats:  gSeats,
+          onlineSeats:   oSeats,
+          chauffeurNom:  dChauffeur.trim() || undefined,
           agentRouteNom: dAgentRoute.trim() || undefined,
         },
       });
@@ -574,7 +624,9 @@ export default function TicketsScreen() {
     setDepSuccess(null);
     setSelectedBus(null);
     setDFrom(""); setDTo(""); setDDate(todayStr()); setDHeure("08:00");
-    setDPrix(""); setDGuichet("20"); setDOnline("24");
+    setDTripType("standard"); setDRouteStops([]);
+    setDAutoPrice(null); setDPriceOverride("");
+    setDGuichet("20"); setDOnline("24");
     setDChauffeur(""); setDAgentRoute("");
   };
 
@@ -1089,29 +1141,115 @@ export default function TicketsScreen() {
                 )}
               </View>
 
-              {/* ── Route ── */}
+              {/* ── Itinéraire ── */}
               <View style={S.card}>
                 <View style={S.cardHeader}>
                   <Ionicons name="navigate-outline" size={18} color={G} />
                   <Text style={S.cardTitle}>Itinéraire</Text>
                 </View>
-                <Text style={S.label}>Ville de départ *</Text>
-                <TextInput style={S.input} placeholder="Ex: Abidjan" value={dFrom} onChangeText={setDFrom} />
-                <Text style={S.label}>Ville d'arrivée *</Text>
-                <TextInput style={S.input} placeholder="Ex: Bouaké" value={dTo} onChangeText={setDTo} />
 
-                <Text style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>Villes fréquentes :</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-                  {CITIES.map((city, i) => (
-                    <TouchableOpacity key={`city-${i}-${city}`}
-                      style={{ backgroundColor: "#F3F4F6", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
-                      onPress={() => {
-                        if (!dFrom) setDFrom(city);
-                        else if (!dTo) setDTo(city);
-                      }}>
-                      <Text style={{ fontSize: 11, color: "#374151", fontWeight: "600" }}>{city}</Text>
-                    </TouchableOpacity>
-                  ))}
+                {/* Ville de départ */}
+                <Text style={S.label}>Ville de départ *</Text>
+                <TouchableOpacity style={[S.input, { justifyContent: "center" }]}
+                  onPress={() => { setCityPickerFor("from"); setCitySearch(""); setCityPickerOpen(true); }}>
+                  <Text style={{ fontSize: 15, color: dFrom ? "#111827" : "#9CA3AF", fontWeight: dFrom ? "600" : "400" }}>
+                    {dFrom || "Rechercher une ville de départ..."}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Route visualization */}
+                {dFrom && dTo && (
+                  <View style={{ marginVertical: 8, paddingLeft: 8 }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                      {/* Ligne verticale */}
+                      <View style={{ alignItems: "center", width: 20, paddingTop: 4 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#10B981" }} />
+                        {dRouteStops.map((_, i) => (
+                          <View key={i}>
+                            <View style={{ width: 2, height: 18, backgroundColor: "#D1D5DB", marginLeft: 4 }} />
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: G_LIGHT, borderWidth: 1.5, borderColor: G, marginLeft: 1 }} />
+                          </View>
+                        ))}
+                        <View style={{ width: 2, height: 18, backgroundColor: "#D1D5DB", marginLeft: 4 }} />
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#EF4444" }} />
+                      </View>
+                      {/* Textes */}
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: "#065F46", paddingTop: 2 }}>{dFrom}</Text>
+                        {dRouteStops.map((stop, i) => (
+                          <Text key={i} style={{ fontSize: 12, color: G_DARK, fontStyle: "italic", paddingTop: 18 }}>
+                            {stop}
+                          </Text>
+                        ))}
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: "#991B1B", paddingTop: dRouteStops.length > 0 ? 18 : 2 }}>
+                          {dTo}
+                        </Text>
+                      </View>
+                    </View>
+                    {dRouteStops.length > 0 && (
+                      <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 6 }}>
+                        {dRouteStops.length} escale{dRouteStops.length > 1 ? "s" : ""} intermédiaire{dRouteStops.length > 1 ? "s" : ""} détectée{dRouteStops.length > 1 ? "s" : ""}
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Ville d'arrivée */}
+                <Text style={S.label}>Ville d'arrivée *</Text>
+                <TouchableOpacity style={[S.input, { justifyContent: "center" }]}
+                  onPress={() => { setCityPickerFor("to"); setCitySearch(""); setCityPickerOpen(true); }}>
+                  <Text style={{ fontSize: 15, color: dTo ? "#111827" : "#9CA3AF", fontWeight: dTo ? "600" : "400" }}>
+                    {dTo || "Rechercher une ville d'arrivée..."}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Échange from/to */}
+                {dFrom && dTo && (
+                  <TouchableOpacity onPress={() => { const tmp = dFrom; setDFrom(dTo); setDTo(tmp); }}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, alignSelf: "center" }}>
+                    <Ionicons name="swap-vertical-outline" size={16} color={G} />
+                    <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Inverser départ/arrivée</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* ── Type de départ ── */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="star-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Type de départ</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center",
+                      backgroundColor: dTripType === "standard" ? G : "#F3F4F6",
+                      borderWidth: 1.5, borderColor: dTripType === "standard" ? G : "#E5E7EB",
+                    }}
+                    onPress={() => setDTripType("standard")}>
+                    <Ionicons name="bus-outline" size={20} color={dTripType === "standard" ? "#fff" : "#6B7280"} />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: dTripType === "standard" ? "#fff" : "#374151", marginTop: 4 }}>
+                      Standard
+                    </Text>
+                    <Text style={{ fontSize: 10, color: dTripType === "standard" ? "#FEF3C7" : "#9CA3AF" }}>
+                      Tarif de base
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center",
+                      backgroundColor: dTripType === "vip" ? "#7C3AED" : "#F3F4F6",
+                      borderWidth: 1.5, borderColor: dTripType === "vip" ? "#7C3AED" : "#E5E7EB",
+                    }}
+                    onPress={() => setDTripType("vip")}>
+                    <Ionicons name="diamond-outline" size={20} color={dTripType === "vip" ? "#fff" : "#6B7280"} />
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: dTripType === "vip" ? "#fff" : "#374151", marginTop: 4 }}>
+                      VIP
+                    </Text>
+                    <Text style={{ fontSize: 10, color: dTripType === "vip" ? "#EDE9FE" : "#9CA3AF" }}>
+                      +30% du tarif
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -1127,15 +1265,49 @@ export default function TicketsScreen() {
                 <TextInput style={S.input} placeholder="HH:MM" value={dHeure} onChangeText={setDHeure} />
               </View>
 
-              {/* ── Prix & quotas ── */}
+              {/* ── Prix & places ── */}
               <View style={S.card}>
                 <View style={S.cardHeader}>
                   <Ionicons name="wallet-outline" size={18} color={G} />
                   <Text style={S.cardTitle}>Prix & places</Text>
                 </View>
-                <Text style={S.label}>Prix du billet (FCFA) *</Text>
-                <TextInput style={S.input} placeholder="Ex: 3500" value={dPrix} onChangeText={setDPrix}
-                  keyboardType="number-pad" />
+
+                {/* Prix auto */}
+                {dFrom && dTo ? (
+                  dPriceLoading ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <ActivityIndicator size="small" color={G} />
+                      <Text style={{ fontSize: 13, color: "#6B7280" }}>Calcul du prix...</Text>
+                    </View>
+                  ) : dAutoPrice ? (
+                    <View style={{ backgroundColor: "#F0FDF4", borderRadius: 10, padding: 12, marginBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View>
+                        <Text style={{ fontSize: 11, color: "#166534", fontWeight: "600" }}>
+                          PRIX {dTripType === "vip" ? "VIP" : "STANDARD"} — {dFrom} → {dTo}
+                        </Text>
+                        <Text style={{ fontSize: 24, fontWeight: "800", color: "#15803D", marginTop: 2 }}>
+                          {dAutoPrice.toLocaleString()} FCFA
+                        </Text>
+                      </View>
+                      <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+                    </View>
+                  ) : (
+                    <View>
+                      <View style={{ backgroundColor: "#FFF7ED", borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                        <Text style={{ fontSize: 12, color: "#92400E" }}>
+                          Trajet non trouvé dans la grille tarifaire. Saisissez le prix manuellement.
+                        </Text>
+                      </View>
+                      <Text style={S.label}>Prix du billet (FCFA) *</Text>
+                      <TextInput style={S.input} placeholder="Ex: 3500" value={dPriceOverride}
+                        onChangeText={setDPriceOverride} keyboardType="number-pad" />
+                    </View>
+                  )
+                ) : (
+                  <Text style={{ fontSize: 13, color: "#9CA3AF", marginBottom: 10 }}>
+                    Sélectionnez départ et arrivée pour calculer le prix automatiquement.
+                  </Text>
+                )}
 
                 <View style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ flex: 1 }}>
@@ -1182,7 +1354,30 @@ export default function TicketsScreen() {
               {/* ── Récap ── */}
               <View style={S.recap}>
                 <Text style={S.recapTitle}>Récapitulatif du départ</Text>
-                <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{dFrom || "—"} → {dTo || "—"}</Text></View>
+                <View style={S.recapRow}>
+                  <Text style={S.recapKey}>Trajet</Text>
+                  <Text style={[S.recapVal, { flexShrink: 1, textAlign: "right" }]}>{dFrom || "—"} → {dTo || "—"}</Text>
+                </View>
+                {dRouteStops.length > 0 && (
+                  <View style={S.recapRow}>
+                    <Text style={S.recapKey}>Escales</Text>
+                    <Text style={[S.recapVal, { flexShrink: 1, textAlign: "right", fontSize: 11, color: G_DARK }]}>
+                      {dRouteStops.join(" · ")}
+                    </Text>
+                  </View>
+                )}
+                <View style={S.recapRow}><Text style={S.recapKey}>Type</Text>
+                  <Text style={[S.recapVal, { color: dTripType === "vip" ? "#7C3AED" : G, fontWeight: "700" }]}>
+                    {dTripType === "vip" ? "VIP" : "Standard"}
+                  </Text>
+                </View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Prix billet</Text>
+                  <Text style={[S.recapVal, { color: "#15803D", fontWeight: "700" }]}>
+                    {(dAutoPrice ?? (dPriceOverride ? parseFloat(dPriceOverride) : null))
+                      ? `${(dAutoPrice ?? parseFloat(dPriceOverride)).toLocaleString()} FCFA`
+                      : "—"}
+                  </Text>
+                </View>
                 <View style={S.recapRow}><Text style={S.recapKey}>Date</Text><Text style={S.recapVal}>{dDate || "—"}</Text></View>
                 <View style={S.recapRow}><Text style={S.recapKey}>Heure</Text><Text style={S.recapVal}>{dHeure || "—"}</Text></View>
                 <View style={S.recapRow}><Text style={S.recapKey}>Bus</Text><Text style={S.recapVal}>{selectedBus?.busName ?? "Non sélectionné"}</Text></View>
@@ -1649,6 +1844,84 @@ export default function TicketsScreen() {
                 </>
               }
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ══════════ CITY PICKER MODAL ══════════ */}
+      <Modal visible={cityPickerOpen} animationType="slide" transparent onRequestClose={() => setCityPickerOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "85%", flex: 0, minHeight: "70%" }}>
+            {/* Header */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
+              <Text style={{ fontSize: 17, fontWeight: "700", color: "#111827" }}>
+                {cityPickerFor === "from" ? "Ville de départ" : "Ville d'arrivée"}
+              </Text>
+              <TouchableOpacity onPress={() => setCityPickerOpen(false)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            {/* Search */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
+              <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+              <TextInput
+                style={{ flex: 1, fontSize: 15, color: "#111827", padding: 0 }}
+                placeholder="Rechercher une ville (ex: Ferké, Bouaké...)"
+                value={citySearch}
+                onChangeText={setCitySearch}
+                autoFocus
+                autoCorrect={false}
+              />
+              {citySearch.length > 0 && (
+                <TouchableOpacity onPress={() => setCitySearch("")}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {/* List */}
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 30 }}>
+              {searchCities(citySearch, ALL_CI_CITIES).map((city) => {
+                const isSelected = cityPickerFor === "from" ? city === dFrom : city === dTo;
+                const isOther    = cityPickerFor === "from" ? city === dTo : city === dFrom;
+                return (
+                  <TouchableOpacity
+                    key={city}
+                    style={{
+                      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                      paddingHorizontal: 20, paddingVertical: 14,
+                      borderBottomWidth: 1, borderColor: "#F9FAFB",
+                      backgroundColor: isSelected ? G_LIGHT : "#fff",
+                      opacity: isOther ? 0.4 : 1,
+                    }}
+                    disabled={isOther}
+                    onPress={() => {
+                      if (cityPickerFor === "from") setDFrom(city);
+                      else setDTo(city);
+                      setCityPickerOpen(false);
+                    }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <Ionicons
+                        name={isSelected ? "checkmark-circle" : "location-outline"}
+                        size={18}
+                        color={isSelected ? G : "#9CA3AF"}
+                      />
+                      <Text style={{ fontSize: 15, color: isSelected ? G_DARK : "#111827", fontWeight: isSelected ? "700" : "400" }}>
+                        {city}
+                      </Text>
+                    </View>
+                    {isOther && <Text style={{ fontSize: 10, color: "#9CA3AF" }}>Déjà sélectionné</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+              {searchCities(citySearch, ALL_CI_CITIES).length === 0 && (
+                <View style={{ padding: 32, alignItems: "center" }}>
+                  <Ionicons name="search-outline" size={32} color="#D1D5DB" />
+                  <Text style={{ fontSize: 14, color: "#9CA3AF", marginTop: 8 }}>
+                    Aucune ville trouvée pour "{citySearch}"
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
