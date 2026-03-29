@@ -24,14 +24,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/utils/api";
 
-const RED    = "#EF4444";
-const RED_D  = "#B91C1C";
-const RED_L  = "#FEF2F2";
-const RED_M  = "#FCA5A5";
-const CAM_BG = "#060A10";
-const CAM_GR = "#94A3B8";
-const CARD   = "#0D1219";
-const BDR    = "rgba(255,255,255,0.06)";
+/* ── 3-colour operational palette ─────────────────────────── */
+const OK      = "#10B981";   /* Vert  — tout va bien          */
+const WARN    = "#F59E0B";   /* Orange — attention requise    */
+const CRIT    = "#EF4444";   /* Rouge  — alerte critique      */
+const RED     = CRIT;
+const RED_D   = "#B91C1C";
+const RED_L   = "#FEF2F2";
+const RED_M   = "#FCA5A5";
+const CAM_BG  = "#060A10";
+const CAM_GR  = "#94A3B8";
+const BG      = "#09101A";   /* Fond général                  */
+const CARD    = "#0F1622";   /* Fond carte                    */
+const CARD2   = "#131D2B";   /* Fond carte secondaire         */
+const BDR     = "rgba(255,255,255,0.07)";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -46,13 +52,13 @@ const RESPONSE_OPTIONS = [
 ];
 
 const BUS_STATUS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  en_attente:  { label: "En attente",  color: "#94A3B8", bg: "rgba(148,163,184,0.08)", icon: "time-outline" },
-  en_route:    { label: "En route",    color: "#E2E8F0", bg: "rgba(226,232,240,0.06)", icon: "navigate-outline" },
-  arret:       { label: "À l'arrêt",   color: "#64748B", bg: "rgba(100,116,139,0.08)", icon: "pause-circle-outline" },
-  probleme:    { label: "Problème",    color: "#EF4444", bg: "rgba(239,68,68,0.08)",   icon: "warning-outline" },
-  maintenance: { label: "Maintenance", color: "#94A3B8", bg: "rgba(148,163,184,0.08)", icon: "construct-outline" },
-  arrivé:      { label: "Arrivé",      color: "#64748B", bg: "rgba(100,116,139,0.08)", icon: "checkmark-circle-outline" },
-  en_panne:    { label: "En panne",    color: "#EF4444", bg: "rgba(239,68,68,0.08)",   icon: "warning-outline" },
+  en_route:    { label: "EN ROUTE",    color: OK,   bg: `${OK}18`,   icon: "navigate-outline"        },
+  en_attente:  { label: "EN ATTENTE",  color: WARN, bg: `${WARN}18`, icon: "time-outline"            },
+  arret:       { label: "À L'ARRÊT",   color: WARN, bg: `${WARN}18`, icon: "pause-circle-outline"    },
+  probleme:    { label: "PROBLÈME",    color: CRIT, bg: `${CRIT}18`, icon: "warning-outline"         },
+  maintenance: { label: "MAINTENANCE", color: WARN, bg: `${WARN}18`, icon: "construct-outline"       },
+  arrivé:      { label: "ARRIVÉ",      color: OK,   bg: `${OK}18`,   icon: "checkmark-circle-outline"},
+  en_panne:    { label: "EN PANNE",    color: CRIT, bg: `${CRIT}18`, icon: "alert-circle-outline"    },
 };
 
 /* ── HLS video player HTML ─────────────────────────────────────── */
@@ -1252,13 +1258,13 @@ export default function SuiviScreen() {
         <View style={S.headerTop}>
           <View style={S.headerLeft}>
             <View style={S.headerIcon}>
-              <Ionicons name="radio" size={20} color="#fff" />
+              <Ionicons name="pulse" size={20} color={OK} />
             </View>
             <View style={{ flex: 1, overflow: "hidden" }}>
               <Text style={S.headerTitle} numberOfLines={1}>{user?.name ?? "Agent Suivi"}</Text>
               <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
                 <Animated.View style={{ width:5, height:5, borderRadius:3,
-                  backgroundColor: CAM_GR,
+                  backgroundColor: OK,
                   opacity: pulseAnim.interpolate({ inputRange:[1,1.04], outputRange:[1,0.1] }) }} />
                 <Text style={S.headerSub}>SYSTÈME EN LIGNE · {new Date().toLocaleDateString("fr-FR")}</Text>
               </View>
@@ -1450,16 +1456,14 @@ export default function SuiviScreen() {
             </View>
           )}
 
-          {/* ══ GRILLE BUS — priorité 3, flex:1 ═══════════════════════ */}
+          {/* ══ LISTE BUS — cartes pleine largeur avec actions ═════════ */}
           <FlatList
             data={sortedBuses}
-            numColumns={2}
             keyExtractor={b => b.id}
             style={{ flex: 1 }}
             contentContainerStyle={S.gridContent}
-            columnWrapperStyle={S.gridRow}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OK} />}
             ListEmptyComponent={
               <View style={[S.center, { paddingVertical: 40 }]}>
                 <Ionicons name="bus-outline" size={40} color="#1E293B" />
@@ -1467,78 +1471,125 @@ export default function SuiviScreen() {
               </View>
             }
             renderItem={({ item: bus }) => {
-              const trip      = data!.trips.find(t => t.busId === bus.id);
-              const st        = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9" };
-              const busAlerts = mergedAlerts.filter(a => a.busId === bus.id);
-              const occ       = trip?.passengerCount != null && trip?.seatCount
+              const trip       = data!.trips.find(t => t.busId === bus.id);
+              const st         = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#1E293B", icon: "bus-outline" };
+              const busAlerts  = mergedAlerts.filter(a => a.busId === bus.id);
+              const pendingAlt = busAlerts.find(a => !a.responseRequested || !a.response);
+              const occ        = trip?.passengerCount != null && trip?.seatCount
                 ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
-              const occColor  = occ != null ? (occ >= 90 ? "#EF4444" : occ >= 70 ? "#F59E0B" : "#94A3B8") : "#94A3B8";
-              const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-              const speed     = busSpeedMap[bus.id];
+              const occColor   = occ != null ? (occ >= 90 ? CRIT : occ >= 70 ? WARN : OK) : "#475569";
+              const camOk      = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+              const speed      = busSpeedMap[bus.id];
               const speedLimit = bus.maxSpeedKmh ?? 120;
-              const speedWarn = speed != null && speed > speedLimit;
+              const speedWarn  = speed != null && speed > speedLimit;
+              /* Couleur du bord gauche : rouge si alerte, orange si attention, vert sinon */
+              const accentColor = busAlerts.length > 0 ? CRIT : speedWarn ? WARN : st.color;
               return (
-                <TouchableOpacity
-                  style={[S.gridCard, { borderLeftColor: busAlerts.length ? RED : speedWarn ? "#EF4444" : st.color }]}
-                  onPress={() => setSelectedBus(bus)}
-                  activeOpacity={0.85}>
-                  {/* Name */}
-                  <Text style={S.gridCardName} numberOfLines={1}>{bus.busName}</Text>
-                  {/* Status chip */}
-                  <View style={[S.gridStatusChip]}>
-                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
-                    <Text style={[S.gridStatusTxt, { color: st.color }]}>{st.label.toUpperCase()}</Text>
+                <View style={[S.busCard, { borderLeftColor: accentColor }]}>
+                  {/* ── Ligne 1 : nom + badge statut ── */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <View style={[S.busCardIcon, { backgroundColor: `${accentColor}18`, borderColor: `${accentColor}30` }]}>
+                      <Ionicons name={st.icon as any} size={16} color={accentColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={S.busCardName} numberOfLines={1}>{bus.busName}</Text>
+                      <Text style={S.busCardPlate}>{bus.plateNumber ?? "—"}</Text>
+                    </View>
+                    <View style={[S.busStatusBadge, { backgroundColor: `${st.color}20`, borderColor: `${st.color}40` }]}>
+                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
+                      <Text style={[S.busStatusTxt, { color: st.color }]}>{st.label}</Text>
+                    </View>
                   </View>
-                  {/* Route */}
+
+                  {/* ── Ligne 2 : itinéraire ── */}
                   {trip && (
-                    <Text style={S.gridRoute} numberOfLines={1}>{trip.from} → {trip.to}</Text>
-                  )}
-                  {/* Speed — only en_route */}
-                  {speed != null && (
-                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3, marginTop: 2 }}>
-                      <Text style={{ fontSize: 20, fontWeight: "900", color: speedWarn ? "#EF4444" : "#E2E8F0", letterSpacing: -1, lineHeight: 24 }}>
-                        {speed}
-                      </Text>
-                      <Text style={{ fontSize: 9, color: speedWarn ? "#EF4444" : "#374151", fontWeight: "700" }}>
-                        km/h
-                      </Text>
-                      {speedWarn && (
-                        <Text style={{ fontSize: 8, color: "#EF4444", fontWeight: "800", marginLeft: 2 }}>
-                          ⚠ MAX {speedLimit}
-                        </Text>
+                    <View style={S.busRouteRow}>
+                      <Ionicons name="navigate-circle-outline" size={13} color="#475569" />
+                      <Text style={S.busRouteTxt} numberOfLines={1}>{trip.from} → {trip.to}</Text>
+                      {trip.departureTime && (
+                        <Text style={S.busDeptTime}>{trip.departureTime}</Text>
                       )}
                     </View>
                   )}
-                  {/* Occupancy */}
+
+                  {/* ── Ligne 3 : vitesse vs limite ── */}
+                  {speed != null && (
+                    <View style={S.busSpeedRow}>
+                      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3 }}>
+                        <Text style={[S.busSpeedNum, { color: speedWarn ? CRIT : "#E2E8F0" }]}>{speed}</Text>
+                        <Text style={[S.busSpeedUnit, { color: speedWarn ? CRIT : "#475569" }]}>km/h</Text>
+                      </View>
+                      <View style={S.busSpeedBarWrap}>
+                        <View style={[S.busSpeedBar, {
+                          width: `${Math.min(100, (speed / speedLimit) * 100)}%` as any,
+                          backgroundColor: speedWarn ? CRIT : speed > speedLimit * 0.85 ? WARN : OK,
+                        }]} />
+                      </View>
+                      <Text style={[S.busSpeedLimit, { color: speedWarn ? CRIT : "#374151" }]}>
+                        {speedWarn ? `⚠ MAX` : "MAX"} {speedLimit}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* ── Ligne 4 : taux d'occupation ── */}
                   {occ != null && (
-                    <View style={S.gridOccWrap}>
-                      <View style={S.gridOccBar}>
-                        <View style={[S.gridOccFill, { width: (occ + "%") as any, backgroundColor: occColor }]} />
+                    <View style={S.busOccRow}>
+                      <Ionicons name="people-outline" size={12} color="#475569" />
+                      <Text style={S.busOccLabel}>{trip?.passengerCount ?? "—"} / {trip?.seatCount ?? "—"}</Text>
+                      <View style={S.busOccBarWrap}>
+                        <View style={[S.busOccFill, { width: (occ + "%") as any, backgroundColor: occColor }]} />
                       </View>
-                      <Text style={[S.gridOccPct, { color: occColor }]}>{occ}%</Text>
+                      <Text style={[S.busOccPct, { color: occColor }]}>{occ}%</Text>
                     </View>
                   )}
-                  {/* Alert */}
+
+                  {/* ── Bandeau alerte active ── */}
                   {busAlerts.length > 0 && (
-                    <View style={S.gridAlertRow}>
-                      <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: RED,
-                        transform: [{ scale: pulseAnim }] }} />
-                      <Text style={S.gridAlertTxt} numberOfLines={1}>{busAlerts[0].message}</Text>
-                    </View>
+                    <TouchableOpacity style={S.busAlertBanner}
+                      onPress={() => setSelectedAlert(busAlerts[0])} activeOpacity={0.8}>
+                      <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CRIT,
+                        transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
+                      <Text style={S.busAlertBannerTxt} numberOfLines={1}>
+                        {busAlerts.length > 1 ? `${busAlerts.length} alertes` : busAlerts[0].message}
+                      </Text>
+                      <Text style={{ color: CRIT, fontSize: 9, fontWeight: "900" }}>TRAITER →</Text>
+                    </TouchableOpacity>
                   )}
-                  {/* Camera indicator + chevron */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+
+                  {/* ── Boutons d'action ── */}
+                  <View style={S.busActions}>
+                    <TouchableOpacity style={S.busActBtn} onPress={() => setSelectedBus(bus)} activeOpacity={0.8}>
+                      <Ionicons name="eye-outline" size={13} color="#94A3B8" />
+                      <Text style={S.busActTxt}>Détails</Text>
+                    </TouchableOpacity>
+                    <View style={S.busActDiv} />
+                    <TouchableOpacity style={S.busActBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
+                      <Ionicons name="warning-outline" size={13} color={WARN} />
+                      <Text style={[S.busActTxt, { color: WARN }]}>Signaler</Text>
+                    </TouchableOpacity>
                     {camOk && (
-                      <View style={S.gridCamDot}>
-                        <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
-                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                        <Text style={S.gridCamTxt}>CAM</Text>
-                      </View>
+                      <>
+                        <View style={S.busActDiv} />
+                        <TouchableOpacity style={S.busActBtn}
+                          onPress={() => trip && setCameraTrip(trip)} activeOpacity={0.8}>
+                          <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: OK,
+                            opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                          <Text style={[S.busActTxt, { color: OK }]}>Caméra</Text>
+                        </TouchableOpacity>
+                      </>
                     )}
-                    <View style={{ flex: 1 }} />
-                    <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
+                    {pendingAlt && (
+                      <>
+                        <View style={S.busActDiv} />
+                        <TouchableOpacity style={[S.busActBtn, { backgroundColor: `${CRIT}15` }]}
+                          onPress={() => setSelectedAlert(pendingAlt)} activeOpacity={0.8}>
+                          <Ionicons name="checkmark-circle-outline" size={13} color={CRIT} />
+                          <Text style={[S.busActTxt, { color: CRIT, fontWeight: "800" }]}>Traiter</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
-                </TouchableOpacity>
+                </View>
               );
             }}
           />
@@ -1657,29 +1708,30 @@ const CP = StyleSheet.create({
 
 /* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#080C14" },
+  safe: { flex: 1, backgroundColor: BG },
 
   /* ── Header ─────────────────────────────────────────────────── */
-  header:     { backgroundColor: RED_D },
+  header:     { backgroundColor: "#0B1120",
+                borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
   headerTop:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center",
                 paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 10 },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, overflow: "hidden" },
   headerRight:{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
-  headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.18)",
+  headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: `${OK}18`,
                 justifyContent: "center", alignItems: "center", flexShrink: 0,
-                borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
-  headerTitle:{ color: "#fff", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
-  headerSub:  { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 1, letterSpacing: 0.3 },
+                borderWidth: 1, borderColor: `${OK}35` },
+  headerTitle:{ color: "#F1F5F9", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  headerSub:  { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1, letterSpacing: 0.3 },
 
-  /* KPI bar — premium dashboard numbers */
+  /* KPI bar — dashboard numbers avec palette sémantique */
   headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 16,
-                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.09)",
-                backgroundColor: "rgba(0,0,0,0.3)" },
+                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
+                backgroundColor: "rgba(0,0,0,0.2)" },
   kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5, marginHorizontal: 2 },
-  kpiNum:     { color: "#E2E8F0", fontSize: 30, fontWeight: "900", lineHeight: 34, letterSpacing: -1 },
-  kpiLbl:     { color: "rgba(255,255,255,0.3)", fontSize: 8, fontWeight: "700", letterSpacing: 1.2 },
+  kpiNum:     { color: "#F1F5F9", fontSize: 30, fontWeight: "900", lineHeight: 34, letterSpacing: -1 },
+  kpiLbl:     { color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: "700", letterSpacing: 1.2 },
   kpiRow:     { flexDirection: "row", alignItems: "center", gap: 4 },
-  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 4 },
+  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.08)", marginVertical: 4 },
 
   syncPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
                 borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
@@ -1690,21 +1742,23 @@ const S = StyleSheet.create({
                 justifyContent: "center", alignItems: "center",
                 borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
 
-  /* Alarm bar — cinematic red band */
-  alarmBar:        { flexDirection: "row", alignItems: "center", gap: 8,
-                     backgroundColor: "#7F1D1D", paddingHorizontal: 16, paddingVertical: 14,
-                     borderBottomWidth: 2, borderBottomColor: "#450A0A" },
-  alarmPulse:      { width: 11, height: 11, borderRadius: 6, backgroundColor: "#FCA5A5", flexShrink: 0 },
-  alarmBarTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.6 },
-  alarmBarBus:     { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "700", flex: 1 },
-  alarmUrgentBadge:{ backgroundColor: "#DC2626", borderRadius: 7,
-                     paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#FCA5A5" },
-  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.8 },
+  /* Alarm bar — clean critical strip */
+  alarmBar:        { flexDirection: "row", alignItems: "center", gap: 10,
+                     backgroundColor: `${CRIT}14`,
+                     paddingHorizontal: 16, paddingVertical: 11,
+                     borderBottomWidth: 1, borderBottomColor: `${CRIT}30`,
+                     borderLeftWidth: 4, borderLeftColor: CRIT },
+  alarmPulse:      { width: 9, height: 9, borderRadius: 5, backgroundColor: CRIT, flexShrink: 0 },
+  alarmBarTxt:     { color: CRIT, fontSize: 12, fontWeight: "900", letterSpacing: 0.6 },
+  alarmBarBus:     { color: "#F1F5F9", fontSize: 11, fontWeight: "700", flex: 1 },
+  alarmUrgentBadge:{ backgroundColor: CRIT, borderRadius: 6,
+                     paddingHorizontal: 9, paddingVertical: 4 },
+  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
 
   /* Center / Loading */
   center:     { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
-  loadingTxt: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
-  loadingSub: { fontSize: 12, color: "#94A3B8", textAlign: "center", lineHeight: 18 },
+  loadingTxt: { fontSize: 15, fontWeight: "700", color: "#E2E8F0" },
+  loadingSub: { fontSize: 12, color: "#64748B", textAlign: "center", lineHeight: 18 },
 
   /* Scroll */
   scroll: { padding: 14, gap: 20, paddingBottom: 64 },
@@ -1720,8 +1774,8 @@ const S = StyleSheet.create({
   section:      { gap: 12 },
   sectionHeader:{ flexDirection: "row", alignItems: "center", gap: 10 },
   sectionIconBox:{ width: 36, height: 36, borderRadius: 11, justifyContent: "center", alignItems: "center" },
-  sectionTitle: { fontSize: 16, fontWeight: "900", color: "#0F172A", letterSpacing: -0.4, flex: 1 },
-  sectionCount: { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4,
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: "#E2E8F0", letterSpacing: -0.4, flex: 1 },
+  sectionCount: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4,
                   fontSize: 11, color: "#64748B", fontWeight: "800" },
 
   /* Alert band header — clean red announcement when alerts active */
@@ -1970,43 +2024,71 @@ const S = StyleSheet.create({
                  paddingVertical: 15, borderRadius: 14 },
 
   /* ── ALERTES FIXÉES (bandeau haut, toujours visible) ─────────── */
-  fixedAlerts:    { backgroundColor: "#450A0A", paddingVertical: 6, paddingHorizontal: 12, gap: 5 },
+  fixedAlerts:    { backgroundColor: `${CRIT}0D`, paddingVertical: 8, paddingHorizontal: 12, gap: 5,
+                    borderBottomWidth: 1, borderBottomColor: `${CRIT}20` },
   fixedAlertRow:  { flexDirection: "row", alignItems: "center", gap: 8,
-                    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 8,
-                    paddingHorizontal: 10, paddingVertical: 7 },
-  fixedAlertBus:  { color: "#FCA5A5", fontSize: 11, fontWeight: "900", flexShrink: 0 },
-  fixedAlertMsg:  { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "600", flex: 1 },
-  fixedAlertTime: { color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: "700", flexShrink: 0 },
+                    backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 8,
+                    paddingHorizontal: 10, paddingVertical: 7,
+                    borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  fixedAlertBus:  { color: "#E2E8F0", fontSize: 11, fontWeight: "900", flexShrink: 0 },
+  fixedAlertMsg:  { color: "#64748B", fontSize: 11, fontWeight: "600", flex: 1 },
+  fixedAlertTime: { color: "#475569", fontSize: 10, fontWeight: "700", flexShrink: 0 },
 
   /* ── GRILLE BUS 2 COLONNES ───────────────────────────────────── */
-  gridContent:    { padding: 10, gap: 10, paddingBottom: 20 },
-  gridRow:        { gap: 10 },
-  gridCard:       { flex: 1, backgroundColor: "#0D1117", borderRadius: 12,
-                    padding: 14, gap: 9, borderLeftWidth: 3,
-                    borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
-  gridCardName:   { fontSize: 13, fontWeight: "800", color: "#E2E8F0", letterSpacing: -0.2 },
-  gridStatusChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 6,
-                    paddingHorizontal: 7, paddingVertical: 4, alignSelf: "flex-start",
-                    backgroundColor: "rgba(255,255,255,0.06)" },
-  gridStatusTxt:  { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
-  gridRoute:      { fontSize: 10.5, color: "#4B5563", fontWeight: "500" },
-  gridOccWrap:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  gridOccBar:     { flex: 1, height: 3, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 2, overflow: "hidden" },
-  gridOccFill:    { height: 3, borderRadius: 2 },
-  gridOccPct:     { fontSize: 10, fontWeight: "800", flexShrink: 0 },
-  gridAlertRow:   { flexDirection: "row", alignItems: "center", gap: 5,
-                    backgroundColor: "rgba(239,68,68,0.10)", borderRadius: 5,
-                    paddingHorizontal: 7, paddingVertical: 4 },
-  gridAlertTxt:   { flex: 1, fontSize: 9.5, color: "#EF4444", fontWeight: "600" },
-  gridCamDot:     { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 2 },
-  gridCamTxt:     { fontSize: 8, color: "#10B981", fontWeight: "700", letterSpacing: 0.8 },
+  gridContent:  { padding: 12, gap: 10, paddingBottom: 24 },
+
+  /* ── Bus card — pleine largeur ─────────────────────────── */
+  busCard:         { backgroundColor: CARD, borderRadius: 14, padding: 14,
+                     borderLeftWidth: 4, gap: 0,
+                     ...(Platform.OS === "web"
+                       ? { boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }
+                       : { elevation: 4, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8 }) },
+  busCardIcon:     { width: 36, height: 36, borderRadius: 10,
+                     justifyContent: "center", alignItems: "center",
+                     borderWidth: 1, flexShrink: 0 },
+  busCardName:     { fontSize: 14, fontWeight: "900", color: "#E2E8F0", letterSpacing: -0.3 },
+  busCardPlate:    { fontSize: 10, color: "#475569", fontWeight: "600", marginTop: 1, letterSpacing: 0.5 },
+  busStatusBadge:  { flexDirection: "row", alignItems: "center", gap: 5,
+                     borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
+                     borderWidth: 1, flexShrink: 0 },
+  busStatusTxt:    { fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  busRouteRow:     { flexDirection: "row", alignItems: "center", gap: 7,
+                     backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 8,
+                     paddingHorizontal: 10, paddingVertical: 7,
+                     borderWidth: 1, borderColor: BDR, marginTop: 8 },
+  busRouteTxt:     { flex: 1, fontSize: 12, fontWeight: "700", color: "#94A3B8", letterSpacing: -0.2 },
+  busDeptTime:     { fontSize: 11, fontWeight: "900", color: "#475569", flexShrink: 0 },
+  busSpeedRow:     { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 },
+  busSpeedNum:     { fontSize: 22, fontWeight: "900", letterSpacing: -1, lineHeight: 26, minWidth: 46 },
+  busSpeedUnit:    { fontSize: 10, fontWeight: "700", marginBottom: 2 },
+  busSpeedBarWrap: { flex: 1, height: 4, backgroundColor: "rgba(255,255,255,0.07)",
+                     borderRadius: 3, overflow: "hidden" },
+  busSpeedBar:     { height: 4, borderRadius: 3 },
+  busSpeedLimit:   { fontSize: 9, fontWeight: "800", flexShrink: 0, letterSpacing: 0.4 },
+  busOccRow:       { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
+  busOccLabel:     { fontSize: 11, fontWeight: "700", color: "#475569", minWidth: 60 },
+  busOccBarWrap:   { flex: 1, height: 4, backgroundColor: "rgba(255,255,255,0.07)",
+                     borderRadius: 3, overflow: "hidden" },
+  busOccFill:      { height: 4, borderRadius: 3 },
+  busOccPct:       { fontSize: 11, fontWeight: "900", minWidth: 34, textAlign: "right" as any },
+  busAlertBanner:  { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10,
+                     backgroundColor: `${CRIT}12`, borderRadius: 8,
+                     paddingHorizontal: 10, paddingVertical: 8,
+                     borderWidth: 1, borderColor: `${CRIT}25` },
+  busAlertBannerTxt:{ flex: 1, fontSize: 11, color: CRIT, fontWeight: "700" },
+  busActions:      { flexDirection: "row", alignItems: "center", marginTop: 12,
+                     borderTopWidth: 1, borderTopColor: BDR, paddingTop: 10, gap: 0 },
+  busActBtn:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                     gap: 5, paddingVertical: 7, borderRadius: 8 },
+  busActTxt:       { fontSize: 11, fontWeight: "700", color: "#64748B" },
+  busActDiv:       { width: 1, height: 20, backgroundColor: BDR },
 
   /* ── BANDE CAMÉRAS (au-dessus de la grille bus) ───────────────── */
   camStrip:       { backgroundColor: "#080C12", borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
   camStripHdr:    { flexDirection: "row", alignItems: "center", gap: 8,
                     paddingHorizontal: 14, paddingVertical: 9 },
-  camStripTitle:  { flex: 1, color: "#374151", fontSize: 9, fontWeight: "800", letterSpacing: 2 },
-  camStripCount:  { color: "#374151", fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+  camStripTitle:  { flex: 1, color: "#94A3B8", fontSize: 9, fontWeight: "800", letterSpacing: 2 },
+  camStripCount:  { color: "#64748B", fontSize: 9, fontWeight: "700", letterSpacing: 1 },
   camStripScroll: { paddingHorizontal: 10, paddingBottom: 10, gap: 8 },
   camStripCard:   { width: 168, borderRadius: 8, overflow: "hidden",
                     backgroundColor: "#060810",

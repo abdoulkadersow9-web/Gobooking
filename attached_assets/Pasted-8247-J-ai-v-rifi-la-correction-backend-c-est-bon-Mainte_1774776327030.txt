@@ -1,0 +1,132 @@
+8247"}
+J’ai vérifié la correction backend, c’est bon.
+
+Maintenant on passe à l’étape critique :
+TRANSFORMER L’INTERFACE EN VÉRITABLE TABLEAU DE CONTRÔLE PROFESSIONNEL.
+
+Actuellement l’interface n’est pas au niveau :
+- trop de couleurs mélangées
+- informations difficiles à lire
+- mauvaise hiérarchie visuelle
+- expérience utilisateur confuse
+- pas adapté à un centre de contrôle en temps réel
+
+---
+
+OBJECTIF :
+
+Créer un DASHBOARD DE SUPERVISION TEMPS RÉEL,
+clair, lisible, moderne, niveau international.
+
+---
+
+1. DESIGN (OBLIGATOIRE)
+
+- Fond sombre uniforme (dark mode professionnel)
+- Supprimer les dégradés rouges agressifs
+- Utiliser seulement 3 couleurs :
+  - Vert = OK
+  - Orange = attention
+  - Rouge = alerte critique
+- Cartes propres, espacées, alignées
+- Typographie lisible, grande, hiérarchisée
+
+---
+
+2. STRUCTURE DES BLOCS
+
+Chaque trajet doit être une carte claire avec :
+
+- Nom du bus / trajet
+- Itinéraire
+- Statut (OK / ALERTE / EN COURS)
+- Vitesse actuelle vs limite
+- Barre de progression simple
+
+---
+
+3. RÈGLES PAR TRAJET (TRÈS IMPORTANT)
+
+Chaque trajet doit avoir ses propres règles dynamiques :
+
+- vitesse max autorisée (ex: 120 km/h)
+- tolérance (ex: jusqu’à 140 selon feuille de route)
+- horaires obligatoires
+
+Ces règles doivent être configurables par :
+- bus
+- trajet
+- départ
+
+---
+
+4. SYSTÈME D’ALERTE COMPLET
+
+Quand une règle est enfreinte :
+
+CÔTÉ AGENT ROUTIER :
+- déclenchement immédiat d’une ALARME SONORE FORTE (sirène)
+- obligation de répondre (raison : panne, retard, etc.)
+
+CÔTÉ AGENT SUIVI :
+- notification + son léger différent
+- affichage de l’alerte dans le dashboard
+
+---
+
+5. TRAITEMENT DES ALERTES (OBLIGATOIRE)
+
+Flux complet :
+
+1. alerte déclenchée
+2. agent routier répond
+3. réponse visible côté agent suivi
+4. agent suivi clique :
+   → “Traiter et confirmer”
+
+SEULE cette action :
+- coupe l’alarme
+- clôture l’alerte
+
+---
+
+6. ACTIONS VISIBLES (INTERFACE)
+
+Chaque carte doit avoir des boutons clairs :
+
+- Voir détails
+- Contacter
+- Signaler panne
+- Traiter / confirmer
+
+---
+
+7. CAMÉRAS LIVE (IMPORTANT)
+
+Supprimer tout contenu fake type “Savannah Lane”
+
+Remplacer par :
+- simulation réelle de route
+- flux réaliste (caméra embarquée style GPS tracking)
+
+---
+
+8. OBJECTIF FINAL
+
+On ne construit pas une simple interface.
+
+On construit un CENTRE DE CONTRÔLE TRANSPORT :
+
+- supervision en temps réel
+- gestion des incidents
+- sécurité des trajets
+- prise de décision rapide
+
+---
+
+IMPORTANT :
+
+Ne rien casser dans la logique existante.
+Améliorer uniquement UX, UI et contrôle.
+
+Priorité = clarté, lisibilité, effic
