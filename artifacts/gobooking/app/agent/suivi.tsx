@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   Easing,
+  FlatList,
   Modal,
   Platform,
   RefreshControl,
@@ -710,452 +711,157 @@ export default function SuiviScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={S.scroll}
-          keyboardShouldPersistTaps="handled"
-          removeClippedSubviews
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={{ flex: 1 }}>
 
-          {/* Sync ticker */}
-          <View style={S.syncRow}>
-            <View style={{ width: 7, height: 7, borderRadius: 4,
-              backgroundColor: syncSec < 4 ? "#22C55E" : syncSec < 8 ? "#FCD34D" : "#CBD5E1" }} />
-            <Text style={S.syncRowTxt}>
-              {syncSec <= (hasCameras ? 5 : 30)
-                ? "Prochaine synchro dans " + Math.max(0, (hasCameras ? 5 : 30) - syncSec) + "s"
-                : "Synchronisation en attente…"}
-              {"  ·  "}{syncLabel}
-            </Text>
-            {hasCameras && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginLeft: "auto" }}>
-                <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR,
-                  opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }) }} />
-                <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "800" }}>
-                  {activeCamCount} FLUX ACTIF{activeCamCount > 1 ? "S" : ""}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* ══ B. ALERTES CRITIQUES — Priorité maximale ══════════════ */}
-          <View style={S.section}>
-            {hasAlerts ? (
-              <View style={S.alertBandHeader}>
-                <Animated.View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: "#FCA5A5",
-                  transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={S.alertBandTitle}>
-                    {alertCount} ALERTE{alertCount > 1 ? "S" : ""} CRITIQUE{alertCount > 1 ? "S" : ""}
-                  </Text>
-                  <Text style={S.alertBandSub}>Intervention requise · {data!.alerts[0]?.busName}</Text>
-                </View>
-                <View style={S.alertBandBadge}>
-                  <Text style={S.alertBandBadgeTxt}>⚠ URGENT</Text>
-                </View>
-              </View>
-            ) : (
-              <View style={S.sectionHeader}>
-                <View style={[S.sectionIconBox, { backgroundColor: "#F0FDF4" }]}>
-                  <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                </View>
-                <Text style={S.sectionTitle}>Alertes actives</Text>
-                <View style={[S.alertCountPill, { backgroundColor: "#22C55E" }]}>
-                  <Text style={S.alertCountPillTxt}>✓ OK</Text>
-                </View>
-              </View>
-            )}
-
-            {!alertCount ? (
-              <View style={S.empty}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#BBF7D0" }}>
-                  <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
-                </View>
-                <Text style={S.emptyTxt}>Aucune alerte active</Text>
-                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
-                  Tous les bus roulent normalement
-                </Text>
-              </View>
-            ) : (
-              data!.alerts.map(alert => {
-                const hasResponse  = !!alert.response;
-                const reqRequested = !!alert.responseRequested;
-                const responseOpt  = RESPONSE_OPTIONS.find(r => r.id === alert.response);
-                const isPanne   = alert.type === "PANNE"  || alert.type === "panne";
-                const isCtrl    = alert.type === "CONTRÔLE" || alert.type === "controle";
+          {/* ══ ALERTES FIXÉES — toujours visibles ══════════════════════ */}
+          {hasAlerts && (
+            <View style={S.fixedAlerts}>
+              {data!.alerts.slice(0, 3).map(alert => {
+                const isPanne = alert.type === "PANNE" || alert.type === "panne";
+                const isCtrl  = alert.type === "CONTRÔLE" || alert.type === "controle";
                 const typeColor = isPanne ? "#DC2626" : isCtrl ? "#B45309" : RED;
-                const typeLabel = isPanne ? "PANNE" : isCtrl ? "CONTRÔLE" : alert.type?.toUpperCase() ?? "ALERTE";
                 return (
-                  <View key={alert.id} style={{ position: "relative" }}>
-                    {isPanne && (
-                      <Animated.View style={{
-                        position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
-                        borderRadius: 24, backgroundColor: "#DC2626",
-                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }),
-                      }} />
-                    )}
-                    <FadeCard style={S.alertCard}>
-                      <View style={[S.alertHeader, { backgroundColor: typeColor }]}>
-                        <View style={S.alertHeaderIcon}>
-                          <Ionicons name={isPanne ? "warning" : isCtrl ? "shield" : "alert-circle"} size={22} color={typeColor} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                            <Text style={S.alertHeaderType}>{typeLabel}</Text>
-                            {isPanne && (
-                              <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
-                                backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
-                            )}
-                          </View>
-                          <Text style={S.alertHeaderBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
-                        </View>
-                        <View style={{ alignItems: "flex-end", gap: 4 }}>
-                          <Text style={S.alertHeaderTime}>
-                            {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                          </Text>
-                          {isPanne && (
-                            <View style={S.alertCritBadge}>
-                              <Text style={S.alertCritBadgeTxt}>CRITIQUE</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                      <View style={S.alertBody}>
-                        <Text style={S.alertMsg}>{alert.message}</Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
-                            <Ionicons name="person" size={13} color="#475569" />
-                          </View>
-                          <Text style={S.alertAgent}>{alert.agentName ?? "Agent inconnu"}</Text>
-                        </View>
-                        {hasResponse && responseOpt && (
-                          <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
-                            <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
-                            <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
-                              Réponse : {responseOpt.label}
-                            </Text>
-                          </View>
-                        )}
-                        {reqRequested && !hasResponse && (
-                          <View style={S.alertWaitRow}>
-                            <ActivityIndicator size="small" color="#D97706" />
-                            <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
-                          </View>
-                        )}
-                        <View style={S.alertActions}>
-                          {!reqRequested && (
-                            <TouchableOpacity
-                              style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF", flex: 1 }]}
-                              onPress={() => demanderReponse(alert.id)} disabled={acting}
-                            >
-                              <Ionicons name="chatbubble-ellipses-outline" size={13} color="#1D4ED8" />
-                              <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
-                            </TouchableOpacity>
-                          )}
-                          <TouchableOpacity
-                            style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
-                            onPress={() => doConfirm(alert.id)} disabled={acting}
-                          >
-                            {acting
-                              ? <ActivityIndicator size="small" color="#166534" />
-                              : <Ionicons name="checkmark-circle-outline" size={13} color="#166534" />}
-                            <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </FadeCard>
+                  <View key={alert.id} style={S.fixedAlertRow}>
+                    <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: typeColor,
+                      transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
+                    <Text style={S.fixedAlertBus} numberOfLines={1}>{alert.busName}</Text>
+                    <Text style={S.fixedAlertMsg} numberOfLines={1}>{alert.message}</Text>
+                    <Text style={S.fixedAlertTime}>
+                      {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
                   </View>
                 );
-              })
-            )}
-          </View>
-
-          {/* ══ C. TOUR DE CONTRÔLE — Bus en supervision ═══════════════ */}
-          <View style={S.section}>
-            <View style={S.consoleBand}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#4F46E5" }} />
-              <Feather name="monitor" size={14} color="#94A3B8" />
-              <Text style={S.consoleBandTitle}>TOUR DE CONTRÔLE</Text>
-              <View style={S.consoleBandCount}>
-                <Text style={S.consoleBandCountTxt}>{busCount} BUS</Text>
-              </View>
+              })}
             </View>
+          )}
 
-            {!sortedBuses.length ? (
-              <View style={S.empty}>
-                <Ionicons name="bus-outline" size={36} color="#CBD5E1" />
-                <Text style={S.emptyTxt}>Aucun bus en service</Text>
-                <Text style={{ fontSize: 12, color: "#CBD5E1", textAlign: "center" }}>
-                  Les bus apparaîtront ici dès leur activation
-                </Text>
+          {/* ══ GRILLE BUS — 2 colonnes, flex:1 ════════════════════════ */}
+          <FlatList
+            data={sortedBuses}
+            numColumns={2}
+            keyExtractor={b => b.id}
+            style={{ flex: 1 }}
+            contentContainerStyle={S.gridContent}
+            columnWrapperStyle={S.gridRow}
+            showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
+            ListEmptyComponent={
+              <View style={[S.center, { paddingVertical: 40 }]}>
+                <Ionicons name="bus-outline" size={40} color="#334155" />
+                <Text style={[S.emptyTxt, { color: "#475569" }]}>Aucun bus en service</Text>
               </View>
-            ) : (
-              sortedBuses.map(bus => {
-                const st        = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
-                const trip      = data!.trips.find(t => t.busId === bus.id);
-                const busAlerts = data!.alerts.filter(a => a.busId === bus.id);
-                const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-                const liveCam   = trip ? liveFrames[trip.id] : null;
-                const isPriority = busAlerts.length > 0;
-                const occ = trip?.passengerCount != null && trip?.seatCount
-                  ? Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))
-                  : null;
-                const occColor = occ != null ? (occ > 90 ? "#DC2626" : occ > 75 ? "#D97706" : "#059669") : "#059669";
-
-                return (
-                  <FadeCard key={bus.id} style={S.ctCard}>
-                    {/* ── FULL-WIDTH STATUS HEADER ─────────────────────── */}
-                    <View style={[S.ctHeader, { backgroundColor: isPriority ? RED : st.color }]}>
-                      <View style={S.ctHeaderIconWrap}>
-                        <Ionicons name="bus" size={24} color="#fff" />
+            }
+            renderItem={({ item: bus }) => {
+              const trip      = data!.trips.find(t => t.busId === bus.id);
+              const st        = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9" };
+              const busAlerts = data!.alerts.filter(a => a.busId === bus.id);
+              const occ       = trip?.passengerCount != null && trip?.seatCount
+                ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
+              const occColor  = occ != null ? (occ >= 90 ? "#DC2626" : occ >= 70 ? "#D97706" : "#16A34A") : "#16A34A";
+              const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+              return (
+                <View style={[S.gridCard, { borderLeftColor: busAlerts.length ? RED : st.color }]}>
+                  {/* Name */}
+                  <Text style={S.gridCardName} numberOfLines={1}>{bus.busName}</Text>
+                  {/* Status */}
+                  <View style={[S.gridStatusChip, { backgroundColor: st.bg }]}>
+                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
+                    <Text style={[S.gridStatusTxt, { color: st.color }]}>{st.label.toUpperCase()}</Text>
+                  </View>
+                  {/* Route */}
+                  {trip && (
+                    <Text style={S.gridRoute} numberOfLines={1}>{trip.from} → {trip.to}</Text>
+                  )}
+                  {/* Occupancy */}
+                  {occ != null && (
+                    <View style={S.gridOccWrap}>
+                      <View style={S.gridOccBar}>
+                        <View style={[S.gridOccFill, { width: (occ + "%") as any, backgroundColor: occColor }]} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={S.ctHeaderName} numberOfLines={1}>{bus.busName}</Text>
-                        <Text style={S.ctHeaderPlate}>{bus.plateNumber}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end", gap: 5 }}>
-                        {busAlerts.length > 0 && (
-                          <View style={S.ctAlertBadge}>
-                            <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
-                              backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
-                            <Text style={S.ctAlertBadgeTxt}>{busAlerts.length} ALERTE{busAlerts.length > 1 ? "S" : ""}</Text>
-                          </View>
-                        )}
-                        <View style={S.ctStatusChip}>
-                          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#fff", opacity: 0.75 }} />
-                          <Text style={S.ctStatusChipTxt}>{st.label.toUpperCase()}</Text>
-                        </View>
-                      </View>
+                      <Text style={[S.gridOccPct, { color: occColor }]}>{occ}%</Text>
                     </View>
-
-                    {/* ── INLINE CAMERA PREVIEW ────────────────────────── */}
-                    {camOk && trip && (
-                      <TouchableOpacity onPress={() => setCameraTrip(trip)} activeOpacity={0.88} style={S.ctCamPreview}>
-                        {/* Dark camera frame background */}
-                        <View style={S.ctCamPreviewBg}>
-                          {[0,1,2,3,4,5,6].map(i => (
-                            <View key={i} style={[S.ctScanLine, { top: i * 22 }]} />
-                          ))}
-                        </View>
-                        {/* Corner brackets — control room style */}
-                        <View style={[S.ctCamCornerTL]} />
-                        <View style={[S.ctCamCornerTR]} />
-                        <View style={[S.ctCamCornerBL]} />
-                        <View style={[S.ctCamCornerBR]} />
-                        {/* REC badge top-left */}
-                        <View style={S.ctRecBadge}>
-                          <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444",
-                            transform: [{ scale: pulseAnim }] }} />
-                          <Text style={S.ctRecTxt}>REC</Text>
-                        </View>
-                        {/* LIVE badge top-right */}
-                        <View style={S.ctLiveBadge}>
-                          <Text style={S.ctLiveTxt}>LIVE</Text>
-                        </View>
-                        {/* Center: bus silhouette */}
-                        <View style={S.ctCamCenterArea}>
-                          <Ionicons name="bus" size={40} color="rgba(255,255,255,0.08)" />
-                        </View>
-                        {/* Signal bars + % bottom-right */}
-                        {liveCam && (
-                          <View style={S.ctSignalWrap}>
-                            <Text style={S.ctSignalPct}>{liveCam.signal}%</Text>
-                            {[1,2,3,4].map(bar => (
-                              <View key={bar} style={[S.ctSignalBar,
-                                { height: bar * 5, backgroundColor: liveCam.signal > bar * 25 ? CAM_GR : "rgba(255,255,255,0.12)" }]} />
-                            ))}
-                          </View>
-                        )}
-                        {/* Bottom overlay: bus info + play button */}
-                        <View style={S.ctCamBottom}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={S.ctCamBottomBus} numberOfLines={1}>{bus.busName}</Text>
-                            <Text style={S.ctCamBottomRoute} numberOfLines={1}>{trip.from} → {trip.to}</Text>
-                          </View>
-                          <View style={S.ctCamPlayBtn}>
-                            <Ionicons name="play-circle" size={14} color={CAM_GR} />
-                            <Text style={S.ctCamPlayTxt}>VISIONNER EN DIRECT</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-
-                    {/* ── CONTENT BODY ─────────────────────────────────── */}
-                    <View style={{ padding: 14, gap: 11 }}>
-
-                      {/* Route + departure — clean single row */}
-                      {trip && (
-                        <View style={S.ctRouteRow}>
-                          <Ionicons name="navigate-outline" size={14} color="#3B82F6" />
-                          <Text style={S.ctRouteFull} numberOfLines={1}>
-                            {trip.from} → {trip.to}
-                          </Text>
-                          <Text style={S.ctDeptTime}>{trip.departureTime}</Text>
-                        </View>
-                      )}
-
-                      {/* Occupancy bar */}
-                      {trip?.passengerCount != null && (
-                        <View style={S.ctOccSection}>
-                          <View style={S.ctOccLabelRow}>
-                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                              <Ionicons name="people" size={12} color="#64748B" />
-                              <Text style={S.ctPassNum}>{trip.passengerCount}</Text>
-                              {trip.seatCount != null && <Text style={S.ctPassTotal}>/ {trip.seatCount}</Text>}
-                            </View>
-                            {occ != null && <Text style={[S.ctOccPct, { color: occColor }]}>{occ}%</Text>}
-                          </View>
-                          <View style={S.ctOccBar}>
-                            <View style={[S.ctOccFill, { width: (occ ?? 0) + "%" as any, backgroundColor: occColor }]} />
-                          </View>
-                        </View>
-                      )}
-
-                      {/* Inline alert preview */}
-                      {busAlerts.slice(0, 1).map(a => (
-                        <View key={a.id} style={S.ctAlertInline}>
-                          <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: RED,
-                            transform: [{ scale: pulseAnim }] }} />
-                          <Text style={S.ctAlertInlineTxt} numberOfLines={2}>{a.message}</Text>
-                          <Text style={S.ctAlertTime}>
-                            {new Date(a.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                          </Text>
-                        </View>
-                      ))}
+                  )}
+                  {/* Alert */}
+                  {busAlerts.length > 0 && (
+                    <View style={S.gridAlertRow}>
+                      <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: RED,
+                        transform: [{ scale: pulseAnim }] }} />
+                      <Text style={S.gridAlertTxt} numberOfLines={1}>{busAlerts[0].message}</Text>
                     </View>
-                  </FadeCard>
-                );
-              })
-            )}
-          </View>
+                  )}
+                  {/* Camera dot */}
+                  {camOk && (
+                    <View style={S.gridCamDot}>
+                      <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
+                        opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                      <Text style={S.gridCamTxt}>LIVE</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            }}
+          />
 
-          {/* ══ C. CAMÉRAS EMBARQUÉES ══════════════════════════════════ */}
-          <View style={S.section}>
-            <View style={S.consoleBand}>
-              <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: CAM_GR,
-                opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }), flexShrink: 0 }} />
-              <Ionicons name="videocam" size={14} color="#94A3B8" />
-              <Text style={S.consoleBandTitle}>CAMÉRAS LIVE</Text>
-              {hasCameras ? (
-                <View style={[S.consoleBandCount, { backgroundColor: "#052E16", borderColor: "#166534" }]}>
-                  <Text style={[S.consoleBandCountTxt, { color: CAM_GR }]}>{activeCamCount} ACTIF{activeCamCount > 1 ? "S" : ""}</Text>
-                </View>
-              ) : (
-                <View style={S.consoleBandCount}>
-                  <Text style={S.consoleBandCountTxt}>0 FLUX</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Stats strip — connections */}
-            {hasCameras && (
-              <View style={S.camStatsRow}>
-                <View style={S.camStatChip}>
-                  <Feather name="wifi" size={12} color="#4ADE80" />
-                  <Text style={S.camStatTxt}>{activeCamCount} connectée{activeCamCount > 1 ? "s" : ""}</Text>
-                </View>
-                <View style={S.camStatChip}>
-                  <Ionicons name="radio-outline" size={12} color="#60A5FA" />
-                  <Text style={S.camStatTxt}>Signal nominal</Text>
-                </View>
-                <View style={S.camStatChip}>
-                  <Feather name="clock" size={12} color="#A78BFA" />
-                  <Text style={S.camStatTxt}>Refresh 5s</Text>
-                </View>
+          {/* ══ BANDE CAMÉRAS — fixée en bas ════════════════════════════ */}
+          {hasCameras && (
+            <View style={S.camStrip}>
+              <View style={S.camStripHdr}>
+                <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CAM_GR,
+                  opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                <Text style={S.camStripTitle}>CAMÉRAS LIVE</Text>
+                <Text style={S.camStripCount}>{activeCamCount} FLUX</Text>
               </View>
-            )}
-
-            {!hasCameras ? (
-              <View style={[S.empty, { backgroundColor: CAM_BG, borderWidth: 1, borderColor: "#1E293B" }]}>
-                <Ionicons name="videocam-off-outline" size={34} color="#334155" />
-                <Text style={[S.emptyTxt, { color: "#475569" }]}>Aucune caméra connectée</Text>
-                <Text style={{ fontSize: 11, color: "#334155", textAlign: "center" }}>
-                  Les caméras s'activent lorsqu'un bus est en route
-                </Text>
-              </View>
-            ) : (
-              sortedBuses.map(bus => {
-                const trip    = data!.trips.find(t => t.busId === bus.id);
-                const camOk   = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-                const liveCam = trip ? liveFrames[trip.id] : null;
-                if (!camOk || !trip) return null;
-                const sigBars  = liveCam ? Math.ceil((liveCam.signal / 100) * 4) : 0;
-                const sigColor = liveCam
-                  ? (liveCam.signal >= 80 ? CAM_GR : liveCam.signal >= 60 ? "#FCD34D" : "#EF4444")
-                  : CAM_GR;
-                return (
-                  <View key={bus.id} style={S.camCard}>
-                    {/* Header — REC badge + signal */}
-                    <View style={S.camCardHdr}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444",
-                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.12] }) }} />
-                        <Text style={S.camLiveLbl}>● REC</Text>
-                        <View style={S.camLiveBadge}>
-                          <Text style={S.camLiveBadgeTxt}>LIVE</Text>
-                        </View>
-                      </View>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        {liveCam && (
-                          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={S.camStripScroll}>
+                {sortedBuses.map(bus => {
+                  const trip  = data!.trips.find(t => t.busId === bus.id);
+                  const camOk = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+                  if (!camOk || !trip) return null;
+                  const liveCam  = liveFrames[trip.id];
+                  const sigBars  = liveCam ? Math.ceil((liveCam.signal / 100) * 4) : 3;
+                  const sigColor = liveCam
+                    ? (liveCam.signal >= 80 ? CAM_GR : liveCam.signal >= 60 ? "#FCD34D" : "#EF4444")
+                    : CAM_GR;
+                  return (
+                    <TouchableOpacity key={bus.id} style={S.camStripCard}
+                      onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
+                      <View style={S.camStripMonitor}>
+                        {/* Badge row */}
+                        <View style={S.camStripBadgeRow}>
+                          <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
+                            backgroundColor: "#EF4444",
+                            opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.1] }) }} />
+                          <Text style={S.camStripRec}>REC</Text>
+                          <View style={S.camStripLiveBadge}><Text style={S.camStripLiveTxt}>LIVE</Text></View>
+                          <View style={{ flex: 1 }} />
+                          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 1.5 }}>
                             {[1,2,3,4].map(b => (
-                              <View key={b} style={{ width: 3, height: 4 + b * 2.5, borderRadius: 1,
-                                backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.1)" }} />
+                              <View key={b} style={{ width: 2.5, height: 3 + b * 2, borderRadius: 1,
+                                backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.12)" }} />
                             ))}
                           </View>
-                        )}
-                        {liveCam && (
-                          <Text style={[S.camSigTxt, { color: sigColor }]}>{liveCam.signal}%</Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Monitor — dark camera feed simulation */}
-                    <View style={S.camMonitor}>
-                      <View style={S.camMonitorBg}>
-                        {/* Scan line effect */}
-                        {[0,1,2,3,4,5,6,7].map(i => (
-                          <View key={i} style={{ height: 1, backgroundColor: "rgba(255,255,255,0.015)", marginBottom: 12 }} />
-                        ))}
-                      </View>
-                      <View style={S.camMonitorCenter}>
-                        <View style={S.camIconWrap}>
-                          <Ionicons name="videocam" size={24} color={CAM_GR} />
-                          <View style={S.camLiveDot} />
                         </View>
-                        <View style={{ gap: 2, alignItems: "center" }}>
-                          <Text style={S.camBusName}>{bus.busName}</Text>
-                          <Text style={S.camRoute}>{trip.cameraPosition ?? "CAM INTÉRIEURE"}</Text>
+                        {/* Icon */}
+                        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                          <Ionicons name="videocam" size={22} color={CAM_GR} style={{ opacity: 0.65 }} />
+                        </View>
+                        {/* Footer */}
+                        <View style={S.camStripFooter}>
+                          <Text style={S.camStripBusName} numberOfLines={1}>{bus.busName}</Text>
+                          <Text style={S.camStripRoute} numberOfLines={1}>{trip.from}→{trip.to}</Text>
                         </View>
                       </View>
-                      <View style={S.camMonitorFooter}>
-                        <Text style={S.camOverRoute}>{trip.from} → {trip.to}</Text>
-                        {liveCam && (
-                          <Text style={S.camFrames}>{liveCam.frames} img · {trip.passengerCount ?? "—"} pax</Text>
-                        )}
+                      <View style={S.camStripBtn}>
+                        <Text style={S.camStripBtnTxt}>▶ VOIR</Text>
                       </View>
-                    </View>
-
-                    {/* Watch button — full width */}
-                    <TouchableOpacity style={S.camWatchBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.75}>
-                      <Ionicons name="play-circle" size={20} color={CAM_GR} />
-                      <Text style={S.camWatchTxt}>VISIONNER EN DIRECT</Text>
-                      <Ionicons name="chevron-forward" size={16} color={CAM_GR} />
                     </TouchableOpacity>
-                  </View>
-                );
-              })
-            )}
-          </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
-          {/* ══ D. ALERTES ACTIVES (moved to top — see section B) ═══ */}
-          {false && <View style={S.section}>
-            <Text style={S.emptyTxt}>Aucune alerte active</Text>
-          </View>}
-
-        </ScrollView>
+        </View>
       )}
 
       {/* ══ MODAL — Déclencher une alerte ════════════════════════════ */}
@@ -1549,4 +1255,59 @@ const S = StyleSheet.create({
   modalActions:{ flexDirection: "row", gap: 10, marginTop: 8 },
   modalBtn:    { flex: 1, alignItems: "center", justifyContent: "center",
                  paddingVertical: 15, borderRadius: 14 },
+
+  /* ── ALERTES FIXÉES (bandeau haut, toujours visible) ─────────── */
+  fixedAlerts:    { backgroundColor: "#450A0A", paddingVertical: 6, paddingHorizontal: 12, gap: 5 },
+  fixedAlertRow:  { flexDirection: "row", alignItems: "center", gap: 8,
+                    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 8,
+                    paddingHorizontal: 10, paddingVertical: 7 },
+  fixedAlertBus:  { color: "#FCA5A5", fontSize: 11, fontWeight: "900", flexShrink: 0 },
+  fixedAlertMsg:  { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "600", flex: 1 },
+  fixedAlertTime: { color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: "700", flexShrink: 0 },
+
+  /* ── GRILLE BUS 2 COLONNES ───────────────────────────────────── */
+  gridContent:    { padding: 10, gap: 8 },
+  gridRow:        { gap: 8 },
+  gridCard:       { flex: 1, backgroundColor: "#fff", borderRadius: 14,
+                    padding: 12, gap: 7, borderLeftWidth: 4,
+                    ...(Platform.OS === "web"
+                      ? { boxShadow: "0 3px 12px rgba(0,0,0,0.11)" }
+                      : { shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10,
+                          shadowOffset: { width: 0, height: 3 }, elevation: 4 }) },
+  gridCardName:   { fontSize: 14, fontWeight: "900", color: "#0F172A", letterSpacing: -0.3 },
+  gridStatusChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 7,
+                    paddingHorizontal: 7, paddingVertical: 4, alignSelf: "flex-start" },
+  gridStatusTxt:  { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
+  gridRoute:      { fontSize: 11, color: "#475569", fontWeight: "600" },
+  gridOccWrap:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  gridOccBar:     { flex: 1, height: 6, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" },
+  gridOccFill:    { height: 6, borderRadius: 4 },
+  gridOccPct:     { fontSize: 10, fontWeight: "900", flexShrink: 0 },
+  gridAlertRow:   { flexDirection: "row", alignItems: "center", gap: 5,
+                    backgroundColor: "#FFF1F2", borderRadius: 6,
+                    paddingHorizontal: 7, paddingVertical: 4 },
+  gridAlertTxt:   { flex: 1, fontSize: 10, color: RED, fontWeight: "700" },
+  gridCamDot:     { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 2 },
+  gridCamTxt:     { fontSize: 8, color: CAM_GR, fontWeight: "900", letterSpacing: 1 },
+
+  /* ── BANDE CAMÉRAS (fixée en bas) ────────────────────────────── */
+  camStrip:       { backgroundColor: CAM_BG, borderTopWidth: 1, borderTopColor: "#1E293B" },
+  camStripHdr:    { flexDirection: "row", alignItems: "center", gap: 8,
+                    paddingHorizontal: 14, paddingVertical: 8 },
+  camStripTitle:  { flex: 1, color: "#64748B", fontSize: 9, fontWeight: "900", letterSpacing: 2 },
+  camStripCount:  { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+  camStripScroll: { paddingHorizontal: 10, paddingBottom: 10, gap: 8 },
+  camStripCard:   { width: 130, borderRadius: 10, overflow: "hidden",
+                    backgroundColor: "#0F172A", borderWidth: 1, borderColor: "#1E293B" },
+  camStripMonitor:{ height: 100, padding: 8, gap: 2 },
+  camStripBadgeRow:{ flexDirection: "row", alignItems: "center", gap: 4 },
+  camStripRec:    { color: "#EF4444", fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  camStripLiveBadge:{ backgroundColor: "#DC2626", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  camStripLiveTxt:{ color: "#fff", fontSize: 7, fontWeight: "900", letterSpacing: 0.8 },
+  camStripFooter: { gap: 1 },
+  camStripBusName:{ color: "#E2E8F0", fontSize: 10, fontWeight: "800" },
+  camStripRoute:  { color: "#475569", fontSize: 9, fontWeight: "600" },
+  camStripBtn:    { backgroundColor: "#052E16", paddingVertical: 7, alignItems: "center",
+                    borderTopWidth: 1, borderTopColor: "#166534" },
+  camStripBtnTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
 });
