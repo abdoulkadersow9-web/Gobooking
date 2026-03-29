@@ -772,33 +772,33 @@ export default function SuiviScreen() {
                 const occColor = occ != null ? (occ > 90 ? "#DC2626" : occ > 75 ? "#D97706" : "#059669") : "#059669";
 
                 return (
-                  <FadeCard key={bus.id} style={[S.ctCard, isPriority && S.ctCardAlert]}>
-                    {/* Status accent strip at top */}
-                    <View style={[S.ctStrip, { backgroundColor: isPriority ? RED : st.color }]} />
-
-                    <View style={{ padding: 14, gap: 11 }}>
-                      {/* Row 1: Name + plate + status pill */}
-                      <View style={S.ctTop}>
-                        <View style={[S.ctStatusIcon, { backgroundColor: st.bg }]}>
-                          <Ionicons name={st.icon as any} size={20} color={st.color} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={S.ctBusName} numberOfLines={1}>{bus.busName}</Text>
-                          <Text style={S.ctBusPlate}>{bus.plateNumber}</Text>
-                        </View>
-                        <View style={{ alignItems: "flex-end", gap: 5 }}>
-                          {busAlerts.length > 0 && (
-                            <View style={S.ctAlertBadge}>
-                              <Ionicons name="warning" size={10} color="#fff" />
-                              <Text style={S.ctAlertBadgeTxt}>{busAlerts.length} !</Text>
-                            </View>
-                          )}
-                          <View style={[S.ctStatusPill, { backgroundColor: st.bg, borderColor: st.color + "40" }]}>
-                            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
-                            <Text style={[S.ctStatusTxt, { color: st.color }]}>{st.label.toUpperCase()}</Text>
+                  <FadeCard key={bus.id} style={S.ctCard}>
+                    {/* ── FULL-WIDTH STATUS HEADER ─────────────────────── */}
+                    <View style={[S.ctHeader, { backgroundColor: isPriority ? RED : st.color }]}>
+                      <View style={S.ctHeaderIconWrap}>
+                        <Ionicons name="bus" size={24} color="#fff" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={S.ctHeaderName} numberOfLines={1}>{bus.busName}</Text>
+                        <Text style={S.ctHeaderPlate}>{bus.plateNumber}</Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end", gap: 5 }}>
+                        {busAlerts.length > 0 && (
+                          <View style={S.ctAlertBadge}>
+                            <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
+                              backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
+                            <Text style={S.ctAlertBadgeTxt}>{busAlerts.length} ALERTE{busAlerts.length > 1 ? "S" : ""}</Text>
                           </View>
+                        )}
+                        <View style={S.ctStatusChip}>
+                          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#fff", opacity: 0.75 }} />
+                          <Text style={S.ctStatusChipTxt}>{st.label.toUpperCase()}</Text>
                         </View>
                       </View>
+                    </View>
+
+                    {/* ── CONTENT BODY ─────────────────────────────────── */}
+                    <View style={{ padding: 14, gap: 11 }}>
 
                       {/* Row 2: Route — bus style */}
                       {trip && (
@@ -1043,87 +1043,88 @@ export default function SuiviScreen() {
                 const typeLabel = isPanne ? "PANNE" : isCtrl ? "CONTRÔLE" : alert.type?.toUpperCase() ?? "ALERTE";
                 return (
                   <View key={alert.id} style={{ position: "relative" }}>
-                    {/* Glow layer — breathes behind PANNE cards */}
+                    {/* Glow behind PANNE */}
                     {isPanne && (
                       <Animated.View style={{
-                        position: "absolute", top: -3, left: -3, right: -3, bottom: -3,
-                        borderRadius: 22, backgroundColor: "#DC2626",
-                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.22] }),
+                        position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
+                        borderRadius: 24, backgroundColor: "#DC2626",
+                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }),
                       }} />
                     )}
-                  <FadeCard style={[S.alertCard, {
-                    borderLeftColor: typeColor,
-                    backgroundColor: cardBg,
-                    borderLeftWidth: isPanne ? 6 : 5,
-                  }]}>
-                    {/* CRITIQUE strip — PANNE only */}
-                    {isPanne && (
-                      <View style={S.alertCritiqueStrip}>
-                        <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff",
-                          transform: [{ scale: pulseAnim }] }} />
-                        <Text style={S.alertCritiqueTxt}>⚡ SITUATION CRITIQUE — ACTION REQUISE</Text>
+                  <FadeCard style={S.alertCard}>
+                    {/* ── FULL-WIDTH COLORED HEADER ────────────────────── */}
+                    <View style={[S.alertHeader, { backgroundColor: typeColor }]}>
+                      <View style={S.alertHeaderIcon}>
+                        <Ionicons name={isPanne ? "warning" : isCtrl ? "shield" : "alert-circle"} size={22} color={typeColor} />
                       </View>
-                    )}
-
-                    {/* Alert header */}
-                    <View style={S.alertTop}>
-                      <View style={[S.alertTypeBadge, { backgroundColor: typeColor }]}>
-                        <Ionicons name={isPanne ? "warning" : isCtrl ? "shield" : "alert-circle"} size={13} color="#fff" />
-                        <Text style={S.alertTypeTxt}>{typeLabel}</Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Text style={S.alertHeaderType}>{typeLabel}</Text>
+                          {isPanne && (
+                            <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
+                              backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
+                          )}
+                        </View>
+                        <Text style={S.alertHeaderBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
                       </View>
-                      <Text style={S.alertBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
-                      <Text style={S.alertTime}>
-                        {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      </Text>
-                    </View>
-
-                    {/* Message */}
-                    <View style={[S.alertMsgBox, { borderLeftColor: typeColor, backgroundColor: typeColor + "0D" }]}>
-                      <Text style={S.alertMsg}>{alert.message}</Text>
-                    </View>
-
-                    {/* Agent */}
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
-                        <Ionicons name="person" size={13} color="#475569" />
-                      </View>
-                      <Text style={S.alertAgent}>{alert.agentName ?? "Agent inconnu"}</Text>
-                    </View>
-
-                    {hasResponse && responseOpt && (
-                      <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
-                        <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
-                        <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
-                          Réponse : {responseOpt.label}
+                      <View style={{ alignItems: "flex-end", gap: 4 }}>
+                        <Text style={S.alertHeaderTime}>
+                          {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                         </Text>
+                        {isPanne && (
+                          <View style={S.alertCritBadge}>
+                            <Text style={S.alertCritBadgeTxt}>CRITIQUE</Text>
+                          </View>
+                        )}
                       </View>
-                    )}
-                    {reqRequested && !hasResponse && (
-                      <View style={S.alertWaitRow}>
-                        <ActivityIndicator size="small" color="#D97706" />
-                        <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
-                      </View>
-                    )}
+                    </View>
 
-                    <View style={S.alertActions}>
-                      {!reqRequested && (
-                        <TouchableOpacity
-                          style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF", flex: 1 }]}
-                          onPress={() => demanderReponse(alert.id)} disabled={acting}
-                        >
-                          <Ionicons name="chatbubble-ellipses-outline" size={13} color="#1D4ED8" />
-                          <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
-                        </TouchableOpacity>
+                    {/* ── BODY ─────────────────────────────────────────── */}
+                    <View style={S.alertBody}>
+                      <Text style={S.alertMsg}>{alert.message}</Text>
+
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
+                          <Ionicons name="person" size={13} color="#475569" />
+                        </View>
+                        <Text style={S.alertAgent}>{alert.agentName ?? "Agent inconnu"}</Text>
+                      </View>
+
+                      {hasResponse && responseOpt && (
+                        <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
+                          <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
+                          <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
+                            Réponse : {responseOpt.label}
+                          </Text>
+                        </View>
                       )}
-                      <TouchableOpacity
-                        style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
-                        onPress={() => doConfirm(alert.id)} disabled={acting}
-                      >
-                        {acting
-                          ? <ActivityIndicator size="small" color="#166534" />
-                          : <Ionicons name="checkmark-circle-outline" size={13} color="#166534" />}
-                        <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
-                      </TouchableOpacity>
+                      {reqRequested && !hasResponse && (
+                        <View style={S.alertWaitRow}>
+                          <ActivityIndicator size="small" color="#D97706" />
+                          <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
+                        </View>
+                      )}
+
+                      <View style={S.alertActions}>
+                        {!reqRequested && (
+                          <TouchableOpacity
+                            style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF", flex: 1 }]}
+                            onPress={() => demanderReponse(alert.id)} disabled={acting}
+                          >
+                            <Ionicons name="chatbubble-ellipses-outline" size={13} color="#1D4ED8" />
+                            <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
+                          onPress={() => doConfirm(alert.id)} disabled={acting}
+                        >
+                          {acting
+                            ? <ActivityIndicator size="small" color="#166534" />
+                            : <Ionicons name="checkmark-circle-outline" size={13} color="#166534" />}
+                          <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </FadeCard>
                   </View>
@@ -1329,24 +1330,28 @@ const S = StyleSheet.create({
   emptyTxt: { color: "#94A3B8", fontSize: 13, fontWeight: "700" },
 
   /* ── B. Bus cards ─────────────────────────────────────────────── */
-  ctCard:     { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden",
-                ...(Platform.OS === "web"
-                  ? { boxShadow: "0 4px 20px rgba(0,0,0,0.11)" }
-                  : { shadowColor: "#000", shadowOpacity: 0.11, shadowRadius: 18,
-                      shadowOffset: { width: 0, height: 5 }, elevation: 6 }) },
-  ctCardAlert:{ backgroundColor: "#FFFBFB" },
-  ctStrip:    { height: 6, width: "100%" },
-
-  ctTop:      { flexDirection: "row", alignItems: "center", gap: 12 },
-  ctStatusIcon:{ width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  ctBusName:  { fontSize: 16, fontWeight: "900", color: "#0F172A", letterSpacing: -0.4 },
-  ctBusPlate: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontWeight: "700" },
-  ctAlertBadge:{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: RED,
-                 borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  ctAlertBadgeTxt:{ fontSize: 10, fontWeight: "900", color: "#fff" },
-  ctStatusPill:{ flexDirection: "row", alignItems: "center", gap: 5,
-                 paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1.5 },
-  ctStatusTxt: { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
+  ctCard:        { backgroundColor: "#fff", borderRadius: 20, overflow: "hidden",
+                   ...(Platform.OS === "web"
+                     ? { boxShadow: "0 6px 24px rgba(0,0,0,0.13)" }
+                     : { shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 20,
+                         shadowOffset: { width: 0, height: 6 }, elevation: 8 }) },
+  ctHeader:      { flexDirection: "row", alignItems: "center",
+                   paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
+  ctHeaderIconWrap:{ width: 46, height: 46, borderRadius: 14,
+                   backgroundColor: "rgba(255,255,255,0.2)",
+                   justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  ctHeaderName:  { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: -0.5 },
+  ctHeaderPlate: { color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: "700", marginTop: 2 },
+  ctAlertBadge:  { flexDirection: "row", alignItems: "center", gap: 5,
+                   backgroundColor: "rgba(255,255,255,0.22)",
+                   borderRadius: 9, paddingHorizontal: 8, paddingVertical: 5,
+                   borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
+  ctAlertBadgeTxt:{ fontSize: 9, fontWeight: "900", color: "#fff" },
+  ctStatusChip:  { flexDirection: "row", alignItems: "center", gap: 5,
+                   backgroundColor: "rgba(255,255,255,0.18)",
+                   borderRadius: 9, paddingHorizontal: 9, paddingVertical: 5,
+                   borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  ctStatusChipTxt:{ color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
 
   /* Route — bus style */
   ctRouteRow:    { flexDirection: "row", alignItems: "center",
@@ -1455,27 +1460,27 @@ const S = StyleSheet.create({
   alertCountPill:   { backgroundColor: RED, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 3 },
   alertCountPillTxt:{ color: "#fff", fontSize: 12, fontWeight: "900" },
 
-  alertCard:     { borderRadius: 18, padding: 16, gap: 12, borderLeftWidth: 4, borderLeftColor: RED,
-                   ...(Platform.OS === "web"
-                     ? { boxShadow: "0 4px 18px rgba(0,0,0,0.12)" }
-                     : { shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 14,
-                         shadowOffset: { width: 0, height: 4 }, elevation: 5 }) },
-
-  /* Critique strip — PANNE only */
-  alertCritiqueStrip: { flexDirection: "row", alignItems: "center", gap: 8,
-                        backgroundColor: "#DC2626", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-                        marginBottom: 2 },
-  alertCritiqueTxt:   { color: "#fff", fontSize: 10, fontWeight: "900", letterSpacing: 0.5, flex: 1 },
-
-  alertTop:      { flexDirection: "row", alignItems: "center", gap: 8 },
-  alertTypeBadge:{ flexDirection: "row", alignItems: "center", gap: 5,
-                   paddingHorizontal: 11, paddingVertical: 6, borderRadius: 9 },
-  alertTypeTxt:  { fontSize: 11, fontWeight: "900", letterSpacing: 0.5, color: "#fff" },
-  alertBus:      { flex: 1, fontSize: 13, fontWeight: "800", color: "#0F172A" },
-  alertTime:     { fontSize: 10, color: "#94A3B8", fontWeight: "700" },
-  alertMsgBox:   { borderLeftWidth: 3, paddingLeft: 12, paddingVertical: 4, borderRadius: 2 },
-  alertMsg:      { fontSize: 13, color: "#1E293B", fontWeight: "600", lineHeight: 20 },
-  alertAgent:    { fontSize: 11, color: "#64748B", fontWeight: "600" },
+  /* ── D. Alert cards — control tower redesign ─────────────────── */
+  alertCard:       { backgroundColor: "#fff", borderRadius: 20, overflow: "hidden",
+                     ...(Platform.OS === "web"
+                       ? { boxShadow: "0 6px 24px rgba(0,0,0,0.14)" }
+                       : { shadowColor: "#000", shadowOpacity: 0.13, shadowRadius: 20,
+                           shadowOffset: { width: 0, height: 6 }, elevation: 8 }) },
+  alertHeader:     { flexDirection: "row", alignItems: "center",
+                     paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
+  alertHeaderIcon: { width: 44, height: 44, borderRadius: 13,
+                     backgroundColor: "rgba(255,255,255,0.22)",
+                     justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  alertHeaderType: { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.6 },
+  alertHeaderBus:  { color: "rgba(255,255,255,0.85)", fontSize: 14, fontWeight: "800", marginTop: 2 },
+  alertHeaderTime: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700" },
+  alertCritBadge:  { backgroundColor: "rgba(255,255,255,0.22)", borderRadius: 6,
+                     paddingHorizontal: 7, paddingVertical: 3, marginTop: 4,
+                     borderWidth: 1, borderColor: "rgba(255,255,255,0.3)" },
+  alertCritBadgeTxt:{ color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
+  alertBody:       { padding: 14, gap: 10 },
+  alertMsg:        { fontSize: 14, color: "#1E293B", fontWeight: "700", lineHeight: 21 },
+  alertAgent:      { fontSize: 11, color: "#64748B", fontWeight: "600" },
   alertResponseRow:{ flexDirection: "row", alignItems: "center", gap: 8,
                      borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   alertResponseTxt:{ fontSize: 12, fontWeight: "700" },
