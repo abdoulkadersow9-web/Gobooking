@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTrips, useCreateTrip, useTripAction, useBuses, usePriceGrid, useTripAgents, useTripAuditHistory, useAgencePerformance, useTripsByAgence, useTripWaypoints, useTripSegmentSeats, useRecordTripDelay, useTripDelayHistory, useTransferBus, useTripTransfers } from "@/hooks/use-company";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X, MapPin, AlertCircle, ArrowRightLeft, History } from "lucide-react";
+import { Map, Plus, PlayCircle, CheckSquare, Clock, Eye, Info, Bus, Users, ClipboardCheck, AlertTriangle, AlertOctagon, CheckCircle2, Building2, TrendingUp, Filter, X, MapPin, AlertCircle, ArrowRightLeft, History, Search, ChevronDown, Shuffle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { getRouteStops, ALL_CI_CITIES, searchCities, TRIP_TYPE_MULTIPLIER } from "@/utils/routeGraph";
 
 export default function Trips() {
   const { data: trips, isLoading } = useTrips();
@@ -50,14 +51,21 @@ export default function Trips() {
     to: "",
     date: new Date().toISOString().split("T")[0],
     departureTime: "08:00",
-    arrivalTime: "12:00",
+    arrivalTime: "",
     price: "",
     busId: "",
+    tripType: "standard" as "standard" | "vip" | "vip_plus",
   });
   const [priceSource, setPriceSource] = useState<"grid" | "manual">("manual");
+  const [routeStops, setRouteStops] = useState<string[]>([]);
+  const [fromSearch, setFromSearch] = useState("");
+  const [toSearch,   setToSearch]   = useState("");
+  const [fromOpen,   setFromOpen]   = useState(false);
+  const [toOpen,     setToOpen]     = useState(false);
+  const fromRef = useRef<HTMLDivElement>(null);
+  const toRef   = useRef<HTMLDivElement>(null);
 
   const buses = (busesData ?? []) as any[];
-  const cities = priceGridData?.cities ?? [];
   const grid   = priceGridData?.grid ?? {};
 
   function getGridPrice(from: string, to: string): number | null {
@@ -66,17 +74,41 @@ export default function Trips() {
     return null;
   }
 
+  function calcArrivalTime(departureTime: string, segments: number): string {
+    if (!departureTime) return "";
+    const [h, m] = departureTime.split(":").map(Number);
+    const totalMin = h * 60 + m + segments * 120;
+    const ah = Math.floor(totalMin / 60) % 24;
+    const am = totalMin % 60;
+    return `${String(ah).padStart(2, "0")}:${String(am).padStart(2, "0")}`;
+  }
+
   useEffect(() => {
     if (form.from && form.to) {
-      const p = getGridPrice(form.from, form.to);
-      if (p != null) {
-        setForm((f) => ({ ...f, price: String(p) }));
+      const stops = getRouteStops(form.from, form.to);
+      setRouteStops(stops);
+      const segments = stops.length + 1;
+      const arrivalTime = calcArrivalTime(form.departureTime, segments);
+      const basePrice = getGridPrice(form.from, form.to);
+      if (basePrice != null) {
+        const mult = TRIP_TYPE_MULTIPLIER[form.tripType] ?? 1.0;
+        setForm((f) => ({ ...f, price: String(Math.round(basePrice * mult)), arrivalTime }));
         setPriceSource("grid");
       } else {
+        setForm((f) => ({ ...f, arrivalTime }));
         setPriceSource("manual");
       }
     }
-  }, [form.from, form.to, priceGridData]);
+  }, [form.from, form.to, form.tripType, form.departureTime, priceGridData]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (fromRef.current && !fromRef.current.contains(e.target as Node)) setFromOpen(false);
+      if (toRef.current && !toRef.current.contains(e.target as Node)) setToOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const handleAction = (id: string, action: "start" | "end") => {
     tripAction({ id, action }, {
@@ -97,14 +129,18 @@ export default function Trips() {
       departureTime: form.departureTime,
       arrivalTime: form.arrivalTime,
       price: Number(form.price),
+      tripType: form.tripType,
+      stops: routeStops.map((city, i) => ({ city, order: i + 1 })),
     };
     if (form.busId) payload.busId = form.busId;
     createTrip(payload, {
       onSuccess: () => {
         toast({ title: "Trajet créé", description: `${form.from} → ${form.to} le ${form.date}` });
         setOpen(false);
-        setForm({ from: "", to: "", date: new Date().toISOString().split("T")[0], departureTime: "08:00", arrivalTime: "12:00", price: "", busId: "" });
+        setForm({ from: "", to: "", date: new Date().toISOString().split("T")[0], departureTime: "08:00", arrivalTime: "", price: "", busId: "", tripType: "standard" });
         setPriceSource("manual");
+        setRouteStops([]);
+        setFromSearch(""); setToSearch("");
       },
       onError: (err: any) => toast({ variant: "destructive", title: "Erreur", description: err.message }),
     });
@@ -254,105 +290,204 @@ export default function Trips() {
         )}
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setFromSearch(""); setToSearch(""); setFromOpen(false); setToOpen(false); } }}>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Programmer un nouveau trajet</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Bus size={18} className="text-blue-600" />
+              Programmer un nouveau trajet
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ville de départ *</label>
-                <select
-                  className={inputCls}
-                  value={form.from}
-                  onChange={(e) => setForm((f) => ({ ...f, from: e.target.value }))}
-                >
-                  <option value="">Sélectionner…</option>
-                  {cities.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ville d'arrivée *</label>
-                <select
-                  className={inputCls}
-                  value={form.to}
-                  onChange={(e) => setForm((f) => ({ ...f, to: e.target.value }))}
-                >
-                  <option value="">Sélectionner…</option>
-                  {cities.filter((c) => c !== form.from).map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+
+            {/* ── Type de départ ── */}
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-2 block">Type de départ</label>
+              <div className="flex gap-2">
+                {(["standard", "vip", "vip_plus"] as const).map((t) => {
+                  const labels: Record<string, string> = { standard: "Standard", vip: "VIP", vip_plus: "VIP+" };
+                  const colors: Record<string, string> = {
+                    standard: form.tripType === t ? "bg-blue-600 text-white border-blue-600" : "border-input text-muted-foreground hover:bg-muted",
+                    vip:      form.tripType === t ? "bg-amber-500 text-white border-amber-500" : "border-input text-muted-foreground hover:bg-muted",
+                    vip_plus: form.tripType === t ? "bg-violet-600 text-white border-violet-600" : "border-input text-muted-foreground hover:bg-muted",
+                  };
+                  return (
+                    <button key={t} type="button"
+                      className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-all ${colors[t]}`}
+                      onClick={() => setForm((f) => ({ ...f, tripType: t }))}
+                    >
+                      {labels[t]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
+            {/* ── Sélection des villes ── */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ville de départ *</label>
+                <div ref={fromRef} className="relative">
+                  <button type="button"
+                    className={`${inputCls} flex items-center justify-between gap-2 text-left`}
+                    onClick={() => { setFromOpen((v) => !v); setFromSearch(""); }}
+                  >
+                    <span className={form.from ? "text-foreground" : "text-muted-foreground"}>
+                      {form.from || "Rechercher une ville…"}
+                    </span>
+                    <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                  </button>
+                  {fromOpen && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                        <Search size={14} className="text-muted-foreground shrink-0" />
+                        <input autoFocus className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                          placeholder="Ferké, Bouaké, Man…"
+                          value={fromSearch}
+                          onChange={(e) => setFromSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {searchCities(fromSearch).filter(c => c !== form.to).map((city) => (
+                          <button key={city} type="button"
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${form.from === city ? "font-semibold text-blue-600 bg-blue-50" : ""}`}
+                            onClick={() => { setForm((f) => ({ ...f, from: city })); setFromOpen(false); setFromSearch(""); }}
+                          >{city}</button>
+                        ))}
+                        {searchCities(fromSearch).length === 0 && (
+                          <p className="text-center py-4 text-xs text-muted-foreground">Aucune ville trouvée</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button type="button"
+                className="mb-0.5 p-2 rounded-lg border border-input hover:bg-muted transition-colors"
+                title="Inverser départ/arrivée"
+                onClick={() => setForm((f) => ({ ...f, from: f.to, to: f.from }))}
+              >
+                <Shuffle size={15} className="text-muted-foreground" />
+              </button>
+
+              <div className="flex-1">
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Ville d'arrivée *</label>
+                <div ref={toRef} className="relative">
+                  <button type="button"
+                    className={`${inputCls} flex items-center justify-between gap-2 text-left`}
+                    onClick={() => { setToOpen((v) => !v); setToSearch(""); }}
+                  >
+                    <span className={form.to ? "text-foreground" : "text-muted-foreground"}>
+                      {form.to || "Rechercher une ville…"}
+                    </span>
+                    <ChevronDown size={14} className="shrink-0 text-muted-foreground" />
+                  </button>
+                  {toOpen && (
+                    <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                        <Search size={14} className="text-muted-foreground shrink-0" />
+                        <input autoFocus className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                          placeholder="Ferké, Man, Korhogo…"
+                          value={toSearch}
+                          onChange={(e) => setToSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {searchCities(toSearch).filter(c => c !== form.from).map((city) => (
+                          <button key={city} type="button"
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${form.to === city ? "font-semibold text-red-600 bg-red-50" : ""}`}
+                            onClick={() => { setForm((f) => ({ ...f, to: city })); setToOpen(false); setToSearch(""); }}
+                          >{city}</button>
+                        ))}
+                        {searchCities(toSearch).length === 0 && (
+                          <p className="text-center py-4 text-xs text-muted-foreground">Aucune ville trouvée</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Visualisation du trajet ── */}
+            {form.from && form.to && (
+              <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide flex items-center gap-1.5">
+                  <MapPin size={12} /> Trajet détecté
+                </p>
+                <div className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                    {routeStops.length > 0 && <div className="w-0.5 bg-border flex-1 my-1" style={{ minHeight: routeStops.length * 28 }} />}
+                    <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+                  </div>
+                  <div className="flex-1 space-y-1 text-sm">
+                    <p className="font-semibold text-emerald-700">{form.from}</p>
+                    {routeStops.map((stop) => (
+                      <p key={stop} className="text-muted-foreground text-xs py-0.5 pl-2 border-l-2 border-blue-200">{stop}</p>
+                    ))}
+                    <p className="font-semibold text-red-700">{form.to}</p>
+                  </div>
+                </div>
+                {routeStops.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {routeStops.length} escale{routeStops.length > 1 ? "s" : ""} intermédiaire{routeStops.length > 1 ? "s" : ""} — {routeStops.length + 1} segments
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── Prix automatique ── */}
             <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                Tarif de la ligne (FCFA / passager) *
+              <label className="text-xs font-semibold text-muted-foreground mb-1 block flex items-center gap-1.5">
+                Tarif (FCFA / passager) *
                 {priceSource === "grid" && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 font-normal">
-                    <Info size={12} /> Grille officielle CI
+                  <span className="inline-flex items-center gap-1 text-emerald-600 font-normal text-xs">
+                    <Info size={11} /> Grille officielle · {form.tripType === "vip" ? "×1,3" : form.tripType === "vip_plus" ? "×1,6" : "×1,0"}
                   </span>
                 )}
               </label>
               <input
-                type="number"
-                min="0"
-                step="500"
+                type="number" min="0" step="500"
                 className={inputCls}
-                placeholder="Ex : 2500"
+                placeholder="Ex : 7500"
                 value={form.price}
                 onChange={(e) => { setForm((f) => ({ ...f, price: e.target.value })); setPriceSource("manual"); }}
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Prix unitaire par passager — ex : Abidjan → Bouaké = 2 500 FCFA
-              </p>
-              {form.from && form.to && getGridPrice(form.from, form.to) == null && (
+              {priceSource === "manual" && form.from && form.to && (
                 <p className="text-xs text-amber-600 mt-1">Trajet hors grille — saisir le prix manuellement.</p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* ── Date et heures ── */}
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Date du départ *</label>
-                <input
-                  type="date"
-                  className={inputCls}
-                  value={form.date}
-                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-                />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Date *</label>
+                <input type="date" className={inputCls} value={form.date}
+                  onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Heure de départ *</label>
-                <input
-                  type="time"
-                  className={inputCls}
-                  value={form.departureTime}
-                  onChange={(e) => setForm((f) => ({ ...f, departureTime: e.target.value }))}
-                />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Départ *</label>
+                <input type="time" className={inputCls} value={form.departureTime}
+                  onChange={(e) => setForm((f) => ({ ...f, departureTime: e.target.value }))} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                  Arrivée estimée
+                  {form.from && form.to && <span className="text-blue-500 font-normal ml-1">(auto)</span>}
+                </label>
+                <input type="time" className={inputCls} value={form.arrivalTime}
+                  onChange={(e) => setForm((f) => ({ ...f, arrivalTime: e.target.value }))} />
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block">Heure d'arrivée estimée</label>
-              <input
-                type="time"
-                className={inputCls}
-                value={form.arrivalTime}
-                onChange={(e) => setForm((f) => ({ ...f, arrivalTime: e.target.value }))}
-              />
-            </div>
-
+            {/* ── Bus assigné ── */}
             {buses.length > 0 && (
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Bus assigné</label>
-                <select
-                  className={inputCls}
-                  value={form.busId}
+                <select className={inputCls} value={form.busId}
                   onChange={(e) => setForm((f) => ({ ...f, busId: e.target.value }))}
                 >
                   <option value="">— Aucun bus spécifié —</option>
@@ -363,13 +498,22 @@ export default function Trips() {
               </div>
             )}
 
+            {/* ── Récapitulatif ── */}
             {form.from && form.to && form.price && (
-              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-sm">
-                <p className="text-emerald-800 font-semibold">{form.from} → {form.to}</p>
-                <p className="text-emerald-700 mt-0.5">
-                  Prix unitaire : <strong>{Number(form.price).toLocaleString("fr-FR")} FCFA</strong>
-                  {priceSource === "grid" && <span className="ml-2 text-xs text-emerald-600">(grille officielle)</span>}
-                </p>
+              <div className="rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm">
+                <p className="text-blue-800 font-bold">{form.from} → {form.to}</p>
+                <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <span className="text-blue-700">
+                    Prix : <strong>{Number(form.price).toLocaleString("fr-FR")} FCFA</strong>
+                    {priceSource === "grid" && <span className="ml-1 text-xs text-emerald-600">(grille officielle)</span>}
+                  </span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${form.tripType === "vip_plus" ? "bg-violet-100 text-violet-700" : form.tripType === "vip" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                    {form.tripType === "vip_plus" ? "VIP+" : form.tripType === "vip" ? "VIP" : "Standard"}
+                  </span>
+                </div>
+                {form.arrivalTime && (
+                  <p className="text-blue-600 text-xs mt-1">Départ {form.departureTime} → Arrivée {form.arrivalTime}</p>
+                )}
               </div>
             )}
           </div>
