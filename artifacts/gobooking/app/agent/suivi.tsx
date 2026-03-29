@@ -911,18 +911,19 @@ export default function SuiviScreen() {
   const sortedBuses = useMemo(() => {
     if (!data?.buses) return [];
     return [...data.buses].sort((a, b) => {
-      const aAlerts = data.alerts.filter(x => x.busId === a.id).length;
-      const bAlerts = data.alerts.filter(x => x.busId === b.id).length;
+      /* Inclut alertes auto-vitesse dans le calcul de priorité */
+      const aAlerts = mergedAlerts.filter(x => x.busId === a.id).length;
+      const bAlerts = mergedAlerts.filter(x => x.busId === b.id).length;
       const aTrip   = data.trips.find(t => t.busId === a.id);
       const bTrip   = data.trips.find(t => t.busId === b.id);
       const aCamOk  = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
       const bCamOk  = !!(bTrip?.cameraStatus === "connected" && bTrip?.cameraStreamUrl);
-      // Priority: alerts+camera → alerts → camera → rest
-      const aScore = (aAlerts > 0 ? 10 : 0) + (aCamOk ? 5 : 0) + aAlerts;
-      const bScore = (bAlerts > 0 ? 10 : 0) + (bCamOk ? 5 : 0) + bAlerts;
+      /* Priorité absolue : alertes actives → caméra → reste */
+      const aScore = (aAlerts > 0 ? 100 : 0) + aAlerts * 10 + (aCamOk ? 3 : 0);
+      const bScore = (bAlerts > 0 ? 100 : 0) + bAlerts * 10 + (bCamOk ? 3 : 0);
       return bScore - aScore;
     });
-  }, [data]);
+  }, [data, mergedAlerts]);
 
   /* ── Signal warning: any camera with signal < 75% ── */
   const signalWarnTrips = useMemo(
@@ -1243,14 +1244,16 @@ export default function SuiviScreen() {
   }
 
 
-  const activeTrip   = data?.trips?.find(t => t.status === "en_route") ?? data?.trips?.[0] ?? null;
+  const activeTrip      = data?.trips?.find(t => t.status === "en_route") ?? data?.trips?.[0] ?? null;
   const totalPassengers = data?.trips?.reduce((s, t) => s + (t.passengerCount ?? 0), 0) ?? 0;
-  const busCount     = data?.buses?.length ?? 0;
-  const alertCount   = mergedAlerts.length;
+  const busCount        = data?.buses?.length ?? 0;
+  const alertCount      = mergedAlerts.length;
+  const busesEnRoute    = data?.buses?.filter(b => b.status === "en_route")?.length ?? 0;
+  const tripsSansAlerte = (data?.buses?.length ?? 0) - [...new Set(mergedAlerts.map(a => a.busId))].length;
 
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
-      <StatusBar barStyle="light-content" backgroundColor={RED_D} />
+      <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
 
       {/* ══ HEADER ════════════════════════════════════════════════════ */}
       <View style={S.header}>
@@ -1292,39 +1295,62 @@ export default function SuiviScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        {/* KPI bar */}
-        <View style={S.headerStats}>
-          <View style={S.kpiTile}>
-            <Text style={S.kpiNum}>{busCount}</Text>
-            <View style={S.kpiRow}>
-              <Ionicons name="bus" size={9} color="rgba(255,255,255,0.3)" />
-              <Text style={S.kpiLbl}>BUS</Text>
+        {/* ── Barre de statut global opérationnel ── */}
+        <View style={S.statusBar}>
+          {/* ALERTES — tile dominant si présentes */}
+          <View style={[S.statusTile, hasAlerts && S.statusTileAlert]}>
+            {hasAlerts ? (
+              <>
+                <Animated.Text style={[S.statusBigNum, { color: CRIT, transform: [{ scale: pulseAnim }] }]}>
+                  {alertCount}
+                </Animated.Text>
+                <View style={S.statusLblRow}>
+                  <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CRIT,
+                    transform: [{ scale: pulseAnim }] }} />
+                  <Text style={[S.statusLbl, { color: CRIT }]}>ALERTE{alertCount > 1 ? "S" : ""}</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={[S.statusBigNum, { color: OK }]}>0</Text>
+                <View style={S.statusLblRow}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: OK }} />
+                  <Text style={[S.statusLbl, { color: OK }]}>ALERTES</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          <View style={S.statusDiv} />
+
+          {/* ACTIFS */}
+          <View style={S.statusTile}>
+            <Text style={[S.statusNum, { color: busesEnRoute > 0 ? OK : "#475569" }]}>{busesEnRoute}</Text>
+            <View style={S.statusLblRow}>
+              <Ionicons name="navigate" size={9} color={busesEnRoute > 0 ? OK : "#374151"} />
+              <Text style={[S.statusLbl, { color: busesEnRoute > 0 ? OK : "#374151" }]}>EN ROUTE</Text>
             </View>
           </View>
-          <View style={S.kpiDiv} />
-          <View style={S.kpiTile}>
-            <Text style={S.kpiNum}>{totalPassengers}</Text>
-            <View style={S.kpiRow}>
-              <Ionicons name="people" size={9} color="rgba(255,255,255,0.3)" />
-              <Text style={S.kpiLbl}>PASSAGERS</Text>
+
+          <View style={S.statusDiv} />
+
+          {/* OK — sans alerte */}
+          <View style={S.statusTile}>
+            <Text style={[S.statusNum, { color: tripsSansAlerte > 0 ? OK : "#475569" }]}>{Math.max(0, tripsSansAlerte)}</Text>
+            <View style={S.statusLblRow}>
+              <Ionicons name="checkmark-circle" size={9} color={tripsSansAlerte > 0 ? OK : "#374151"} />
+              <Text style={[S.statusLbl, { color: tripsSansAlerte > 0 ? OK : "#374151" }]}>OK</Text>
             </View>
           </View>
-          <View style={S.kpiDiv} />
-          <View style={S.kpiTile}>
-            <Text style={[S.kpiNum, hasAlerts && { color: RED }]}>{alertCount}</Text>
-            <View style={S.kpiRow}>
-              {hasAlerts && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: RED,
-                transform: [{ scale: pulseAnim }] }} />}
-              <Text style={[S.kpiLbl, hasAlerts && { color: RED }]}>ALERTES</Text>
-            </View>
-          </View>
-          <View style={S.kpiDiv} />
-          <View style={S.kpiTile}>
-            <Text style={S.kpiNum}>{activeCamCount}</Text>
-            <View style={S.kpiRow}>
-              {hasCameras && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.5)",
-                opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }) }} />}
-              <Text style={S.kpiLbl}>CAM</Text>
+
+          <View style={S.statusDiv} />
+
+          {/* PASSAGERS */}
+          <View style={S.statusTile}>
+            <Text style={S.statusNum}>{totalPassengers}</Text>
+            <View style={S.statusLblRow}>
+              <Ionicons name="people" size={9} color="#374151" />
+              <Text style={S.statusLbl}>PAX</Text>
             </View>
           </View>
         </View>
@@ -1471,40 +1497,86 @@ export default function SuiviScreen() {
               </View>
             }
             renderItem={({ item: bus }) => {
-              const trip       = data!.trips.find(t => t.busId === bus.id);
-              const st         = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#1E293B", icon: "bus-outline" };
-              const busAlerts  = mergedAlerts.filter(a => a.busId === bus.id);
-              const pendingAlt = busAlerts.find(a => !a.responseRequested || !a.response);
-              const occ        = trip?.passengerCount != null && trip?.seatCount
+              const trip        = data!.trips.find(t => t.busId === bus.id);
+              const st          = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#1E293B", icon: "bus-outline" };
+              const busAlerts   = mergedAlerts.filter(a => a.busId === bus.id);
+              const isCritical  = busAlerts.length > 0;
+              /* Étapes du flux opérationnel pour la première alerte */
+              const firstAlert  = busAlerts[0];
+              const flowStep    = firstAlert
+                ? firstAlert.response         ? "validate"
+                : firstAlert.responseRequested? "waiting"
+                :                               "new"
+                : null;
+              const occ         = trip?.passengerCount != null && trip?.seatCount
                 ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
-              const occColor   = occ != null ? (occ >= 90 ? CRIT : occ >= 70 ? WARN : OK) : "#475569";
-              const camOk      = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-              const speed      = busSpeedMap[bus.id];
-              const speedLimit = bus.maxSpeedKmh ?? 120;
-              const speedWarn  = speed != null && speed > speedLimit;
-              /* Couleur du bord gauche : rouge si alerte, orange si attention, vert sinon */
-              const accentColor = busAlerts.length > 0 ? CRIT : speedWarn ? WARN : st.color;
+              const occColor    = occ != null ? (occ >= 90 ? CRIT : occ >= 70 ? WARN : OK) : "#374151";
+              const camOk       = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+              const speed       = busSpeedMap[bus.id];
+              const speedLimit  = bus.maxSpeedKmh ?? 120;
+              const speedWarn   = speed != null && speed > speedLimit;
+
               return (
-                <View style={[S.busCard, { borderLeftColor: accentColor }]}>
-                  {/* ── Ligne 1 : nom + badge statut ── */}
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                    <View style={[S.busCardIcon, { backgroundColor: `${accentColor}18`, borderColor: `${accentColor}30` }]}>
-                      <Ionicons name={st.icon as any} size={16} color={accentColor} />
+                <View style={[
+                  S.busCard,
+                  isCritical && S.busCardCritical,
+                  { borderLeftColor: isCritical ? CRIT : speedWarn ? WARN : st.color },
+                ]}>
+
+                  {/* ═══ BANDEAU CRITIQUE — pleine largeur, impossible à ignorer ═══ */}
+                  {isCritical && (
+                    <View style={S.critBand}>
+                      <Animated.View style={[S.critDot, { transform: [{ scale: pulseAnim }] }]} />
+                      <Text style={S.critLabel}>
+                        {busAlerts.length > 1 ? `${busAlerts.length} ALERTES ACTIVES` : "ALERTE ACTIVE"}
+                      </Text>
+                      {/* Étape du flux */}
+                      <View style={[S.flowStep,
+                        flowStep === "validate" && { backgroundColor: `${OK}20`, borderColor: `${OK}40` },
+                        flowStep === "waiting"  && { backgroundColor: `${WARN}20`, borderColor: `${WARN}40` },
+                        flowStep === "new"      && { backgroundColor: `${CRIT}20`, borderColor: `${CRIT}40` },
+                      ]}>
+                        <Text style={[S.flowStepTxt,
+                          flowStep === "validate" && { color: OK },
+                          flowStep === "waiting"  && { color: WARN },
+                          flowStep === "new"      && { color: CRIT },
+                        ]}>
+                          {flowStep === "validate" ? "✓ RÉPONSE REÇUE"
+                          : flowStep === "waiting" ? "⏳ EN ATTENTE"
+                          :                          "⚡ NOUVEAU"}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* ── Ligne identité ── */}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: isCritical ? 10 : 0, marginBottom: 6 }}>
+                    <View style={[S.busCardIcon, {
+                      backgroundColor: `${isCritical ? CRIT : st.color}18`,
+                      borderColor:     `${isCritical ? CRIT : st.color}30`,
+                    }]}>
+                      <Ionicons name={(isCritical ? "alert-circle" : st.icon) as any} size={16}
+                        color={isCritical ? CRIT : st.color} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={S.busCardName} numberOfLines={1}>{bus.busName}</Text>
+                      <Text style={[S.busCardName, isCritical && { color: "#fff" }]} numberOfLines={1}>
+                        {bus.busName}
+                      </Text>
                       <Text style={S.busCardPlate}>{bus.plateNumber ?? "—"}</Text>
                     </View>
-                    <View style={[S.busStatusBadge, { backgroundColor: `${st.color}20`, borderColor: `${st.color}40` }]}>
-                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
-                      <Text style={[S.busStatusTxt, { color: st.color }]}>{st.label}</Text>
-                    </View>
+                    {/* Badge statut — discret si alerte (le bandeau prend le dessus) */}
+                    {!isCritical && (
+                      <View style={[S.busStatusBadge, { backgroundColor: `${st.color}20`, borderColor: `${st.color}40` }]}>
+                        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
+                        <Text style={[S.busStatusTxt, { color: st.color }]}>{st.label}</Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* ── Ligne 2 : itinéraire ── */}
+                  {/* ── Itinéraire ── */}
                   {trip && (
                     <View style={S.busRouteRow}>
-                      <Ionicons name="navigate-circle-outline" size={13} color="#475569" />
+                      <Ionicons name="navigate-circle-outline" size={13} color="#374151" />
                       <Text style={S.busRouteTxt} numberOfLines={1}>{trip.from} → {trip.to}</Text>
                       {trip.departureTime && (
                         <Text style={S.busDeptTime}>{trip.departureTime}</Text>
@@ -1512,12 +1584,14 @@ export default function SuiviScreen() {
                     </View>
                   )}
 
-                  {/* ── Ligne 3 : vitesse vs limite ── */}
+                  {/* ── Vitesse vs limite (lecture < 1 sec) ── */}
                   {speed != null && (
                     <View style={S.busSpeedRow}>
                       <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3 }}>
-                        <Text style={[S.busSpeedNum, { color: speedWarn ? CRIT : "#E2E8F0" }]}>{speed}</Text>
-                        <Text style={[S.busSpeedUnit, { color: speedWarn ? CRIT : "#475569" }]}>km/h</Text>
+                        <Text style={[S.busSpeedNum, { color: speedWarn ? CRIT : isCritical ? "#CBD5E1" : "#E2E8F0" }]}>
+                          {speed}
+                        </Text>
+                        <Text style={[S.busSpeedUnit, { color: speedWarn ? CRIT : "#374151" }]}>km/h</Text>
                       </View>
                       <View style={S.busSpeedBarWrap}>
                         <View style={[S.busSpeedBar, {
@@ -1526,16 +1600,16 @@ export default function SuiviScreen() {
                         }]} />
                       </View>
                       <Text style={[S.busSpeedLimit, { color: speedWarn ? CRIT : "#374151" }]}>
-                        {speedWarn ? `⚠ MAX` : "MAX"} {speedLimit}
+                        {speedWarn ? "⚠" : ""} {speedLimit} max
                       </Text>
                     </View>
                   )}
 
-                  {/* ── Ligne 4 : taux d'occupation ── */}
+                  {/* ── Occupation ── */}
                   {occ != null && (
                     <View style={S.busOccRow}>
-                      <Ionicons name="people-outline" size={12} color="#475569" />
-                      <Text style={S.busOccLabel}>{trip?.passengerCount ?? "—"} / {trip?.seatCount ?? "—"}</Text>
+                      <Ionicons name="people-outline" size={12} color="#374151" />
+                      <Text style={S.busOccLabel}>{trip?.passengerCount ?? "—"}/{trip?.seatCount ?? "—"}</Text>
                       <View style={S.busOccBarWrap}>
                         <View style={[S.busOccFill, { width: (occ + "%") as any, backgroundColor: occColor }]} />
                       </View>
@@ -1543,52 +1617,63 @@ export default function SuiviScreen() {
                     </View>
                   )}
 
-                  {/* ── Bandeau alerte active ── */}
-                  {busAlerts.length > 0 && (
-                    <TouchableOpacity style={S.busAlertBanner}
-                      onPress={() => setSelectedAlert(busAlerts[0])} activeOpacity={0.8}>
-                      <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CRIT,
-                        transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
-                      <Text style={S.busAlertBannerTxt} numberOfLines={1}>
-                        {busAlerts.length > 1 ? `${busAlerts.length} alertes` : busAlerts[0].message}
-                      </Text>
-                      <Text style={{ color: CRIT, fontSize: 9, fontWeight: "900" }}>TRAITER →</Text>
-                    </TouchableOpacity>
+                  {/* ═══ BOUTONS D'ACTION HIÉRARCHISÉS ═══ */}
+                  {isCritical ? (
+                    /* Mode critique : TRAITER en premier, pleine largeur, rouge */
+                    <View style={{ marginTop: 12, gap: 8 }}>
+                      <TouchableOpacity style={S.critTraiterBtn}
+                        onPress={() => firstAlert && setSelectedAlert(firstAlert)} activeOpacity={0.85}>
+                        <Ionicons name="checkmark-done" size={16} color="#fff" />
+                        <Text style={S.critTraiterTxt}>
+                          {flowStep === "validate" ? "VALIDER ET CLORE" : "TRAITER L'ALERTE"}
+                        </Text>
+                        <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.8)",
+                          transform: [{ scale: pulseAnim }] }} />
+                      </TouchableOpacity>
+                      <View style={{ flexDirection: "row", gap: 8 }}>
+                        <TouchableOpacity style={S.secBtn} onPress={() => setSelectedBus(bus)} activeOpacity={0.8}>
+                          <Ionicons name="eye-outline" size={13} color="#94A3B8" />
+                          <Text style={S.secBtnTxt}>Détails</Text>
+                        </TouchableOpacity>
+                        {camOk && (
+                          <TouchableOpacity style={S.secBtn}
+                            onPress={() => trip && setCameraTrip(trip)} activeOpacity={0.8}>
+                            <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: OK,
+                              opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                            <Text style={[S.secBtnTxt, { color: OK }]}>Caméra</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity style={S.secBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
+                          <Ionicons name="warning-outline" size={13} color={WARN} />
+                          <Text style={[S.secBtnTxt, { color: WARN }]}>Signaler</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    /* Mode normal : actions discrètes en ligne */
+                    <View style={S.busActions}>
+                      <TouchableOpacity style={S.busActBtn} onPress={() => setSelectedBus(bus)} activeOpacity={0.8}>
+                        <Ionicons name="eye-outline" size={13} color="#94A3B8" />
+                        <Text style={S.busActTxt}>Détails</Text>
+                      </TouchableOpacity>
+                      <View style={S.busActDiv} />
+                      <TouchableOpacity style={S.busActBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
+                        <Ionicons name="warning-outline" size={13} color={WARN} />
+                        <Text style={[S.busActTxt, { color: WARN }]}>Signaler</Text>
+                      </TouchableOpacity>
+                      {camOk && (
+                        <>
+                          <View style={S.busActDiv} />
+                          <TouchableOpacity style={S.busActBtn}
+                            onPress={() => trip && setCameraTrip(trip)} activeOpacity={0.8}>
+                            <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: OK,
+                              opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                            <Text style={[S.busActTxt, { color: OK }]}>Caméra</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
                   )}
-
-                  {/* ── Boutons d'action ── */}
-                  <View style={S.busActions}>
-                    <TouchableOpacity style={S.busActBtn} onPress={() => setSelectedBus(bus)} activeOpacity={0.8}>
-                      <Ionicons name="eye-outline" size={13} color="#94A3B8" />
-                      <Text style={S.busActTxt}>Détails</Text>
-                    </TouchableOpacity>
-                    <View style={S.busActDiv} />
-                    <TouchableOpacity style={S.busActBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
-                      <Ionicons name="warning-outline" size={13} color={WARN} />
-                      <Text style={[S.busActTxt, { color: WARN }]}>Signaler</Text>
-                    </TouchableOpacity>
-                    {camOk && (
-                      <>
-                        <View style={S.busActDiv} />
-                        <TouchableOpacity style={S.busActBtn}
-                          onPress={() => trip && setCameraTrip(trip)} activeOpacity={0.8}>
-                          <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: OK,
-                            opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                          <Text style={[S.busActTxt, { color: OK }]}>Caméra</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                    {pendingAlt && (
-                      <>
-                        <View style={S.busActDiv} />
-                        <TouchableOpacity style={[S.busActBtn, { backgroundColor: `${CRIT}15` }]}
-                          onPress={() => setSelectedAlert(pendingAlt)} activeOpacity={0.8}>
-                          <Ionicons name="checkmark-circle-outline" size={13} color={CRIT} />
-                          <Text style={[S.busActTxt, { color: CRIT, fontWeight: "800" }]}>Traiter</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
                 </View>
               );
             }}
@@ -1723,11 +1808,18 @@ const S = StyleSheet.create({
   headerTitle:{ color: "#F1F5F9", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
   headerSub:  { color: "rgba(255,255,255,0.5)", fontSize: 11, marginTop: 1, letterSpacing: 0.3 },
 
-  /* KPI bar — dashboard numbers avec palette sémantique */
-  headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 16,
-                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
-                backgroundColor: "rgba(0,0,0,0.2)" },
-  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5, marginHorizontal: 2 },
+  /* ── Status bar opérationnel ────────────────────────────── */
+  statusBar:      { flexDirection: "row", borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
+                    backgroundColor: "rgba(0,0,0,0.25)" },
+  statusTile:     { flex: 1, alignItems: "center", paddingVertical: 13, gap: 5 },
+  statusTileAlert:{ backgroundColor: `${CRIT}10`, borderBottomWidth: 2, borderBottomColor: CRIT },
+  statusBigNum:   { fontSize: 34, fontWeight: "900", lineHeight: 38, letterSpacing: -1.5 },
+  statusNum:      { fontSize: 26, fontWeight: "900", lineHeight: 30, letterSpacing: -1, color: "#E2E8F0" },
+  statusLblRow:   { flexDirection: "row", alignItems: "center", gap: 4 },
+  statusLbl:      { fontSize: 8, fontWeight: "800", letterSpacing: 1.2, color: "#374151" },
+  statusDiv:      { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 8 },
+  /* Garde les anciens noms pour compat interne */
+  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5 },
   kpiNum:     { color: "#F1F5F9", fontSize: 30, fontWeight: "900", lineHeight: 34, letterSpacing: -1 },
   kpiLbl:     { color: "rgba(255,255,255,0.35)", fontSize: 8, fontWeight: "700", letterSpacing: 1.2 },
   kpiRow:     { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -2043,6 +2135,34 @@ const S = StyleSheet.create({
                      ...(Platform.OS === "web"
                        ? { boxShadow: "0 2px 12px rgba(0,0,0,0.35)" }
                        : { elevation: 4, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 8 }) },
+  /* Carte critique — teinte rouge subtile + ombre plus forte */
+  busCardCritical: { backgroundColor: "#130812",
+                     ...(Platform.OS === "web"
+                       ? { boxShadow: `0 0 0 1px ${CRIT}28, 0 4px 20px rgba(239,68,68,0.15)` }
+                       : { elevation: 6, shadowColor: CRIT, shadowOpacity: 0.25, shadowRadius: 12 }) },
+  /* Bandeau de tête critique */
+  critBand:        { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2,
+                     paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: `${CRIT}25` },
+  critDot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: CRIT, flexShrink: 0 },
+  critLabel:       { flex: 1, fontSize: 10, fontWeight: "900", color: CRIT, letterSpacing: 1.2 },
+  /* Étape flux opérationnel */
+  flowStep:        { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4,
+                     borderWidth: 1, flexShrink: 0 },
+  flowStepTxt:     { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  /* Bouton TRAITER — prioritaire, pleine largeur */
+  critTraiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                     backgroundColor: CRIT, borderRadius: 10, paddingVertical: 13,
+                     ...(Platform.OS === "web"
+                       ? { boxShadow: `0 4px 14px ${CRIT}50` }
+                       : { elevation: 4, shadowColor: CRIT, shadowOpacity: 0.4, shadowRadius: 8 }) },
+  critTraiterTxt:  { color: "#fff", fontSize: 14, fontWeight: "900", letterSpacing: 0.4 },
+  /* Boutons secondaires — discrètes, en ligne */
+  secBtn:          { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                     gap: 5, paddingVertical: 9, borderRadius: 9,
+                     backgroundColor: "rgba(255,255,255,0.04)",
+                     borderWidth: 1, borderColor: BDR },
+  secBtnTxt:       { fontSize: 11, fontWeight: "700", color: "#64748B" },
+
   busCardIcon:     { width: 36, height: 36, borderRadius: 10,
                      justifyContent: "center", alignItems: "center",
                      borderWidth: 1, flexShrink: 0 },

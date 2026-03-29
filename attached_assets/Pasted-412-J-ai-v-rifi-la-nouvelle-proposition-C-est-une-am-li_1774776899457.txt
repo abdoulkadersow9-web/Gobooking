@@ -1,0 +1,123 @@
+412"}
+J’ai vérifié la nouvelle proposition.
+
+C’est une amélioration, mais ce n’est toujours pas au niveau attendu pour un système de supervision professionnel.
+
+On ne veut pas une simple interface lisible.
+On veut un véritable CENTRE DE CONTRÔLE.
+
+---
+
+PROBLÈMES ACTUELS :
+
+- L’interface reste orientée “affichage”
+- Pas assez orientée “prise de décision rapide”
+- Pas de hiérarchie visuelle forte entre critique / normal
+- Impossible de comprendre l’état global en 1 seconde
+
+---
+
+CORRECTIONS OBLIGATOIRES :
+
+1. PRIORITÉ VISUELLE (CRITIQUE)
+
+- Les bus en alerte doivent être :
+  → toujours en haut
+  → visuellement dominants
+  → avec bordure rouge + animation légère
+
+- Les bus normaux doivent être visuellement discrets
+
+Objectif :
+→ voir immédiatement les problèmes sans lire
+
+---
+
+2. MODE “LECTURE RAPIDE”
+
+Chaque carte doit être compréhensible en moins de 2 secondes :
+
+- statut clair (OK / ALERTE / RETARD)
+- vitesse actuelle
+- limite autorisée
+- indicateur visuel simple
+
+Pas de surcharge inutile.
+
+---
+
+3. MODE SUPERVISION
+
+Ajouter un résumé global en haut :
+
+- nombre de bus actifs
+- nombre d’alertes
+- nombre de trajets OK
+
+C’est obligatoire pour un centre de contrôle.
+
+---
+
+4. ACTIONS CRITIQUES PRIORITAIRES
+
+Les boutons doivent être hiérarchisés :
+
+- TRAITER (prioritaire, visible en rouge si alerte)
+- CONTACTER
+- DÉTAILS
+
+Pas tous au même niveau visuel.
+
+---
+
+5. ALERTES = ÉVÉNEMENTS CRITIQUES
+
+Une alerte doit être :
+
+- visible immédiatement
+- impossible à ignorer
+- liée à une action obligatoire
+
+Pas juste un badge discret.
+
+---
+
+6. FLUX OPÉRATIONNEL (IMPORTANT)
+
+Interface doit refléter le flux réel :
+
+- alerte déclenchée
+- réponse agent routier
+- validation agent suivi
+
+Chaque étape doit être visible clairement.
+
+---
+
+7. OBJECTIF FINAL
+
+On construit un outil utilisé en conditions réelles :
+
+- supervision transport en temps réel
+- sécurité
+- gestion d’incidents
+
+Ce n’est pas une UI classique.
+
+---
+
+IMPORTANT :
+
+Ne pas casser la logique backend existante.
+
+Améliorer uniquement :
+- hiérarchie visuelle
+- priorisation
+- clarté opérationnelle
+
+---
+
+On doit atteindre un niveau comparable à :
+un dashboard de sécurité ou de contrôle trafic.
+
+Revoir l’interface avec cet obje
