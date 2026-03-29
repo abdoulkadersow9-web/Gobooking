@@ -905,6 +905,7 @@ export default function SuiviScreen() {
   type LiveCamData = { frames: number; signal: number };
   const [liveFrames, setLiveFrames] = useState<Record<string, LiveCamData>>({});
   const [syncSec,    setSyncSec]    = useState(0);
+  const [liveTime,   setLiveTime]   = useState(() => new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 
   const activeCamTrips = useMemo(
     () => data?.trips?.filter(t => t.cameraStatus === "connected" && !!t.cameraStreamUrl) ?? [],
@@ -1005,6 +1006,14 @@ export default function SuiviScreen() {
     const iv = setInterval(() => setSyncSec(s => s + 1), 1000);
     return () => clearInterval(iv);
   }, [lastSync]);
+
+  /* ── Live clock (HH:MM:SS) ── */
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setLiveTime(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   /* ── Simulated frame counter for connected camera trips (1s for fluidity) ── */
   useEffect(() => {
@@ -1275,22 +1284,23 @@ export default function SuiviScreen() {
               <Ionicons name="pulse" size={20} color={OK} />
             </View>
             <View style={{ flex: 1, overflow: "hidden" }}>
-              <Text style={S.headerTitle} numberOfLines={1}>{user?.name ?? "Agent Suivi"}</Text>
+              <Text style={S.headerTitle} numberOfLines={1}>Centre de Contrôle</Text>
               <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
                 <Animated.View style={{ width:5, height:5, borderRadius:3,
-                  backgroundColor: OK,
+                  backgroundColor: hasAlerts ? CRIT : OK,
                   opacity: pulseAnim.interpolate({ inputRange:[1,1.04], outputRange:[1,0.1] }) }} />
-                <Text style={S.headerSub}>SYSTÈME EN LIGNE · {new Date().toLocaleDateString("fr-FR")}</Text>
+                <Text style={[S.headerSub, hasAlerts && { color: "#F87171" }]}>
+                  {hasAlerts ? `${alertCount} ALERTE${alertCount > 1 ? "S" : ""} ACTIVE${alertCount > 1 ? "S" : ""}` : "SYSTÈME EN LIGNE"}
+                </Text>
               </View>
             </View>
           </View>
           <View style={S.headerRight}>
-            {lastSync && (
-              <View style={S.syncPill}>
-                <View style={S.syncDot} />
-                <Text style={S.syncTxt}>{syncLabel}</Text>
-              </View>
-            )}
+            {/* Horloge temps réel */}
+            <View style={S.clockPill}>
+              <Ionicons name="time-outline" size={11} color="#475569" />
+              <Text style={S.clockTxt}>{liveTime}</Text>
+            </View>
             {hasAlerts && (
               <TouchableOpacity onPress={() => setSoundMuted(m => !m)} style={[S.iconBtn,
                 soundMuted && { backgroundColor: "rgba(239,68,68,0.2)", borderColor: "rgba(239,68,68,0.3)" }]}>
@@ -1417,120 +1427,95 @@ export default function SuiviScreen() {
         >
 
           {/* ══════════════════════════════════════════════════════════════
-              ZONE 2 — MODE FOCUS ALERTE
-              Une seule alerte en grand. Flotte effacée derrière.
+              ZONE 2 — TOUTES LES ALERTES ACTIVES (si présentes)
               ══════════════════════════════════════════════════════════════ */}
           {hasAlerts && (() => {
-            /* Alerte la plus critique : new > waiting > validate */
             const rank = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
             const sorted = [...mergedAlerts].sort((a, b) => rank(a) - rank(b));
-            const top = sorted[0];
-            if (!top) return null;
-            const flowStep  = top.response ? "validate" : top.responseRequested ? "waiting" : "new";
-            const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
-            const stepLabel = flowStep === "validate" ? "Réponse reçue"
-                            : flowStep === "waiting"  ? "En attente de réponse"
-                            :                           "Action requise";
-            const btnLabel  = flowStep === "validate" ? "VALIDER ET CLORE" : "TRAITER L'ALERTE";
-            const others    = sorted.slice(1);
-            /* Caméra du bus en alerte — double matching: busId puis busName */
-            const alertTrip  = data?.trips.find(t =>
-              (top.busId && t.busId === top.busId) ||
-              (top.busName && t.busName === top.busName)
-            );
-            const alertCamOk = !!(alertTrip?.cameraStatus === "connected" && alertTrip?.cameraStreamUrl);
-            const alertLive  = alertTrip ? liveFrames[alertTrip.id] : undefined;
             return (
               <View style={S.focusZone}>
-
-                {/* ── Carte principale ─────────────────────── */}
-                <View style={[S.focusCard, { borderColor: `${stepColor}50` }]}>
-
-                  {/* En-tête : étape + heure */}
-                  <View style={S.focusCardTopRow}>
-                    <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
-                      backgroundColor: stepColor, transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
-                    <Text style={[S.focusCardStepTxt, { color: stepColor }]}>{stepLabel}</Text>
-                    <Text style={S.focusCardTime}>
-                      {new Date(top.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                    </Text>
-                  </View>
-
-                  {/* Identité + message */}
-                  <View style={S.focusCardBody}>
-                    <Text style={S.focusCardBus}>{top.busName}</Text>
-                    <Text style={S.focusCardMsg}>{top.message}</Text>
-                  </View>
-
-                  {/* ── CAMÉRA LIVE — intégrée dans la carte si disponible ── */}
-                  {alertCamOk && alertTrip && (
-                    <View style={S.focusCamWrap}>
-                      {/* Bandeau "LIVE" */}
-                      <View style={S.focusCamBar}>
-                        <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
-                          backgroundColor: "#EF4444",
-                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.15] }) }} />
-                        <Text style={S.focusCamBarTxt}>CAMÉRA LIVE</Text>
-                        <View style={{ flex: 1 }} />
-                        <Text style={S.focusCamRoute} numberOfLines={1}>
-                          {alertTrip.from} → {alertTrip.to}
-                        </Text>
-                      </View>
-                      {/* Flux vidéo — tappable pour ouvrir vue plein écran */}
-                      <TouchableOpacity
-                        onPress={() => setCameraTrip(alertTrip)}
-                        activeOpacity={0.9}
-                      >
-                        <View style={{ height: 160, backgroundColor: "#060810", overflow: "hidden" }}>
-                          <LiveCamView
-                            signal={alertLive?.signal ?? 80}
-                            route={`${alertTrip.from} → ${alertTrip.to}`}
-                            busId={top.busId ?? alertTrip.busId ?? ""}
-                          />
-                        </View>
-                        {/* Overlay "Appuyer pour agrandir" */}
-                        <View style={S.focusCamOverlay}>
-                          <Ionicons name="expand-outline" size={16} color="rgba(255,255,255,0.7)" />
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Espace bas carte */}
-                  <View style={{ height: 4 }} />
+                {/* En-tête section alertes */}
+                <View style={S.alertsSectionHeader}>
+                  <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: CRIT,
+                    transform: [{ scale: pulseAnim }] }} />
+                  <Text style={S.alertsSectionTitle}>
+                    {alertCount} ALERTE{alertCount > 1 ? "S" : ""} ACTIVE{alertCount > 1 ? "S" : ""}
+                  </Text>
                 </View>
 
-                {/* ── Bouton TRAITER — seul élément d'action ── */}
-                <TouchableOpacity
-                  style={[S.focusTraiterBtn, { borderColor: stepColor }]}
-                  onPress={() => setSelectedAlert(top)}
-                  activeOpacity={0.88}
-                >
-                  <Ionicons
-                    name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"}
-                    size={22} color={stepColor}
-                  />
-                  <Text style={[S.focusTraiterTxt, { color: stepColor }]}>{btnLabel}</Text>
-                </TouchableOpacity>
+                {/* Une carte par alerte — toutes visibles */}
+                {sorted.map((alert) => {
+                  const flowStep  = alert.response ? "validate" : alert.responseRequested ? "waiting" : "new";
+                  const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
+                  const stepLabel = flowStep === "validate" ? "Réponse reçue"
+                                  : flowStep === "waiting"  ? "En attente"
+                                  :                           "Action requise";
+                  const btnLabel  = flowStep === "validate" ? "VALIDER" : "TRAITER";
+                  const aTrip     = data?.trips.find(t =>
+                    (alert.busId && t.busId === alert.busId) ||
+                    (alert.busName && t.busName === alert.busName)
+                  );
+                  const aCamOk    = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
+                  const aLive     = aTrip ? liveFrames[aTrip.id] : undefined;
+                  const timeAgo   = Math.round((Date.now() - new Date(alert.createdAt).getTime()) / 60000);
 
-                {/* ── Autres alertes en liste secondaire discrète ── */}
-                {others.length > 0 && (
-                  <View style={S.focusOtherList}>
-                    <Text style={S.focusOtherLabel}>
-                      {others.length} autre{others.length > 1 ? "s" : ""} alerte{others.length > 1 ? "s" : ""}
-                    </Text>
-                    {others.map(a => (
-                      <TouchableOpacity key={a.id} style={S.focusOtherRow}
-                        onPress={() => setSelectedAlert(a)} activeOpacity={0.75}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3,
-                          backgroundColor: a.response ? OK : a.responseRequested ? WARN : CRIT, flexShrink: 0 }} />
-                        <Text style={S.focusOtherBus} numberOfLines={1}>{a.busName}</Text>
-                        <Text style={S.focusOtherMsg} numberOfLines={1}>{a.message}</Text>
-                        <Ionicons name="chevron-forward" size={11} color="#1E293B" />
+                  return (
+                    <View key={alert.id} style={[S.alertCard, { borderColor: `${stepColor}40` }]}>
+                      {/* En-tête alerte */}
+                      <View style={S.alertCardTop}>
+                        <Animated.View style={{ width: 7, height: 7, borderRadius: 4, flexShrink: 0,
+                          backgroundColor: stepColor,
+                          ...(flowStep === "new" ? { transform: [{ scale: pulseAnim }] } : {}) }} />
+                        <View style={[S.alertStepBadge, { backgroundColor: `${stepColor}18`, borderColor: `${stepColor}35` }]}>
+                          <Text style={[S.alertStepTxt, { color: stepColor }]}>{stepLabel}</Text>
+                        </View>
+                        <View style={{ flex: 1 }} />
+                        <Text style={S.alertTimeAgo}>{timeAgo < 1 ? "À l'instant" : `il y a ${timeAgo} min`}</Text>
+                      </View>
+
+                      {/* Bus + message */}
+                      <View style={S.alertCardBody}>
+                        <Text style={S.alertCardBus}>{alert.busName ?? "Bus inconnu"}</Text>
+                        <Text style={S.alertCardMsg}>{alert.message}</Text>
+                      </View>
+
+                      {/* Caméra intégrée si disponible */}
+                      {aCamOk && aTrip && (
+                        <TouchableOpacity onPress={() => setCameraTrip(aTrip)} activeOpacity={0.9}>
+                          <View style={S.alertCamBar}>
+                            <Animated.View style={{ width: 5, height: 5, borderRadius: 3,
+                              backgroundColor: CRIT,
+                              opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                            <Text style={S.alertCamLabel}>CAMÉRA LIVE</Text>
+                            <View style={{ flex: 1 }} />
+                            <Text style={S.alertCamRoute} numberOfLines={1}>{aTrip.from} → {aTrip.to}</Text>
+                            <Ionicons name="expand-outline" size={11} color="#374151" />
+                          </View>
+                          <View style={{ height: 150, overflow: "hidden", backgroundColor: "#060810" }}>
+                            <LiveCamView
+                              signal={aLive?.signal ?? 80}
+                              route={`${aTrip.from} → ${aTrip.to}`}
+                              busId={alert.busId ?? aTrip.busId ?? ""}
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      )}
+
+                      {/* Bouton traiter */}
+                      <TouchableOpacity
+                        style={[S.alertTraiterBtn, { borderColor: stepColor }]}
+                        onPress={() => setSelectedAlert(alert)}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"}
+                          size={18} color={stepColor}
+                        />
+                        <Text style={[S.alertTraiterTxt, { color: stepColor }]}>{btnLabel} L'ALERTE</Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
+                    </View>
+                  );
+                })}
               </View>
             );
           })()}
@@ -1584,11 +1569,12 @@ export default function SuiviScreen() {
                       ...(isCritical ? { transform: [{ scale: pulseAnim }] } : {}),
                     }} />
 
-                    {/* Nom + trajet */}
+                    {/* Nom + plaque + trajet */}
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={[S.busCardName, isCritical && { color: "#F1F5F9" }]} numberOfLines={1}>
                         {bus.busName}
                       </Text>
+                      <Text style={S.busCardPlateInline} numberOfLines={1}>{bus.plateNumber}</Text>
                       {trip && (
                         <Text style={S.busCardRoute} numberOfLines={1}>
                           {trip.from} → {trip.to}
@@ -1621,6 +1607,26 @@ export default function SuiviScreen() {
                     {/* Chevron */}
                     <Ionicons name="chevron-forward" size={14} color="#1E293B" style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
+
+                  {/* ── Barre d'occupation ── */}
+                  {trip && trip.seatCount && trip.passengerCount != null && (
+                    <View style={S.busCardOccRow}>
+                      <Ionicons name="people" size={10} color="#374151" />
+                      <Text style={S.busCardOccTxt}>
+                        {trip.passengerCount}/{trip.seatCount} PAX
+                      </Text>
+                      <View style={S.busCardOccBar}>
+                        <View style={[S.busCardOccFill, {
+                          width: `${Math.min(100, (trip.passengerCount / trip.seatCount) * 100)}%` as any,
+                          backgroundColor: trip.passengerCount / trip.seatCount > 0.9 ? CRIT
+                            : trip.passengerCount / trip.seatCount > 0.7 ? WARN : OK,
+                        }]} />
+                      </View>
+                      <Text style={S.busCardOccPct}>
+                        {Math.round((trip.passengerCount / trip.seatCount) * 100)}%
+                      </Text>
+                    </View>
+                  )}
 
                   {/* ── Badge alerte active ── */}
                   {isCritical && busAlerts[0] && (
@@ -2135,6 +2141,55 @@ const S = StyleSheet.create({
                         ? {}
                         : { elevation: 2, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6 }) },
   focusTraiterTxt:  { fontSize: 17, fontWeight: "900", letterSpacing: 0.4 },
+
+  /* ── Horloge header ── */
+  clockPill:        { flexDirection: "row", alignItems: "center", gap: 4,
+                      backgroundColor: "rgba(255,255,255,0.05)",
+                      borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+                      borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
+  clockTxt:         { fontSize: 12, fontWeight: "900", color: "#CBD5E1", letterSpacing: 0.5,
+                      fontVariant: ["tabular-nums"] as any },
+
+  /* ── Zone 2 : section alertes ── */
+  alertsSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8,
+                          marginBottom: 10 },
+  alertsSectionTitle:  { fontSize: 11, fontWeight: "900", color: CRIT, letterSpacing: 1.2,
+                          textTransform: "uppercase" as any },
+
+  /* Carte alerte individuelle */
+  alertCard:        { backgroundColor: "#080C14", borderRadius: 16, borderWidth: 1,
+                      overflow: "hidden", marginBottom: 12,
+                      ...(Platform.OS === "web"
+                        ? { boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }
+                        : { elevation: 6, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 12 }) },
+  alertCardTop:     { flexDirection: "row", alignItems: "center", gap: 8,
+                      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  alertStepBadge:   { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  alertStepTxt:     { fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
+  alertTimeAgo:     { fontSize: 10, color: "#374151", fontWeight: "600" },
+  alertCardBody:    { paddingHorizontal: 16, paddingBottom: 14, gap: 4 },
+  alertCardBus:     { fontSize: 19, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.4 },
+  alertCardMsg:     { fontSize: 13, color: "#64748B", fontWeight: "600", lineHeight: 18 },
+  alertCamBar:      { flexDirection: "row", alignItems: "center", gap: 7,
+                      paddingHorizontal: 14, paddingVertical: 8,
+                      backgroundColor: "rgba(0,0,0,0.4)",
+                      borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
+  alertCamLabel:    { fontSize: 9, fontWeight: "900", color: "#EF4444", letterSpacing: 1.2 },
+  alertCamRoute:    { fontSize: 9, color: "#374151", fontWeight: "600", flexShrink: 1 },
+  alertTraiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                      margin: 12, marginTop: 10, paddingVertical: 12,
+                      backgroundColor: "#080C14", borderRadius: 10, borderWidth: 1.5 },
+  alertTraiterTxt:  { fontSize: 14, fontWeight: "900", letterSpacing: 0.4 },
+
+  /* ── Bus card extras ── */
+  busCardPlateInline: { fontSize: 9, fontWeight: "700", color: "#374151", letterSpacing: 0.5 },
+  busCardOccRow:    { flexDirection: "row", alignItems: "center", gap: 6,
+                      paddingHorizontal: 14, paddingBottom: 10 },
+  busCardOccTxt:    { fontSize: 10, fontWeight: "700", color: "#374151", minWidth: 60 },
+  busCardOccBar:    { flex: 1, height: 3, backgroundColor: "rgba(255,255,255,0.06)",
+                      borderRadius: 2, overflow: "hidden" },
+  busCardOccFill:   { height: 3, borderRadius: 2 },
+  busCardOccPct:    { fontSize: 9, fontWeight: "800", color: "#374151", minWidth: 28, textAlign: "right" as any },
 
   /* Caméra intégrée dans la carte alerte */
   focusCamWrap:     { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
