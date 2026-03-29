@@ -500,15 +500,6 @@ export default function TicketsScreen() {
     if (activeTab === "impression") fetchImpTrips();
   }, [activeTab]);
 
-  /* ── Auto-fetch + ouverture plan plein écran quand trajet sélectionné ── */
-  useEffect(() => {
-    if (selectedTrip) {
-      setSeatMapData([]);
-      fetchSeatMap(selectedTrip.id);
-      setShowBusPlan(true);
-    }
-  }, [selectedTrip?.id]);
-
   /* ── Polling seat map (15s) when plan is visible ── */
   useEffect(() => {
     if (!showSeatMap || !selectedTrip) return;
@@ -816,7 +807,20 @@ export default function TicketsScreen() {
                 {trips.map(trip => (
                   <TouchableOpacity key={trip.id}
                     style={[S.tripItem, selectedTrip?.id === trip.id && S.tripItemSel]}
-                    onPress={() => setSelectedTrip(trip)}
+                    onPress={() => {
+                      setSelectedTrip(trip);
+                      router.push({
+                        pathname: "/agent/seat-plan/[tripId]" as any,
+                        params: {
+                          tripId:  trip.id,
+                          from:    trip.from,
+                          to:      trip.to,
+                          date:    trip.date,
+                          time:    trip.departureTime,
+                          busType: trip.busType ?? "",
+                        },
+                      });
+                    }}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={S.tripRoute}>{trip.from} → {trip.to}</Text>
