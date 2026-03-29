@@ -295,6 +295,127 @@ function CameraPlayer({
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   LIVE CAM VIEW — Simulation vidéo animée style monitoring
+   ══════════════════════════════════════════════════════════════════ */
+function LiveCamView({
+  signal, route, busId,
+}: {
+  signal: number; route: string; busId: string;
+}) {
+  const scanAnim  = useRef(new Animated.Value(0)).current;
+  const [ts,     setTs]     = useState(() => new Date().toLocaleTimeString("fr-FR"));
+  const [coords, setCoords] = useState(() => ({
+    lat: (5.35 + Math.random() * 0.08).toFixed(4),
+    lon: (3.95 + Math.random() * 0.06).toFixed(4),
+  }));
+  const [speed,  setSpeed]  = useState(() => 65 + Math.floor(Math.random() * 30));
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanAnim, { toValue: 1, duration: 2600, useNativeDriver: true, easing: Easing.linear }),
+        Animated.timing(scanAnim, { toValue: 0, duration: 0,    useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+
+    const tInterval = setInterval(() => {
+      setTs(new Date().toLocaleTimeString("fr-FR"));
+    }, 1000);
+
+    const dataInterval = setInterval(() => {
+      setCoords(c => ({
+        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.0012).toFixed(4),
+        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.0008).toFixed(4),
+      }));
+      setSpeed(s => Math.max(40, Math.min(110, s + Math.floor((Math.random() - 0.45) * 8))));
+    }, 2200);
+
+    return () => { loop.stop(); clearInterval(tInterval); clearInterval(dataInterval); };
+  }, [busId]);
+
+  const sigBars  = Math.max(1, Math.ceil((signal / 100) * 4));
+  const sigColor = signal >= 75 ? CAM_GR : signal >= 50 ? "#FCD34D" : "#EF4444";
+  const CARD_H   = 90;
+
+  return (
+    <View style={{ height: CARD_H, backgroundColor: "#010508", overflow: "hidden" }}>
+      {/* Static horizontal scan lines (CRT effect) */}
+      {Array.from({ length: 9 }).map((_, i) => (
+        <View key={i} style={{
+          position: "absolute", left: 0, right: 0,
+          top: 10 + i * 9, height: 1,
+          backgroundColor: "rgba(34,197,94,0.035)",
+        }} />
+      ))}
+
+      {/* Moving scan line */}
+      <Animated.View style={{
+        position: "absolute", left: 0, right: 0, height: 2,
+        backgroundColor: "rgba(34,197,94,0.5)",
+        transform: [{ translateY: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CARD_H] }) }],
+        ...(Platform.OS === "web" ? { boxShadow: "0 0 6px rgba(34,197,94,0.7)" } : {}),
+      }} />
+
+      {/* Corner brackets */}
+      {/* TL */}
+      <View style={{ position:"absolute", top:5, left:6, width:10, height:10,
+        borderTopWidth:1.5, borderLeftWidth:1.5, borderColor: CAM_GR }} />
+      {/* TR */}
+      <View style={{ position:"absolute", top:5, right:6, width:10, height:10,
+        borderTopWidth:1.5, borderRightWidth:1.5, borderColor: CAM_GR }} />
+      {/* BL */}
+      <View style={{ position:"absolute", bottom:5, left:6, width:10, height:10,
+        borderBottomWidth:1.5, borderLeftWidth:1.5, borderColor: CAM_GR }} />
+      {/* BR */}
+      <View style={{ position:"absolute", bottom:5, right:6, width:10, height:10,
+        borderBottomWidth:1.5, borderRightWidth:1.5, borderColor: CAM_GR }} />
+
+      {/* Top overlay: GPS + speed */}
+      <View style={{ position:"absolute", top:7, left:18, right:18,
+        flexDirection:"row", justifyContent:"space-between", alignItems:"center" }}>
+        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.3, opacity:0.9 }}>
+          {coords.lat}°N {coords.lon}°W
+        </Text>
+        <Text style={{ color:"#FCD34D", fontSize:7, fontWeight:"900" }}>{speed}km/h</Text>
+      </View>
+
+      {/* Center crosshair */}
+      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:0,
+        justifyContent:"center", alignItems:"center" }}>
+        <View style={{ position:"absolute", width:18, height:1,
+          backgroundColor:"rgba(34,197,94,0.45)" }} />
+        <View style={{ position:"absolute", width:1, height:18,
+          backgroundColor:"rgba(34,197,94,0.45)" }} />
+        <View style={{ width:4, height:4, borderRadius:2,
+          borderWidth:1, borderColor:"rgba(34,197,94,0.6)" }} />
+      </View>
+
+      {/* Signal bars (right side, vertical center) */}
+      <View style={{ position:"absolute", right:18, bottom:22,
+        flexDirection:"row", alignItems:"flex-end", gap:1.5 }}>
+        {[1,2,3,4].map(b => (
+          <View key={b} style={{ width:2.5, height:3 + b * 2.5, borderRadius:1,
+            backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.08)" }} />
+        ))}
+      </View>
+
+      {/* Bottom overlay: route + timestamp */}
+      <View style={{ position:"absolute", bottom:0, left:0, right:0,
+        backgroundColor:"rgba(0,0,0,0.72)", paddingHorizontal:10, paddingVertical:4,
+        flexDirection:"row", justifyContent:"space-between" }}>
+        <Text style={{ color:"rgba(255,255,255,0.45)", fontSize:6.5, fontWeight:"600" }} numberOfLines={1}>
+          {route}
+        </Text>
+        <Text style={{ color:"rgba(34,197,94,0.85)", fontSize:6.5, fontWeight:"700", letterSpacing:0.3 }}>
+          {ts}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 /* ── Camera status pill ─────────────────────────────────────────── */
 function CamPill({ trip, onView }: { trip: TripItem; onView: () => void }) {
   const isConnected = trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
@@ -825,34 +946,27 @@ export default function SuiviScreen() {
                   return (
                     <TouchableOpacity key={bus.id} style={S.camStripCard}
                       onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
-                      <View style={S.camStripMonitor}>
-                        {/* Badge row */}
-                        <View style={S.camStripBadgeRow}>
-                          <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
-                            backgroundColor: "#EF4444",
-                            opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.1] }) }} />
-                          <Text style={S.camStripRec}>REC</Text>
-                          <View style={S.camStripLiveBadge}><Text style={S.camStripLiveTxt}>LIVE</Text></View>
-                          <View style={{ flex: 1 }} />
-                          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 1.5 }}>
-                            {[1,2,3,4].map(b => (
-                              <View key={b} style={{ width: 2.5, height: 3 + b * 2, borderRadius: 1,
-                                backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.12)" }} />
-                            ))}
-                          </View>
-                        </View>
-                        {/* Icon */}
-                        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                          <Ionicons name="videocam" size={22} color={CAM_GR} style={{ opacity: 0.65 }} />
-                        </View>
-                        {/* Footer */}
-                        <View style={S.camStripFooter}>
-                          <Text style={S.camStripBusName} numberOfLines={1}>{bus.busName}</Text>
-                          <Text style={S.camStripRoute} numberOfLines={1}>{trip.from}→{trip.to}</Text>
-                        </View>
+                      {/* REC/LIVE badge row — above the live view */}
+                      <View style={S.camStripBadgeRow}>
+                        <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
+                          backgroundColor: "#EF4444",
+                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.08] }) }} />
+                        <Text style={S.camStripRec}>REC</Text>
+                        <View style={S.camStripLiveBadge}><Text style={S.camStripLiveTxt}>LIVE</Text></View>
+                        <View style={{ flex: 1 }} />
+                        <Text style={{ color: "#475569", fontSize: 7, fontWeight: "700" }} numberOfLines={1}>
+                          {bus.busName}
+                        </Text>
                       </View>
+                      {/* Animated live camera simulation */}
+                      <LiveCamView
+                        signal={liveCam?.signal ?? 85}
+                        route={`${trip.from}→${trip.to}`}
+                        busId={bus.id}
+                      />
+                      {/* Watch button */}
                       <View style={S.camStripBtn}>
-                        <Text style={S.camStripBtnTxt}>▶ VOIR</Text>
+                        <Text style={S.camStripBtnTxt}>▶ VISIONNER EN DIRECT</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -938,7 +1052,7 @@ const CP = StyleSheet.create({
 
 /* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#C8D3DF" },
+  safe: { flex: 1, backgroundColor: "#080C14" },
 
   /* ── Header ─────────────────────────────────────────────────── */
   header:     { backgroundColor: RED_D },
@@ -1268,24 +1382,27 @@ const S = StyleSheet.create({
   /* ── GRILLE BUS 2 COLONNES ───────────────────────────────────── */
   gridContent:    { padding: 10, gap: 8 },
   gridRow:        { gap: 8 },
-  gridCard:       { flex: 1, backgroundColor: "#fff", borderRadius: 14,
+  gridCard:       { flex: 1, backgroundColor: "#111827", borderRadius: 14,
                     padding: 12, gap: 7, borderLeftWidth: 4,
+                    borderWidth: 1, borderColor: "#1E293B",
                     ...(Platform.OS === "web"
-                      ? { boxShadow: "0 3px 12px rgba(0,0,0,0.11)" }
-                      : { shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10,
-                          shadowOffset: { width: 0, height: 3 }, elevation: 4 }) },
-  gridCardName:   { fontSize: 14, fontWeight: "900", color: "#0F172A", letterSpacing: -0.3 },
+                      ? { boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }
+                      : { shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12,
+                          shadowOffset: { width: 0, height: 4 }, elevation: 6 }) },
+  gridCardName:   { fontSize: 14, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.3 },
   gridStatusChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 7,
-                    paddingHorizontal: 7, paddingVertical: 4, alignSelf: "flex-start" },
+                    paddingHorizontal: 7, paddingVertical: 4, alignSelf: "flex-start",
+                    backgroundColor: "rgba(255,255,255,0.07)" },
   gridStatusTxt:  { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
-  gridRoute:      { fontSize: 11, color: "#475569", fontWeight: "600" },
+  gridRoute:      { fontSize: 11, color: "#64748B", fontWeight: "600" },
   gridOccWrap:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  gridOccBar:     { flex: 1, height: 6, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" },
+  gridOccBar:     { flex: 1, height: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" },
   gridOccFill:    { height: 6, borderRadius: 4 },
   gridOccPct:     { fontSize: 10, fontWeight: "900", flexShrink: 0 },
   gridAlertRow:   { flexDirection: "row", alignItems: "center", gap: 5,
-                    backgroundColor: "#FFF1F2", borderRadius: 6,
-                    paddingHorizontal: 7, paddingVertical: 4 },
+                    backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 6,
+                    paddingHorizontal: 7, paddingVertical: 4,
+                    borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" },
   gridAlertTxt:   { flex: 1, fontSize: 10, color: RED, fontWeight: "700" },
   gridCamDot:     { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 2 },
   gridCamTxt:     { fontSize: 8, color: CAM_GR, fontWeight: "900", letterSpacing: 1 },
@@ -1297,17 +1414,20 @@ const S = StyleSheet.create({
   camStripTitle:  { flex: 1, color: "#64748B", fontSize: 9, fontWeight: "900", letterSpacing: 2 },
   camStripCount:  { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
   camStripScroll: { paddingHorizontal: 10, paddingBottom: 10, gap: 8 },
-  camStripCard:   { width: 130, borderRadius: 10, overflow: "hidden",
-                    backgroundColor: "#0F172A", borderWidth: 1, borderColor: "#1E293B" },
-  camStripMonitor:{ height: 100, padding: 8, gap: 2 },
-  camStripBadgeRow:{ flexDirection: "row", alignItems: "center", gap: 4 },
+  camStripCard:   { width: 170, borderRadius: 10, overflow: "hidden",
+                    backgroundColor: "#060A12",
+                    borderWidth: 1, borderColor: "#162032" },
+  camStripMonitor:{ height: 90 },
+  camStripBadgeRow:{ flexDirection: "row", alignItems: "center", gap: 4,
+                    paddingHorizontal: 8, paddingVertical: 5,
+                    backgroundColor: "#0B1220", maxWidth: 170 },
   camStripRec:    { color: "#EF4444", fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
   camStripLiveBadge:{ backgroundColor: "#DC2626", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   camStripLiveTxt:{ color: "#fff", fontSize: 7, fontWeight: "900", letterSpacing: 0.8 },
   camStripFooter: { gap: 1 },
   camStripBusName:{ color: "#E2E8F0", fontSize: 10, fontWeight: "800" },
   camStripRoute:  { color: "#475569", fontSize: 9, fontWeight: "600" },
-  camStripBtn:    { backgroundColor: "#052E16", paddingVertical: 7, alignItems: "center",
+  camStripBtn:    { backgroundColor: "#071A0E", paddingVertical: 7, alignItems: "center",
                     borderTopWidth: 1, borderTopColor: "#166534" },
   camStripBtnTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
 });
