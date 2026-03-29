@@ -1,0 +1,85 @@
+J’ai vérifié les captures de la page Agent Suivi et Agent en route.
+
+Actuellement, l’interface n’est pas au niveau attendu.
+Ce n’est pas encore une tour de contrôle professionnelle.
+
+OBJECTIF IMMÉDIAT :
+Transformer cette page en véritable centre de supervision moderne, impressionnant et fluide.
+
+IMPORTANT :
+Ne rien casser dans la logique existante.
+Améliorer uniquement le rendu, la lisibilité et l’impact visuel.
+
+CORRECTIONS PRIORITAIRES :
+
+1. PROBLÈME MAJEUR — MANQUE D’IMPACT :
+- La page ne donne pas un effet “wow”
+- Ce n’est pas immersif
+- On doit ressentir un système critique (type tour de contrôle)
+
+À FAIRE :
+- Renforcer les contrastes
+- Donner plus de présence aux blocs importants
+- Hiérarchiser clairement les informations
+
+2. TRAJET — ERREUR GRAVE :
+- L’icône actuelle (avion) est incorrecte
+- Nous sommes dans le transport routier
+
+À FAIRE IMMÉDIATEMENT :
+- Remplacer l’icône avion par une icône BUS cohérente
+- Harmoniser toutes les icônes avec le contexte transport terrestre
+
+3. CARTES BUS (Agent Suivi) :
+Actuellement pas assez lisibles ni impactantes
+
+À AMÉLIORER :
+- Nom du trajet plus visible
+- Départ / arrivée plus clairs
+- Statut (EN ROUTE) plus visible
+- Barre de progression plus nette
+- Réduction du bruit visuel
+
+Chaque carte doit être compréhensible en 1 seconde
+
+4. ALERTES :
+- Elles ne dominent pas assez visuellement
+
+À FAIRE :
+- Couleurs plus fortes (rouge / orange)
+- Animation légère (pulse ou glow)
+- Mise en avant immédiate
+
+5. STRUCTURE “TOUR DE CONTRÔLE” :
+L’agent doit voir rapidement :
+- Combien de bus sont actifs
+- Où sont les problèmes
+- Quel bus nécessite une action
+
+À FAIRE :
+- Renforcer la zone KPI en haut
+- Donner une lecture globale instantanée
+
+6. CAMÉRAS :
+- Pas assez mises en valeur
+
+À FAIRE :
+- Badges LIVE très visibles
+- Bouton “Voir” plus accessible
+- Style plus “monitoring”
+
+7. FLUIDITÉ & DESIGN :
+- Les éléments semblent encore mélangés
+
+À FAIRE :
+- Alignements parfaits
+- Espacements réguliers
+- Suppression de tout effet “chargé”
+
+OBJECTIF FINAL :
+Une interface moderne, fluide, professionnelle, et impressionnante dès l’ouverture.
+
+PRIORITÉ :
+Impact visuel + clarté + cohérence métier (BUS, pas avion)
+
+On doit atteindre un niveau produit premium, prêt pour démonstration.

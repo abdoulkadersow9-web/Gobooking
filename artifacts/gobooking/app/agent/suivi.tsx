@@ -744,7 +744,7 @@ export default function SuiviScreen() {
           <View style={S.section}>
             <View style={S.sectionHeader}>
               <View style={[S.sectionIconBox, { backgroundColor: "#EEF2FF" }]}>
-                <Feather name="monitor" size={14} color="#4F46E5" />
+                <Feather name="monitor" size={16} color="#4F46E5" />
               </View>
               <Text style={S.sectionTitle}>Tour de contrôle</Text>
               <Text style={S.sectionCount}>{busCount} véhicule{busCount > 1 ? "s" : ""}</Text>
@@ -800,28 +800,29 @@ export default function SuiviScreen() {
                         </View>
                       </View>
 
-                      {/* Row 2: Route — flight-board style */}
+                      {/* Row 2: Route — bus style */}
                       {trip && (
                         <View style={S.ctRouteRow}>
-                          <View style={S.ctCityBox}>
-                            <Text style={S.ctCityCode}>{trip.from.slice(0, 3).toUpperCase()}</Text>
-                            <Text style={S.ctCityFull} numberOfLines={1}>{trip.from}</Text>
+                          <View style={S.ctRouteBusIcon}>
+                            <Ionicons name="bus" size={16} color="#3B82F6" />
                           </View>
-                          <View style={S.ctRouteArrow}>
-                            <View style={S.ctArrowLine} />
-                            <Ionicons name="airplane" size={14} color="#94A3B8" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={S.ctRouteLabel}>TRAJET</Text>
+                            <Text style={S.ctRouteFull} numberOfLines={1}>
+                              {trip.from} → {trip.to}
+                            </Text>
                           </View>
-                          <View style={[S.ctCityBox, { alignItems: "flex-end" }]}>
-                            <Text style={S.ctCityCode}>{trip.to.slice(0, 3).toUpperCase()}</Text>
-                            <Text style={S.ctCityFull} numberOfLines={1}>{trip.to}</Text>
-                          </View>
-                          <View style={S.ctTimesBox}>
-                            <Text style={S.ctDeptLbl}>DEP</Text>
-                            <Text style={S.ctDeptTime}>{trip.departureTime}</Text>
-                            {trip.etaTime && <>
-                              <Text style={S.ctDeptLbl}>ARR</Text>
-                              <Text style={[S.ctDeptTime, { color: "#7C3AED" }]}>{trip.etaTime}</Text>
-                            </>}
+                          <View style={{ alignItems: "flex-end", gap: 2 }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                              <Text style={S.ctDeptLbl}>DEP</Text>
+                              <Text style={S.ctDeptTime}>{trip.departureTime}</Text>
+                            </View>
+                            {trip.etaTime && (
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                <Text style={S.ctDeptLbl}>ARR</Text>
+                                <Text style={[S.ctDeptTime, { color: "#7C3AED" }]}>{trip.etaTime}</Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                       )}
@@ -893,7 +894,7 @@ export default function SuiviScreen() {
           <View style={S.section}>
             <View style={S.sectionHeader}>
               <View style={[S.sectionIconBox, { backgroundColor: "#F0FDF4" }]}>
-                <Ionicons name="videocam" size={14} color="#16A34A" />
+                <Ionicons name="videocam" size={16} color="#16A34A" />
               </View>
               <Text style={S.sectionTitle}>Caméras embarquées</Text>
               {hasCameras && (
@@ -1009,7 +1010,7 @@ export default function SuiviScreen() {
           <View style={S.section}>
             <View style={S.sectionHeader}>
               <View style={[S.sectionIconBox, { backgroundColor: hasAlerts ? RED_L : "#F0FDF4" }]}>
-                <Ionicons name="warning" size={14} color={hasAlerts ? RED : "#22C55E"} />
+                <Ionicons name="warning" size={16} color={hasAlerts ? RED : "#22C55E"} />
               </View>
               <Text style={S.sectionTitle}>Alertes actives</Text>
               {alertCount > 0 && (
@@ -1252,7 +1253,7 @@ const CP = StyleSheet.create({
 
 /* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEF2F7" },
+  safe: { flex: 1, backgroundColor: "#DDE4ED" },
 
   /* ── Header ─────────────────────────────────────────────────── */
   header:     { backgroundColor: RED_D },
@@ -1263,20 +1264,20 @@ const S = StyleSheet.create({
   headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.18)",
                 justifyContent: "center", alignItems: "center", flexShrink: 0,
                 borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  headerTitle:{ color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
-  headerSub:  { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1, letterSpacing: 0.2 },
+  headerTitle:{ color: "#fff", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
+  headerSub:  { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 1, letterSpacing: 0.3 },
 
   /* KPI bar — premium dashboard numbers */
-  headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 4, paddingBottom: 12,
-                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.07)",
-                backgroundColor: "rgba(0,0,0,0.18)" },
-  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 8, gap: 4,
-                borderBottomWidth: 2.5, borderBottomColor: "rgba(255,255,255,0.1)",
+  headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 14,
+                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.09)",
+                backgroundColor: "rgba(0,0,0,0.25)" },
+  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 10, gap: 5,
+                borderBottomWidth: 3, borderBottomColor: "rgba(255,255,255,0.1)",
                 marginHorizontal: 2 },
-  kpiNum:     { color: "#fff", fontSize: 28, fontWeight: "900", lineHeight: 32, letterSpacing: -1 },
-  kpiLbl:     { color: "rgba(255,255,255,0.42)", fontSize: 8, fontWeight: "800", letterSpacing: 1 },
+  kpiNum:     { color: "#fff", fontSize: 32, fontWeight: "900", lineHeight: 36, letterSpacing: -1.5 },
+  kpiLbl:     { color: "rgba(255,255,255,0.55)", fontSize: 8, fontWeight: "900", letterSpacing: 1.2 },
   kpiRow:     { flexDirection: "row", alignItems: "center", gap: 4 },
-  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 8 },
+  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 6 },
 
   syncPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
                 borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
@@ -1289,14 +1290,14 @@ const S = StyleSheet.create({
 
   /* Alarm bar — cinematic */
   alarmBar:        { flexDirection: "row", alignItems: "center", gap: 8,
-                     backgroundColor: "#991B1B", paddingHorizontal: 14, paddingVertical: 10,
-                     borderBottomWidth: 1, borderBottomColor: "#7F1D1D" },
-  alarmPulse:      { width: 9, height: 9, borderRadius: 5, backgroundColor: "#FCA5A5", flexShrink: 0 },
-  alarmBarTxt:     { color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.5 },
-  alarmBarBus:     { color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: "600", flex: 1 },
-  alarmUrgentBadge:{ backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 6,
-                     paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
-  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+                     backgroundColor: "#7F1D1D", paddingHorizontal: 16, paddingVertical: 12,
+                     borderBottomWidth: 2, borderBottomColor: "#991B1B" },
+  alarmPulse:      { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FCA5A5", flexShrink: 0 },
+  alarmBarTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.5 },
+  alarmBarBus:     { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700", flex: 1 },
+  alarmUrgentBadge:{ backgroundColor: "#DC2626", borderRadius: 7,
+                     paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#FCA5A5" },
+  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
 
   /* Center / Loading */
   center:     { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
@@ -1315,9 +1316,10 @@ const S = StyleSheet.create({
   /* Sections */
   section:      { gap: 12 },
   sectionHeader:{ flexDirection: "row", alignItems: "center", gap: 10 },
-  sectionIconBox:{ width: 32, height: 32, borderRadius: 10, justifyContent: "center", alignItems: "center" },
-  sectionTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A", letterSpacing: -0.3, flex: 1 },
-  sectionCount: { fontSize: 11, color: "#94A3B8", fontWeight: "700" },
+  sectionIconBox:{ width: 36, height: 36, borderRadius: 11, justifyContent: "center", alignItems: "center" },
+  sectionTitle: { fontSize: 16, fontWeight: "900", color: "#0F172A", letterSpacing: -0.4, flex: 1 },
+  sectionCount: { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4,
+                  fontSize: 11, color: "#64748B", fontWeight: "800" },
 
   /* Empty state */
   empty: { backgroundColor: "#fff", borderRadius: 18, padding: 32, alignItems: "center", gap: 12,
@@ -1326,48 +1328,46 @@ const S = StyleSheet.create({
              : { shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }) },
   emptyTxt: { color: "#94A3B8", fontSize: 13, fontWeight: "700" },
 
-  /* ── B. Bus cards — Aviation style ─────────────────────────────── */
+  /* ── B. Bus cards ─────────────────────────────────────────────── */
   ctCard:     { backgroundColor: "#fff", borderRadius: 18, overflow: "hidden",
                 ...(Platform.OS === "web"
-                  ? { boxShadow: "0 3px 16px rgba(0,0,0,0.09)" }
-                  : { shadowColor: "#000", shadowOpacity: 0.09, shadowRadius: 14,
-                      shadowOffset: { width: 0, height: 4 }, elevation: 5 }) },
+                  ? { boxShadow: "0 4px 20px rgba(0,0,0,0.11)" }
+                  : { shadowColor: "#000", shadowOpacity: 0.11, shadowRadius: 18,
+                      shadowOffset: { width: 0, height: 5 }, elevation: 6 }) },
   ctCardAlert:{ backgroundColor: "#FFFBFB" },
-  ctStrip:    { height: 4, width: "100%" },
+  ctStrip:    { height: 6, width: "100%" },
 
-  ctTop:      { flexDirection: "row", alignItems: "center", gap: 11 },
-  ctStatusIcon:{ width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  ctBusName:  { fontSize: 15, fontWeight: "800", color: "#0F172A", letterSpacing: -0.3 },
-  ctBusPlate: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontWeight: "600" },
+  ctTop:      { flexDirection: "row", alignItems: "center", gap: 12 },
+  ctStatusIcon:{ width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  ctBusName:  { fontSize: 16, fontWeight: "900", color: "#0F172A", letterSpacing: -0.4 },
+  ctBusPlate: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontWeight: "700" },
   ctAlertBadge:{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: RED,
-                 borderRadius: 8, paddingHorizontal: 7, paddingVertical: 4 },
+                 borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
   ctAlertBadgeTxt:{ fontSize: 10, fontWeight: "900", color: "#fff" },
   ctStatusPill:{ flexDirection: "row", alignItems: "center", gap: 5,
-                 paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9, borderWidth: 1 },
-  ctStatusTxt: { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+                 paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1.5 },
+  ctStatusTxt: { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
 
-  /* Route — flight board */
-  ctRouteRow:  { flexDirection: "row", alignItems: "center",
-                 backgroundColor: "#F8FAFC", borderRadius: 12,
-                 paddingHorizontal: 12, paddingVertical: 10,
-                 borderWidth: 1, borderColor: "#E2E8F0", gap: 8 },
-  ctCityBox:   { alignItems: "flex-start", minWidth: 60 },
-  ctCityCode:  { fontSize: 18, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 },
-  ctCityFull:  { fontSize: 9, color: "#94A3B8", fontWeight: "600", letterSpacing: 0.2 },
-  ctRouteArrow:{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  ctArrowLine: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
-  ctTimesBox:  { alignItems: "flex-end", gap: 1 },
-  ctDeptLbl:   { fontSize: 8, color: "#94A3B8", fontWeight: "800", letterSpacing: 0.8 },
-  ctDeptTime:  { fontSize: 11, fontWeight: "800", color: "#0F172A" },
+  /* Route — bus style */
+  ctRouteRow:    { flexDirection: "row", alignItems: "center",
+                   backgroundColor: "#EFF6FF", borderRadius: 12,
+                   paddingHorizontal: 12, paddingVertical: 11,
+                   borderWidth: 1, borderColor: "#BFDBFE", gap: 10 },
+  ctRouteBusIcon:{ width: 36, height: 36, borderRadius: 10, backgroundColor: "#DBEAFE",
+                   justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  ctRouteLabel:  { fontSize: 8, color: "#93C5FD", fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
+  ctRouteFull:   { fontSize: 14, fontWeight: "800", color: "#1E3A5F", letterSpacing: -0.3 },
+  ctDeptLbl:     { fontSize: 8, color: "#94A3B8", fontWeight: "800", letterSpacing: 0.8 },
+  ctDeptTime:    { fontSize: 12, fontWeight: "900", color: "#0F172A" },
 
   /* Occupancy */
-  ctOccSection: { gap: 6 },
+  ctOccSection: { gap: 7 },
   ctOccLabelRow:{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  ctPassNum:    { fontSize: 13, fontWeight: "800", color: "#0F172A" },
-  ctPassTotal:  { fontSize: 11, color: "#94A3B8", fontWeight: "500" },
-  ctOccBar:     { height: 8, backgroundColor: "#F1F5F9", borderRadius: 6, overflow: "hidden" },
-  ctOccFill:    { height: 8, borderRadius: 6 },
-  ctOccPct:     { fontSize: 12, fontWeight: "900" },
+  ctPassNum:    { fontSize: 14, fontWeight: "900", color: "#0F172A" },
+  ctPassTotal:  { fontSize: 11, color: "#94A3B8", fontWeight: "600" },
+  ctOccBar:     { height: 10, backgroundColor: "#F1F5F9", borderRadius: 8, overflow: "hidden" },
+  ctOccFill:    { height: 10, borderRadius: 8 },
+  ctOccPct:     { fontSize: 13, fontWeight: "900" },
 
   ctFooter:    { flexDirection: "row", alignItems: "center", gap: 7, flexWrap: "wrap" },
   ctCamBtn:    { flexDirection: "row", alignItems: "center", gap: 5,
