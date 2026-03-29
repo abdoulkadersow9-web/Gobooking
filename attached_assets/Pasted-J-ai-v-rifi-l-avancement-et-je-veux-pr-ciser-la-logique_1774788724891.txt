@@ -1,0 +1,202 @@
+J’ai vérifié l’avancement et je veux préciser la logique complète du module Agent Guichet.
+
+Ce module est critique et doit strictement respecter la logique métier déjà définie.
+
+---
+
+EXIGENCE PRINCIPALE :
+
+Toute la logique du système doit être respectée.
+
+Tous les paramétrages mis en place doivent être suivis.
+
+Aucune modification ne doit sortir de cette logique.
+
+---
+
+1. ACCÈS AU DÉPART
+
+Quand l’agent guichet ouvre un départ (ex : 07h00) :
+
+Il doit voir immédiatement :
+
+- les informations du trajet  
+- le bus  
+- le nombre total de places  
+- les places disponibles  
+- les places vendues  
+- les réservations en attente  
+
+---
+
+2. LISTE DES PASSAGERS (OBLIGATOIRE)
+
+Dans chaque départ, l’agent guichet doit voir :
+
+- la liste complète des passagers  
+- les passagers déjà payés  
+- les réservations non encore payées  
+
+Avec :
+
+- nom  
+- téléphone  
+- statut (payé / réservé / SP)  
+
+Cette liste doit être identique partout :
+
+- chef d’agence  
+- compagnie  
+- agent embarquement  
+- agent suivi  
+
+---
+
+3. GESTION DES PLACES
+
+L’agent guichet :
+
+- ne peut vendre que les places disponibles  
+- ne doit pas modifier les places vendues en ligne  
+
+Les places en ligne restent gérées par le système.
+
+Seul le chef d’agence peut débloquer une place.
+
+---
+
+4. VENTE DE TICKET EN GARE
+
+Quand l’agent clique sur une place :
+
+- il saisit les informations du client  
+- le ticket est généré automatiquement  
+- le passager est ajouté dans la liste  
+
+Même si le client n’a pas l’application :
+
+- ses informations doivent être enregistrées  
+- il devient un client du système  
+
+---
+
+5. RÉIMPRESSION DES TICKETS
+
+Dans la liste des passagers :
+
+- chaque passager doit avoir son ticket  
+- possibilité de réimprimer à tout moment  
+
+---
+
+6. ANNULATION (TRÈS IMPORTANT)
+
+Réservations en ligne :
+
+- non annulables directement  
+- transformées en BON  
+
+Tickets en gare :
+
+- annulables uniquement par :
+  - chef d’agence  
+  - ou compagnie  
+
+Quand annulé :
+
+- la place devient disponible  
+- le montant devient 0  
+- aucune suppression brute  
+
+---
+
+7. RÉSERVATIONS
+
+L’agent peut réserver des places non payées.
+
+Mais :
+
+- toutes les réservations sont annulées automatiquement 45 minutes avant le départ  
+
+---
+
+8. SP (SANS PAYER)
+
+Quand un ticket SP est créé :
+
+- la place est occupée  
+- le passager est visible  
+- montant = 0  
+- statut = SP  
+
+Visible partout dans le système.
+
+---
+
+9. SYNCHRONISATION (TRÈS IMPORTANT)
+
+Toutes les actions doivent être synchronisées automatiquement avec :
+
+- agent embarquement  
+- agent suivi  
+- chef d’agence  
+- compagnie  
+- admin  
+
+Même information partout, en temps réel.
+
+---
+
+10. LOGIQUE ET PARAMÉTRAGE (CRITIQUE)
+
+Toutes les modifications doivent respecter :
+
+- les paramétrages déjà définis  
+- la logique globale du système  
+
+Cela veut dire :
+
+- tout ce qui est fait doit suivre la logique existante  
+- toutes les données doivent correspondre aux paramétrages  
+- aucune logique parallèle ou isolée  
+
+Tout doit être intelligent et connecté.
+
+---
+
+11. COHÉRENCE GLOBALE DE L’APPLICATION
+
+L’application doit être au même niveau d’information partout.
+
+Cela veut dire :
+
+- les mêmes données visibles sur toutes les pages  
+- les mêmes informations pour tous les rôles  
+- aucune différence entre les écrans  
+
+Tout doit être :
+
+- en temps réel  
+- synchronisé  
+- cohérent  
+
+---
+
+OBJECTIF :
+
+Créer un système :
+
+- professionnel  
+- fiable  
+- rapide  
+- totalement connecté  
+
+---
+
+IMPORTANT :
+
+Ne rien casser.
+
+Respecter toute la logique existante.
+
+Toutes les améliorations doivent être intégrées dans le système actuel.
