@@ -677,10 +677,11 @@ router.post("/reservations", async (req, res) => {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
-    const { clientName, clientPhone, tripId, seatCount, paymentMethod, boardingCity, alightingCity, isSP } = req.body as {
+    const { clientName, clientPhone, tripId, seatCount, paymentMethod, boardingCity, alightingCity, isSP, isReservation, preferredSeatNumber } = req.body as {
       clientName: string; clientPhone: string; tripId: string;
       seatCount: number; paymentMethod: string;
       boardingCity?: string; alightingCity?: string; isSP?: boolean;
+      isReservation?: boolean; preferredSeatNumber?: string;
     };
 
     if (!clientName?.trim() || !tripId || !seatCount) {
@@ -740,21 +741,42 @@ router.post("/reservations", async (req, res) => {
       i === 0 ? { name: clientName.trim() } : { name: `Passager ${i + 1}` }
     );
 
-    // Auto-assigner des sièges disponibles
+    // Auto-assigner des sièges disponibles (ou siège spécifique si demandé)
     let assignedSeatIds: string[]    = [];
     let assignedSeatNumbers: string[] = [];
+    const seatStatus = isReservation ? "reserved" : "occupied";
     try {
-      const freeSeats = await db.execute(sql`
-        SELECT id, number FROM seats
-        WHERE trip_id = ${tripId} AND status = 'available'
-        ORDER BY "row", "column"
-        LIMIT ${count}
-      `);
-      assignedSeatIds    = (freeSeats.rows as any[]).map(s => s.id);
-      assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
+      if (preferredSeatNumber) {
+        // Siège spécifique demandé (depuis le plan des sièges)
+        const specificSeat = await db.execute(sql`
+          SELECT id, number FROM seats
+          WHERE trip_id = ${tripId} AND number = ${preferredSeatNumber} AND status = 'available'
+          LIMIT 1
+        `);
+        if (specificSeat.rows.length > 0) {
+          assignedSeatIds    = [(specificSeat.rows[0] as any).id];
+          assignedSeatNumbers = [(specificSeat.rows[0] as any).number];
+        } else {
+          // Siège non disponible → auto-assigner
+          const freeSeats = await db.execute(sql`
+            SELECT id, number FROM seats WHERE trip_id = ${tripId} AND status = 'available' ORDER BY "row","column" LIMIT ${count}
+          `);
+          assignedSeatIds    = (freeSeats.rows as any[]).map(s => s.id);
+          assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
+        }
+      } else {
+        const freeSeats = await db.execute(sql`
+          SELECT id, number FROM seats
+          WHERE trip_id = ${tripId} AND status = 'available'
+          ORDER BY "row", "column"
+          LIMIT ${count}
+        `);
+        assignedSeatIds    = (freeSeats.rows as any[]).map(s => s.id);
+        assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
+      }
       if (assignedSeatIds.length > 0) {
         await db.execute(sql`
-          UPDATE seats SET status = 'occupied'
+          UPDATE seats SET status = ${seatStatus}
           WHERE id = ANY(${assignedSeatIds}::text[])
         `);
       }
@@ -771,8 +793,8 @@ router.post("/reservations", async (req, res) => {
       seatNumbers:      assignedSeatNumbers,
       totalAmount:      amount,
       paymentMethod:    isSP ? "sp" : (paymentMethod || "cash"),
-      paymentStatus:    isSP ? "sp" : "paid",
-      status:           "confirmed",
+      paymentStatus:    isSP ? "sp" : (isReservation ? "pending" : "paid"),
+      status:           isReservation ? "reserved" : "confirmed",
       contactPhone:     clientPhone || "",
       contactEmail:     "",
       commissionAmount: Math.round(amount * 0.10),

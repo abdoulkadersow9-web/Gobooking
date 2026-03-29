@@ -216,6 +216,17 @@ export default function VenteScreen() {
   /* Passenger filter */
   const [passengerFilter, setPassengerFilter] = useState<"all" | "payé" | "réservé" | "sp">("all");
 
+  /* Seat map */
+  const [showSeatMap, setShowSeatMap]         = useState(false);
+  const [seatMapData, setSeatMapData]         = useState<any[]>([]);
+  const [loadingSeatMap, setLoadingSeatMap]   = useState(false);
+  const [clickedSeat, setClickedSeat]         = useState<any | null>(null);
+  const [seatActionType, setSeatActionType]   = useState<"vendre" | "réserver" | "sp">("vendre");
+  const [showSeatModal, setShowSeatModal]     = useState(false);
+  const [seatPaxName, setSeatPaxName]         = useState("");
+  const [seatPaxPhone, setSeatPaxPhone]       = useState("");
+  const [seatSubmitting, setSeatSubmitting]   = useState(false);
+
   /* ── Fetch trips list ── */
   const fetchTrips = useCallback(async () => {
     setLoadingTrips(true);
@@ -250,11 +261,24 @@ export default function VenteScreen() {
     }
   }, [token]);
 
+  /* ── Fetch seat map ── */
+  const fetchSeatMap = useCallback(async (tripId: string) => {
+    setLoadingSeatMap(true);
+    try {
+      const res = await apiFetch<any[]>(`/agent/seats/${tripId}`, { token: token ?? undefined });
+      setSeatMapData(Array.isArray(res) ? res : []);
+    } catch {
+      setSeatMapData([]);
+    } finally {
+      setLoadingSeatMap(false);
+    }
+  }, [token]);
+
   /* Auto-refresh on focus */
   useFocusEffect(useCallback(() => {
     fetchTrips();
-    if (selectedTrip) fetchDashboard(selectedTrip.id);
-  }, [fetchTrips, fetchDashboard, selectedTrip]));
+    if (selectedTrip) { fetchDashboard(selectedTrip.id); fetchSeatMap(selectedTrip.id); }
+  }, [fetchTrips, fetchDashboard, fetchSeatMap, selectedTrip]));
 
   /* ── Select trip → go to detail view ── */
   const selectTrip = (trip: Trip) => {
@@ -263,7 +287,9 @@ export default function VenteScreen() {
     setBoardingCity(cities[0] ?? "");
     setAlightingCity(cities[cities.length - 1] ?? "");
     setView("detail");
+    setShowSeatMap(false);
     fetchDashboard(trip.id);
+    fetchSeatMap(trip.id);
   };
 
   /* ── Open sale form ── */
@@ -424,6 +450,52 @@ export default function VenteScreen() {
         },
       ]
     );
+  };
+
+  /* ── Seat map click handler ── */
+  const handleSeatClick = (seat: any) => {
+    if (seat.status !== "available") return;
+    setClickedSeat(seat);
+    setSeatPaxName("");
+    setSeatPaxPhone("");
+    setSeatActionType("vendre");
+    setShowSeatModal(true);
+  };
+
+  /* ── Submit sale from seat modal ── */
+  const handleSeatSale = async () => {
+    if (!selectedTrip || !clickedSeat) return;
+    if (!seatPaxName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
+    const isSPAction = seatActionType === "sp";
+    const isResv     = seatActionType === "réserver";
+    setSeatSubmitting(true);
+    try {
+      const res = await apiFetch<any>("/agent/reservations", {
+        token: token ?? undefined,
+        method: "POST",
+        body: {
+          tripId:              selectedTrip.id,
+          clientName:          seatPaxName.trim(),
+          clientPhone:         seatPaxPhone.trim(),
+          seatCount:           1,
+          paymentMethod:       isSPAction ? "sp" : "cash",
+          boardingCity:        selectedTrip.fromCity ?? selectedTrip.from,
+          alightingCity:       selectedTrip.toCity   ?? selectedTrip.to,
+          isSP:                isSPAction,
+          isReservation:       isResv,
+          preferredSeatNumber: clickedSeat.number,
+        },
+      });
+      setShowSeatModal(false);
+      fetchDashboard(selectedTrip.id);
+      fetchSeatMap(selectedTrip.id);
+      const label = isSPAction ? "SP créé" : isResv ? "Réservé" : "Vendu";
+      Alert.alert("Succès", `Siège ${clickedSeat.number} — ${label}\nRéf: ${res.bookingRef ?? res.id}`);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de traiter la demande");
+    } finally {
+      setSeatSubmitting(false);
+    }
   };
 
   /* ── Access control ── */
@@ -625,7 +697,115 @@ export default function VenteScreen() {
             <Text style={s.newSaleBtnText}>Nouvelle vente / Billet SP</Text>
           </TouchableOpacity>
 
-          {/* ── Liste passagers ── */}
+          {/* ── Toggle Passagers / Plan sièges ── */}
+          <View style={s.viewToggleRow}>
+            <TouchableOpacity
+              style={[s.viewToggleBtn, !showSeatMap && s.viewToggleBtnActive]}
+              onPress={() => setShowSeatMap(false)}
+            >
+              <Ionicons name="people-outline" size={15} color={!showSeatMap ? G : "#9CA3AF"} />
+              <Text style={[s.viewToggleTxt, !showSeatMap && s.viewToggleTxtActive]}>
+                Passagers ({d?.totals.passengersCount ?? 0})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.viewToggleBtn, showSeatMap && s.viewToggleBtnActive]}
+              onPress={() => { setShowSeatMap(true); if (selectedTrip && seatMapData.length === 0) fetchSeatMap(selectedTrip.id); }}
+            >
+              <Ionicons name="grid-outline" size={15} color={showSeatMap ? G : "#9CA3AF"} />
+              <Text style={[s.viewToggleTxt, showSeatMap && s.viewToggleTxtActive]}>Plan sièges</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ── PLAN DES SIÈGES ── */}
+          {showSeatMap && (() => {
+            const spSeatNums = new Set<string>(
+              (d?.passengers ?? []).filter(p => p.status === "sp").flatMap(p => p.seatNumbers)
+            );
+            const rows = [...new Set(seatMapData.map(s => s.row))].sort((a, b) => a - b);
+            const seatByRowCol: Record<string, Record<number, any>> = {};
+            for (const seat of seatMapData) {
+              if (!seatByRowCol[seat.row]) seatByRowCol[seat.row] = {};
+              seatByRowCol[seat.row][seat.column] = seat;
+            }
+            const seatColor = (seat: any) => {
+              if (seat.status === "available") return { bg: G_LIGHT,  border: G,        text: G_DARK };
+              if (seat.status === "reserved")  return { bg: "#FEF3C7", border: "#D97706", text: "#92400E" };
+              if (spSeatNums.has(seat.number)) return { bg: "#EDE9FE", border: "#7C3AED", text: "#6D28D9" };
+              return { bg: "#FEE2E2", border: "#DC2626", text: "#991B1B" };
+            };
+            const maxCols = Math.max(...seatMapData.map(s => s.column), 0);
+            const midPoint = Math.ceil(maxCols / 2);
+            return (
+              <View style={s.card}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <Text style={s.cardTitle}><Ionicons name="grid-outline" size={15} color={G} /> Plan des sièges</Text>
+                  {loadingSeatMap && <ActivityIndicator color={G} size="small" />}
+                  <TouchableOpacity onPress={() => selectedTrip && fetchSeatMap(selectedTrip.id)} hitSlop={8}>
+                    <Ionicons name="refresh" size={18} color={G} />
+                  </TouchableOpacity>
+                </View>
+                {/* Legend */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                  {[
+                    { bg: G_LIGHT,   border: G,        text: "Disponible" },
+                    { bg: "#FEE2E2", border: "#DC2626", text: "Occupé" },
+                    { bg: "#FEF3C7", border: "#D97706", text: "Réservé" },
+                    { bg: "#EDE9FE", border: "#7C3AED", text: "SP" },
+                  ].map(item => (
+                    <View key={item.text} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: item.bg, borderWidth: 1.5, borderColor: item.border }} />
+                      <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.text}</Text>
+                    </View>
+                  ))}
+                </View>
+                {/* Driver row */}
+                <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
+                  <View style={{ backgroundColor: "#F3F4F6", borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="person" size={12} color="#6B7280" />
+                    <Text style={{ fontSize: 11, color: "#6B7280" }}>Chauffeur</Text>
+                  </View>
+                </View>
+                {/* Seat grid */}
+                {rows.map(rowNum => {
+                  const colMap = seatByRowCol[rowNum] ?? {};
+                  const colNums = Object.keys(colMap).map(Number).sort((a, b) => a - b);
+                  return (
+                    <View key={rowNum} style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 4 }}>
+                      <Text style={{ width: 20, fontSize: 11, color: "#9CA3AF", textAlign: "right" }}>{rowNum}</Text>
+                      <View style={{ flex: 1, flexDirection: "row", gap: 4 }}>
+                        {colNums.map((col, ci) => {
+                          const seat = colMap[col];
+                          const c = seatColor(seat);
+                          const isAvail = seat.status === "available";
+                          const isMidGap = col > midPoint && colNums[ci - 1] <= midPoint;
+                          return (
+                            <React.Fragment key={col}>
+                              {isMidGap && <View style={{ width: 12 }} />}
+                              <TouchableOpacity
+                                style={[s.seatBox, { backgroundColor: c.bg, borderColor: c.border }]}
+                                onPress={() => handleSeatClick(seat)}
+                                disabled={!isAvail}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[s.seatBoxTxt, { color: c.text }]}>{seat.number}</Text>
+                              </TouchableOpacity>
+                            </React.Fragment>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  );
+                })}
+                <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 8 }}>
+                  Appuyez sur un siège vert pour le vendre, réserver ou marquer SP
+                </Text>
+              </View>
+            );
+          })()}
+
+          {/* ── Liste passagers (masquée si plan sièges actif) ── */}
+          {!showSeatMap && (
           <View style={s.card}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <Text style={s.cardTitle}>
@@ -743,9 +923,10 @@ export default function VenteScreen() {
               })
             )}
           </View>
+          )}
 
           {/* Revenue summary */}
-          {d && (
+          {!showSeatMap && d && (
             <View style={s.revCard}>
               <View style={s.revRow}>
                 <Text style={s.revKey}>Total passagers</Text>
@@ -758,6 +939,97 @@ export default function VenteScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* ─── Seat Action Modal ─── */}
+        <Modal visible={showSeatModal} animationType="slide" transparent onRequestClose={() => setShowSeatModal(false)}>
+          <View style={s.modalOverlay}>
+            <View style={[s.reprintModal, { paddingBottom: 48 }]}>
+              {/* Header */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, padding: 8 }}>
+                    <Ionicons name="grid-outline" size={20} color={G} />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>Siège {clickedSeat?.number}</Text>
+                    <Text style={{ fontSize: 12, color: "#6B7280" }}>{selectedTrip?.from} → {selectedTrip?.to}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => setShowSeatModal(false)} hitSlop={10}>
+                  <Ionicons name="close" size={22} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Action type selector */}
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+                {([
+                  { key: "vendre" as const,   label: "Vendre",   icon: "cash-outline" as const,  color: G,        bg: G_LIGHT },
+                  { key: "réserver" as const, label: "Réserver", icon: "bookmark-outline" as const, color: "#D97706", bg: "#FEF3C7" },
+                  { key: "sp" as const,       label: "SP",       icon: "star-outline" as const,  color: "#7C3AED", bg: "#EDE9FE" },
+                ] as const).map(action => (
+                  <TouchableOpacity
+                    key={action.key}
+                    style={{ flex: 1, backgroundColor: seatActionType === action.key ? action.bg : "#F9FAFB", borderWidth: 2, borderColor: seatActionType === action.key ? action.color : "#E5E7EB", borderRadius: 10, padding: 10, alignItems: "center", gap: 4 }}
+                    onPress={() => setSeatActionType(action.key)}
+                  >
+                    <Ionicons name={action.icon} size={20} color={seatActionType === action.key ? action.color : "#9CA3AF"} />
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: seatActionType === action.key ? action.color : "#9CA3AF" }}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* SP badge */}
+              {seatActionType === "sp" && (
+                <View style={{ backgroundColor: "#EDE9FE", borderRadius: 8, padding: 10, flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Ionicons name="star" size={16} color="#7C3AED" />
+                  <Text style={{ fontSize: 12, color: "#6D28D9", fontWeight: "600" }}>Sans Payer — Montant = 0 FCFA · Place occupée</Text>
+                </View>
+              )}
+              {seatActionType === "réserver" && (
+                <View style={{ backgroundColor: "#FEF3C7", borderRadius: 8, padding: 10, flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Ionicons name="time-outline" size={16} color="#D97706" />
+                  <Text style={{ fontSize: 12, color: "#92400E", fontWeight: "600" }}>Réservation — annulée auto. 45 min avant départ</Text>
+                </View>
+              )}
+
+              {/* Passenger info */}
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 4 }}>Nom complet *</Text>
+              <TextInput
+                style={[s.input, { marginBottom: 10 }]}
+                placeholder="Ex: Kouamé Jean"
+                value={seatPaxName}
+                onChangeText={setSeatPaxName}
+              />
+              <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 4 }}>Téléphone</Text>
+              <TextInput
+                style={[s.input, { marginBottom: 16 }]}
+                placeholder="Ex: 07 12 34 56"
+                value={seatPaxPhone}
+                onChangeText={setSeatPaxPhone}
+                keyboardType="phone-pad"
+              />
+
+              {/* Submit */}
+              <TouchableOpacity
+                style={[s.submitBtn, seatSubmitting && s.submitBtnDisabled,
+                  seatActionType === "sp" ? { backgroundColor: "#7C3AED" } :
+                  seatActionType === "réserver" ? { backgroundColor: "#D97706" } : {}
+                ]}
+                onPress={handleSeatSale}
+                disabled={seatSubmitting}
+              >
+                {seatSubmitting ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name={seatActionType === "sp" ? "star-outline" : seatActionType === "réserver" ? "bookmark-outline" : "checkmark-circle-outline"} size={20} color="#fff" />
+                    <Text style={s.submitBtnText}>
+                      {seatActionType === "sp" ? "Créer ticket SP" : seatActionType === "réserver" ? "Réserver ce siège" : "Valider la vente"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* ─── Sale Form Modal ─── */}
         <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowForm(false)}>
@@ -1062,4 +1334,13 @@ const s = StyleSheet.create({
 
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   reprintModal: { backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 36 },
+
+  viewToggleRow:       { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 4, gap: 4 },
+  viewToggleBtn:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 8 },
+  viewToggleBtnActive: { backgroundColor: "#fff", elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
+  viewToggleTxt:       { fontSize: 13, fontWeight: "600", color: "#9CA3AF" },
+  viewToggleTxtActive: { color: G },
+
+  seatBox:    { width: 44, height: 40, borderRadius: 8, borderWidth: 1.5, justifyContent: "center", alignItems: "center" },
+  seatBoxTxt: { fontSize: 11, fontWeight: "700" },
 });

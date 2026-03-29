@@ -22,8 +22,18 @@ const P_DARK  = "#4C1D95";
 const G       = "#059669";
 
 const CITIES = [
-  "Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pedro",
-  "Daloa", "Man", "Gagnoa", "Divo", "Abengourou", "Soubré", "Bondoukou",
+  "Abidjan", "Abengourou", "Aboisso", "Adzopé", "Agboville", "Agnibilékrou",
+  "Alépé", "Anyama", "Bangolo", "Bettié", "Biankouma", "Bingerville",
+  "Bocanda", "Bondoukou", "Bongouanou", "Bonoua", "Bouaflé", "Bouaké",
+  "Bouna", "Boundiali", "Dabou", "Daloa", "Danané", "Daoukro",
+  "Didiévi", "Dimbokro", "Divo", "Duékoué", "Ferkessédougou", "Fresco",
+  "Gagnoa", "Grand-Bassam", "Grand-Béréby", "Grand-Lahou", "Guiglo", "Issia",
+  "Jacqueville", "Katiola", "Kong", "Korhogo", "Lakota", "Man",
+  "Mankono", "Mbahiakro", "Méagui", "Minignan", "Niakaramandougou", "Niablé",
+  "Odienné", "Oumé", "San-Pédro", "Sassandra", "Séguéla", "Sikensi",
+  "Sinfra", "Sinématiali", "Soubré", "Tabou", "Taï", "Tengréla",
+  "Tiassalé", "Tiébissou", "Touba", "Toulepleu", "Toumodi", "Vavoua",
+  "Yamoussoukro", "Zouan-Hounien", "Zuénoula",
 ];
 const PARCEL_TYPES = ["Documents", "Colis standard", "Fragile", "Alimentaire", "Électronique", "Vêtements", "Autre"];
 const PAYMENT_METHODS = [

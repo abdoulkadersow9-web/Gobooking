@@ -27,10 +27,18 @@ const AMBER_LIGHT = "#FFFBEB";
 const AMBER_BG    = "#FEF3C7";
 
 const CI_CITIES = [
-  "Abidjan","Abengourou","Aboisso","Adzopé","Agboville","Anyama","Bondoukou",
-  "Bouaflé","Bouaké","Daloa","Daoukro","Dimbokro","Divo","Duékoué","Ferkessédougou",
-  "Gagnoa","Grand-Bassam","Guiglo","Issia","Katiola","Korhogo","Man","Odienné",
-  "San-Pédro","Sassandra","Séguéla","Sinfra","Soubré","Tiassalé","Toumodi","Yamoussoukro",
+  "Abidjan", "Abengourou", "Aboisso", "Adzopé", "Agboville", "Agnibilékrou",
+  "Alépé", "Anyama", "Bangolo", "Bettié", "Biankouma", "Bingerville",
+  "Bocanda", "Bondoukou", "Bongouanou", "Bonoua", "Bouaflé", "Bouaké",
+  "Bouna", "Boundiali", "Dabou", "Daloa", "Danané", "Daoukro",
+  "Didiévi", "Dimbokro", "Divo", "Duékoué", "Ferkessédougou", "Fresco",
+  "Gagnoa", "Grand-Bassam", "Grand-Béréby", "Grand-Lahou", "Guiglo", "Issia",
+  "Jacqueville", "Katiola", "Kong", "Korhogo", "Lakota", "Man",
+  "Mankono", "Mbahiakro", "Méagui", "Minignan", "Niakaramandougou", "Niablé",
+  "Odienné", "Oumé", "San-Pédro", "Sassandra", "Séguéla", "Sikensi",
+  "Sinfra", "Sinématiali", "Soubré", "Tabou", "Taï", "Tengréla",
+  "Tiassalé", "Tiébissou", "Touba", "Toulepleu", "Toumodi", "Vavoua",
+  "Yamoussoukro", "Zouan-Hounien", "Zuénoula",
 ];
 
 const TRIP_TYPE_LABELS: Record<string, string> = {
