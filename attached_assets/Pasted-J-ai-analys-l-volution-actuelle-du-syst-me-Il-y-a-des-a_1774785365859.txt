@@ -1,0 +1,185 @@
+J’ai analysé l’évolution actuelle du système.
+
+Il y a des améliorations visuelles, mais le problème principal reste le même :
+
+Le système ne travaille pas encore selon une logique globale intelligente.
+
+---
+
+EXIGENCE PRINCIPALE :
+
+Tout le système doit fonctionner de manière CONNECTÉE, AUTOMATIQUE et LOGIQUE.
+
+Chaque paramétrage doit être utilisé automatiquement dans toutes les parties du système.
+
+---
+
+1. LOGIQUE GÉNÉRALE OBLIGATOIRE
+
+Le système doit comprendre que tout est lié :
+
+- compagnie
+- agences
+- départs
+- bus
+- caméras
+- alertes
+- grille tarifaire
+- agents
+- rapports
+
+Tout doit être connecté automatiquement.
+
+---
+
+2. PARAMÉTRAGE COMPAGNIE (BASE DU SYSTÈME)
+
+Quand une compagnie est créée, elle doit pouvoir définir :
+
+- ses agences
+- ses villes (ex: Abidjan, Bouaké, Ouangolodougou…)
+- ses types de départ (Standard, VIP, etc.)
+- ses grilles tarifaires
+- ses paramètres (vitesse, alertes, caméras)
+
+Ces données deviennent la référence principale.
+
+---
+
+3. GRILLE TARIFAIRE AUTOMATIQUE
+
+Exemple :
+
+- Abidjan → Ouangolodougou STANDARD = 9000  
+- Abidjan → Ouangolodougou VIP = 10000  
+- Abidjan → Ouangolodougou VIP+ = 12000  
+
+Quand le chef d’agence crée un départ :
+
+Le système doit automatiquement :
+
+- reconnaître le trajet  
+- reconnaître le type (STANDARD / VIP)  
+- appliquer automatiquement le bon prix  
+
+Aucune saisie manuelle du prix.
+
+---
+
+4. CRÉATION DE DÉPART (CHEF D’AGENCE)
+
+Quand le chef d’agence crée un départ :
+
+Le système doit automatiquement :
+
+- lier le bus  
+- appliquer la grille tarifaire  
+- activer le suivi  
+- activer les règles d’alerte  
+- envoyer les infos aux autres espaces  
+
+---
+
+5. GESTION DES AGENTS (OBLIGATOIRE)
+
+Quand les agents sont créés dans une compagnie (agent route, agent suivi, agent embarquement, etc.) :
+
+Le système doit :
+
+- attacher automatiquement les agents aux départs concernés  
+OU  
+- permettre de sélectionner les agents lors de la création du départ  
+
+Chaque départ doit obligatoirement contenir :
+
+- un agent route  
+- un agent suivi  
+- les autres agents nécessaires selon le rôle  
+
+Ensuite :
+
+- chaque agent ne voit que ses données  
+- les actions des agents sont reliées au départ  
+- toutes les informations remontent automatiquement à la compagnie  
+
+---
+
+6. CAMÉRAS ET SUIVI
+
+Quand une caméra est connectée par un agent :
+
+- elle doit automatiquement être visible dans l’espace agent suivi  
+- liée au bus en cours  
+- affichée dans les alertes si nécessaire  
+
+Aucune duplication manuelle.
+
+---
+
+7. ALERTES INTELLIGENTES
+
+Les alertes doivent être générées automatiquement selon :
+
+- vitesse  
+- retard  
+- arrêt anormal  
+- incidents  
+
+Basées sur les paramètres définis.
+
+---
+
+8. SYNCHRONISATION ENTRE LES ESPACES
+
+Toutes les données doivent apparaître automatiquement dans :
+
+- espace agent suivi  
+- espace compagnie  
+- espace admin  
+- rapports  
+
+Même donnée = même information partout.
+
+---
+
+9. RAPPORTS AUTOMATIQUES
+
+Le système doit comprendre que :
+
+- les actions des agents → remontent à la compagnie  
+- les incidents → enregistrés automatiquement  
+- les trajets → historisés  
+
+---
+
+10. INTERFACE (RAPPEL)
+
+Continuer à améliorer :
+
+- fluidité  
+- lisibilité  
+- limitation à 5 éléments visibles  
+
+Mais sans casser la logique système.
+
+---
+
+OBJECTIF FINAL :
+
+Créer un système intelligent qui fonctionne automatiquement :
+
+- paramétrage → utilisé partout  
+- création → déclenche tout  
+- agents → reliés aux départs  
+- données → synchronisées  
+- alertes → automatiques  
+
+---
+
+IMPORTANT :
+
+Arrêter les développements isolés.
+
+Tout doit être construit autour d’une seule logique centrale cohérente.
+
+C’est obligatoire pour la suite du projet.
