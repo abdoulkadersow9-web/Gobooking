@@ -578,51 +578,86 @@ export default function SuiviScreen() {
     );
   }
 
-  const activeTrip = data?.trips?.find(t => t.status === "en_route") ?? data?.trips?.[0] ?? null;
-  const agentStatusLabel = activeTrip ? "EN ROUTE" : "ACTIF";
+
+  const activeTrip   = data?.trips?.find(t => t.status === "en_route") ?? data?.trips?.[0] ?? null;
+  const totalPassengers = data?.trips?.reduce((s, t) => s + (t.passengerCount ?? 0), 0) ?? 0;
+  const busCount     = data?.buses?.length ?? 0;
+  const alertCount   = data?.alerts?.length ?? 0;
 
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={RED_D} />
 
-      {/* ══ A. HEADER ══════════════════════════════════════════════ */}
+      {/* ══ HEADER ════════════════════════════════════════════════════ */}
       <View style={S.header}>
-        <View style={S.headerLeft}>
-          <View style={S.headerIcon}>
-            <Ionicons name="radio" size={20} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Text style={S.headerTitle} numberOfLines={1}>{user?.name ?? "Agent Suivi"}</Text>
-              <View style={[S.statusBadge, { backgroundColor: activeTrip ? "rgba(34,197,94,0.22)" : "rgba(255,255,255,0.12)" }]}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: activeTrip ? "#22C55E" : "rgba(255,255,255,0.4)" }} />
-                <Text style={[S.statusBadgeTxt, { color: activeTrip ? "#4ADE80" : "rgba(255,255,255,0.65)" }]}>{agentStatusLabel}</Text>
-              </View>
+        {/* Top row */}
+        <View style={S.headerTop}>
+          <View style={S.headerLeft}>
+            <View style={S.headerIcon}>
+              <Ionicons name="radio" size={20} color="#fff" />
             </View>
-            <Text style={S.headerSub} numberOfLines={1}>
-              {activeTrip
-                ? `${activeTrip.from} → ${activeTrip.to} · départ ${activeTrip.departureTime}`
-                : "Surveillance en temps réel"}
-            </Text>
+            <View style={{ flex: 1, overflow: "hidden" }}>
+              <Text style={S.headerTitle} numberOfLines={1}>{user?.name ?? "Agent Suivi"}</Text>
+              <Text style={S.headerSub}>Tour de contrôle · GoBooking</Text>
+            </View>
+          </View>
+          <View style={S.headerRight}>
+            {lastSync && (
+              <View style={S.syncPill}>
+                <View style={S.syncDot} />
+                <Text style={S.syncTxt}>{syncLabel}</Text>
+              </View>
+            )}
+            <TouchableOpacity onPress={() => load(true)} style={S.iconBtn}>
+              <Feather name="refresh-cw" size={14} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={logout} style={S.iconBtn} hitSlop={8}>
+              <Ionicons name="log-out-outline" size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
-        <View style={S.headerRight}>
-          {lastSync && (
-            <View style={S.syncPill}>
-              <View style={S.syncDot} />
-              <Text style={S.syncTxt}>{syncLabel}</Text>
-            </View>
-          )}
-          <TouchableOpacity onPress={() => load(true)} style={S.iconBtn}>
-            <Feather name="refresh-cw" size={14} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={logout} style={S.iconBtn} hitSlop={8}>
-            <Ionicons name="log-out-outline" size={18} color="#fff" />
-          </TouchableOpacity>
+        {/* Stats bar */}
+        <View style={S.headerStats}>
+          <View style={S.statChip}>
+            <Ionicons name="bus" size={13} color="rgba(255,255,255,0.65)" />
+            <Text style={S.statNum}>{busCount}</Text>
+            <Text style={S.statLbl}>Bus</Text>
+          </View>
+          <View style={S.statDiv} />
+          <View style={S.statChip}>
+            <Ionicons name="people" size={13} color="rgba(255,255,255,0.65)" />
+            <Text style={S.statNum}>{totalPassengers}</Text>
+            <Text style={S.statLbl}>Passagers</Text>
+          </View>
+          <View style={S.statDiv} />
+          <View style={S.statChip}>
+            <Ionicons name="warning" size={13} color={hasAlerts ? "#FCA5A5" : "rgba(255,255,255,0.65)"} />
+            <Text style={[S.statNum, hasAlerts && { color: "#FCA5A5" }]}>{alertCount}</Text>
+            <Text style={[S.statLbl, hasAlerts && { color: "#FCA5A5" }]}>Alertes</Text>
+          </View>
+          <View style={S.statDiv} />
+          <View style={S.statChip}>
+            <Ionicons name="videocam" size={13} color={hasCameras ? "#4ADE80" : "rgba(255,255,255,0.65)"} />
+            <Text style={[S.statNum, hasCameras && { color: "#4ADE80" }]}>{activeCamCount}</Text>
+            <Text style={[S.statLbl, hasCameras && { color: "#4ADE80" }]}>Cam LIVE</Text>
+          </View>
         </View>
       </View>
 
-      {/* ── Loading / Error ── */}
+      {/* Alarm bar — pinned below header if alerts */}
+      {hasAlerts && (
+        <Animated.View style={[S.alarmBar, { transform: [{ scale: pulseAnim }] }]}>
+          <Ionicons name="warning" size={15} color="#fff" />
+          <Text style={S.alarmBarTxt}>
+            {alertCount} ALERTE{alertCount > 1 ? "S" : ""} ACTIVE{alertCount > 1 ? "S" : ""}
+          </Text>
+          <Text style={S.alarmBarBus}>
+            {data!.alerts[0]?.busName ? "· Bus : " + data!.alerts[0].busName : "· Intervention requise"}
+          </Text>
+        </Animated.View>
+      )}
+
+      {/* Loading / Error */}
       {loading && !data ? (
         <View style={S.center}>
           <ActivityIndicator size="large" color={RED} />
@@ -656,188 +691,189 @@ export default function SuiviScreen() {
           showsVerticalScrollIndicator={false}
         >
 
-          {/* ══ B. TOUR DE CONTRÔLE — toujours visible ══════════════ */}
-          <View style={S.cockpit}>
-            {/* Cockpit header */}
-            <View style={S.cockpitHdr}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Animated.View style={{
-                  width: 8, height: 8, borderRadius: 4,
-                  backgroundColor: hasAlerts ? "#EF4444" : "#22C55E",
-                  opacity: hasAlerts
-                    ? pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] })
-                    : 1,
-                }} />
-                <Text style={S.cockpitTitle}>TOUR DE CONTRÔLE</Text>
-              </View>
-              {hasCameras && (
-                <View style={S.cockpitLivePill}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR }} />
-                  <Text style={S.cockpitLiveTxt}>{activeCamCount} CAM LIVE</Text>
-                </View>
-              )}
-            </View>
-
-            {/* KPI row — 4 chips toujours visibles */}
-            <View style={S.cockpitKpiRow}>
-              <View style={S.cockpitKpiItem}>
-                <Text style={[S.cockpitKpiNum, { color: "#A78BFA" }]}>
-                  {data?.trips?.reduce((s, t) => s + (t.passengerCount ?? 0), 0) ?? 0}
-                </Text>
-                <Ionicons name="people" size={11} color="#6D28D9" />
-                <Text style={S.cockpitKpiLbl}>Passagers</Text>
-              </View>
-              <View style={S.cockpitKpiDiv} />
-              <View style={S.cockpitKpiItem}>
-                <Text style={[S.cockpitKpiNum, { color: hasAlerts ? "#F87171" : "#94A3B8" }]}>
-                  {data?.alerts?.length ?? 0}
-                </Text>
-                <Ionicons name="warning" size={11} color={hasAlerts ? "#EF4444" : "#475569"} />
-                <Text style={S.cockpitKpiLbl}>Alertes</Text>
-              </View>
-              <View style={S.cockpitKpiDiv} />
-              <View style={S.cockpitKpiItem}>
-                <Text style={[S.cockpitKpiNum, { color: "#60A5FA" }]}>{data?.buses?.length ?? 0}</Text>
-                <Ionicons name="bus" size={11} color="#1D4ED8" />
-                <Text style={S.cockpitKpiLbl}>Bus actifs</Text>
-              </View>
-              <View style={S.cockpitKpiDiv} />
-              <View style={S.cockpitKpiItem}>
-                <Text style={[S.cockpitKpiNum, { color: hasCameras ? CAM_GR : "#94A3B8" }]}>{activeCamCount}</Text>
-                <Ionicons name="videocam" size={11} color={hasCameras ? "#16A34A" : "#475569"} />
-                <Text style={S.cockpitKpiLbl}>Caméras</Text>
-              </View>
-            </View>
-
-            {/* Signal warning */}
-            {signalWarnTrips.length > 0 && (
-              <View style={S.cockpitSignalWarn}>
-                <Ionicons name="warning" size={13} color="#FCD34D" />
-                <Text style={S.cockpitSignalWarnTxt}>
-                  SIGNAL FAIBLE — {signalWarnTrips.map(t => `${t.from}→${t.to}`).join(", ")}
-                </Text>
-                <Text style={{ color: "#FCD34D", fontSize: 9, fontWeight: "900" }}>
-                  {Math.min(...signalWarnTrips.map(t => liveFrames[t.id]?.signal ?? 99))}%
+          {/* Sync ticker */}
+          <View style={S.syncRow}>
+            <View style={{ width: 7, height: 7, borderRadius: 4,
+              backgroundColor: syncSec < 4 ? "#22C55E" : syncSec < 8 ? "#FCD34D" : "#CBD5E1" }} />
+            <Text style={S.syncRowTxt}>
+              {syncSec <= (hasCameras ? 5 : 30)
+                ? "Prochaine synchro dans " + Math.max(0, (hasCameras ? 5 : 30) - syncSec) + "s"
+                : "Synchronisation en attente…"}
+              {"  ·  "}{syncLabel}
+            </Text>
+            {hasCameras && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginLeft: "auto" }}>
+                <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR,
+                  opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }) }} />
+                <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "800" }}>
+                  {activeCamCount} FLUX ACTIF{activeCamCount > 1 ? "S" : ""}
                 </Text>
               </View>
             )}
-
-            {/* Alerte banner animée */}
-            {hasAlerts && (
-              <Animated.View style={[S.alarmBanner, { transform: [{ scale: pulseAnim }] }]}>
-                <Ionicons name="warning" size={18} color="#fff" />
-                <View style={{ flex: 1 }}>
-                  <Text style={S.alarmTxt}>
-                    {data!.alerts.length} ALERTE{data!.alerts.length > 1 ? "S" : ""} ACTIVE{data!.alerts.length > 1 ? "S" : ""}
-                  </Text>
-                  <Text style={S.alarmSub}>
-                    {data!.alerts[0]?.busName ? `Bus : ${data!.alerts[0].busName}` : "Intervention requise"}
-                  </Text>
-                </View>
-              </Animated.View>
-            )}
-
-            {/* Live camera trips */}
-            {activeCamTrips.map(trip => {
-              const liveCam    = liveFrames[trip.id];
-              const tripAlerts = data?.alerts?.filter(a => a.busId === trip.busId) ?? [];
-              const hasAlert   = tripAlerts.length > 0;
-              const sigLow     = (liveCam?.signal ?? 100) < 75;
-              return (
-                <View key={trip.id} style={[S.cockpitTripRow, hasAlert && S.cockpitTripRowAlert, sigLow && !hasAlert && S.cockpitTripRowSigWarn]}>
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <View style={S.cockpitLiveDot} />
-                      <Text style={S.cockpitTripName} numberOfLines={1}>{trip.from} → {trip.to}</Text>
-                      {tripAlerts.length > 0 && (
-                        <View style={{ backgroundColor: "#7F1D1D", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 }}>
-                          <Text style={{ color: "#FCA5A5", fontSize: 9, fontWeight: "900" }}>⚠ {tripAlerts.length}</Text>
-                        </View>
-                      )}
-                    </View>
-                    {liveCam && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                        <Text style={S.cockpitFramesTxt}>▲ {liveCam.frames} img</Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-                          {[0,1,2,3].map(b => (
-                            <View key={b} style={{ width: 3, height: 5 + b * 2,
-                              backgroundColor: b < Math.ceil((liveCam.signal / 100) * 4) ? CAM_GR : "#1E293B", borderRadius: 1 }} />
-                          ))}
-                          <Text style={[S.cockpitFramesTxt, { marginLeft: 2 }]}>{liveCam.signal}%</Text>
-                        </View>
-                      </View>
-                    )}
-                    {!liveCam && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <ActivityIndicator size="small" color={CAM_GR} />
-                        <Text style={S.cockpitFramesTxt}>Initialisation flux…</Text>
-                      </View>
-                    )}
-                  </View>
-                  <TouchableOpacity style={S.cockpitWatchBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
-                    <Ionicons name="play-circle" size={16} color={CAM_GR} />
-                    <Text style={S.cockpitWatchTxt}>Voir</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-
-            {/* Sync ticker */}
-            <View style={S.cockpitSyncRow}>
-              <View style={{ width: 5, height: 5, borderRadius: 3,
-                backgroundColor: syncSec < 4 ? CAM_GR : syncSec < 8 ? "#FCD34D" : "#94A3B8" }} />
-              <Text style={S.cockpitSyncTxt}>
-                {syncSec < 2
-                  ? "Sync OK"
-                  : syncSec <= (hasCameras ? 5 : 30)
-                    ? `Next sync ${Math.max(0, (hasCameras ? 5 : 30) - syncSec)}s`
-                    : "En attente…"}
-                {" · "}{syncLabel}
-              </Text>
-              {hasCameras && (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-                  <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
-                    opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                  <Text style={{ color: CAM_GR, fontSize: 9, fontWeight: "900" }}>
-                    {activeCamCount} FLUX ACTIF{activeCamCount > 1 ? "S" : ""}
-                  </Text>
-                </View>
-              )}
-            </View>
           </View>
 
-          {/* ══ C. CAMÉRA EMBARQUÉE ═══════════════════════════════════ */}
+          {/* ══ B. TOUR DE CONTRÔLE — Bus en supervision ═══════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Ionicons name="videocam" size={16} color="#0369A1" />
-              <Text style={S.sectionTitle}>Caméra embarquée</Text>
+              <View style={[S.sectionIconBox, { backgroundColor: "#EEF2FF" }]}>
+                <Feather name="monitor" size={14} color="#4F46E5" />
+              </View>
+              <Text style={S.sectionTitle}>Tour de contrôle</Text>
+              <Text style={S.sectionCount}>{busCount} véhicule{busCount > 1 ? "s" : ""}</Text>
+            </View>
+
+            {!sortedBuses.length ? (
+              <View style={S.empty}>
+                <Ionicons name="bus-outline" size={36} color="#CBD5E1" />
+                <Text style={S.emptyTxt}>Aucun bus en service</Text>
+                <Text style={{ fontSize: 12, color: "#CBD5E1", textAlign: "center" }}>
+                  Les bus apparaîtront ici dès leur activation
+                </Text>
+              </View>
+            ) : (
+              sortedBuses.map(bus => {
+                const st        = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
+                const trip      = data!.trips.find(t => t.busId === bus.id);
+                const busAlerts = data!.alerts.filter(a => a.busId === bus.id);
+                const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+                const liveCam   = trip ? liveFrames[trip.id] : null;
+                const isPriority = busAlerts.length > 0;
+                const occ = trip?.passengerCount != null && trip?.seatCount
+                  ? Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))
+                  : null;
+                const occColor = occ != null ? (occ > 90 ? "#DC2626" : occ > 75 ? "#D97706" : "#059669") : "#059669";
+
+                return (
+                  <FadeCard key={bus.id} style={[S.ctCard, isPriority && S.ctCardAlert, { borderLeftColor: isPriority ? RED : st.color }]}>
+                    {/* Top: icon + name + status */}
+                    <View style={S.ctTop}>
+                      <View style={[S.ctStatusIcon, { backgroundColor: st.bg }]}>
+                        <Ionicons name={st.icon as any} size={22} color={st.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={S.ctBusName}>{bus.busName}</Text>
+                        <Text style={S.ctBusPlate}>{bus.plateNumber}</Text>
+                      </View>
+                      <View style={{ alignItems: "flex-end", gap: 5 }}>
+                        {busAlerts.length > 0 && (
+                          <View style={S.ctAlertBadge}>
+                            <Ionicons name="warning" size={11} color="#fff" />
+                            <Text style={S.ctAlertBadgeTxt}>{busAlerts.length}</Text>
+                          </View>
+                        )}
+                        <View style={[S.ctStatusPill, { backgroundColor: st.bg }]}>
+                          <Text style={[S.ctStatusTxt, { color: st.color }]}>{st.label}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Route */}
+                    {trip && (
+                      <View style={S.ctRouteRow}>
+                        <Ionicons name="navigate" size={13} color="#3B82F6" />
+                        <Text style={S.ctRouteTxt} numberOfLines={1}>{trip.from} → {trip.to}</Text>
+                        <Text style={S.ctDeptTxt}>· {trip.departureTime}</Text>
+                        {trip.etaTime && <Text style={S.ctEtaTxt}>ETA {trip.etaTime}</Text>}
+                      </View>
+                    )}
+
+                    {/* Passenger occupancy */}
+                    {trip?.passengerCount != null && (
+                      <View style={S.ctPassRow}>
+                        <Ionicons name="people" size={13} color="#64748B" />
+                        <Text style={S.ctPassNum}>{trip.passengerCount}</Text>
+                        {trip.seatCount != null && (
+                          <Text style={S.ctPassTotal}>/ {trip.seatCount} sièges</Text>
+                        )}
+                        {occ != null && (
+                          <>
+                            <View style={S.ctOccBar}>
+                              <View style={[S.ctOccFill, { width: (occ + "%") as any, backgroundColor: occColor }]} />
+                            </View>
+                            <Text style={[S.ctOccPct, { color: occColor }]}>{occ}%</Text>
+                          </>
+                        )}
+                      </View>
+                    )}
+
+                    {/* Footer: camera + GPS + trigger */}
+                    <View style={S.ctFooter}>
+                      {camOk && trip ? (
+                        <TouchableOpacity style={S.ctCamBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.82}>
+                          <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CAM_GR,
+                            opacity: liveCam ? pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }) : 1 }} />
+                          <Text style={S.ctCamTxt}>LIVE</Text>
+                          <Ionicons name="play-circle" size={14} color={CAM_GR} />
+                          {liveCam && <Text style={S.ctCamFrames}>{liveCam.signal}%</Text>}
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={S.ctNoCam}>
+                          <Ionicons name="videocam-off-outline" size={13} color="#CBD5E1" />
+                          <Text style={S.ctNoCamTxt}>Hors ligne</Text>
+                        </View>
+                      )}
+                      {bus.currentLocation && (
+                        <View style={S.ctGpsChip}>
+                          <Ionicons name="location" size={11} color="#7C3AED" />
+                          <Text style={S.ctGpsTxt} numberOfLines={1}>{bus.currentLocation}</Text>
+                        </View>
+                      )}
+                      <TouchableOpacity style={S.ctTriggerBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
+                        <Ionicons name="warning-outline" size={13} color={RED} />
+                        <Text style={S.ctTriggerTxt}>Alerte</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Inline alert preview */}
+                    {busAlerts.slice(0, 1).map(a => (
+                      <View key={a.id} style={S.ctAlertInline}>
+                        <Ionicons name="alert-circle" size={13} color={RED} />
+                        <Text style={S.ctAlertInlineTxt} numberOfLines={2}>{a.message}</Text>
+                        <Text style={S.ctAlertTime}>
+                          {new Date(a.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </Text>
+                      </View>
+                    ))}
+                  </FadeCard>
+                );
+              })
+            )}
+          </View>
+
+          {/* ══ C. CAMÉRAS EMBARQUÉES ══════════════════════════════════ */}
+          <View style={S.section}>
+            <View style={S.sectionHeader}>
+              <View style={[S.sectionIconBox, { backgroundColor: "#F0FDF4" }]}>
+                <Ionicons name="videocam" size={14} color="#16A34A" />
+              </View>
+              <Text style={S.sectionTitle}>Caméras embarquées</Text>
               {hasCameras && (
-                <View style={{ backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: "auto" }}>
-                  <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "800" }}>{activeCamCount} LIVE</Text>
+                <View style={S.camLivePill}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR }} />
+                  <Text style={S.camLivePillTxt}>{activeCamCount} LIVE</Text>
                 </View>
               )}
             </View>
 
-            {/* Connexion status — ligne horizontale : QR | Bluetooth | Wi-Fi */}
+            {/* Connection indicators */}
             <View style={S.camConnRow}>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }]}>
-                <Ionicons name="qr-code" size={16} color={hasCameras ? "#7C3AED" : "#94A3B8"} />
-                <Text style={[S.camConnTxt, hasCameras && { color: "#7C3AED", fontWeight: "800" }]}>QR</Text>
+                <Ionicons name="qr-code" size={15} color={hasCameras ? "#7C3AED" : "#CBD5E1"} />
+                <Text style={[S.camConnTxt, hasCameras && { color: "#7C3AED", fontWeight: "700" as any }]}>QR Code</Text>
               </View>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#0369A1", backgroundColor: "#F0F9FF" }]}>
-                <Feather name="bluetooth" size={16} color={hasCameras ? "#0369A1" : "#94A3B8"} />
-                <Text style={[S.camConnTxt, hasCameras && { color: "#0369A1", fontWeight: "800" }]}>Bluetooth</Text>
+                <Feather name="bluetooth" size={15} color={hasCameras ? "#0369A1" : "#CBD5E1"} />
+                <Text style={[S.camConnTxt, hasCameras && { color: "#0369A1", fontWeight: "700" as any }]}>Bluetooth</Text>
               </View>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#059669", backgroundColor: "#F0FDF4" }]}>
-                <Feather name="wifi" size={16} color={hasCameras ? "#059669" : "#94A3B8"} />
-                <Text style={[S.camConnTxt, hasCameras && { color: "#059669", fontWeight: "800" }]}>Wi-Fi</Text>
+                <Feather name="wifi" size={15} color={hasCameras ? "#059669" : "#CBD5E1"} />
+                <Text style={[S.camConnTxt, hasCameras && { color: "#059669", fontWeight: "700" as any }]}>Wi-Fi</Text>
               </View>
             </View>
 
-            {/* Liste caméras ou état vide */}
             {!hasCameras ? (
               <View style={[S.empty, { backgroundColor: CAM_BG, borderWidth: 1, borderColor: "#1E293B" }]}>
-                <Ionicons name="videocam-off-outline" size={28} color="#334155" />
+                <Ionicons name="videocam-off-outline" size={30} color="#334155" />
                 <Text style={[S.emptyTxt, { color: "#475569" }]}>Aucune caméra connectée</Text>
                 <Text style={{ fontSize: 11, color: "#334155", textAlign: "center" }}>
                   Les caméras s'activent lorsqu'un bus est en route
@@ -845,109 +881,124 @@ export default function SuiviScreen() {
               </View>
             ) : (
               sortedBuses.map(bus => {
-                const trip  = data!.trips.find(t => t.busId === bus.id);
-                const camOk = !!(trip && trip.cameraStatus === "connected" && trip.cameraStreamUrl);
+                const trip    = data!.trips.find(t => t.busId === bus.id);
+                const camOk   = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
                 const liveCam = trip ? liveFrames[trip.id] : null;
                 if (!camOk || !trip) return null;
+                const sigBars  = liveCam ? Math.ceil((liveCam.signal / 100) * 4) : 0;
+                const sigColor = liveCam
+                  ? (liveCam.signal >= 80 ? CAM_GR : liveCam.signal >= 60 ? "#FCD34D" : "#EF4444")
+                  : CAM_GR;
                 return (
                   <View key={bus.id} style={S.camCard}>
-                    <View style={S.camCardLeft}>
+                    {/* Dark header bar */}
+                    <View style={S.camCardHdr}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#EF4444",
+                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                        <Text style={S.camLiveLbl}>● LIVE</Text>
+                      </View>
+                      {liveCam && (
+                        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
+                          {[1,2,3,4].map(b => (
+                            <View key={b} style={{ width: 3, height: 3 + b * 2.5, borderRadius: 1,
+                              backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.12)" }} />
+                          ))}
+                          <Text style={[S.camSigTxt, { color: sigColor }]}>{liveCam.signal}%</Text>
+                        </View>
+                      )}
+                    </View>
+                    {/* Camera body */}
+                    <View style={S.camCardBody}>
                       <View style={S.camIconWrap}>
-                        <Ionicons name="videocam" size={20} color={CAM_GR} />
+                        <Ionicons name="videocam" size={22} color={CAM_GR} />
                         <View style={S.camLiveDot} />
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Text style={S.camCardTitle}>{bus.busName}</Text>
-                          <View style={S.tcLiveBadge}>
-                            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#fff" }} />
-                            <Text style={S.tcLiveTxt}>LIVE</Text>
-                          </View>
-                        </View>
-                        <Text style={S.camCardSub}>
-                          {trip.from} → {trip.to} · {trip.cameraPosition ?? "intérieur"}
-                        </Text>
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={S.camBusName}>{bus.busName}</Text>
+                        <Text style={S.camRoute}>{trip.from} → {trip.to}</Text>
+                        <Text style={S.camPos}>{trip.cameraPosition ?? "Caméra intérieure"}</Text>
                         {liveCam && (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 }}>
-                            <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "700" }}>▲ {liveCam.frames} img</Text>
-                            <View style={{ flexDirection: "row", gap: 2, alignItems: "flex-end" }}>
-                              {[0,1,2,3].map(b => (
-                                <View key={b} style={{ width: 3, height: 5 + b * 2,
-                                  backgroundColor: b < Math.ceil((liveCam.signal / 100) * 4) ? CAM_GR : "#1E293B", borderRadius: 1 }} />
-                              ))}
-                              <Text style={{ color: CAM_GR, fontSize: 10, fontWeight: "700", marginLeft: 2 }}>{liveCam.signal}%</Text>
-                            </View>
-                          </View>
+                          <Text style={S.camFrames}>▲ {liveCam.frames} img · {trip.passengerCount ?? "—"} pax</Text>
                         )}
                       </View>
+                      <TouchableOpacity style={S.camWatchBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
+                        <Ionicons name="play-circle" size={18} color={CAM_GR} />
+                        <Text style={S.camWatchTxt}>Voir</Text>
+                      </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={S.tcWatchBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.82}>
-                      <Ionicons name="play-circle" size={16} color={CAM_GR} />
-                      <Text style={S.tcWatchTxt}>Voir</Text>
-                    </TouchableOpacity>
                   </View>
                 );
               })
             )}
           </View>
 
-          {/* ══ D. ALERTES ═══════════════════════════════════════════ */}
+          {/* ══ D. ALERTES ACTIVES ═════════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Ionicons name="warning" size={16} color={hasAlerts ? RED : "#22C55E"} />
+              <View style={[S.sectionIconBox, { backgroundColor: hasAlerts ? RED_L : "#F0FDF4" }]}>
+                <Ionicons name="warning" size={14} color={hasAlerts ? RED : "#22C55E"} />
+              </View>
               <Text style={S.sectionTitle}>Alertes actives</Text>
-              {data?.alerts?.length ? (
-                <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: "auto" }}>
-                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{data.alerts.length}</Text>
+              {alertCount > 0 && (
+                <View style={S.alertCountPill}>
+                  <Text style={S.alertCountPillTxt}>{alertCount}</Text>
                 </View>
-              ) : null}
+              )}
             </View>
 
-            {!data?.alerts?.length ? (
+            {!alertCount ? (
               <View style={S.empty}>
-                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center" }}>
-                  <Ionicons name="checkmark-circle" size={28} color="#22C55E" />
+                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center" }}>
+                  <Ionicons name="checkmark-circle" size={30} color="#22C55E" />
                 </View>
                 <Text style={S.emptyTxt}>Aucune alerte active</Text>
-                <Text style={{ fontSize: 11, color: "#94A3B8", textAlign: "center" }}>Tous les bus roulent normalement</Text>
+                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
+                  Tous les bus roulent normalement
+                </Text>
               </View>
             ) : (
               data!.alerts.map(alert => {
                 const hasResponse  = !!alert.response;
                 const reqRequested = !!alert.responseRequested;
                 const responseOpt  = RESPONSE_OPTIONS.find(r => r.id === alert.response);
-                const typeColor    = alert.type === "panne" ? "#DC2626" : alert.type === "controle" ? "#D97706" : RED;
-                const typeBg       = alert.type === "panne" ? "#FEE2E2" : alert.type === "controle" ? "#FEF3C7" : RED_L;
-                const borderCol    = alert.type === "panne" ? "#DC2626" : alert.type === "controle" ? "#D97706" : "#94A3B8";
-                const typeLabel    = alert.type === "panne" ? "PANNE" : alert.type === "controle" ? "CONTRÔLE" : "ALERTE";
+                const isCritical   = alert.type === "panne";
+                const isCtrl       = alert.type === "controle";
+                const typeColor    = isCritical ? "#DC2626" : isCtrl ? "#D97706" : RED;
+                const typeBg       = isCritical ? "#FEE2E2" : isCtrl ? "#FEF3C7" : RED_L;
+                const borderCol    = isCritical ? "#DC2626" : isCtrl ? "#D97706" : RED;
+                const typeLabel    = isCritical ? "PANNE" : isCtrl ? "CONTRÔLE" : "ALERTE";
                 return (
                   <FadeCard key={alert.id} style={[S.alertCard, { borderLeftColor: borderCol }]}>
                     <View style={S.alertTop}>
                       <View style={[S.alertTypeBadge, { backgroundColor: typeBg }]}>
                         <Text style={[S.alertTypeTxt, { color: typeColor }]}>{typeLabel}</Text>
                       </View>
-                      <Text style={S.alertBus}>{alert.busName ?? "Bus inconnu"}</Text>
+                      <Text style={S.alertBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
                       <Text style={S.alertTime}>
                         {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                       </Text>
                     </View>
 
                     <Text style={S.alertMsg}>{alert.message}</Text>
-                    <Text style={S.alertAgent}>
-                      <Ionicons name="person-outline" size={10} color="#94A3B8" />{" "}
-                      {alert.agentName ?? alert.agentId}
-                    </Text>
+
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="person-circle-outline" size={13} color="#94A3B8" />
+                      <Text style={S.alertAgent}>{alert.agentName ?? alert.agentId}</Text>
+                    </View>
 
                     {hasResponse && responseOpt && (
-                      <View style={[S.responsePill, { backgroundColor: responseOpt.bg, gap: 6 }]}>
-                        <Ionicons name="checkmark-circle" size={13} color={responseOpt.color} />
-                        <Text style={[S.responseTxt, { color: responseOpt.color }]}>Réponse : {responseOpt.label}</Text>
+                      <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
+                        <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
+                        <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
+                          Réponse : {responseOpt.label}
+                        </Text>
                       </View>
                     )}
                     {reqRequested && !hasResponse && (
-                      <View style={S.waitPill}>
+                      <View style={S.alertWaitRow}>
                         <ActivityIndicator size="small" color="#D97706" />
-                        <Text style={S.waitTxt}>En attente de réponse de l'agent route…</Text>
+                        <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
                       </View>
                     )}
 
@@ -962,12 +1013,12 @@ export default function SuiviScreen() {
                         </TouchableOpacity>
                       )}
                       <TouchableOpacity
-                        style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1, justifyContent: "center" }]}
+                        style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
                         onPress={() => doConfirm(alert.id)} disabled={acting}
                       >
                         {acting
                           ? <ActivityIndicator size="small" color="#166534" />
-                          : <Ionicons name="checkmark-circle-outline" size={14} color="#166834" />}
+                          : <Ionicons name="checkmark-circle-outline" size={14} color="#166534" />}
                         <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
                       </TouchableOpacity>
                     </View>
@@ -977,143 +1028,15 @@ export default function SuiviScreen() {
             )}
           </View>
 
-          {/* ══ E. BUS EN TEMPS RÉEL ══════════════════════════════════ */}
+          {/* ══ E. ACTIONS RAPIDES ═════════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Feather name="radio" size={16} color="#1D4ED8" />
-              <Text style={S.sectionTitle}>Bus en temps réel</Text>
-              <Text style={{ fontSize: 11, color: "#94A3B8", marginLeft: "auto" }}>
-                {data?.buses?.length ?? 0} véhicule{(data?.buses?.length ?? 0) > 1 ? "s" : ""}
-              </Text>
-            </View>
-
-            {!sortedBuses.length ? (
-              <View style={S.empty}>
-                <Ionicons name="bus-outline" size={32} color="#CBD5E1" />
-                <Text style={S.emptyTxt}>Aucun bus trouvé</Text>
+              <View style={[S.sectionIconBox, { backgroundColor: "#FFF7ED" }]}>
+                <Feather name="zap" size={14} color="#D97706" />
               </View>
-            ) : (
-              sortedBuses.map(bus => {
-                const st        = BUS_STATUS[bus.logisticStatus] ?? { label: bus.logisticStatus, color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
-                const trip      = data!.trips.find(t => t.busId === bus.id);
-                const busAlerts = data!.alerts.filter(a => a.busId === bus.id);
-                const eta       = trip?.etaTime ?? trip?.arrivalTime;
-                const isPriority = busAlerts.length > 0;
-                return (
-                  <View key={bus.id} style={[S.busCard, { borderLeftWidth: 3, borderLeftColor: isPriority ? RED : st.color }, isPriority && S.busCardPriority]}>
-
-                    {/* Bus header */}
-                    <View style={S.busTop}>
-                      <View style={[S.busStatus, { backgroundColor: st.bg }]}>
-                        <Ionicons name={st.icon as any} size={20} color={st.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={S.busName}>{bus.busName}</Text>
-                        <Text style={S.busPlate}>{bus.plateNumber}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end", gap: 4 }}>
-                        {busAlerts.length > 0 && (
-                          <View style={S.alertCountBadge}>
-                            <Ionicons name="warning" size={11} color="#fff" />
-                            <Text style={S.alertCountTxt}>{busAlerts.length}</Text>
-                          </View>
-                        )}
-                        <View style={[S.statusPill, { backgroundColor: st.bg }]}>
-                          <Text style={[S.statusTxt, { color: st.color }]}>{st.label}</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Trajet + ETA */}
-                    {trip && (
-                      <View style={S.busInfoRow}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1 }}>
-                          <Ionicons name="navigate" size={12} color="#1D4ED8" />
-                          <Text style={S.busInfoTxt} numberOfLines={1}>{trip.from} → {trip.to}</Text>
-                        </View>
-                        <View style={S.busChip}>
-                          <Ionicons name="time-outline" size={11} color="#64748B" />
-                          <Text style={S.busChipTxt}>{trip.departureTime}</Text>
-                        </View>
-                        {eta && (
-                          <View style={[S.busChip, { backgroundColor: "#F0FDF4" }]}>
-                            <Ionicons name="flag-outline" size={11} color="#15803D" />
-                            <Text style={[S.busChipTxt, { color: "#15803D" }]}>{eta}</Text>
-                          </View>
-                        )}
-                      </View>
-                    )}
-
-                    {/* GPS */}
-                    {bus.currentLocation && (
-                      <View style={S.busGpsRow}>
-                        <Ionicons name="location" size={12} color="#7C3AED" />
-                        <Text style={S.busGpsTxt}>{bus.currentLocation}</Text>
-                        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR }} />
-                        <Text style={{ fontSize: 10, color: CAM_GR, fontWeight: "700" }}>GPS</Text>
-                      </View>
-                    )}
-
-                    {/* Occupation */}
-                    {trip && trip.passengerCount != null && trip.seatCount != null && trip.seatCount > 0 && (
-                      <View style={{ gap: 4 }}>
-                        <View style={S.tcOccHeader}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                            <Ionicons name="people" size={12} color="#059669" />
-                            <Text style={S.tcOccLabel}>Occupation</Text>
-                          </View>
-                          <Text style={S.tcOccValue}>
-                            {trip.passengerCount} / {trip.seatCount} · {Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%
-                          </Text>
-                        </View>
-                        <View style={S.tcOccBar}>
-                          <View style={[S.tcOccFill, {
-                            width: `${Math.min(100, Math.round((trip.passengerCount / trip.seatCount) * 100))}%` as any,
-                            backgroundColor: trip.passengerCount / trip.seatCount > 0.9 ? "#DC2626" : "#22C55E",
-                          }]} />
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Alerte inline */}
-                    {busAlerts.length > 0 && (
-                      <View style={S.tcAlertInline}>
-                        <Ionicons name="warning" size={14} color={RED} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={S.tcAlertTxt} numberOfLines={2}>{busAlerts[0].message}</Text>
-                          <Text style={S.tcAlertTime}>
-                            {new Date(busAlerts[0].createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                            {busAlerts.length > 1 ? ` · +${busAlerts.length - 1} alerte(s)` : ""}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-
-                    {bus.issue && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FEF2F2", borderRadius: 8, padding: 8 }}>
-                        <Ionicons name="alert-circle" size={14} color="#DC2626" />
-                        <Text style={{ fontSize: 12, color: "#DC2626", fontWeight: "600", flex: 1 }}>{bus.issue}</Text>
-                      </View>
-                    )}
-
-                    <TouchableOpacity style={S.triggerBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
-                      <Ionicons name="warning-outline" size={14} color={RED} />
-                      <Text style={S.triggerBtnTxt}>Déclencher une alerte</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })
-            )}
-          </View>
-
-          {/* ══ F. ACTIONS RAPIDES ════════════════════════════════════ */}
-          <View style={S.section}>
-            <View style={S.sectionHeader}>
-              <Feather name="zap" size={16} color="#D97706" />
               <Text style={S.sectionTitle}>Actions rapides</Text>
             </View>
             <View style={S.quickGrid}>
-              {/* Row 1 */}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/scan" as never)} activeOpacity={0.8}>
                   <View style={[S.quickIcon, { backgroundColor: "#EEF2FF" }]}>
@@ -1129,7 +1052,6 @@ export default function SuiviScreen() {
                   <Text style={S.quickBtnTxt}>Ajouter passager</Text>
                 </TouchableOpacity>
               </View>
-              {/* Row 2 */}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/rapport" as never)} activeOpacity={0.8}>
                   <View style={[S.quickIcon, { backgroundColor: "#FFF7ED" }]}>
@@ -1153,29 +1075,39 @@ export default function SuiviScreen() {
         </ScrollView>
       )}
 
-      {/* ── Modal — Déclencher une alerte ── */}
+      {/* ══ MODAL — Déclencher une alerte ════════════════════════════ */}
       <Modal visible={!!triggerBus} transparent animationType="slide">
         <View style={S.modalBg}>
           <View style={S.modalBox}>
-            <Text style={S.modalTitle}>Déclencher une alerte</Text>
-            <Text style={S.modalSub}>Bus : {triggerBus?.busName} ({triggerBus?.plateNumber})</Text>
-            <Text style={S.modalLabel}>Choisir le message</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 }}>
+              <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: RED_L,
+                justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: RED_M }}>
+                <Ionicons name="warning" size={22} color={RED} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={S.modalTitle}>Déclencher une alerte</Text>
+                <Text style={S.modalSub}>
+                  {triggerBus?.busName} · {triggerBus?.plateNumber}
+                </Text>
+              </View>
+            </View>
+            <Text style={S.modalLabel}>Type d'alerte</Text>
             {["Arrêt anormal non prévu", "Bus immobilisé sur route", "Besoin d'assistance immédiate"].map(msg => (
               <TouchableOpacity key={msg} style={S.msgOption} onPress={() => triggerBus && doTrigger(triggerBus, msg)}>
-                <Ionicons name="alert-circle-outline" size={16} color={RED} />
+                <Ionicons name="alert-circle-outline" size={18} color={RED} />
                 <Text style={S.msgOptionTxt}>{msg}</Text>
+                <Ionicons name="chevron-forward" size={16} color={RED_M} />
               </TouchableOpacity>
             ))}
             <View style={S.modalActions}>
               <TouchableOpacity style={[S.modalBtn, { backgroundColor: "#F1F5F9" }]} onPress={() => setTriggerBus(null)}>
-                <Text style={{ fontWeight: "700", color: "#475569" }}>Annuler</Text>
+                <Text style={{ color: "#64748B", fontWeight: "700", fontSize: 14 }}>Annuler</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[S.modalBtn, { backgroundColor: RED }]}
-                onPress={() => triggerBus && doTrigger(triggerBus)} disabled={acting}>
-                {acting
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Text style={{ fontWeight: "700", color: "#fff" }}>Alerte générale</Text>}
-              </TouchableOpacity>
+              {acting && (
+                <View style={[S.modalBtn, { backgroundColor: RED_D }]}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -1199,12 +1131,10 @@ const CS = StyleSheet.create({
   footer:      { flexDirection: "row", justifyContent: "space-around", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)" },
   footerItem:  { flexDirection: "row", alignItems: "center", gap: 5 },
   footerTxt:   { color: "#64748B", fontSize: 11, fontWeight: "600" },
-  /* Metadata overlay */
   metaOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(10,14,26,0.82)", paddingHorizontal: 12, paddingVertical: 8 },
   metaRow:     { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   metaChip:    { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
   metaChipTxt: { color: "#94A3B8", fontSize: 10, fontWeight: "700" },
-  /* Zoom hint */
   zoomHint:    { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(10,14,26,0.75)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   zoomHintTxt: { color: "rgba(255,255,255,0.5)", fontSize: 10 },
 });
@@ -1217,141 +1147,176 @@ const CP = StyleSheet.create({
   txt:        { fontSize: 12, fontWeight: "600", color: "#94A3B8", flex: 1 },
 });
 
-
-
-/* ── Styles ─────────────────────────────────────────────────────── */
+/* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F0F4F8" },
 
-  /* ── A. Header ─────────────────────────────────────────────────── */
-  header:        { backgroundColor: RED_D, paddingHorizontal: 16, paddingVertical: 14,
-                   flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
-  headerLeft:    { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, overflow: "hidden" },
-  headerRight:   { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
-  headerIcon:    { width: 42, height: 42, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.18)",
-                   justifyContent: "center", alignItems: "center", flexShrink: 0,
-                   borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
-  headerTitle:   { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
-  headerSub:     { color: "rgba(255,255,255,0.72)", fontSize: 11, marginTop: 2 },
-  statusBadge:   { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8,
-                   paddingHorizontal: 8, paddingVertical: 3 },
-  statusBadgeTxt:{ fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  syncPill:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
-                   borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
-                   borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
-  syncDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR },
-  syncTxt:       { color: "rgba(255,255,255,0.82)", fontSize: 9, fontWeight: "700", letterSpacing: 0.3 },
-  iconBtn:       { width: 36, height: 36, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.14)",
-                   justifyContent: "center", alignItems: "center",
-                   borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  /* ── Header ─────────────────────────────────────────────────── */
+  header:     { backgroundColor: RED_D },
+  headerTop:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+                paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, gap: 10 },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, overflow: "hidden" },
+  headerRight:{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
+  headerIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.18)",
+                justifyContent: "center", alignItems: "center", flexShrink: 0,
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  headerTitle:{ color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
+  headerSub:  { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
 
-  /* ── Loading / Error ──────────────────────────────────────────── */
-  center:        { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
-  loadingTxt:    { fontSize: 15, fontWeight: "700", color: "#0F172A" },
-  loadingSub:    { fontSize: 12, color: "#94A3B8", textAlign: "center", lineHeight: 18 },
+  /* Stats bar */
+  headerStats:{ flexDirection: "row", paddingHorizontal: 16, paddingVertical: 10,
+                borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)",
+                backgroundColor: "rgba(0,0,0,0.15)" },
+  statChip:   { flex: 1, alignItems: "center", gap: 2 },
+  statNum:    { color: "#fff", fontSize: 18, fontWeight: "900", lineHeight: 22 },
+  statLbl:    { color: "rgba(255,255,255,0.55)", fontSize: 9, fontWeight: "700", letterSpacing: 0.3 },
+  statDiv:    { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 4 },
 
-  /* ── Scroll ──────────────────────────────────────────────────── */
-  scroll: { padding: 16, gap: 20, paddingBottom: 52 },
+  syncPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
+                borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
+  syncDot:    { width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR },
+  syncTxt:    { color: "rgba(255,255,255,0.8)", fontSize: 9, fontWeight: "700", letterSpacing: 0.3 },
+  iconBtn:    { width: 36, height: 36, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.14)",
+                justifyContent: "center", alignItems: "center",
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
 
-  /* ── B. Tour de Contrôle — Cockpit ───────────────────────────── */
-  cockpit: { backgroundColor: CAM_BG, borderRadius: 18, overflow: "hidden",
-             borderWidth: 1, borderColor: "#1E293B",
-             ...(Platform.OS === "web"
-               ? { boxShadow: "0 4px 20px rgba(0,0,0,0.22)" }
-               : { shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 14,
-                   shadowOffset: { width: 0, height: 4 }, elevation: 8 }) },
-  cockpitHdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                paddingHorizontal: 16, paddingVertical: 13,
-                borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)",
-                backgroundColor: "rgba(0,0,0,0.18)" },
-  cockpitTitle: { color: "#E2E8F0", fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },
-  cockpitLivePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#052E16",
-                     borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5,
-                     borderWidth: 1, borderColor: "#166534" },
-  cockpitLiveTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
+  /* Alarm bar */
+  alarmBar:   { flexDirection: "row", alignItems: "center", gap: 8,
+                backgroundColor: "#B91C1C", paddingHorizontal: 16, paddingVertical: 9 },
+  alarmBarTxt:{ color: "#fff", fontSize: 12, fontWeight: "900", letterSpacing: 0.4 },
+  alarmBarBus:{ color: "rgba(255,255,255,0.75)", fontSize: 12, fontWeight: "600", flex: 1 },
 
-  cockpitKpiRow:  { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 14,
-                    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
-  cockpitKpiItem: { flex: 1, alignItems: "center", gap: 4 },
-  cockpitKpiNum:  { fontSize: 22, fontWeight: "900", color: "#F8FAFC", lineHeight: 26 },
-  cockpitKpiLbl:  { fontSize: 9, fontWeight: "700", color: "#64748B", letterSpacing: 0.7 },
-  cockpitKpiDiv:  { width: 1, backgroundColor: "rgba(255,255,255,0.06)", marginVertical: 6 },
+  /* Center / Loading */
+  center:     { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
+  loadingTxt: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
+  loadingSub: { fontSize: 12, color: "#94A3B8", textAlign: "center", lineHeight: 18 },
 
-  cockpitSignalWarn:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 9,
-                          backgroundColor: "rgba(252,211,77,0.07)", borderTopWidth: 1, borderTopColor: "rgba(252,211,77,0.18)" },
-  cockpitSignalWarnTxt: { flex: 1, color: "#FCD34D", fontSize: 10, fontWeight: "700" },
+  /* Scroll */
+  scroll: { padding: 14, gap: 20, paddingBottom: 52 },
 
-  alarmBanner:  { backgroundColor: RED, flexDirection: "row", alignItems: "center", gap: 10,
-                  marginHorizontal: 16, marginTop: 12, paddingVertical: 11, paddingHorizontal: 13,
-                  borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  alarmTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.3 },
-  alarmSub:     { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 2 },
+  /* Sync row */
+  syncRow:    { flexDirection: "row", alignItems: "center", gap: 8,
+                backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+                borderWidth: 1, borderColor: "#E2E8F0" },
+  syncRowTxt: { fontSize: 11, color: "#64748B", fontWeight: "600", flex: 1 },
 
-  cockpitTripRow:        { flexDirection: "row", alignItems: "center", gap: 12,
-                           paddingHorizontal: 16, paddingVertical: 12,
-                           borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
-  cockpitTripRowAlert:   { borderLeftWidth: 3, borderLeftColor: "#EF4444", backgroundColor: "rgba(239,68,68,0.07)" },
-  cockpitTripRowSigWarn: { borderLeftWidth: 3, borderLeftColor: "#FCD34D", backgroundColor: "rgba(252,211,77,0.05)" },
-  cockpitLiveDot:        { width: 9, height: 9, borderRadius: 5, backgroundColor: "#EF4444" },
-  cockpitTripName:       { fontSize: 13, fontWeight: "800", color: "#E2E8F0" },
-  cockpitFramesTxt:      { fontSize: 9, color: CAM_GR, fontWeight: "800" },
-  cockpitWatchBtn:       { flexDirection: "row", alignItems: "center", gap: 5,
-                           backgroundColor: "rgba(34,197,94,0.14)", borderRadius: 9,
-                           paddingHorizontal: 11, paddingVertical: 8,
-                           borderWidth: 1, borderColor: "#166534" },
-  cockpitWatchTxt:       { color: CAM_GR, fontSize: 11, fontWeight: "800" },
+  /* Sections */
+  section:      { gap: 12 },
+  sectionHeader:{ flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionIconBox:{ width: 30, height: 30, borderRadius: 9, justifyContent: "center", alignItems: "center" },
+  sectionTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2, flex: 1 },
+  sectionCount: { fontSize: 11, color: "#94A3B8", fontWeight: "600" },
 
-  cockpitSyncRow: { flexDirection: "row", alignItems: "center", gap: 6,
-                    paddingHorizontal: 16, paddingVertical: 9,
-                    borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.04)",
-                    backgroundColor: "rgba(0,0,0,0.12)" },
-  cockpitSyncTxt: { fontSize: 9, color: "#475569", fontWeight: "600", letterSpacing: 0.2 },
+  /* Empty state */
+  empty: { backgroundColor: "#fff", borderRadius: 16, padding: 32, alignItems: "center", gap: 10,
+           ...(Platform.OS === "web"
+             ? { boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }
+             : { shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }) },
+  emptyTxt: { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
 
-  /* ── Sections generiques ─────────────────────────────────────── */
-  section:       { gap: 12 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sectionTitle:  { fontSize: 14, fontWeight: "800", color: "#0F172A", letterSpacing: -0.1 },
-  empty:         { backgroundColor: "#fff", borderRadius: 16, padding: 32,
-                   alignItems: "center", gap: 10,
-                   ...(Platform.OS === "web"
-                     ? { boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }
-                     : { shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }) },
-  emptyTxt:      { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
+  /* ── B. Tour de contrôle — Bus cards ──────────────────────────── */
+  ctCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
+                borderLeftWidth: 4, borderLeftColor: "#22C55E",
+                ...(Platform.OS === "web"
+                  ? { boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }
+                  : { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 12,
+                      shadowOffset: { width: 0, height: 3 }, elevation: 4 }) },
+  ctCardAlert:{ backgroundColor: "#FFF8F8" },
 
-  /* ── C. Caméra embarquée ─────────────────────────────────────── */
+  ctTop:      { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  ctStatusIcon:{ width: 46, height: 46, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  ctBusName:  { fontSize: 16, fontWeight: "800", color: "#0F172A", letterSpacing: -0.3 },
+  ctBusPlate: { fontSize: 11, color: "#64748B", marginTop: 2 },
+  ctAlertBadge:{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: RED,
+                 borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  ctAlertBadgeTxt:{ fontSize: 10, fontWeight: "900", color: "#fff" },
+  ctStatusPill:{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  ctStatusTxt: { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
+
+  ctRouteRow:  { flexDirection: "row", alignItems: "center", gap: 6,
+                 backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9,
+                 borderWidth: 1, borderColor: "#E2E8F0" },
+  ctRouteTxt:  { fontSize: 13, fontWeight: "700", color: "#0F172A", flex: 1 },
+  ctDeptTxt:   { fontSize: 11, color: "#64748B" },
+  ctEtaTxt:    { fontSize: 10, color: "#7C3AED", fontWeight: "700",
+                 backgroundColor: "#EDE9FE", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+
+  ctPassRow:   { flexDirection: "row", alignItems: "center", gap: 7 },
+  ctPassNum:   { fontSize: 14, fontWeight: "800", color: "#0F172A" },
+  ctPassTotal: { fontSize: 11, color: "#94A3B8" },
+  ctOccBar:    { flex: 1, height: 6, backgroundColor: "#F1F5F9", borderRadius: 4, overflow: "hidden" },
+  ctOccFill:   { height: 6, borderRadius: 4 },
+  ctOccPct:    { fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
+
+  ctFooter:    { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  ctCamBtn:    { flexDirection: "row", alignItems: "center", gap: 5,
+                 backgroundColor: "#052E16", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7,
+                 borderWidth: 1, borderColor: "#166534" },
+  ctCamTxt:    { color: CAM_GR, fontSize: 11, fontWeight: "900" },
+  ctCamFrames: { color: "#4ADE80", fontSize: 10, fontWeight: "700" },
+  ctNoCam:     { flexDirection: "row", alignItems: "center", gap: 5,
+                 backgroundColor: "#F8FAFC", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7,
+                 borderWidth: 1, borderColor: "#E2E8F0" },
+  ctNoCamTxt:  { fontSize: 11, color: "#CBD5E1", fontWeight: "600" },
+  ctGpsChip:   { flexDirection: "row", alignItems: "center", gap: 4, flex: 1,
+                 backgroundColor: "#FAF5FF", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6,
+                 borderWidth: 1, borderColor: "#E9D5FF" },
+  ctGpsTxt:    { fontSize: 11, color: "#7C3AED", fontWeight: "600", flex: 1 },
+  ctTriggerBtn:{ flexDirection: "row", alignItems: "center", gap: 4,
+                 backgroundColor: RED_L, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7,
+                 borderWidth: 1, borderColor: RED_M },
+  ctTriggerTxt:{ fontSize: 11, color: RED, fontWeight: "700" },
+
+  ctAlertInline:   { flexDirection: "row", alignItems: "center", gap: 8,
+                     backgroundColor: "#FFF1F2", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+                     borderWidth: 1, borderColor: RED_M },
+  ctAlertInlineTxt:{ flex: 1, fontSize: 12, color: RED_D, fontWeight: "600", lineHeight: 16 },
+  ctAlertTime:     { fontSize: 10, color: RED, fontWeight: "700" },
+
+  /* ── C. Caméras ──────────────────────────────────────────────── */
+  camLivePill:    { flexDirection: "row", alignItems: "center", gap: 5,
+                    backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4,
+                    borderWidth: 1, borderColor: "#166534" },
+  camLivePillTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
+
   camConnRow:  { flexDirection: "row", gap: 10 },
   camConnChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                 backgroundColor: "#fff", borderRadius: 12, paddingVertical: 12,
-                 borderWidth: 1.5, borderColor: "#E2E8F0",
-                 ...(Platform.OS === "web"
-                   ? { boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }
-                   : { elevation: 1 }) },
-  camConnTxt:  { fontSize: 12, fontWeight: "700", color: "#94A3B8" },
+                 backgroundColor: "#F8FAFC", borderRadius: 12, paddingVertical: 11,
+                 borderWidth: 1.5, borderColor: "#E2E8F0" },
+  camConnTxt:  { fontSize: 11, fontWeight: "600", color: "#CBD5E1" },
 
-  camCard:     { backgroundColor: CAM_BG, borderRadius: 14, padding: 14, flexDirection: "row",
-                 alignItems: "center", justifyContent: "space-between", gap: 10,
-                 borderWidth: 1, borderColor: "#166534",
+  camCard:     { backgroundColor: CAM_BG, borderRadius: 16, overflow: "hidden",
+                 borderWidth: 1, borderColor: "#166834",
                  ...(Platform.OS === "web"
-                   ? { boxShadow: "0 2px 12px rgba(0,0,0,0.16)" }
-                   : { shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, elevation: 4 }) },
-  camCardLeft: { flexDirection: "row", alignItems: "flex-start", gap: 12, flex: 1 },
+                   ? { boxShadow: "0 3px 14px rgba(0,0,0,0.2)" }
+                   : { shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 12, elevation: 5 }) },
+  camCardHdr:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                 paddingHorizontal: 14, paddingVertical: 9,
+                 backgroundColor: "rgba(0,0,0,0.3)", borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  camLiveLbl:  { color: "#EF4444", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  camSigTxt:   { fontSize: 10, fontWeight: "700", marginLeft: 3 },
+
+  camCardBody: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   camIconWrap: { width: 46, height: 46, borderRadius: 13, backgroundColor: "rgba(34,197,94,0.15)",
                  justifyContent: "center", alignItems: "center", position: "relative", flexShrink: 0,
-                 borderWidth: 1, borderColor: "rgba(34,197,94,0.25)" },
+                 borderWidth: 1, borderColor: "rgba(34,197,94,0.3)" },
   camLiveDot:  { position: "absolute", top: 3, right: 3, width: 9, height: 9, borderRadius: 5,
                  backgroundColor: CAM_GR, borderWidth: 2, borderColor: CAM_BG },
-  camCardTitle:{ fontSize: 14, fontWeight: "800", color: "#E2E8F0" },
-  camCardSub:  { fontSize: 11, color: "#64748B", marginTop: 3, lineHeight: 15 },
-  tcLiveBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#DC2626",
-                 borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
-  tcLiveTxt:   { color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 1.2 },
-  tcWatchBtn:  { flexDirection: "row", alignItems: "center", gap: 6,
-                 backgroundColor: "rgba(34,197,94,0.14)", borderRadius: 10,
-                 paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: "#166534" },
-  tcWatchTxt:  { color: CAM_GR, fontSize: 12, fontWeight: "800" },
+  camBusName:  { fontSize: 14, fontWeight: "800", color: "#E2E8F0" },
+  camRoute:    { fontSize: 11, color: "#64748B", marginTop: 1 },
+  camPos:      { fontSize: 10, color: "#475569" },
+  camFrames:   { fontSize: 10, color: CAM_GR, fontWeight: "700" },
+  camWatchBtn: { flexDirection: "row", alignItems: "center", gap: 6,
+                 backgroundColor: "rgba(34,197,94,0.15)", borderRadius: 11,
+                 paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: "#166834" },
+  camWatchTxt: { color: CAM_GR, fontSize: 12, fontWeight: "800" },
 
   /* ── D. Alertes ──────────────────────────────────────────────── */
-  alertCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
+  alertCountPill:   { backgroundColor: RED, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 3 },
+  alertCountPillTxt:{ color: "#fff", fontSize: 12, fontWeight: "900" },
+
+  alertCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 10,
                    borderLeftWidth: 4, borderLeftColor: RED,
                    ...(Platform.OS === "web"
                      ? { boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }
@@ -1363,63 +1328,20 @@ const S = StyleSheet.create({
   alertBus:      { flex: 1, fontSize: 13, fontWeight: "700", color: "#0F172A" },
   alertTime:     { fontSize: 11, color: "#94A3B8" },
   alertMsg:      { fontSize: 13, color: "#1E293B", fontWeight: "600", lineHeight: 19 },
-  alertAgent:    { fontSize: 11, color: "#94A3B8", letterSpacing: 0.1 },
-  responsePill:  { flexDirection: "row", alignItems: "center", gap: 6,
-                   paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9 },
-  responseTxt:   { fontSize: 12, fontWeight: "700" },
-  waitPill:      { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFBEB",
-                   paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9,
+  alertAgent:    { fontSize: 11, color: "#94A3B8" },
+  alertResponseRow:{ flexDirection: "row", alignItems: "center", gap: 8,
+                     borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8 },
+  alertResponseTxt:{ fontSize: 12, fontWeight: "700" },
+  alertWaitRow:  { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFBEB",
+                   borderRadius: 9, paddingHorizontal: 10, paddingVertical: 8,
                    borderWidth: 1, borderColor: "#FDE68A" },
-  waitTxt:       { fontSize: 12, color: "#D97706", fontWeight: "600" },
+  alertWaitTxt:  { fontSize: 12, color: "#D97706", fontWeight: "600", flex: 1 },
   alertActions:  { flexDirection: "row", gap: 8 },
   alertBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
                    paddingHorizontal: 12, paddingVertical: 11, borderRadius: 11, borderWidth: 1 },
   alertBtnTxt:   { fontSize: 12, fontWeight: "700" },
 
-  /* ── E. Bus en temps réel ────────────────────────────────────── */
-  busCard:         { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
-                     ...(Platform.OS === "web"
-                       ? { boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }
-                       : { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10,
-                           shadowOffset: { width: 0, height: 2 }, elevation: 3 }) },
-  busCardPriority: { backgroundColor: "#FFF5F5" },
-  busTop:          { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  busStatus:       { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center" },
-  busName:         { fontSize: 15, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
-  busPlate:        { fontSize: 11, color: "#64748B", marginTop: 1 },
-  statusPill:      { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
-  statusTxt:       { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
-  alertCountBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: RED,
-                     borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
-  alertCountTxt:   { fontSize: 10, fontWeight: "900", color: "#fff" },
-
-  busInfoRow:  { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap",
-                 backgroundColor: "#F8FAFC", borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9,
-                 borderWidth: 1, borderColor: "#E2E8F0" },
-  busInfoTxt:  { fontSize: 13, fontWeight: "700", color: "#0F172A", flex: 1 },
-  busChip:     { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF",
-                 borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5 },
-  busChipTxt:  { fontSize: 11, fontWeight: "700", color: "#4F46E5" },
-  busGpsRow:   { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
-  busGpsTxt:   { fontSize: 12, color: "#7C3AED", fontWeight: "600", flex: 1 },
-
-  tcOccHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  tcOccLabel:  { fontSize: 11, color: "#64748B", fontWeight: "600" },
-  tcOccValue:  { fontSize: 11, color: "#059669", fontWeight: "700" },
-  tcOccBar:    { height: 7, backgroundColor: "#DCFCE7", borderRadius: 5, overflow: "hidden" },
-  tcOccFill:   { height: 7, borderRadius: 5 },
-
-  tcAlertInline: { flexDirection: "row", alignItems: "flex-start", gap: 9, backgroundColor: "#FFF1F2",
-                   borderRadius: 11, padding: 11, borderWidth: 1, borderColor: RED_M },
-  tcAlertTxt:    { fontSize: 12, color: RED_D, fontWeight: "700", lineHeight: 17 },
-  tcAlertTime:   { fontSize: 10, color: RED, marginTop: 3, fontWeight: "600" },
-
-  triggerBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                   paddingVertical: 12, borderRadius: 11, borderWidth: 1.5,
-                   borderColor: RED_M, backgroundColor: RED_L },
-  triggerBtnTxt: { fontSize: 13, fontWeight: "700", color: RED },
-
-  /* ── F. Actions rapides ──────────────────────────────────────── */
+  /* ── E. Actions rapides ──────────────────────────────────────── */
   quickGrid:   { gap: 12 },
   quickBtn:    { flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 16,
                  alignItems: "center", gap: 10,
@@ -1431,16 +1353,16 @@ const S = StyleSheet.create({
   quickBtnTxt: { fontSize: 12, fontWeight: "700", color: "#0F172A", textAlign: "center", lineHeight: 16 },
 
   /* ── Modal ──────────────────────────────────────────────────── */
-  modalBg:      { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  modalBox:     { backgroundColor: "#fff", borderTopLeftRadius: 26, borderTopRightRadius: 26,
-                  padding: 24, gap: 12 },
-  modalTitle:   { fontSize: 19, fontWeight: "900", color: "#0F172A", letterSpacing: -0.3 },
-  modalSub:     { fontSize: 13, color: "#64748B", lineHeight: 18 },
-  modalLabel:   { fontSize: 12, fontWeight: "700", color: "#475569", marginTop: 4, letterSpacing: 0.2 },
-  msgOption:    { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: RED_L,
-                  borderRadius: 12, padding: 14, borderWidth: 1, borderColor: RED_M },
-  msgOptionTxt: { flex: 1, fontSize: 13, fontWeight: "600", color: RED_D, lineHeight: 18 },
-  modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
-  modalBtn:     { flex: 1, alignItems: "center", justifyContent: "center",
-                  paddingVertical: 15, borderRadius: 13 },
+  modalBg:     { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  modalBox:    { backgroundColor: "#fff", borderTopLeftRadius: 26, borderTopRightRadius: 26,
+                 padding: 24, gap: 12 },
+  modalTitle:  { fontSize: 18, fontWeight: "900", color: "#0F172A", letterSpacing: -0.3 },
+  modalSub:    { fontSize: 12, color: "#64748B" },
+  modalLabel:  { fontSize: 12, fontWeight: "700", color: "#475569", letterSpacing: 0.2 },
+  msgOption:   { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: RED_L,
+                 borderRadius: 12, padding: 14, borderWidth: 1, borderColor: RED_M },
+  msgOptionTxt:{ flex: 1, fontSize: 13, fontWeight: "600", color: RED_D, lineHeight: 18 },
+  modalActions:{ flexDirection: "row", gap: 10, marginTop: 8 },
+  modalBtn:    { flex: 1, alignItems: "center", justifyContent: "center",
+                 paddingVertical: 15, borderRadius: 13 },
 });

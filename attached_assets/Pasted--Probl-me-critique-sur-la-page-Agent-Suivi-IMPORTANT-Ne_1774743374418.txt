@@ -1,0 +1,87 @@
+"}
+Problème critique sur la page “Agent Suivi”.
+
+IMPORTANT :
+Ne rien casser dans la logique existante.
+Refondre complètement l’organisation visuelle et fonctionnelle pour atteindre un niveau professionnel.
+
+Problèmes observés :
+- Interface désorganisée
+- Icônes mélangées et incohérentes
+- Éléments mal alignés
+- Pas fluide visuellement
+- Pas moderne
+- Ne correspond pas à une vraie “tour de contrôle”
+
+OBJECTIF :
+Transformer la page Agent Suivi en véritable tour de contrôle (comme aviation), capable de gérer plusieurs bus en temps réel.
+
+À corriger immédiatement :
+
+1. CONCEPT GLOBAL (OBLIGATOIRE) :
+La page Agent Suivi doit fonctionner comme une tour de contrôle :
+- Visualisation de plusieurs départs en simultané
+- Vision globale + détails accessibles
+- Suivi en temps réel
+
+2. STRUCTURE PRINCIPALE :
+
+A. HEADER GLOBAL :
+- Statut global (nombre de bus en route)
+- Nombre total de passagers
+- Nombre d’alertes actives
+- Indicateur système (OK / problème)
+
+B. TOUR DE CONTRÔLE (ZONE PRINCIPALE) :
+- Liste ou grille de tous les bus actifs
+- Chaque bus = carte claire avec :
+  • trajet (ex : Abidjan → Bouaké)
+  • statut (en route / arrêt / problème)
+  • nombre de passagers
+  • alertes associées
+  • bouton “Voir détails”
+
+C. CAMÉRAS (TRÈS IMPORTANT) :
+- Section dédiée affichant toutes les caméras actives
+- Multi-caméras visibles (grid)
+- Bouton “Voir” pour chaque caméra
+- Indicateur LIVE
+
+D. ALERTES :
+- Liste globale des alertes (tous les bus)
+- Tri par priorité
+- Couleurs claires :
+  • rouge = critique
+  • jaune = attente
+- Actions visibles
+
+E. ACTIONS RAPIDES :
+- Scanner ticket
+- Ajouter passager
+- Faire rapport
+- Déclencher alerte
+- Grille propre et moderne
+
+3. DESIGN (TRÈS IMPORTANT) :
+- Interface moderne type dashboard
+- Cartes bien espacées
+- Icônes cohérentes (même style)
+- Alignement parfait
+- Aucune superposition
+- Couleurs propres et professionnelles
+
+4. FLUIDITÉ :
+- Scroll fluide
+- Aucun blocage
+- Navigation rapide
+- Aucun élément cassé
+
+5. COHÉRENCE :
+- Même niveau visuel que compagnie/admin
+- Même logique UI dans toute l’application
+
+OBJECTIF FINAL :
+Une vraie interface de supervision en temps réel, claire, moderne, fluide, professionnelle, permettant de suivre plusieurs bus et caméras simultanément.
+
+PRIORITÉ MAXIMALE :
+Refonte complète Agent Suivi (UX + UI + logique multi-bu
