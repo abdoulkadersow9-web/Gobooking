@@ -809,7 +809,7 @@ export default function SuiviScreen() {
           {/* ══ C. CAMÉRA EMBARQUÉE ═══════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Ionicons name="videocam" size={15} color="#334155" />
+              <Ionicons name="videocam" size={16} color="#0369A1" />
               <Text style={S.sectionTitle}>Caméra embarquée</Text>
               {hasCameras && (
                 <View style={{ backgroundColor: "#052E16", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginLeft: "auto" }}>
@@ -821,15 +821,15 @@ export default function SuiviScreen() {
             {/* Connexion status — ligne horizontale : QR | Bluetooth | Wi-Fi */}
             <View style={S.camConnRow}>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#7C3AED", backgroundColor: "#F5F3FF" }]}>
-                <Ionicons name="qr-code" size={15} color={hasCameras ? "#7C3AED" : "#94A3B8"} />
+                <Ionicons name="qr-code" size={16} color={hasCameras ? "#7C3AED" : "#94A3B8"} />
                 <Text style={[S.camConnTxt, hasCameras && { color: "#7C3AED", fontWeight: "800" }]}>QR</Text>
               </View>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#0369A1", backgroundColor: "#F0F9FF" }]}>
-                <Feather name="bluetooth" size={15} color={hasCameras ? "#0369A1" : "#94A3B8"} />
+                <Feather name="bluetooth" size={16} color={hasCameras ? "#0369A1" : "#94A3B8"} />
                 <Text style={[S.camConnTxt, hasCameras && { color: "#0369A1", fontWeight: "800" }]}>Bluetooth</Text>
               </View>
               <View style={[S.camConnChip, hasCameras && { borderColor: "#059669", backgroundColor: "#F0FDF4" }]}>
-                <Feather name="wifi" size={15} color={hasCameras ? "#059669" : "#94A3B8"} />
+                <Feather name="wifi" size={16} color={hasCameras ? "#059669" : "#94A3B8"} />
                 <Text style={[S.camConnTxt, hasCameras && { color: "#059669", fontWeight: "800" }]}>Wi-Fi</Text>
               </View>
             </View>
@@ -894,7 +894,7 @@ export default function SuiviScreen() {
           {/* ══ D. ALERTES ═══════════════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Ionicons name="warning" size={15} color={hasAlerts ? RED : "#22C55E"} />
+              <Ionicons name="warning" size={16} color={hasAlerts ? RED : "#22C55E"} />
               <Text style={S.sectionTitle}>Alertes actives</Text>
               {data?.alerts?.length ? (
                 <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, marginLeft: "auto" }}>
@@ -980,7 +980,7 @@ export default function SuiviScreen() {
           {/* ══ E. BUS EN TEMPS RÉEL ══════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Feather name="radio" size={14} color="#1D4ED8" />
+              <Feather name="radio" size={16} color="#1D4ED8" />
               <Text style={S.sectionTitle}>Bus en temps réel</Text>
               <Text style={{ fontSize: 11, color: "#94A3B8", marginLeft: "auto" }}>
                 {data?.buses?.length ?? 0} véhicule{(data?.buses?.length ?? 0) > 1 ? "s" : ""}
@@ -1109,38 +1109,44 @@ export default function SuiviScreen() {
           {/* ══ F. ACTIONS RAPIDES ════════════════════════════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
-              <Feather name="zap" size={14} color="#D97706" />
+              <Feather name="zap" size={16} color="#D97706" />
               <Text style={S.sectionTitle}>Actions rapides</Text>
             </View>
             <View style={S.quickGrid}>
-              <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/scan" as never)} activeOpacity={0.8}>
-                <View style={[S.quickIcon, { backgroundColor: "#EEF2FF" }]}>
-                  <Ionicons name="qr-code" size={22} color="#4F46E5" />
-                </View>
-                <Text style={S.quickBtnTxt}>Scanner ticket</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
-                onPress={() => Alert.alert("Ajouter passager", "Disponible depuis le guichet ou la réservation.")}>
-                <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
-                  <Ionicons name="person-add" size={22} color="#16A34A" />
-                </View>
-                <Text style={S.quickBtnTxt}>Ajouter passager</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/rapport" as never)} activeOpacity={0.8}>
-                <View style={[S.quickIcon, { backgroundColor: "#FFF7ED" }]}>
-                  <Feather name="file-text" size={22} color="#D97706" />
-                </View>
-                <Text style={S.quickBtnTxt}>Faire un rapport</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
-                onPress={() => sortedBuses.length
-                  ? setTriggerBus(sortedBuses[0])
-                  : Alert.alert("Aucun bus", "Aucun bus actif disponible.")}>
-                <View style={[S.quickIcon, { backgroundColor: RED_L }]}>
-                  <Ionicons name="warning" size={22} color={RED} />
-                </View>
-                <Text style={S.quickBtnTxt}>Déclencher alerte</Text>
-              </TouchableOpacity>
+              {/* Row 1 */}
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/scan" as never)} activeOpacity={0.8}>
+                  <View style={[S.quickIcon, { backgroundColor: "#EEF2FF" }]}>
+                    <Ionicons name="qr-code" size={24} color="#4F46E5" />
+                  </View>
+                  <Text style={S.quickBtnTxt}>Scanner ticket</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
+                  onPress={() => Alert.alert("Ajouter passager", "Disponible depuis le guichet ou la réservation.")}>
+                  <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
+                    <Ionicons name="person-add" size={24} color="#16A34A" />
+                  </View>
+                  <Text style={S.quickBtnTxt}>Ajouter passager</Text>
+                </TouchableOpacity>
+              </View>
+              {/* Row 2 */}
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/rapport" as never)} activeOpacity={0.8}>
+                  <View style={[S.quickIcon, { backgroundColor: "#FFF7ED" }]}>
+                    <Feather name="file-text" size={24} color="#D97706" />
+                  </View>
+                  <Text style={S.quickBtnTxt}>Faire un rapport</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
+                  onPress={() => sortedBuses.length
+                    ? setTriggerBus(sortedBuses[0])
+                    : Alert.alert("Aucun bus", "Aucun bus actif disponible.")}>
+                  <View style={[S.quickIcon, { backgroundColor: RED_L }]}>
+                    <Ionicons name="warning" size={24} color={RED} />
+                  </View>
+                  <Text style={S.quickBtnTxt}>Déclencher alerte</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
@@ -1212,184 +1218,229 @@ const CP = StyleSheet.create({
 });
 
 
+
 /* ── Styles ─────────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F1F5F9" },
+  safe: { flex: 1, backgroundColor: "#F0F4F8" },
 
-  /* A. Header */
-  header:        { backgroundColor: RED_D, paddingHorizontal: 16, paddingVertical: 12,
+  /* ── A. Header ─────────────────────────────────────────────────── */
+  header:        { backgroundColor: RED_D, paddingHorizontal: 16, paddingVertical: 14,
                    flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
   headerLeft:    { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, overflow: "hidden" },
-  headerRight:   { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  headerIcon:    { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)",
-                   justifyContent: "center", alignItems: "center", flexShrink: 0 },
-  headerTitle:   { color: "#fff", fontSize: 16, fontWeight: "800" },
-  headerSub:     { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 },
-  statusBadge:   { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8,
-                   paddingHorizontal: 7, paddingVertical: 3 },
+  headerRight:   { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
+  headerIcon:    { width: 42, height: 42, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.18)",
+                   justifyContent: "center", alignItems: "center", flexShrink: 0,
+                   borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  headerTitle:   { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: -0.2 },
+  headerSub:     { color: "rgba(255,255,255,0.72)", fontSize: 11, marginTop: 2 },
+  statusBadge:   { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8,
+                   paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeTxt:{ fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
   syncPill:      { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
-                   borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+                   borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
+                   borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
   syncDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR },
-  syncTxt:       { color: "rgba(255,255,255,0.8)", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
-  iconBtn:       { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.13)",
-                   justifyContent: "center", alignItems: "center" },
+  syncTxt:       { color: "rgba(255,255,255,0.82)", fontSize: 9, fontWeight: "700", letterSpacing: 0.3 },
+  iconBtn:       { width: 36, height: 36, borderRadius: 11, backgroundColor: "rgba(255,255,255,0.14)",
+                   justifyContent: "center", alignItems: "center",
+                   borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
 
-  /* Loading / Error center */
-  center:        { flex: 1, justifyContent: "center", alignItems: "center", gap: 14, padding: 36 },
-  loadingTxt:    { fontSize: 14, fontWeight: "700", color: "#0F172A" },
-  loadingSub:    { fontSize: 12, color: "#94A3B8", textAlign: "center" },
+  /* ── Loading / Error ──────────────────────────────────────────── */
+  center:        { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
+  loadingTxt:    { fontSize: 15, fontWeight: "700", color: "#0F172A" },
+  loadingSub:    { fontSize: 12, color: "#94A3B8", textAlign: "center", lineHeight: 18 },
 
-  /* Scroll */
-  scroll: { padding: 16, gap: 18, paddingBottom: 40 },
+  /* ── Scroll ──────────────────────────────────────────────────── */
+  scroll: { padding: 16, gap: 20, paddingBottom: 52 },
 
-  /* B. Tour de Contrôle — cockpit panel */
-  cockpit:             { backgroundColor: CAM_BG, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "#1E293B" },
-  cockpitHdr:          { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                         paddingHorizontal: 14, paddingVertical: 11,
-                         borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
-  cockpitTitle:        { color: "#E2E8F0", fontSize: 11, fontWeight: "900", letterSpacing: 1.2 },
-  cockpitLivePill:     { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#052E16",
-                         borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  cockpitLiveTxt:      { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  /* ── B. Tour de Contrôle — Cockpit ───────────────────────────── */
+  cockpit: { backgroundColor: CAM_BG, borderRadius: 18, overflow: "hidden",
+             borderWidth: 1, borderColor: "#1E293B",
+             ...(Platform.OS === "web"
+               ? { boxShadow: "0 4px 20px rgba(0,0,0,0.22)" }
+               : { shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 14,
+                   shadowOffset: { width: 0, height: 4 }, elevation: 8 }) },
+  cockpitHdr: { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                paddingHorizontal: 16, paddingVertical: 13,
+                borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.07)",
+                backgroundColor: "rgba(0,0,0,0.18)" },
+  cockpitTitle: { color: "#E2E8F0", fontSize: 11, fontWeight: "900", letterSpacing: 1.5 },
+  cockpitLivePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#052E16",
+                     borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5,
+                     borderWidth: 1, borderColor: "#166534" },
+  cockpitLiveTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
 
-  cockpitKpiRow:   { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 12,
-                     borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
-  cockpitKpiItem:  { flex: 1, alignItems: "center", gap: 3 },
-  cockpitKpiNum:   { fontSize: 20, fontWeight: "900", color: "#E2E8F0" },
-  cockpitKpiLbl:   { fontSize: 9, fontWeight: "700", color: "#475569", letterSpacing: 0.5 },
-  cockpitKpiDiv:   { width: 1, backgroundColor: "rgba(255,255,255,0.07)", marginVertical: 4 },
+  cockpitKpiRow:  { flexDirection: "row", paddingHorizontal: 16, paddingVertical: 14,
+                    borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  cockpitKpiItem: { flex: 1, alignItems: "center", gap: 4 },
+  cockpitKpiNum:  { fontSize: 22, fontWeight: "900", color: "#F8FAFC", lineHeight: 26 },
+  cockpitKpiLbl:  { fontSize: 9, fontWeight: "700", color: "#64748B", letterSpacing: 0.7 },
+  cockpitKpiDiv:  { width: 1, backgroundColor: "rgba(255,255,255,0.06)", marginVertical: 6 },
 
-  cockpitSignalWarn:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 8,
-                          backgroundColor: "rgba(252,211,77,0.08)", borderTopWidth: 1, borderTopColor: "rgba(252,211,77,0.2)" },
+  cockpitSignalWarn:    { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 9,
+                          backgroundColor: "rgba(252,211,77,0.07)", borderTopWidth: 1, borderTopColor: "rgba(252,211,77,0.18)" },
   cockpitSignalWarnTxt: { flex: 1, color: "#FCD34D", fontSize: 10, fontWeight: "700" },
 
   alarmBanner:  { backgroundColor: RED, flexDirection: "row", alignItems: "center", gap: 10,
-                  marginHorizontal: 14, marginTop: 10, paddingVertical: 10, paddingHorizontal: 12,
-                  borderRadius: 10 },
-  alarmTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.4 },
-  alarmSub:     { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 1 },
+                  marginHorizontal: 16, marginTop: 12, paddingVertical: 11, paddingHorizontal: 13,
+                  borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+  alarmTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.3 },
+  alarmSub:     { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 2 },
 
-  cockpitTripRow:       { flexDirection: "row", alignItems: "flex-start", gap: 12,
-                          paddingHorizontal: 14, paddingVertical: 11,
-                          borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
-  cockpitTripRowAlert:  { borderLeftWidth: 2, borderLeftColor: "#EF4444", backgroundColor: "rgba(239,68,68,0.06)" },
-  cockpitTripRowSigWarn:{ borderLeftWidth: 2, borderLeftColor: "#FCD34D", backgroundColor: "rgba(252,211,77,0.04)" },
-  cockpitLiveDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF3B3B", marginTop: 3 },
-  cockpitTripName:      { fontSize: 13, fontWeight: "800", color: "#E2E8F0", flex: 1 },
-  cockpitFramesTxt:     { fontSize: 9, color: CAM_GR, fontWeight: "800" },
-  cockpitWatchBtn:      { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(34,197,94,0.12)",
-                          borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, borderWidth: 1, borderColor: "#166534" },
-  cockpitWatchTxt:      { color: CAM_GR, fontSize: 11, fontWeight: "800" },
+  cockpitTripRow:        { flexDirection: "row", alignItems: "center", gap: 12,
+                           paddingHorizontal: 16, paddingVertical: 12,
+                           borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
+  cockpitTripRowAlert:   { borderLeftWidth: 3, borderLeftColor: "#EF4444", backgroundColor: "rgba(239,68,68,0.07)" },
+  cockpitTripRowSigWarn: { borderLeftWidth: 3, borderLeftColor: "#FCD34D", backgroundColor: "rgba(252,211,77,0.05)" },
+  cockpitLiveDot:        { width: 9, height: 9, borderRadius: 5, backgroundColor: "#EF4444" },
+  cockpitTripName:       { fontSize: 13, fontWeight: "800", color: "#E2E8F0" },
+  cockpitFramesTxt:      { fontSize: 9, color: CAM_GR, fontWeight: "800" },
+  cockpitWatchBtn:       { flexDirection: "row", alignItems: "center", gap: 5,
+                           backgroundColor: "rgba(34,197,94,0.14)", borderRadius: 9,
+                           paddingHorizontal: 11, paddingVertical: 8,
+                           borderWidth: 1, borderColor: "#166534" },
+  cockpitWatchTxt:       { color: CAM_GR, fontSize: 11, fontWeight: "800" },
 
-  cockpitSyncRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8 },
-  cockpitSyncTxt: { fontSize: 9, color: "#334155", fontWeight: "600" },
+  cockpitSyncRow: { flexDirection: "row", alignItems: "center", gap: 6,
+                    paddingHorizontal: 16, paddingVertical: 9,
+                    borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.04)",
+                    backgroundColor: "rgba(0,0,0,0.12)" },
+  cockpitSyncTxt: { fontSize: 9, color: "#475569", fontWeight: "600", letterSpacing: 0.2 },
 
-  /* Sections */
-  section:       { gap: 10 },
+  /* ── Sections generiques ─────────────────────────────────────── */
+  section:       { gap: 12 },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  sectionTitle:  { fontSize: 14, fontWeight: "800", color: "#0F172A" },
-  empty:         { backgroundColor: "#fff", borderRadius: 12, padding: 28, alignItems: "center", gap: 8 },
+  sectionTitle:  { fontSize: 14, fontWeight: "800", color: "#0F172A", letterSpacing: -0.1 },
+  empty:         { backgroundColor: "#fff", borderRadius: 16, padding: 32,
+                   alignItems: "center", gap: 10,
+                   ...(Platform.OS === "web"
+                     ? { boxShadow: "0 1px 8px rgba(0,0,0,0.06)" }
+                     : { shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }) },
   emptyTxt:      { color: "#94A3B8", fontSize: 13, fontWeight: "600" },
 
-  /* C. Caméra embarquée */
+  /* ── C. Caméra embarquée ─────────────────────────────────────── */
   camConnRow:  { flexDirection: "row", gap: 10 },
   camConnChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                 backgroundColor: "#F8FAFC", borderRadius: 10, paddingVertical: 10,
-                 borderWidth: 1, borderColor: "#E2E8F0" },
-  camConnTxt:  { fontSize: 12, fontWeight: "600", color: "#94A3B8" },
+                 backgroundColor: "#fff", borderRadius: 12, paddingVertical: 12,
+                 borderWidth: 1.5, borderColor: "#E2E8F0",
+                 ...(Platform.OS === "web"
+                   ? { boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }
+                   : { elevation: 1 }) },
+  camConnTxt:  { fontSize: 12, fontWeight: "700", color: "#94A3B8" },
 
-  camCard:     { backgroundColor: CAM_BG, borderRadius: 12, padding: 12, flexDirection: "row",
+  camCard:     { backgroundColor: CAM_BG, borderRadius: 14, padding: 14, flexDirection: "row",
                  alignItems: "center", justifyContent: "space-between", gap: 10,
-                 borderWidth: 1, borderColor: "#166534" },
-  camCardLeft: { flexDirection: "row", alignItems: "flex-start", gap: 10, flex: 1 },
-  camIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: "rgba(34,197,94,0.15)",
-                 justifyContent: "center", alignItems: "center", position: "relative", flexShrink: 0 },
-  camLiveDot:  { position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: 4,
-                 backgroundColor: CAM_GR, borderWidth: 1.5, borderColor: CAM_BG },
-  camCardTitle:{ fontSize: 13, fontWeight: "800", color: "#E2E8F0" },
-  camCardSub:  { fontSize: 11, color: "#64748B", marginTop: 2 },
+                 borderWidth: 1, borderColor: "#166534",
+                 ...(Platform.OS === "web"
+                   ? { boxShadow: "0 2px 12px rgba(0,0,0,0.16)" }
+                   : { shadowColor: "#000", shadowOpacity: 0.14, shadowRadius: 10, elevation: 4 }) },
+  camCardLeft: { flexDirection: "row", alignItems: "flex-start", gap: 12, flex: 1 },
+  camIconWrap: { width: 46, height: 46, borderRadius: 13, backgroundColor: "rgba(34,197,94,0.15)",
+                 justifyContent: "center", alignItems: "center", position: "relative", flexShrink: 0,
+                 borderWidth: 1, borderColor: "rgba(34,197,94,0.25)" },
+  camLiveDot:  { position: "absolute", top: 3, right: 3, width: 9, height: 9, borderRadius: 5,
+                 backgroundColor: CAM_GR, borderWidth: 2, borderColor: CAM_BG },
+  camCardTitle:{ fontSize: 14, fontWeight: "800", color: "#E2E8F0" },
+  camCardSub:  { fontSize: 11, color: "#64748B", marginTop: 3, lineHeight: 15 },
   tcLiveBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#DC2626",
-                 borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
-  tcLiveTxt:   { color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 1 },
-  tcWatchBtn:  { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(34,197,94,0.12)",
-                 borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, borderWidth: 1, borderColor: "#166534" },
+                 borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  tcLiveTxt:   { color: "#fff", fontSize: 8, fontWeight: "900", letterSpacing: 1.2 },
+  tcWatchBtn:  { flexDirection: "row", alignItems: "center", gap: 6,
+                 backgroundColor: "rgba(34,197,94,0.14)", borderRadius: 10,
+                 paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: "#166534" },
   tcWatchTxt:  { color: CAM_GR, fontSize: 12, fontWeight: "800" },
 
-  /* D. Alertes */
-  alertCard:     { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 10,
-                   borderLeftWidth: 4, borderLeftColor: RED },
+  /* ── D. Alertes ──────────────────────────────────────────────── */
+  alertCard:     { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
+                   borderLeftWidth: 4, borderLeftColor: RED,
+                   ...(Platform.OS === "web"
+                     ? { boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }
+                     : { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 10,
+                         shadowOffset: { width: 0, height: 2 }, elevation: 3 }) },
   alertTop:      { flexDirection: "row", alignItems: "center", gap: 8 },
-  alertTypeBadge:{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  alertTypeTxt:  { fontSize: 10, fontWeight: "800" },
+  alertTypeBadge:{ paddingHorizontal: 9, paddingVertical: 4, borderRadius: 7 },
+  alertTypeTxt:  { fontSize: 10, fontWeight: "900", letterSpacing: 0.3 },
   alertBus:      { flex: 1, fontSize: 13, fontWeight: "700", color: "#0F172A" },
   alertTime:     { fontSize: 11, color: "#94A3B8" },
-  alertMsg:      { fontSize: 13, color: "#1E293B", fontWeight: "600", lineHeight: 18 },
-  alertAgent:    { fontSize: 11, color: "#94A3B8" },
-  responsePill:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  alertMsg:      { fontSize: 13, color: "#1E293B", fontWeight: "600", lineHeight: 19 },
+  alertAgent:    { fontSize: 11, color: "#94A3B8", letterSpacing: 0.1 },
+  responsePill:  { flexDirection: "row", alignItems: "center", gap: 6,
+                   paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9 },
   responseTxt:   { fontSize: 12, fontWeight: "700" },
-  waitPill:      { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FEF3C7",
-                   paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  waitPill:      { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFBEB",
+                   paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9,
+                   borderWidth: 1, borderColor: "#FDE68A" },
   waitTxt:       { fontSize: 12, color: "#D97706", fontWeight: "600" },
   alertActions:  { flexDirection: "row", gap: 8 },
-  alertBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-                   paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  alertBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7,
+                   paddingHorizontal: 12, paddingVertical: 11, borderRadius: 11, borderWidth: 1 },
   alertBtnTxt:   { fontSize: 12, fontWeight: "700" },
 
-  /* E. Bus en temps réel */
-  busCard:         { backgroundColor: "#fff", borderRadius: 14, padding: 14, gap: 10 },
+  /* ── E. Bus en temps réel ────────────────────────────────────── */
+  busCard:         { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12,
+                     ...(Platform.OS === "web"
+                       ? { boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }
+                       : { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10,
+                           shadowOffset: { width: 0, height: 2 }, elevation: 3 }) },
   busCardPriority: { backgroundColor: "#FFF5F5" },
   busTop:          { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  busStatus:       { width: 42, height: 42, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  busName:         { fontSize: 15, fontWeight: "800", color: "#0F172A" },
-  busPlate:        { fontSize: 11, color: "#64748B" },
-  statusPill:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusTxt:       { fontSize: 10, fontWeight: "700" },
+  busStatus:       { width: 44, height: 44, borderRadius: 13, justifyContent: "center", alignItems: "center" },
+  busName:         { fontSize: 15, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 },
+  busPlate:        { fontSize: 11, color: "#64748B", marginTop: 1 },
+  statusPill:      { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  statusTxt:       { fontSize: 10, fontWeight: "800", letterSpacing: 0.2 },
   alertCountBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: RED,
-                     borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+                     borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
   alertCountTxt:   { fontSize: 10, fontWeight: "900", color: "#fff" },
 
   busInfoRow:  { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap",
-                 backgroundColor: "#F8FAFC", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+                 backgroundColor: "#F8FAFC", borderRadius: 11, paddingHorizontal: 12, paddingVertical: 9,
+                 borderWidth: 1, borderColor: "#E2E8F0" },
   busInfoTxt:  { fontSize: 13, fontWeight: "700", color: "#0F172A", flex: 1 },
-  busChip:     { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#E2E8F0",
-                 borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
-  busChipTxt:  { fontSize: 11, fontWeight: "700", color: "#475569" },
-  busGpsRow:   { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 2 },
+  busChip:     { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#EEF2FF",
+                 borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5 },
+  busChipTxt:  { fontSize: 11, fontWeight: "700", color: "#4F46E5" },
+  busGpsRow:   { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 2 },
   busGpsTxt:   { fontSize: 12, color: "#7C3AED", fontWeight: "600", flex: 1 },
 
   tcOccHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   tcOccLabel:  { fontSize: 11, color: "#64748B", fontWeight: "600" },
   tcOccValue:  { fontSize: 11, color: "#059669", fontWeight: "700" },
-  tcOccBar:    { height: 6, backgroundColor: "#DCFCE7", borderRadius: 4, overflow: "hidden" },
-  tcOccFill:   { height: 6, borderRadius: 4 },
+  tcOccBar:    { height: 7, backgroundColor: "#DCFCE7", borderRadius: 5, overflow: "hidden" },
+  tcOccFill:   { height: 7, borderRadius: 5 },
 
-  tcAlertInline: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FFF1F2",
-                   borderRadius: 10, padding: 10, borderWidth: 1, borderColor: RED_M },
-  tcAlertTxt:    { fontSize: 12, color: RED_D, fontWeight: "700", lineHeight: 16 },
-  tcAlertTime:   { fontSize: 10, color: RED, marginTop: 2 },
+  tcAlertInline: { flexDirection: "row", alignItems: "flex-start", gap: 9, backgroundColor: "#FFF1F2",
+                   borderRadius: 11, padding: 11, borderWidth: 1, borderColor: RED_M },
+  tcAlertTxt:    { fontSize: 12, color: RED_D, fontWeight: "700", lineHeight: 17 },
+  tcAlertTime:   { fontSize: 10, color: RED, marginTop: 3, fontWeight: "600" },
 
   triggerBtn:    { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                   paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: RED_M, backgroundColor: RED_L },
+                   paddingVertical: 12, borderRadius: 11, borderWidth: 1.5,
+                   borderColor: RED_M, backgroundColor: RED_L },
   triggerBtnTxt: { fontSize: 13, fontWeight: "700", color: RED },
 
-  /* F. Actions rapides */
-  quickGrid:   { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  quickBtn:    { width: "47%", backgroundColor: "#fff", borderRadius: 14, padding: 14,
-                 alignItems: "center", gap: 8,
-                 ...(Platform.OS === "web" ? { boxShadow: "0 1px 6px rgba(0,0,0,0.07)" } : { elevation: 2 }) },
-  quickIcon:   { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center" },
-  quickBtnTxt: { fontSize: 12, fontWeight: "700", color: "#0F172A", textAlign: "center" },
+  /* ── F. Actions rapides ──────────────────────────────────────── */
+  quickGrid:   { gap: 12 },
+  quickBtn:    { flex: 1, backgroundColor: "#fff", borderRadius: 16, padding: 16,
+                 alignItems: "center", gap: 10,
+                 ...(Platform.OS === "web"
+                   ? { boxShadow: "0 2px 10px rgba(0,0,0,0.07)" }
+                   : { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 10,
+                       shadowOffset: { width: 0, height: 2 }, elevation: 3 }) },
+  quickIcon:   { width: 52, height: 52, borderRadius: 16, justifyContent: "center", alignItems: "center" },
+  quickBtnTxt: { fontSize: 12, fontWeight: "700", color: "#0F172A", textAlign: "center", lineHeight: 16 },
 
-  /* Modal */
-  modalBg:      { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalBox:     { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 12 },
-  modalTitle:   { fontSize: 18, fontWeight: "900", color: "#0F172A" },
-  modalSub:     { fontSize: 13, color: "#64748B" },
-  modalLabel:   { fontSize: 12, fontWeight: "700", color: "#475569", marginTop: 4 },
+  /* ── Modal ──────────────────────────────────────────────────── */
+  modalBg:      { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
+  modalBox:     { backgroundColor: "#fff", borderTopLeftRadius: 26, borderTopRightRadius: 26,
+                  padding: 24, gap: 12 },
+  modalTitle:   { fontSize: 19, fontWeight: "900", color: "#0F172A", letterSpacing: -0.3 },
+  modalSub:     { fontSize: 13, color: "#64748B", lineHeight: 18 },
+  modalLabel:   { fontSize: 12, fontWeight: "700", color: "#475569", marginTop: 4, letterSpacing: 0.2 },
   msgOption:    { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: RED_L,
-                  borderRadius: 10, padding: 12, borderWidth: 1, borderColor: RED_M },
-  msgOptionTxt: { flex: 1, fontSize: 13, fontWeight: "600", color: RED_D },
+                  borderRadius: 12, padding: 14, borderWidth: 1, borderColor: RED_M },
+  msgOptionTxt: { flex: 1, fontSize: 13, fontWeight: "600", color: RED_D, lineHeight: 18 },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 8 },
-  modalBtn:     { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 14, borderRadius: 12 },
+  modalBtn:     { flex: 1, alignItems: "center", justifyContent: "center",
+                  paddingVertical: 15, borderRadius: 13 },
 });
