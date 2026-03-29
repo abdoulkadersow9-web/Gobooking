@@ -722,6 +722,49 @@ export default function RouteScreen() {
   /* Toutes les alertes : API + auto-détectées */
   const allAlerts = useMemo<BusAlert[]>(() => [...busAlerts, ...autoAlerts], [busAlerts, autoAlerts]);
 
+  /* ── ALARME D'URGENCE — son fort, prioritaire, agent routier ── */
+  const routeAlarmRef = useRef<{ stop: () => void } | null>(null);
+  const [alarmMuted, setAlarmMuted] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    const hasUrgent = allAlerts.length > 0;
+    if (hasUrgent && !alarmMuted) {
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        /* Siren sweep: 200→550Hz alternating, fort (volume 0.55), rythme rapide */
+        const playAlarm = (when: number) => {
+          const scheduleBeep = (t: number, freq: number, dur: number) => {
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sawtooth";
+            osc.frequency.setValueAtTime(freq, t);
+            osc.frequency.linearRampToValueAtTime(freq * 1.8, t + dur * 0.6);
+            gain.gain.setValueAtTime(0, t);
+            gain.gain.linearRampToValueAtTime(0.55, t + 0.01);
+            gain.gain.linearRampToValueAtTime(0, t + dur);
+            osc.start(t); osc.stop(t + dur);
+          };
+          scheduleBeep(when,       200, 0.25);
+          scheduleBeep(when + 0.3, 380, 0.25);
+          scheduleBeep(when + 0.6, 200, 0.25);
+          scheduleBeep(when + 0.9, 550, 0.25);
+        };
+        playAlarm(ctx.currentTime);
+        const iv = setInterval(() => { playAlarm(ctx.currentTime); }, 1400);
+        routeAlarmRef.current = { stop: () => { clearInterval(iv); ctx.close().catch(() => {}); } };
+      } catch {}
+    } else {
+      routeAlarmRef.current?.stop();
+      routeAlarmRef.current = null;
+    }
+    return () => { routeAlarmRef.current?.stop(); routeAlarmRef.current = null; };
+  }, [allAlerts.length, alarmMuted]);
+
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor={G_DARK} />
@@ -759,6 +802,15 @@ export default function RouteScreen() {
               <Ionicons name="warning" size={11} color="#fff" />
               <Text style={S.hdrAlertTxt}>{allAlerts.length}</Text>
             </View>
+          )}
+          {allAlerts.length > 0 && (
+            <TouchableOpacity onPress={() => setAlarmMuted(m => !m)}
+              style={[S.logoutBtn, alarmMuted
+                ? { backgroundColor: "rgba(239,68,68,0.2)", borderRadius: 8, padding: 5 }
+                : { backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, padding: 5 }]}>
+              <Ionicons name={alarmMuted ? "volume-mute" : "volume-high"} size={17}
+                color={alarmMuted ? "#FCA5A5" : "#fff"} />
+            </TouchableOpacity>
           )}
           <TouchableOpacity
             style={S.logoutBtn}

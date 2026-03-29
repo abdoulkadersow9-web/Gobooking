@@ -3014,12 +3014,12 @@ router.get("/suivi/overview", async (req, res) => {
 
     /* ── Demo enrichment: generate realistic multi-bus tour de contrôle data ── */
     const DEMO_FLEET = [
-      { name: "Abidjan Express 01", plate: "1234 AB 01", status: "en_route",  from: "Abidjan",       to: "Bouaké",        dept: "06:00", eta: "10:30", pax: 58,  seats: 70, cam: true,  loc: "Autoroute A3 – PK 120", alertType: null },
-      { name: "Savane Liner 02",    plate: "2578 CI 02", status: "en_route",  from: "Abidjan",       to: "Yamoussoukro",  dept: "07:30", eta: "10:00", pax: 42,  seats: 55, cam: true,  loc: "Tiassalé – sortie ville", alertType: "CONTRÔLE" },
-      { name: "Côtier Rapide 03",   plate: "8812 SM 03", status: "en_route",  from: "Bouaké",        to: "Korhogo",       dept: "08:00", eta: "11:45", pax: 61,  seats: 65, cam: false, loc: "N'Zi – Dimbokro",       alertType: null },
-      { name: "Daloa Express 04",   plate: "3301 DL 04", status: "arret",     from: "Abidjan",       to: "Daloa",         dept: "08:30", eta: "13:00", pax: 29,  seats: 60, cam: false, loc: "Gare de Lakota",        alertType: null },
-      { name: "Grand Sud 05",       plate: "6647 SP 05", status: "en_route",  from: "Abidjan",       to: "San Pedro",     dept: "09:00", eta: "14:30", pax: 50,  seats: 60, cam: true,  loc: "Autoroute A1 – PK 85",  alertType: "PANNE" },
-      { name: "Nord Express 06",    plate: "9923 MN 06", status: "probleme",  from: "Bouaké",        to: "Ferkessédougou",dept: "09:30", eta: "15:00", pax: 38,  seats: 55, cam: false, loc: "Yamoussoukro – centre",  alertType: "PANNE" },
+      { name: "Abidjan Express 01", plate: "1234 AB 01", status: "en_route",  from: "Abidjan",       to: "Bouaké",        dept: "06:00", eta: "10:30", pax: 58,  seats: 70, cam: true,  loc: "Autoroute A3 – PK 120",  alertType: null,       maxSpeedKmh: 120 },
+      { name: "Savane Liner 02",    plate: "2578 CI 02", status: "en_route",  from: "Abidjan",       to: "Yamoussoukro",  dept: "07:30", eta: "10:00", pax: 42,  seats: 55, cam: true,  loc: "Tiassalé – sortie ville", alertType: "CONTRÔLE", maxSpeedKmh: 110 },
+      { name: "Côtier Rapide 03",   plate: "8812 SM 03", status: "en_route",  from: "Bouaké",        to: "Korhogo",       dept: "08:00", eta: "11:45", pax: 61,  seats: 65, cam: false, loc: "N'Zi – Dimbokro",        alertType: null,       maxSpeedKmh: 130 },
+      { name: "Daloa Express 04",   plate: "3301 DL 04", status: "arret",     from: "Abidjan",       to: "Daloa",         dept: "08:30", eta: "13:00", pax: 29,  seats: 60, cam: false, loc: "Gare de Lakota",         alertType: null,       maxSpeedKmh: 120 },
+      { name: "Grand Sud 05",       plate: "6647 SP 05", status: "en_route",  from: "Abidjan",       to: "San Pedro",     dept: "09:00", eta: "14:30", pax: 50,  seats: 60, cam: true,  loc: "Autoroute A1 – PK 85",   alertType: "PANNE",    maxSpeedKmh: 140 },
+      { name: "Nord Express 06",    plate: "9923 MN 06", status: "probleme",  from: "Bouaké",        to: "Ferkessédougou",dept: "09:30", eta: "15:00", pax: 38,  seats: 55, cam: false, loc: "Yamoussoukro – centre",   alertType: "PANNE",    maxSpeedKmh: 110 },
     ];
 
     const now = new Date();
@@ -3036,8 +3036,10 @@ router.get("/suivi/overview", async (req, res) => {
         busName:         demo.name,
         plateNumber:     demo.plate,
         logisticStatus:  demo.status,
+        status:          demo.status,
         currentLocation: demo.loc,
         currentTripId:   tripId,
+        maxSpeedKmh:     demo.maxSpeedKmh,
         condition:       demo.status === "probleme" ? "mauvais" : "bon",
         issue:           demo.status === "probleme" ? "Problème moteur signalé" : null,
       });

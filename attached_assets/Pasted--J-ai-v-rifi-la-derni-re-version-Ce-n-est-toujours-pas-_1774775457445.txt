@@ -1,0 +1,178 @@
+}
+J’ai vérifié la dernière version.
+
+Ce n’est toujours pas au niveau professionnel attendu.
+
+L’interface reste :
+- trop chargée
+- trop de couleurs mélangées
+- difficile à lire
+- pas moderne
+- pas au standard international
+
+Et la logique métier n’est pas correctement intégrée.
+
+---
+
+1. DESIGN NON PROFESSIONNEL
+
+Actuellement :
+- mélange rouge / vert / noir / gradients
+- trop agressif visuellement
+- manque de cohérence
+
+À FAIRE :
+
+- réduire à 2 ou 3 couleurs maximum
+- fond sombre propre
+- couleurs utilisées uniquement pour les alertes
+- espacement plus large
+- interface plus minimaliste
+
+OBJECTIF :
+design propre, lisible, premium
+
+---
+
+2. LISIBILITÉ ET STRUCTURE
+
+Actuellement :
+- informations mélangées
+- difficile de comprendre rapidement
+
+À FAIRE :
+
+- simplifier chaque carte
+- afficher seulement les infos essentielles
+- rendre lecture possible en 1 seconde
+
+---
+
+3. INTERACTION (CLIC)
+
+Actuellement :
+- on clique mais ce n’est pas clair
+
+À FAIRE :
+
+- chaque carte doit ouvrir un détail propre
+- structure claire dans le détail
+- navigation fluide
+
+---
+
+4. LOGIQUE MÉTIER – FEUILLE DE ROUTE (CRITIQUE)
+
+Chaque trajet / bus doit avoir ses propres règles définies par la compagnie.
+
+Exemple :
+
+- Bus 001 :
+  vitesse max = 120 km/h
+
+- Bus 002 :
+  vitesse autorisée jusqu’à 140 km/h
+
+Ces règles dépendent :
+- du trajet
+- du bus
+- de la feuille de route
+
+---
+
+5. DÉCLENCHEMENT AUTOMATIQUE DES ALERTES
+
+À FAIRE :
+
+Si une règle est dépassée :
+
+- déclencher alerte automatique
+- afficher dans dashboard
+- envoyer à agent routier
+
+Exemple :
+Bus 001 dépasse 120 → alerte immédiate  
+Bus 002 dépasse 140 → alerte immédiate
+
+---
+
+6. SYSTÈME D’ALERTE SONORE (DIFFÉRENCIÉ PAR RÔLE)
+
+Lorsqu’une alerte se déclenche :
+
+- Agent routier :
+  • déclenchement d’une ALARME SONORE FORTE (critique)
+  • son puissant et obligatoire (type alarme urgente)
+  • obligation de réagir immédiatement
+
+- Agent suivi :
+  • reçoit une notification avec un son léger (signal d’attention)
+  • doit visualiser et surveiller la situation
+
+IMPORTANT :
+- les deux sons doivent être différents
+- l’alarme de l’agent routier doit être forte et prioritaire
+- la notification de l’agent suivi doit attirer l’attention sans être agressive
+
+---
+
+7. TRAITEMENT DE L’ALERTE
+
+Processus obligatoire :
+
+1. l’agent routier reçoit l’alerte
+2. il répond (explication du problème)
+3. la réponse est envoyée au système
+4. l’agent suivi reçoit et voit la réponse
+5. l’agent suivi clique pour vérifier et valider
+
+---
+
+8. ARRÊT DE L’ALERTE
+
+L’alerte et les sons s’arrêtent uniquement si :
+
+- l’agent suivi valide
+
+Sinon :
+- l’alerte reste active
+- le système continue
+
+---
+
+9. INTÉGRATION LOGISTIQUE
+
+Si panne détectée :
+
+→ envoyer automatiquement l’information à l’agent logistique
+
+---
+
+10. OBJECTIF FINAL
+
+Créer une vraie tour de contrôle :
+
+- moderne
+- claire
+- minimaliste
+- interactive
+- intelligente
+- connectée
+- en temps réel
+
+---
+
+RÉSUMÉ :
+
+moins de couleurs  
+plus de clarté  
+plus de logique  
+plus de professionnalisme  
+
+---
+
+PRIORITÉ :
+
+corriger le design + intégrer correctement la logique métier + alarme forte côté agent routier.
+
+Refaire proprement sans casser la logique existante

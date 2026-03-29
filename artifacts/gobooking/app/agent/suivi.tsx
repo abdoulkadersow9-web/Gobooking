@@ -24,12 +24,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/utils/api";
 
-const RED    = "#BE123C";
-const RED_D  = "#9F1239";
-const RED_L  = "#FFF1F2";
-const RED_M  = "#FDA4AF";
-const CAM_BG = "#0A0E1A";
-const CAM_GR = "#22C55E";
+const RED    = "#EF4444";
+const RED_D  = "#B91C1C";
+const RED_L  = "#FEF2F2";
+const RED_M  = "#FCA5A5";
+const CAM_BG = "#060A10";
+const CAM_GR = "#94A3B8";
+const CARD   = "#0D1219";
+const BDR    = "rgba(255,255,255,0.06)";
 
 const { width: SW } = Dimensions.get("window");
 
@@ -44,13 +46,13 @@ const RESPONSE_OPTIONS = [
 ];
 
 const BUS_STATUS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  en_attente: { label: "En attente",  color: "#D97706", bg: "#FEF3C7", icon: "time-outline" },
-  en_route:   { label: "En route",    color: "#166534", bg: "#DCFCE7", icon: "navigate-outline" },
-  arret:      { label: "À l'arrêt",   color: "#0369A1", bg: "#E0F2FE", icon: "pause-circle-outline" },
-  probleme:   { label: "Problème",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
-  maintenance:{ label: "Maintenance", color: "#7C3AED", bg: "#F5F3FF", icon: "construct-outline" },
-  arrivé:     { label: "Arrivé",      color: "#0369A1", bg: "#E0F2FE", icon: "checkmark-circle-outline" },
-  en_panne:   { label: "En panne",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
+  en_attente:  { label: "En attente",  color: "#94A3B8", bg: "rgba(148,163,184,0.08)", icon: "time-outline" },
+  en_route:    { label: "En route",    color: "#E2E8F0", bg: "rgba(226,232,240,0.06)", icon: "navigate-outline" },
+  arret:       { label: "À l'arrêt",   color: "#64748B", bg: "rgba(100,116,139,0.08)", icon: "pause-circle-outline" },
+  probleme:    { label: "Problème",    color: "#EF4444", bg: "rgba(239,68,68,0.08)",   icon: "warning-outline" },
+  maintenance: { label: "Maintenance", color: "#94A3B8", bg: "rgba(148,163,184,0.08)", icon: "construct-outline" },
+  arrivé:      { label: "Arrivé",      color: "#64748B", bg: "rgba(100,116,139,0.08)", icon: "checkmark-circle-outline" },
+  en_panne:    { label: "En panne",    color: "#EF4444", bg: "rgba(239,68,68,0.08)",   icon: "warning-outline" },
 };
 
 /* ── HLS video player HTML ─────────────────────────────────────── */
@@ -96,7 +98,7 @@ interface BusItem {
   id: string; busName: string; plateNumber: string;
   logisticStatus: string; status?: string;
   currentLocation?: string; issue?: string;
-  currentTripId?: string;
+  currentTripId?: string; maxSpeedKmh?: number;
 }
 interface TripItem {
   id: string; from: string; to: string; departureTime: string; status: string;
@@ -473,7 +475,18 @@ function AlertDetailModal({
       const res = await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/confirm`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) { onRefresh(); onClose(); }
+      if (res.ok) {
+        /* Si c'est une panne : notifier automatiquement la logistique */
+        const isPanneType = alert.type === "PANNE" || alert.type === "panne";
+        if (isPanneType && alert.busId) {
+          fetch(`${BASE_URL}/agent/logistique/buses/${alert.busId}/signaler-panne`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ note: `Signalé par Agent Suivi — ${alert.message}` }),
+          }).catch(() => {});
+        }
+        onRefresh(); onClose();
+      }
     } catch {} finally { setActing(false); }
   };
 
@@ -612,12 +625,14 @@ function BusDetailModal({
   onOpenCamera: () => void; onSelectAlert: (a: AlertItem) => void;
   onRefresh: () => void;
 }) {
-  const st        = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
+  const st        = BUS_STATUS[bus.status ?? bus.logisticStatus ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
   const occ       = trip?.passengerCount != null && trip?.seatCount
     ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
   const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
   const spd       = speed ?? 0;
-  const speedWarn = bus.status === "en_route" && spd > 120;
+  const isMoving  = bus.status === "en_route" || bus.logisticStatus === "en_route";
+  const maxSpd    = bus.maxSpeedKmh ?? 120;
+  const speedWarn = isMoving && spd > maxSpd;
 
   return (
     <Modal visible transparent animationType="slide">
@@ -669,14 +684,14 @@ function BusDetailModal({
                   numberOfLines={1}>{st.label.toUpperCase()}</Text>
               </View>
               {/* Speed */}
-              {bus.status === "en_route" && (
+              {isMoving && (
                 <View style={{ flex: 1.4, backgroundColor: speedWarn ? "rgba(239,68,68,0.07)" : "#0D1117",
                   borderRadius: 10, padding: 12, alignItems: "center",
                   borderWidth: 1, borderColor: speedWarn ? "rgba(239,68,68,0.22)" : "rgba(255,255,255,0.05)" }}>
                   <Text style={{ color: speedWarn ? "#EF4444" : "#E2E8F0", fontSize: 22, fontWeight: "900",
                     letterSpacing: -1, lineHeight: 26 }}>{spd}</Text>
                   <Text style={{ color: speedWarn ? "#EF4444" : "#374151", fontSize: 8, fontWeight: "700", letterSpacing: 0.5 }}>
-                    {speedWarn ? "⚠ KM/H" : "KM/H"}
+                    {speedWarn ? `⚠ MAX ${maxSpd}` : `KM/H · MAX ${maxSpd}`}
                   </Text>
                 </View>
               )}
@@ -684,17 +699,18 @@ function BusDetailModal({
               {occ != null && (
                 <View style={{ flex: 1, backgroundColor: "#0D1117", borderRadius: 10, padding: 12,
                   alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
-                  <Text style={{ color: occ >= 90 ? "#EF4444" : occ >= 70 ? "#F59E0B" : "#E2E8F0",
-                    fontSize: 22, fontWeight: "900", letterSpacing: -1, lineHeight: 26 }}>{occ}</Text>
+                  <Text style={{ color: occ != null && occ >= 90 ? "#EF4444" : occ != null && occ >= 70 ? "#F59E0B" : "#E2E8F0",
+                    fontSize: 22, fontWeight: "900", letterSpacing: -1, lineHeight: 26 }}>{occ ?? "—"}</Text>
                   <Text style={{ color: "#374151", fontSize: 8, fontWeight: "700", letterSpacing: 0.5 }}>PASSAGERS %</Text>
                 </View>
               )}
               {/* Camera */}
-              <View style={{ flex: 1, backgroundColor: camOk ? "rgba(16,185,129,0.05)" : "#0D1117",
-                borderRadius: 10, padding: 12, alignItems: "center", gap: 5,
-                borderWidth: 1, borderColor: camOk ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.05)" }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: camOk ? "#10B981" : "#1F2937" }} />
-                <Text style={{ color: camOk ? "#10B981" : "#374151", fontSize: 8, fontWeight: "700" }}>CAM</Text>
+              <View style={{ flex: 1, backgroundColor: "#0D1117", borderRadius: 10, padding: 12,
+                alignItems: "center", gap: 5,
+                borderWidth: 1, borderColor: camOk ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)" }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4,
+                  backgroundColor: camOk ? "#E2E8F0" : "#1F2937" }} />
+                <Text style={{ color: camOk ? "#94A3B8" : "#374151", fontSize: 8, fontWeight: "700" }}>CAM</Text>
               </View>
             </View>
 
@@ -851,7 +867,9 @@ export default function SuiviScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim  = useRef(new Animated.Value(0)).current;
 
-  const hasAlerts      = !!(data?.alerts?.length);
+  const [autoSpeedAlerts, setAutoSpeedAlerts] = useState<AlertItem[]>([]);
+  const mergedAlerts   = useMemo(() => [...(data?.alerts ?? []), ...autoSpeedAlerts], [data?.alerts, autoSpeedAlerts]);
+  const hasAlerts      = mergedAlerts.length > 0;
   const activeCamCount = data?.trips?.filter(t => t.cameraStatus === "connected").length ?? 0;
   const hasCameras     = activeCamCount > 0;
 
@@ -1030,14 +1048,19 @@ export default function SuiviScreen() {
     return () => { soundRef.current?.stop(); soundRef.current = null; };
   }, [hasAlerts, soundMuted]);
 
-  /* ── Speed simulation per bus (en_route only) ── */
+  /* ── Speed simulation per bus (en_route only) — uses per-bus maxSpeedKmh ── */
+  const autoAlertSent = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!data?.buses) return;
     setBusSpeedMap(prev => {
       const next: Record<string, number> = { ...prev };
       data.buses.forEach(b => {
-        if ((b.status === "en_route" || b.status === "en_route_alerte") && !next[b.id])
-          next[b.id] = 65 + Math.floor(Math.random() * 40);
+        const isMoving = b.status === "en_route" || b.logisticStatus === "en_route";
+        if (isMoving && !next[b.id]) {
+          const max = b.maxSpeedKmh ?? 120;
+          next[b.id] = Math.max(50, Math.round(max * 0.60) + Math.floor(Math.random() * Math.round(max * 0.30)));
+        }
       });
       return next;
     });
@@ -1045,9 +1068,12 @@ export default function SuiviScreen() {
       setBusSpeedMap(prev => {
         const next: Record<string, number> = {};
         data.buses.forEach(b => {
-          if (b.status === "en_route" || b.status === "en_route_alerte") {
-            const cur = prev[b.id] ?? 75;
-            next[b.id] = Math.max(45, Math.min(128, cur + Math.floor((Math.random() - 0.45) * 9)));
+          const isMoving = b.status === "en_route" || b.logisticStatus === "en_route";
+          if (isMoving) {
+            const max = b.maxSpeedKmh ?? 120;
+            const cur = prev[b.id] ?? Math.round(max * 0.7);
+            const drift = Math.floor((Math.random() - 0.43) * 10);
+            next[b.id] = Math.max(40, Math.min(Math.round(max * 1.18), cur + drift));
           }
         });
         return next;
@@ -1055,6 +1081,52 @@ export default function SuiviScreen() {
     }, 2800);
     return () => clearInterval(iv);
   }, [data?.buses]);
+
+  /* ── Auto-alerte vitesse : si dépassement du seuil par bus ── */
+  useEffect(() => {
+    if (!data?.buses) return;
+    data.buses.forEach(b => {
+      const spd  = busSpeedMap[b.id];
+      const max  = b.maxSpeedKmh ?? 120;
+      const key  = `speed-${b.id}`;
+      if (spd && spd > max && !autoAlertSent.current.has(key)) {
+        autoAlertSent.current.add(key);
+        const newAlert: AlertItem = {
+          id:                key,
+          type:              "VITESSE",
+          busId:             b.id,
+          busName:           b.busName,
+          agentId:           "system",
+          agentName:         "Système Auto",
+          message:           `Vitesse excessive : ${spd} km/h (limite ${max} km/h)`,
+          status:            "active",
+          response:          null,
+          respondedAt:       null,
+          responseRequested: false,
+          createdAt:         new Date().toISOString(),
+        };
+        setAutoSpeedAlerts(prev => {
+          const exists = prev.some(a => a.id === key);
+          return exists ? prev : [newAlert, ...prev];
+        });
+        /* Notify API — best effort */
+        if (token) {
+          fetch(`${BASE_URL}/agent/suivi/alerts/trigger`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              busId: b.id, busName: b.busName, tripId: b.currentTripId,
+              type: "VITESSE",
+              message: `Vitesse excessive détectée : ${spd} km/h — limite autorisée ${max} km/h`,
+            }),
+          }).catch(() => {});
+        }
+      } else if (spd && spd <= max) {
+        autoAlertSent.current.delete(key);
+        setAutoSpeedAlerts(prev => prev.filter(a => a.id !== key));
+      }
+    });
+  }, [busSpeedMap, data?.buses, token]);
 
   /* When watching a camera live, refresh its trip data every 8s to detect disconnect */
   useEffect(() => {
@@ -1160,7 +1232,7 @@ export default function SuiviScreen() {
   const activeTrip   = data?.trips?.find(t => t.status === "en_route") ?? data?.trips?.[0] ?? null;
   const totalPassengers = data?.trips?.reduce((s, t) => s + (t.passengerCount ?? 0), 0) ?? 0;
   const busCount     = data?.buses?.length ?? 0;
-  const alertCount   = data?.alerts?.length ?? 0;
+  const alertCount   = mergedAlerts.length;
 
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
@@ -1206,39 +1278,39 @@ export default function SuiviScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        {/* KPI bar — Premium dashboard */}
+        {/* KPI bar */}
         <View style={S.headerStats}>
-          <View style={[S.kpiTile, { borderBottomColor: "#60A5FA" }]}>
+          <View style={S.kpiTile}>
             <Text style={S.kpiNum}>{busCount}</Text>
             <View style={S.kpiRow}>
-              <Ionicons name="bus" size={9} color="rgba(255,255,255,0.45)" />
+              <Ionicons name="bus" size={9} color="rgba(255,255,255,0.3)" />
               <Text style={S.kpiLbl}>BUS</Text>
             </View>
           </View>
           <View style={S.kpiDiv} />
-          <View style={[S.kpiTile, { borderBottomColor: "#4ADE80" }]}>
+          <View style={S.kpiTile}>
             <Text style={S.kpiNum}>{totalPassengers}</Text>
             <View style={S.kpiRow}>
-              <Ionicons name="people" size={9} color="rgba(255,255,255,0.45)" />
+              <Ionicons name="people" size={9} color="rgba(255,255,255,0.3)" />
               <Text style={S.kpiLbl}>PASSAGERS</Text>
             </View>
           </View>
           <View style={S.kpiDiv} />
-          <View style={[S.kpiTile, { borderBottomColor: hasAlerts ? "#FCA5A5" : "rgba(255,255,255,0.1)" }]}>
-            <Text style={[S.kpiNum, hasAlerts && { color: "#FCA5A5" }]}>{alertCount}</Text>
+          <View style={S.kpiTile}>
+            <Text style={[S.kpiNum, hasAlerts && { color: RED }]}>{alertCount}</Text>
             <View style={S.kpiRow}>
-              {hasAlerts && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#FCA5A5",
+              {hasAlerts && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: RED,
                 transform: [{ scale: pulseAnim }] }} />}
-              <Text style={[S.kpiLbl, hasAlerts && { color: "#FCA5A5" }]}>ALERTES</Text>
+              <Text style={[S.kpiLbl, hasAlerts && { color: RED }]}>ALERTES</Text>
             </View>
           </View>
           <View style={S.kpiDiv} />
-          <View style={[S.kpiTile, { borderBottomColor: hasCameras ? CAM_GR : "rgba(255,255,255,0.1)" }]}>
-            <Text style={[S.kpiNum, hasCameras && { color: CAM_GR }]}>{activeCamCount}</Text>
+          <View style={S.kpiTile}>
+            <Text style={S.kpiNum}>{activeCamCount}</Text>
             <View style={S.kpiRow}>
-              {hasCameras && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CAM_GR,
+              {hasCameras && <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.5)",
                 opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.3] }) }} />}
-              <Text style={[S.kpiLbl, hasCameras && { color: CAM_GR }]}>CAM LIVE</Text>
+              <Text style={S.kpiLbl}>CAM</Text>
             </View>
           </View>
         </View>
@@ -1253,7 +1325,7 @@ export default function SuiviScreen() {
             {alertCount} ALERTE{alertCount > 1 ? "S" : ""} EN COURS
           </Text>
           <Text style={S.alarmBarBus} numberOfLines={1}>
-            {data!.alerts[0]?.busName ?? "Intervention requise"}
+            {mergedAlerts[0]?.busName ?? "Intervention requise"}
           </Text>
           <View style={S.alarmUrgentBadge}>
             <Text style={S.alarmUrgentTxt}>URGENT</Text>
@@ -1291,7 +1363,7 @@ export default function SuiviScreen() {
           {/* ══ ALERTES FIXÉES — toujours visibles ══════════════════════ */}
           {hasAlerts && (
             <View style={S.fixedAlerts}>
-              {data!.alerts.slice(0, 3).map(alert => {
+              {mergedAlerts.slice(0, 3).map(alert => {
                 const isPanne = alert.type === "PANNE" || alert.type === "panne";
                 const isCtrl  = alert.type === "CONTRÔLE" || alert.type === "controle";
                 const typeColor = isPanne ? "#DC2626" : isCtrl ? "#B45309" : RED;
@@ -1389,13 +1461,14 @@ export default function SuiviScreen() {
             renderItem={({ item: bus }) => {
               const trip      = data!.trips.find(t => t.busId === bus.id);
               const st        = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9" };
-              const busAlerts = data!.alerts.filter(a => a.busId === bus.id);
+              const busAlerts = mergedAlerts.filter(a => a.busId === bus.id);
               const occ       = trip?.passengerCount != null && trip?.seatCount
                 ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
-              const occColor  = occ != null ? (occ >= 90 ? "#DC2626" : occ >= 70 ? "#D97706" : "#16A34A") : "#16A34A";
+              const occColor  = occ != null ? (occ >= 90 ? "#EF4444" : occ >= 70 ? "#F59E0B" : "#94A3B8") : "#94A3B8";
               const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
               const speed     = busSpeedMap[bus.id];
-              const speedWarn = speed != null && speed > 120;
+              const speedLimit = bus.maxSpeedKmh ?? 120;
+              const speedWarn = speed != null && speed > speedLimit;
               return (
                 <TouchableOpacity
                   style={[S.gridCard, { borderLeftColor: busAlerts.length ? RED : speedWarn ? "#EF4444" : st.color }]}
@@ -1414,13 +1487,18 @@ export default function SuiviScreen() {
                   )}
                   {/* Speed — only en_route */}
                   {speed != null && (
-                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 2, marginTop: 1 }}>
-                      <Text style={{ fontSize: 18, fontWeight: "900", color: speedWarn ? "#EF4444" : "#E2E8F0", letterSpacing: -0.5, lineHeight: 22 }}>
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 3, marginTop: 2 }}>
+                      <Text style={{ fontSize: 20, fontWeight: "900", color: speedWarn ? "#EF4444" : "#E2E8F0", letterSpacing: -1, lineHeight: 24 }}>
                         {speed}
                       </Text>
                       <Text style={{ fontSize: 9, color: speedWarn ? "#EF4444" : "#374151", fontWeight: "700" }}>
-                        {speedWarn ? "⚠ km/h" : "km/h"}
+                        km/h
                       </Text>
+                      {speedWarn && (
+                        <Text style={{ fontSize: 8, color: "#EF4444", fontWeight: "800", marginLeft: 2 }}>
+                          ⚠ MAX {speedLimit}
+                        </Text>
+                      )}
                     </View>
                   )}
                   {/* Occupancy */}
@@ -1585,11 +1663,9 @@ const S = StyleSheet.create({
   headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 16,
                 borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.09)",
                 backgroundColor: "rgba(0,0,0,0.3)" },
-  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5,
-                borderBottomWidth: 3, borderBottomColor: "rgba(255,255,255,0.1)",
-                marginHorizontal: 2 },
-  kpiNum:     { color: "#fff", fontSize: 34, fontWeight: "900", lineHeight: 38, letterSpacing: -1.5 },
-  kpiLbl:     { color: "rgba(255,255,255,0.5)", fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },
+  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5, marginHorizontal: 2 },
+  kpiNum:     { color: "#E2E8F0", fontSize: 30, fontWeight: "900", lineHeight: 34, letterSpacing: -1 },
+  kpiLbl:     { color: "rgba(255,255,255,0.3)", fontSize: 8, fontWeight: "700", letterSpacing: 1.2 },
   kpiRow:     { flexDirection: "row", alignItems: "center", gap: 4 },
   kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 4 },
 
