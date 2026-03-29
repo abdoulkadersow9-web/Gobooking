@@ -303,222 +303,97 @@ function LiveCamView({
 }: {
   signal: number; route: string; busId: string;
 }) {
-  const scanAnim    = useRef(new Animated.Value(0)).current;
-  const glitchAnim  = useRef(new Animated.Value(0)).current;
-
-  const [ts,      setTs]      = useState(() => new Date().toLocaleTimeString("fr-FR"));
-  const [frames,  setFrames]  = useState(() => 1000 + Math.floor(Math.random() * 8000));
-  const [coords,  setCoords]  = useState(() => ({
+  const scanAnim = useRef(new Animated.Value(0)).current;
+  const [ts,     setTs]     = useState(() => new Date().toLocaleTimeString("fr-FR"));
+  const [coords, setCoords] = useState(() => ({
     lat: (5.35 + Math.random() * 0.08).toFixed(4),
     lon: (3.95 + Math.random() * 0.06).toFixed(4),
   }));
-  const [speed,   setSpeed]   = useState(() => 65 + Math.floor(Math.random() * 30));
-  const [bw,      setBw]      = useState(() => (1.8 + Math.random() * 1.4).toFixed(1));
-  const [heading, setHeading] = useState(() => 45 + Math.floor(Math.random() * 270));
-  const [noise,   setNoise]   = useState(() => [
-    { x: 20, y: 25, w: 18, h: 5 },
-    { x: 60, y: 48, w: 12, h: 3 },
-    { x: 35, y: 70, w: 22, h: 4 },
-  ]);
+  const [speed, setSpeed] = useState(() => 65 + Math.floor(Math.random() * 30));
 
   useEffect(() => {
-    const scanLoop = Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scanAnim, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.linear }),
+        Animated.timing(scanAnim, { toValue: 1, duration: 3500, useNativeDriver: true, easing: Easing.linear }),
         Animated.timing(scanAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
       ])
     );
-    scanLoop.start();
+    loop.start();
 
-    const glitchLoop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(3000 + Math.random() * 4000),
-        Animated.timing(glitchAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-        Animated.timing(glitchAnim, { toValue: 0, duration: 80, useNativeDriver: true }),
-        Animated.timing(glitchAnim, { toValue: 0.5, duration: 60, useNativeDriver: true }),
-        Animated.timing(glitchAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-      ])
-    );
-    glitchLoop.start();
-
-    const frameInterval = setInterval(() => {
-      setFrames(f => f + 2 + Math.floor(Math.random() * 3));
-    }, 80);
-
-    const tInterval = setInterval(() => {
-      setTs(new Date().toLocaleTimeString("fr-FR"));
-    }, 1000);
+    const tInterval = setInterval(() => setTs(new Date().toLocaleTimeString("fr-FR")), 1000);
 
     const dataInterval = setInterval(() => {
       setCoords(c => ({
-        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.0014).toFixed(4),
-        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.001).toFixed(4),
+        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.001).toFixed(4),
+        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.0008).toFixed(4),
       }));
-      setSpeed(s => Math.max(38, Math.min(115, s + Math.floor((Math.random() - 0.42) * 9))));
-      setBw(((1.8 + Math.random() * 1.4)).toFixed(1));
-      setHeading(h => (h + Math.floor((Math.random() - 0.5) * 6) + 360) % 360);
-      setNoise([
-        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 10 + Math.floor(Math.random() * 25), h: 3 + Math.floor(Math.random() * 5) },
-        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 8 + Math.floor(Math.random() * 20), h: 2 + Math.floor(Math.random() * 4) },
-        { x: Math.floor(Math.random() * 120), y: Math.floor(Math.random() * 90), w: 14 + Math.floor(Math.random() * 30), h: 3 + Math.floor(Math.random() * 6) },
-      ]);
-    }, 1800);
+      setSpeed(s => Math.max(40, Math.min(110, s + Math.floor((Math.random() - 0.45) * 7))));
+    }, 2500);
 
-    return () => {
-      scanLoop.stop(); glitchLoop.stop();
-      clearInterval(frameInterval); clearInterval(tInterval); clearInterval(dataInterval);
-    };
+    return () => { loop.stop(); clearInterval(tInterval); clearInterval(dataInterval); };
   }, [busId]);
 
-  const sigBars  = Math.max(1, Math.ceil((signal / 100) * 4));
-  const sigColor = signal >= 75 ? CAM_GR : signal >= 50 ? "#FCD34D" : "#EF4444";
-  const CARD_H   = 128;
-  const headingStr = `${heading.toString().padStart(3,"0")}°`;
+  const CARD_H = 118;
+  const sigBars = Math.max(1, Math.ceil((signal / 100) * 4));
+  const sigOk   = signal >= 65;
 
   return (
-    <View style={{ height: CARD_H, backgroundColor: "#010306", overflow: "hidden" }}>
+    <View style={{ height: CARD_H, backgroundColor: "#060810", overflow: "hidden" }}>
 
-      {/* ── Subtle green tint overlay (night-vision feel) */}
-      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:0,
-        backgroundColor:"rgba(0,30,10,0.38)" }} />
-
-      {/* ── CRT scan lines */}
-      {Array.from({ length: 13 }).map((_, i) => (
-        <View key={i} style={{
-          position:"absolute", left:0, right:0,
-          top: i * 10, height: 1,
-          backgroundColor:"rgba(0,0,0,0.22)",
-        }} />
-      ))}
-
-      {/* ── Video compression noise artifacts */}
-      {noise.map((n, i) => (
-        <View key={i} style={{
-          position:"absolute", left:n.x, top:n.y, width:n.w, height:n.h,
-          backgroundColor:"rgba(34,197,94,0.07)",
-          opacity: 0.5 + Math.random() * 0.5,
-        }} />
-      ))}
-
-      {/* ── Glitch horizontal bar */}
+      {/* Subtle moving scan line — white, barely visible */}
       <Animated.View style={{
-        position:"absolute", left:0, right:0, height:3,
-        top: 40 + Math.floor(Math.random() * 60),
-        backgroundColor:"rgba(34,197,94,0.15)",
-        opacity: glitchAnim,
+        position: "absolute", left: 0, right: 0, height: 1,
+        backgroundColor: "rgba(255,255,255,0.1)",
+        transform: [{ translateY: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CARD_H] }) }],
       }} />
 
-      {/* ── Moving scan line */}
-      <Animated.View style={{
-        position:"absolute", left:0, right:0, height:1.5,
-        backgroundColor:"rgba(34,197,94,0.55)",
-        transform:[{ translateY: scanAnim.interpolate({ inputRange:[0,1], outputRange:[0, CARD_H] }) }],
-        ...(Platform.OS==="web" ? { boxShadow:"0 0 8px rgba(34,197,94,0.8)" } : {}),
-      }} />
+      {/* Corner brackets — thin white */}
+      <View style={{ position:"absolute", top:7, left:8, width:9, height:9,
+        borderTopWidth:1, borderLeftWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
+      <View style={{ position:"absolute", top:7, right:8, width:9, height:9,
+        borderTopWidth:1, borderRightWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
+      <View style={{ position:"absolute", bottom:22, left:8, width:9, height:9,
+        borderBottomWidth:1, borderLeftWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
+      <View style={{ position:"absolute", bottom:22, right:8, width:9, height:9,
+        borderBottomWidth:1, borderRightWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
 
-      {/* ── Corner brackets (targeting system) */}
-      <View style={{ position:"absolute", top:6, left:7, width:12, height:12,
-        borderTopWidth:1.5, borderLeftWidth:1.5, borderColor:CAM_GR }} />
-      <View style={{ position:"absolute", top:6, right:7, width:12, height:12,
-        borderTopWidth:1.5, borderRightWidth:1.5, borderColor:CAM_GR }} />
-      <View style={{ position:"absolute", bottom:18, left:7, width:12, height:12,
-        borderBottomWidth:1.5, borderLeftWidth:1.5, borderColor:CAM_GR }} />
-      <View style={{ position:"absolute", bottom:18, right:7, width:12, height:12,
-        borderBottomWidth:1.5, borderRightWidth:1.5, borderColor:CAM_GR }} />
+      {/* GPS — top left */}
+      <Text style={{ position:"absolute", top:9, left:20,
+        color:"rgba(255,255,255,0.45)", fontSize:7, letterSpacing:0.5 }}>
+        {coords.lat}°N · {coords.lon}°W
+      </Text>
 
-      {/* ── TOP LEFT: GPS */}
-      <View style={{ position:"absolute", top:10, left:22 }}>
-        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.4, opacity:0.92 }}>
-          {coords.lat}°N
-        </Text>
-        <Text style={{ color:CAM_GR, fontSize:6.5, fontWeight:"700", letterSpacing:0.4, opacity:0.92 }}>
-          {coords.lon}°W
-        </Text>
-      </View>
+      {/* Speed — top right */}
+      <Text style={{ position:"absolute", top:9, right:20,
+        color:"rgba(255,255,255,0.75)", fontSize:8, fontWeight:"700" }}>
+        {speed} km/h
+      </Text>
 
-      {/* ── TOP RIGHT: heading + speed */}
-      <View style={{ position:"absolute", top:10, right:22, alignItems:"flex-end" }}>
-        <Text style={{ color:"#FCD34D", fontSize:7.5, fontWeight:"900", letterSpacing:0.3 }}>
-          {speed} km/h
-        </Text>
-        <Text style={{ color:"rgba(252,211,77,0.65)", fontSize:6, fontWeight:"700" }}>
-          CAP {headingStr}
-        </Text>
-      </View>
-
-      {/* ── CENTER: crosshair */}
-      <View style={{ position:"absolute", top:0, left:0, right:0, bottom:18,
-        justifyContent:"center", alignItems:"center" }}>
-        <View style={{ position:"absolute", width:22, height:1,
-          backgroundColor:"rgba(34,197,94,0.5)" }} />
-        <View style={{ position:"absolute", width:1, height:22,
-          backgroundColor:"rgba(34,197,94,0.5)" }} />
-        <View style={{ width:5, height:5, borderRadius:2.5,
-          borderWidth:1, borderColor:"rgba(34,197,94,0.75)",
-          backgroundColor:"transparent" }} />
-      </View>
-
-      {/* ── BOTTOM BAR: data overlay */}
-      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:18,
-        backgroundColor:"rgba(0,0,0,0.82)",
-        flexDirection:"row", alignItems:"center",
-        paddingHorizontal:8, gap:8 }}>
-        {/* timestamp */}
-        <Text style={{ color:CAM_GR, fontSize:7, fontWeight:"800", letterSpacing:0.4 }}>
-          {ts}
-        </Text>
-        <View style={{ width:1, height:8, backgroundColor:"rgba(34,197,94,0.25)" }} />
-        {/* frame counter */}
-        <Text style={{ color:"rgba(34,197,94,0.7)", fontSize:6.5, fontWeight:"700" }}>
-          F:{frames.toString().padStart(5,"0")}
-        </Text>
-        <View style={{ flex:1 }} />
-        {/* bandwidth */}
-        <Text style={{ color:"rgba(148,163,184,0.8)", fontSize:6.5, fontWeight:"700" }}>
-          {bw} Mbps
-        </Text>
-        <View style={{ width:1, height:8, backgroundColor:"rgba(34,197,94,0.2)" }} />
-        {/* signal bars */}
+      {/* Signal — middle right */}
+      <View style={{ position:"absolute", right:20, top:0, bottom:22,
+        justifyContent:"center" }}>
         <View style={{ flexDirection:"row", alignItems:"flex-end", gap:1.5 }}>
           {[1,2,3,4].map(b => (
-            <View key={b} style={{ width:2.5, height:3 + b * 2, borderRadius:1,
-              backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.1)" }} />
+            <View key={b} style={{ width:2.5, height:3 + b * 2.5, borderRadius:1,
+              backgroundColor: b <= sigBars
+                ? (sigOk ? "rgba(255,255,255,0.65)" : "rgba(239,68,68,0.8)")
+                : "rgba(255,255,255,0.1)" }} />
           ))}
         </View>
       </View>
-    </View>
-  );
-}
 
-/* ══════════════════════════════════════════════════════════════════
-   BUS HEARTBEAT — mini waveform indicator sur les cartes bus
-   ══════════════════════════════════════════════════════════════════ */
-function BusHeartbeat({ color, active }: { color: string; active: boolean }) {
-  const [bars, setBars] = useState<number[]>(() =>
-    Array.from({ length: 10 }, () => 2 + Math.random() * 5)
-  );
-
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => {
-      setBars(prev => {
-        const next = [...prev.slice(1), 2 + Math.random() * 5];
-        return next;
-      });
-    }, 280);
-    return () => clearInterval(id);
-  }, [active]);
-
-  return (
-    <View style={{ flexDirection:"row", alignItems:"flex-end", gap:1.5,
-      height:8, marginTop:4 }}>
-      {bars.map((h, i) => (
-        <View key={i} style={{
-          flex:1, height:h, borderRadius:1,
-          backgroundColor: active ? color : "rgba(255,255,255,0.08)",
-          opacity: active ? 0.5 + (i / 10) * 0.5 : 0.3,
-        }} />
-      ))}
+      {/* Bottom strip — route + timestamp */}
+      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:22,
+        backgroundColor:"rgba(0,0,0,0.6)",
+        flexDirection:"row", alignItems:"center",
+        paddingHorizontal:12, justifyContent:"space-between" }}>
+        <Text style={{ color:"rgba(255,255,255,0.4)", fontSize:7.5, fontWeight:"600" }} numberOfLines={1}>
+          {route}
+        </Text>
+        <Text style={{ color:"rgba(255,255,255,0.3)", fontSize:7, letterSpacing:0.5 }}>
+          {ts}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -968,7 +843,53 @@ export default function SuiviScreen() {
             </View>
           )}
 
-          {/* ══ GRILLE BUS — 2 colonnes, flex:1 ════════════════════════ */}
+          {/* ══ BANDE CAMÉRAS — priorité 2, au-dessus des bus ═════════ */}
+          {hasCameras && (
+            <View style={S.camStrip}>
+              <View style={S.camStripHdr}>
+                <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR,
+                  opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                <Text style={S.camStripTitle}>CAMÉRAS LIVE</Text>
+                <Text style={S.camStripCount}>{activeCamCount} FLUX</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                contentContainerStyle={S.camStripScroll}>
+                {sortedBuses.map(bus => {
+                  const trip  = data!.trips.find(t => t.busId === bus.id);
+                  const camOk = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+                  if (!camOk || !trip) return null;
+                  const liveCam = liveFrames[trip.id];
+                  return (
+                    <TouchableOpacity key={bus.id} style={S.camStripCard}
+                      onPress={() => setCameraTrip(trip)} activeOpacity={0.85}>
+                      {/* Badge row */}
+                      <View style={S.camStripBadgeRow}>
+                        <Animated.View style={{ width: 5, height: 5, borderRadius: 2.5,
+                          backgroundColor: "#EF4444",
+                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.1] }) }} />
+                        <Text style={S.camStripRec}>REC</Text>
+                        <View style={S.camStripLiveBadge}><Text style={S.camStripLiveTxt}>LIVE</Text></View>
+                        <View style={{ flex: 1 }} />
+                        <Text style={{ color: "#4B5563", fontSize: 7, fontWeight: "600" }} numberOfLines={1}>
+                          {bus.busName}
+                        </Text>
+                      </View>
+                      <LiveCamView
+                        signal={liveCam?.signal ?? 82}
+                        route={`${trip.from} → ${trip.to}`}
+                        busId={bus.id}
+                      />
+                      <View style={S.camStripBtn}>
+                        <Text style={S.camStripBtnTxt}>VOIR EN DIRECT</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* ══ GRILLE BUS — priorité 3, flex:1 ═══════════════════════ */}
           <FlatList
             data={sortedBuses}
             numColumns={2}
@@ -980,7 +901,7 @@ export default function SuiviScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={RED} />}
             ListEmptyComponent={
               <View style={[S.center, { paddingVertical: 40 }]}>
-                <Ionicons name="bus-outline" size={40} color="#334155" />
+                <Ionicons name="bus-outline" size={40} color="#1E293B" />
                 <Text style={[S.emptyTxt, { color: "#475569" }]}>Aucun bus en service</Text>
               </View>
             }
@@ -1022,75 +943,18 @@ export default function SuiviScreen() {
                       <Text style={S.gridAlertTxt} numberOfLines={1}>{busAlerts[0].message}</Text>
                     </View>
                   )}
-                  {/* Camera dot */}
+                  {/* Camera indicator — compact */}
                   {camOk && (
                     <View style={S.gridCamDot}>
                       <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
                         opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                      <Text style={S.gridCamTxt}>LIVE</Text>
+                      <Text style={S.gridCamTxt}>CAM</Text>
                     </View>
                   )}
-                  {/* Heartbeat waveform */}
-                  <BusHeartbeat
-                    color={st.color}
-                    active={bus.status === "en_route" || bus.status === "en_route_alerte"}
-                  />
                 </View>
               );
             }}
           />
-
-          {/* ══ BANDE CAMÉRAS — fixée en bas ════════════════════════════ */}
-          {hasCameras && (
-            <View style={S.camStrip}>
-              <View style={S.camStripHdr}>
-                <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: CAM_GR,
-                  opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                <Text style={S.camStripTitle}>CAMÉRAS LIVE</Text>
-                <Text style={S.camStripCount}>{activeCamCount} FLUX</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                contentContainerStyle={S.camStripScroll}>
-                {sortedBuses.map(bus => {
-                  const trip  = data!.trips.find(t => t.busId === bus.id);
-                  const camOk = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-                  if (!camOk || !trip) return null;
-                  const liveCam  = liveFrames[trip.id];
-                  const sigBars  = liveCam ? Math.ceil((liveCam.signal / 100) * 4) : 3;
-                  const sigColor = liveCam
-                    ? (liveCam.signal >= 80 ? CAM_GR : liveCam.signal >= 60 ? "#FCD34D" : "#EF4444")
-                    : CAM_GR;
-                  return (
-                    <TouchableOpacity key={bus.id} style={S.camStripCard}
-                      onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
-                      {/* REC/LIVE badge row — above the live view */}
-                      <View style={S.camStripBadgeRow}>
-                        <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
-                          backgroundColor: "#EF4444",
-                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.08] }) }} />
-                        <Text style={S.camStripRec}>REC</Text>
-                        <View style={S.camStripLiveBadge}><Text style={S.camStripLiveTxt}>LIVE</Text></View>
-                        <View style={{ flex: 1 }} />
-                        <Text style={{ color: "#475569", fontSize: 7, fontWeight: "700" }} numberOfLines={1}>
-                          {bus.busName}
-                        </Text>
-                      </View>
-                      {/* Animated live camera simulation */}
-                      <LiveCamView
-                        signal={liveCam?.signal ?? 85}
-                        route={`${trip.from}→${trip.to}`}
-                        busId={bus.id}
-                      />
-                      {/* Watch button */}
-                      <View style={S.camStripBtn}>
-                        <Text style={S.camStripBtnTxt}>▶ VISIONNER EN DIRECT</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
 
         </View>
       )}
@@ -1238,20 +1102,16 @@ const S = StyleSheet.create({
   sectionCount: { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4,
                   fontSize: 11, color: "#64748B", fontWeight: "800" },
 
-  /* Alert band header — full-width red announcement when alerts active */
+  /* Alert band header — clean red announcement when alerts active */
   alertBandHeader: { flexDirection: "row", alignItems: "center", gap: 12,
-                     backgroundColor: "#7F1D1D", borderRadius: 16,
-                     paddingHorizontal: 16, paddingVertical: 16,
-                     borderWidth: 1.5, borderColor: "#991B1B",
-                     ...(Platform.OS === "web"
-                       ? { boxShadow: "0 4px 20px rgba(220,38,38,0.35)" }
-                       : { shadowColor: "#DC2626", shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 }) },
-  alertBandTitle:  { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: -0.3 },
-  alertBandSub:    { color: "rgba(255,255,255,0.65)", fontSize: 11, fontWeight: "600", marginTop: 2 },
-  alertBandBadge:  { backgroundColor: "#DC2626", borderRadius: 9,
-                     paddingHorizontal: 10, paddingVertical: 6,
-                     borderWidth: 1, borderColor: "#FCA5A5", flexShrink: 0 },
-  alertBandBadgeTxt:{ color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
+                     backgroundColor: "#1A0505", borderRadius: 8,
+                     paddingHorizontal: 14, paddingVertical: 12,
+                     borderWidth: 1, borderColor: "rgba(239,68,68,0.2)" },
+  alertBandTitle:  { color: "#FECACA", fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
+  alertBandSub:    { color: "rgba(252,165,165,0.5)", fontSize: 10, fontWeight: "500", marginTop: 1 },
+  alertBandBadge:  { backgroundColor: "#EF4444", borderRadius: 6,
+                     paddingHorizontal: 9, paddingVertical: 5, flexShrink: 0 },
+  alertBandBadgeTxt:{ color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
 
   /* Console band — dark monitoring header for Tour de contrôle / Caméras */
   consoleBand:      { flexDirection: "row", alignItems: "center", gap: 10,
@@ -1497,54 +1357,49 @@ const S = StyleSheet.create({
   fixedAlertTime: { color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: "700", flexShrink: 0 },
 
   /* ── GRILLE BUS 2 COLONNES ───────────────────────────────────── */
-  gridContent:    { padding: 10, gap: 8 },
-  gridRow:        { gap: 8 },
-  gridCard:       { flex: 1, backgroundColor: "#111827", borderRadius: 14,
-                    padding: 12, gap: 7, borderLeftWidth: 4,
-                    borderWidth: 1, borderColor: "#1E293B",
-                    ...(Platform.OS === "web"
-                      ? { boxShadow: "0 4px 16px rgba(0,0,0,0.4)" }
-                      : { shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12,
-                          shadowOffset: { width: 0, height: 4 }, elevation: 6 }) },
-  gridCardName:   { fontSize: 14, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.3 },
-  gridStatusChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 7,
+  gridContent:    { padding: 10, gap: 10, paddingBottom: 20 },
+  gridRow:        { gap: 10 },
+  gridCard:       { flex: 1, backgroundColor: "#0D1117", borderRadius: 12,
+                    padding: 14, gap: 9, borderLeftWidth: 3,
+                    borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" },
+  gridCardName:   { fontSize: 13, fontWeight: "800", color: "#E2E8F0", letterSpacing: -0.2 },
+  gridStatusChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 6,
                     paddingHorizontal: 7, paddingVertical: 4, alignSelf: "flex-start",
-                    backgroundColor: "rgba(255,255,255,0.07)" },
-  gridStatusTxt:  { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
-  gridRoute:      { fontSize: 11, color: "#64748B", fontWeight: "600" },
+                    backgroundColor: "rgba(255,255,255,0.06)" },
+  gridStatusTxt:  { fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+  gridRoute:      { fontSize: 10.5, color: "#4B5563", fontWeight: "500" },
   gridOccWrap:    { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  gridOccBar:     { flex: 1, height: 6, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 4, overflow: "hidden" },
-  gridOccFill:    { height: 6, borderRadius: 4 },
-  gridOccPct:     { fontSize: 10, fontWeight: "900", flexShrink: 0 },
+  gridOccBar:     { flex: 1, height: 3, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 2, overflow: "hidden" },
+  gridOccFill:    { height: 3, borderRadius: 2 },
+  gridOccPct:     { fontSize: 10, fontWeight: "800", flexShrink: 0 },
   gridAlertRow:   { flexDirection: "row", alignItems: "center", gap: 5,
-                    backgroundColor: "rgba(239,68,68,0.15)", borderRadius: 6,
-                    paddingHorizontal: 7, paddingVertical: 4,
-                    borderWidth: 1, borderColor: "rgba(239,68,68,0.25)" },
-  gridAlertTxt:   { flex: 1, fontSize: 10, color: RED, fontWeight: "700" },
-  gridCamDot:     { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-end", marginTop: 2 },
-  gridCamTxt:     { fontSize: 8, color: CAM_GR, fontWeight: "900", letterSpacing: 1 },
+                    backgroundColor: "rgba(239,68,68,0.10)", borderRadius: 5,
+                    paddingHorizontal: 7, paddingVertical: 4 },
+  gridAlertTxt:   { flex: 1, fontSize: 9.5, color: "#EF4444", fontWeight: "600" },
+  gridCamDot:     { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", marginTop: 2 },
+  gridCamTxt:     { fontSize: 8, color: "#10B981", fontWeight: "700", letterSpacing: 0.8 },
 
-  /* ── BANDE CAMÉRAS (fixée en bas) ────────────────────────────── */
-  camStrip:       { backgroundColor: CAM_BG, borderTopWidth: 1, borderTopColor: "#1E293B" },
+  /* ── BANDE CAMÉRAS (au-dessus de la grille bus) ───────────────── */
+  camStrip:       { backgroundColor: "#080C12", borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
   camStripHdr:    { flexDirection: "row", alignItems: "center", gap: 8,
-                    paddingHorizontal: 14, paddingVertical: 8 },
-  camStripTitle:  { flex: 1, color: "#64748B", fontSize: 9, fontWeight: "900", letterSpacing: 2 },
-  camStripCount:  { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1 },
+                    paddingHorizontal: 14, paddingVertical: 9 },
+  camStripTitle:  { flex: 1, color: "#374151", fontSize: 9, fontWeight: "800", letterSpacing: 2 },
+  camStripCount:  { color: "#374151", fontSize: 9, fontWeight: "700", letterSpacing: 1 },
   camStripScroll: { paddingHorizontal: 10, paddingBottom: 10, gap: 8 },
-  camStripCard:   { width: 170, borderRadius: 10, overflow: "hidden",
-                    backgroundColor: "#060A12",
-                    borderWidth: 1, borderColor: "#162032" },
-  camStripMonitor:{ height: 128 },
+  camStripCard:   { width: 168, borderRadius: 8, overflow: "hidden",
+                    backgroundColor: "#060810",
+                    borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" },
+  camStripMonitor:{ height: 118 },
   camStripBadgeRow:{ flexDirection: "row", alignItems: "center", gap: 4,
                     paddingHorizontal: 8, paddingVertical: 5,
-                    backgroundColor: "#0B1220", maxWidth: 170 },
-  camStripRec:    { color: "#EF4444", fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
-  camStripLiveBadge:{ backgroundColor: "#DC2626", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  camStripLiveTxt:{ color: "#fff", fontSize: 7, fontWeight: "900", letterSpacing: 0.8 },
+                    backgroundColor: "#04060B" },
+  camStripRec:    { color: "#EF4444", fontSize: 7.5, fontWeight: "800", letterSpacing: 0.4 },
+  camStripLiveBadge:{ backgroundColor: "#DC2626", borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 },
+  camStripLiveTxt:{ color: "#fff", fontSize: 7, fontWeight: "900", letterSpacing: 0.6 },
   camStripFooter: { gap: 1 },
-  camStripBusName:{ color: "#E2E8F0", fontSize: 10, fontWeight: "800" },
-  camStripRoute:  { color: "#475569", fontSize: 9, fontWeight: "600" },
-  camStripBtn:    { backgroundColor: "#071A0E", paddingVertical: 7, alignItems: "center",
-                    borderTopWidth: 1, borderTopColor: "#166534" },
-  camStripBtnTxt: { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  camStripBusName:{ color: "#CBD5E1", fontSize: 10, fontWeight: "700" },
+  camStripRoute:  { color: "#374151", fontSize: 9, fontWeight: "500" },
+  camStripBtn:    { paddingVertical: 7, alignItems: "center",
+                    borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
+  camStripBtnTxt: { color: "rgba(255,255,255,0.35)", fontSize: 8.5, fontWeight: "700", letterSpacing: 1 },
 });
