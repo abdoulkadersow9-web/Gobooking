@@ -1,0 +1,133 @@
+J’ai vérifié les dernières mises à jour ainsi que les tests effectués.
+
+Plusieurs points critiques doivent être corrigés immédiatement pour continuer correctement le paramétrage et les tests.
+
+---
+
+1. PROBLÈME SP (SANS PAYER) – CÔTÉ AGENT GUICHET
+
+Le statut SP n’est pas visible ni utilisable dans le module Agent Guichet.
+
+Alors que :
+
+- la logique SP est déjà définie  
+- elle doit être opérationnelle côté guichet  
+
+---
+
+EXIGENCE :
+
+Ajouter le statut SP dans le module Agent Guichet uniquement.
+
+Cela veut dire :
+
+- lors de la création d’un ticket → option SP disponible  
+- possibilité de marquer un ticket comme SP  
+- montant automatiquement = 0  
+- statut = SP  
+- badge SP visible dans la liste  
+
+SP doit être visible et synchronisé sur :
+
+- agent guichet  
+- chef d’agence  
+- compagnie  
+- admin  
+
+---
+
+2. SÉLECTION DES SIÈGES (TRÈS IMPORTANT)
+
+L’agent guichet doit pouvoir utiliser le squelette du car (seat map) comme le client.
+
+Cela veut dire :
+
+- affichage visuel des sièges  
+- possibilité de cliquer sur un siège  
+
+Quand il clique sur un siège, il doit pouvoir :
+
+- réserver la place  
+- vendre la place (ticket payé)  
+- marquer la place en SP  
+
+---
+
+EXIGENCE :
+
+Implémenter un système simple :
+
+- clic sur siège → ouvre formulaire  
+- choix rapide :
+  - réserver  
+  - vendre  
+  - SP  
+
+---
+
+3. PROBLÈME LISTE DES VILLES (CRITIQUE)
+
+Dans le paramétrage (grille tarifaire), toutes les villes de la Côte d’Ivoire ne sont pas disponibles.
+
+Cela bloque le paramétrage réel du système.
+
+---
+
+EXIGENCE :
+
+Afficher la liste complète des villes de la Côte d’Ivoire dans :
+
+- création de trajet  
+- grille tarifaire  
+- paramétrage compagnie  
+
+---
+
+IMPORTANT :
+
+Je dois pouvoir configurer librement :
+
+- ville départ  
+- ville arrivée  
+- type (standard / VIP)  
+- prix  
+
+Sans limitation.
+
+---
+
+4. LOGIQUE DE PARAMÉTRAGE
+
+Je vais faire les paramétrages manuellement.
+
+Donc :
+
+- toutes les données doivent être disponibles  
+- aucune restriction  
+- tout doit suivre la logique définie  
+
+---
+
+5. PRIORITÉ
+
+Corriger immédiatement :
+
+- SP côté agent guichet  
+- sélection des sièges (squelette du car)  
+- liste complète des villes  
+
+---
+
+OBJECTIF :
+
+Permettre :
+
+- un vrai fonctionnement guichet  
+- un paramétrage complet  
+- une cohérence avec la logique métier  
+
+---
+
+IMPORTANT :
+
+Ces corrections sont nécessaires avant de continuer les tests et les améliorations.

@@ -55,6 +55,8 @@ interface Confirmed {
   seatCount: number;
   trip: Trip;
   paymentLabel: string;
+  isSP?: boolean;
+  seatNumber?: string;
 }
 
 /* ── Impression Départ interfaces ── */
@@ -247,6 +249,18 @@ export default function TicketsScreen() {
   const [printing, setPrinting]     = useState(false);
   const [confirmed, setConfirmed]   = useState<Confirmed | null>(null);
 
+  /* ── SP & Seat Map state ── */
+  const [isSP, setIsSP]                       = useState(false);
+  const [showSeatMap, setShowSeatMap]         = useState(false);
+  const [seatMapData, setSeatMapData]         = useState<any[]>([]);
+  const [loadingSeatMap, setLoadingSeatMap]   = useState(false);
+  const [clickedSeat, setClickedSeat]         = useState<any | null>(null);
+  const [seatActionType, setSeatActionType]   = useState<"vendre" | "réserver" | "sp">("vendre");
+  const [showSeatModal, setShowSeatModal]     = useState(false);
+  const [seatPaxName, setSeatPaxName]         = useState("");
+  const [seatPaxPhone, setSeatPaxPhone]       = useState("");
+  const [seatSubmitting, setSeatSubmitting]   = useState(false);
+
   /* ── Créer départ state ── */
   const [fleetBuses, setFleetBuses]       = useState<BusFleet[]>([]);
   const [loadingBuses, setLoadingBuses]   = useState(false);
@@ -309,6 +323,47 @@ export default function TicketsScreen() {
     } finally {
       setLoadingBuses(false);
     }
+  };
+
+  /* ── Fetch seat map ── */
+  const fetchSeatMap = useCallback(async (tripId: string) => {
+    setLoadingSeatMap(true);
+    try {
+      const res = await apiFetch(`/agent/seats/${tripId}`, { token: token ?? undefined });
+      setSeatMapData(Array.isArray(res) ? res : []);
+    } catch { setSeatMapData([]); }
+    finally { setLoadingSeatMap(false); }
+  }, [token]);
+
+  /* ── Handle seat sale from seat map ── */
+  const handleSeatSale = async () => {
+    if (!selectedTrip || !clickedSeat) return;
+    if (!seatPaxName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
+    const isSPAction = seatActionType === "sp";
+    const isResv     = seatActionType === "réserver";
+    setSeatSubmitting(true);
+    try {
+      const res = await apiFetch<{ bookingRef?: string; id?: string }>("/agent/reservations", {
+        token: token ?? undefined, method: "POST",
+        body: {
+          tripId:              selectedTrip.id,
+          clientName:          seatPaxName.trim(),
+          clientPhone:         seatPaxPhone.trim(),
+          seatCount:           1,
+          paymentMethod:       isSPAction ? "sp" : "cash",
+          isSP:                isSPAction,
+          isReservation:       isResv,
+          preferredSeatNumber: clickedSeat.number,
+        },
+      });
+      setShowSeatModal(false);
+      setSeatPaxName(""); setSeatPaxPhone(""); setSeatActionType("vendre");
+      const label = isSPAction ? "SP créé" : isResv ? "Réservé" : "Vendu";
+      Alert.alert("Succès", `Siège ${clickedSeat.number} — ${label}\nRéf: ${res.bookingRef ?? res.id}`);
+      fetchSeatMap(selectedTrip.id);
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de traiter la demande");
+    } finally { setSeatSubmitting(false); }
   };
 
   /* ── Impression Départ functions ── */
@@ -423,11 +478,13 @@ export default function TicketsScreen() {
   const handleSubmit = async () => {
     if (!selectedTrip) { Alert.alert("Erreur", "Sélectionnez un trajet."); return; }
     if (!passengerName.trim()) { Alert.alert("Erreur", "Saisissez le nom du passager."); return; }
-    if (!passengerPhone.trim()) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
-    if (!paymentMethod) { Alert.alert("Erreur", "Sélectionnez un mode de paiement."); return; }
+    if (!isSP && !passengerPhone.trim()) { Alert.alert("Erreur", "Saisissez le numéro de téléphone."); return; }
+    if (!isSP && !paymentMethod) { Alert.alert("Erreur", "Sélectionnez un mode de paiement."); return; }
     const count = parseInt(passengerCount) || 1;
     if (count < 1 || count > 10) { Alert.alert("Erreur", "Nombre de passagers invalide (1-10)."); return; }
-    const pmLabel = PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label ?? paymentMethod;
+    const pmLabel = isSP ? "SP (Sans Payer)" : (PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label ?? paymentMethod);
+    const finalPayment = isSP ? "sp" : paymentMethod;
+    const finalTotal   = isSP ? 0 : selectedTrip.price * count;
 
     setSubmitting(true);
     try {
@@ -436,27 +493,29 @@ export default function TicketsScreen() {
         await saveOffline({
           type: "reservation",
           payload: { tripId: selectedTrip.id, passengerName: passengerName.trim(),
-            passengerPhone: passengerPhone.trim(), passengerCount: count, paymentMethod },
+            passengerPhone: passengerPhone.trim(), passengerCount: count, paymentMethod: finalPayment },
           token: token ?? "", createdAt: Date.now(),
         });
-        setConfirmed({ bookingRef: offlineRef, total: selectedTrip.price * count,
+        setConfirmed({ bookingRef: offlineRef, total: finalTotal,
           passengerName: passengerName.trim(), passengerPhone: passengerPhone.trim(),
-          seatCount: count, trip: selectedTrip, paymentLabel: pmLabel });
+          seatCount: count, trip: selectedTrip, paymentLabel: pmLabel, isSP });
         return;
       }
       const res = await apiFetch<{ bookingRef?: string; id?: string }>("/agent/reservations", {
         token: token ?? undefined, method: "POST",
         body: { tripId: selectedTrip.id, clientName: passengerName.trim(),
-          clientPhone: passengerPhone.trim(), seatCount: count, paymentMethod },
+          clientPhone: passengerPhone.trim(), seatCount: count,
+          paymentMethod: finalPayment, isSP },
       });
       setConfirmed({
         bookingRef: res.bookingRef ?? res.id ?? "—",
-        total: selectedTrip.price * count,
+        total: finalTotal,
         passengerName: passengerName.trim(),
         passengerPhone: passengerPhone.trim(),
         seatCount: count,
         trip: selectedTrip,
         paymentLabel: pmLabel,
+        isSP,
       });
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation");
@@ -533,6 +592,7 @@ export default function TicketsScreen() {
     setConfirmed(null); setSelectedTrip(null);
     setPassengerName(""); setPassengerPhone("");
     setPassengerCount("1"); setPaymentMethod("");
+    setIsSP(false); setShowSeatMap(false); setSeatMapData([]);
   };
 
   /* ── Confirmed screen ── */
@@ -553,17 +613,29 @@ export default function TicketsScreen() {
           </TouchableOpacity>
         </View>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={[S.content, { alignItems: "center", paddingTop: 32 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
-          <Text style={S.successTitle}>Billet émis !</Text>
+          {confirmed.isSP
+            ? <Ionicons name="shield-checkmark" size={72} color="#7C3AED" />
+            : <Ionicons name="checkmark-circle" size={72} color="#16a34a" />
+          }
+          <Text style={[S.successTitle, confirmed.isSP && { color: "#7C3AED" }]}>
+            {confirmed.isSP ? "SP Émis !" : "Billet émis !"}
+          </Text>
+          {confirmed.isSP && (
+            <View style={S.spBadge}>
+              <Ionicons name="shield-checkmark" size={14} color="#7C3AED" />
+              <Text style={S.spBadgeTxt}>Sans Payer — Billet de courtoisie</Text>
+            </View>
+          )}
 
           <View style={S.ticketCard}>
-            <View style={S.ticketCardHeader}>
-              <Text style={S.ticketRef}>{confirmed.bookingRef}</Text>
+            <View style={[S.ticketCardHeader, confirmed.isSP && { borderBottomColor: "#DDD6FE" }]}>
+              <Text style={[S.ticketRef, confirmed.isSP && { color: "#7C3AED" }]}>{confirmed.bookingRef}</Text>
+              {confirmed.isSP && <Text style={{ fontSize: 11, color: "#7C3AED", fontWeight: "700" }}>SP</Text>}
             </View>
             <Text style={S.ticketRoute}>{confirmed.trip.from} → {confirmed.trip.to}</Text>
             {[
               { k: "Passager",   v: confirmed.passengerName },
-              { k: "Téléphone",  v: confirmed.passengerPhone },
+              { k: "Téléphone",  v: confirmed.passengerPhone || "—" },
               { k: "Date",       v: confirmed.trip.date },
               { k: "Départ",     v: confirmed.trip.departureTime },
               { k: "Places",     v: `${confirmed.seatCount}` },
@@ -576,7 +648,9 @@ export default function TicketsScreen() {
             ))}
             <View style={[S.ticketRow, S.ticketTotalRow]}>
               <Text style={S.ticketTotalKey}>TOTAL</Text>
-              <Text style={S.ticketTotalVal}>{confirmed.total.toLocaleString("fr-FR")} FCFA</Text>
+              <Text style={[S.ticketTotalVal, confirmed.isSP && { color: "#7C3AED" }]}>
+                {confirmed.isSP ? "0 FCFA (SP)" : `${confirmed.total.toLocaleString("fr-FR")} FCFA`}
+              </Text>
             </View>
           </View>
 
@@ -703,93 +777,222 @@ export default function TicketsScreen() {
             )}
           </View>
 
-          {/* PASSAGER */}
-          <View style={S.card}>
-            <View style={S.cardHeader}>
-              <Ionicons name="person-outline" size={18} color={G} />
-              <Text style={S.cardTitle}>Informations passager</Text>
-            </View>
-            <Text style={S.label}>Nom complet *</Text>
-            <TextInput style={S.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
-            <Text style={S.label}>Téléphone *</Text>
-            <TextInput style={S.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone}
-              onChangeText={setPassengerPhone} keyboardType="phone-pad" />
-            <Text style={S.label}>Nombre de passagers</Text>
-            <View style={S.countRow}>
-              <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
-                <Ionicons name="remove" size={20} color={G} />
-              </TouchableOpacity>
-              <TextInput style={S.countInput} value={passengerCount} onChangeText={setPassengerCount}
-                keyboardType="number-pad" textAlign="center" />
-              <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
-                <Ionicons name="add" size={20} color={G} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* PAIEMENT */}
-          <View style={S.card}>
-            <View style={S.cardHeader}>
-              <Ionicons name="wallet-outline" size={18} color={G} />
-              <Text style={S.cardTitle}>Mode de paiement *</Text>
-            </View>
-            {!paymentMethod && (
-              <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 6 }}>
-                Veuillez sélectionner un mode de paiement
-              </Text>
-            )}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-              {PAYMENT_METHODS.map(pm => {
-                const selected = paymentMethod === pm.id;
-                return (
-                  <TouchableOpacity key={pm.id}
-                    activeOpacity={0.7}
-                    style={[S.payItem, selected && S.payItemSel]}
-                    onPress={() => setPaymentMethod(pm.id)}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                      <Ionicons name={pm.icon} size={20} color={selected ? "#fff" : "#9CA3AF"} />
-                      <Text style={[S.payLabel, selected && { color: "#fff", fontWeight: "800" }]}>{pm.label}</Text>
-                      {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* RECAP */}
+          {/* SEAT MAP TOGGLE + GRID */}
           {selectedTrip && (
-            <View style={S.recap}>
-              <Text style={S.recapTitle}>Récapitulatif</Text>
-              <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
-              <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
-              <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
-              <View style={[S.recapRow, { borderTopWidth: 1, borderColor: "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
-                <Text style={[S.recapKey, { fontWeight: "700", color: G_DARK }]}>TOTAL</Text>
-                <Text style={[S.recapVal, { fontWeight: "800", color: G, fontSize: 18 }]}>
-                  {(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA
-                </Text>
+            <View style={S.card}>
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={[S.viewToggleBtn, !showSeatMap && S.viewToggleBtnActive]}
+                  onPress={() => setShowSeatMap(false)}>
+                  <Ionicons name="person-outline" size={14} color={!showSeatMap ? G_DARK : "#9CA3AF"} />
+                  <Text style={[S.viewToggleTxt, !showSeatMap && S.viewToggleTxtActive]}>Passagers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[S.viewToggleBtn, showSeatMap && S.viewToggleBtnActive]}
+                  onPress={() => {
+                    setShowSeatMap(true);
+                    if (seatMapData.length === 0) fetchSeatMap(selectedTrip.id);
+                  }}>
+                  <Ionicons name="grid-outline" size={14} color={showSeatMap ? G_DARK : "#9CA3AF"} />
+                  <Text style={[S.viewToggleTxt, showSeatMap && S.viewToggleTxtActive]}>Plan sièges</Text>
+                </TouchableOpacity>
               </View>
+
+              {showSeatMap && (
+                <>
+                  {/* Légende */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                    {[
+                      { color: "#F3F4F6", label: "Libre" },
+                      { color: "#FDE68A", label: "Réservé" },
+                      { color: "#FCA5A5", label: "Vendu" },
+                      { color: "#C4B5FD", label: "SP" },
+                    ].map(l => (
+                      <View key={l.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: l.color, borderWidth: 1, borderColor: "#E5E7EB" }} />
+                        <Text style={{ fontSize: 11, color: "#6B7280" }}>{l.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {loadingSeatMap ? (
+                    <ActivityIndicator color={G} style={{ marginVertical: 16 }} />
+                  ) : seatMapData.length === 0 ? (
+                    <View style={{ alignItems: "center", padding: 16, gap: 8 }}>
+                      <Ionicons name="grid-outline" size={32} color="#D1D5DB" />
+                      <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Plan de sièges non disponible</Text>
+                      <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)}>
+                        <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={{ gap: 6 }}>
+                        {(() => {
+                          const maxRow = Math.max(...seatMapData.map((s: any) => s.row ?? 1));
+                          const maxCol = Math.max(...seatMapData.map((s: any) => s.column ?? 1));
+                          return Array.from({ length: maxRow }, (_, ri) => (
+                            <View key={ri} style={{ flexDirection: "row", gap: 6 }}>
+                              {ri === 0 && <View style={{ width: 22 }} />}
+                              {Array.from({ length: maxCol }, (_, ci) => {
+                                const seat = seatMapData.find((s: any) => s.row === ri + 1 && s.column === ci + 1);
+                                if (!seat) return <View key={ci} style={{ width: 40, height: 40 }} />;
+                                const st = seat.status;
+                                const bg = st === "sold" ? "#FCA5A5" : st === "reserved" ? "#FDE68A" : st === "sp" ? "#C4B5FD" : "#F3F4F6";
+                                const txtColor = st === "sold" ? "#991B1B" : st === "sp" ? "#5B21B6" : st === "reserved" ? "#92400E" : "#374151";
+                                const isFree = st === "available";
+                                return (
+                                  <TouchableOpacity
+                                    key={ci}
+                                    style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: bg, borderWidth: 1.5, borderColor: isFree ? "#E5E7EB" : "#D1D5DB", alignItems: "center", justifyContent: "center" }}
+                                    disabled={!isFree}
+                                    onPress={() => {
+                                      if (!isFree) return;
+                                      setClickedSeat(seat);
+                                      setSeatActionType("vendre");
+                                      setSeatPaxName(""); setSeatPaxPhone("");
+                                      setShowSeatModal(true);
+                                    }}>
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: txtColor }}>{seat.number}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          ));
+                        })()}
+                      </View>
+                    </ScrollView>
+                  )}
+                  <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
+                    <Ionicons name="refresh-outline" size={14} color={G} />
+                    <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Actualiser le plan</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           )}
 
-          <TouchableOpacity style={[S.submitBtn, submitting && { opacity: 0.6 }]}
-            onPress={handleSubmit} disabled={submitting}>
-            {submitting ? <ActivityIndicator color="#fff" /> : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={22} color="#fff" />
-                <Text style={S.submitTxt}>Valider la vente</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {/* PASSAGER + PAIEMENT + RECAP + SUBMIT — masqués si plan sièges visible */}
+          {!showSeatMap && (
+            <>
+              {/* PASSAGER */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="person-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Informations passager</Text>
+                </View>
+                <Text style={S.label}>Nom complet *</Text>
+                <TextInput style={S.input} placeholder="Ex: Kouamé Jean" value={passengerName} onChangeText={setPassengerName} />
+                {!isSP && (
+                  <>
+                    <Text style={[S.label, { marginTop: 8 }]}>Téléphone *</Text>
+                    <TextInput style={S.input} placeholder="Ex: 07 12 34 56 78" value={passengerPhone}
+                      onChangeText={setPassengerPhone} keyboardType="phone-pad" />
+                  </>
+                )}
+                <Text style={[S.label, { marginTop: 8 }]}>Nombre de passagers</Text>
+                <View style={S.countRow}>
+                  <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.max(1, parseInt(c) - 1)))}>
+                    <Ionicons name="remove" size={20} color={G} />
+                  </TouchableOpacity>
+                  <TextInput style={S.countInput} value={passengerCount} onChangeText={setPassengerCount}
+                    keyboardType="number-pad" textAlign="center" />
+                  <TouchableOpacity style={S.countBtn} onPress={() => setPassengerCount(c => String(Math.min(10, parseInt(c) + 1)))}>
+                    <Ionicons name="add" size={20} color={G} />
+                  </TouchableOpacity>
+                </View>
+              </View>
 
-          <TouchableOpacity
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, marginTop: 8, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-            onPress={() => router.push("/agent/rapport" as never)}
-          >
-            <Feather name="alert-triangle" size={16} color="#fff" />
-            <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
-          </TouchableOpacity>
+              {/* PAIEMENT + SP TOGGLE */}
+              <View style={S.card}>
+                <View style={S.cardHeader}>
+                  <Ionicons name="wallet-outline" size={18} color={G} />
+                  <Text style={S.cardTitle}>Mode de paiement *</Text>
+                </View>
+
+                {/* SP Toggle */}
+                <TouchableOpacity
+                  style={[S.spToggle, isSP && S.spToggleActive]}
+                  onPress={() => { setIsSP(v => !v); if (!isSP) setPaymentMethod(""); }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="shield-checkmark-outline" size={18} color={isSP ? "#fff" : "#7C3AED"} />
+                    <View>
+                      <Text style={[S.spToggleTxt, isSP && { color: "#fff" }]}>Billet SP (Sans Payer)</Text>
+                      <Text style={[S.spToggleSub, isSP && { color: "#EDE9FE" }]}>Courtoisie · Montant = 0 FCFA</Text>
+                    </View>
+                  </View>
+                  <View style={[S.spTogglePill, isSP && S.spTogglePillActive]}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: isSP ? "#7C3AED" : "#9CA3AF" }}>
+                      {isSP ? "ON" : "OFF"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {!isSP && (
+                  <>
+                    {!paymentMethod && (
+                      <Text style={{ fontSize: 12, color: "#EF4444", marginBottom: 6, marginTop: 8 }}>
+                        Veuillez sélectionner un mode de paiement
+                      </Text>
+                    )}
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+                      {PAYMENT_METHODS.map(pm => {
+                        const selected = paymentMethod === pm.id;
+                        return (
+                          <TouchableOpacity key={pm.id}
+                            activeOpacity={0.7}
+                            style={[S.payItem, selected && S.payItemSel]}
+                            onPress={() => setPaymentMethod(pm.id)}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                              <Ionicons name={pm.icon} size={20} color={selected ? "#fff" : "#9CA3AF"} />
+                              <Text style={[S.payLabel, selected && { color: "#fff", fontWeight: "800" }]}>{pm.label}</Text>
+                              {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* RECAP */}
+              {selectedTrip && (
+                <View style={[S.recap, isSP && { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" }]}>
+                  <Text style={[S.recapTitle, isSP && { color: "#5B21B6" }]}>Récapitulatif</Text>
+                  <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
+                  <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
+                  <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
+                  {isSP && <View style={S.recapRow}><Text style={S.recapKey}>Type</Text><Text style={{ fontSize: 13, fontWeight: "700", color: "#7C3AED" }}>SP — Sans Payer</Text></View>}
+                  <View style={[S.recapRow, { borderTopWidth: 1, borderColor: isSP ? "#DDD6FE" : "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
+                    <Text style={[S.recapKey, { fontWeight: "700", color: isSP ? "#5B21B6" : G_DARK }]}>TOTAL</Text>
+                    <Text style={[S.recapVal, { fontWeight: "800", fontSize: 18, color: isSP ? "#7C3AED" : G }]}>
+                      {isSP ? "0 FCFA (SP)" : `${(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA`}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[S.submitBtn, isSP && { backgroundColor: "#7C3AED", shadowColor: "#7C3AED" }, submitting && { opacity: 0.6 }]}
+                onPress={handleSubmit} disabled={submitting}>
+                {submitting ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name={isSP ? "shield-checkmark-outline" : "checkmark-circle-outline"} size={22} color="#fff" />
+                    <Text style={S.submitTxt}>{isSP ? "Émettre billet SP" : "Valider la vente"}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, marginTop: 8, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                onPress={() => router.push("/agent/rapport" as never)}
+              >
+                <Feather name="alert-triangle" size={16} color="#fff" />
+                <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       )}
 
@@ -1360,6 +1563,90 @@ export default function TicketsScreen() {
           </Modal>
         </>
       )}
+
+      {/* ── Modal: action sur siège ── */}
+      <Modal visible={showSeatModal} transparent animationType="slide" onRequestClose={() => setShowSeatModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 40, gap: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827" }}>
+                Siège {clickedSeat?.number}
+              </Text>
+              <TouchableOpacity onPress={() => setShowSeatModal(false)} hitSlop={8}>
+                <Ionicons name="close" size={22} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Action type */}
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {[
+                { v: "vendre",   label: "Vendre",    color: G,         darkColor: G_DARK },
+                { v: "réserver", label: "Réserver",  color: "#1D4ED8",  darkColor: "#1E3A8A" },
+                { v: "sp",       label: "SP",         color: "#7C3AED",  darkColor: "#5B21B6" },
+              ].map(act => {
+                const sel = seatActionType === act.v;
+                return (
+                  <TouchableOpacity key={act.v}
+                    style={{ flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 2,
+                      borderColor: sel ? act.color : "#E5E7EB",
+                      backgroundColor: sel ? act.color : "#F9FAFB",
+                      alignItems: "center" }}
+                    onPress={() => setSeatActionType(act.v as any)}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: sel ? "#fff" : "#6B7280" }}>
+                      {act.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {seatActionType === "sp" && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, padding: 10 }}>
+                <Ionicons name="shield-checkmark-outline" size={14} color="#7C3AED" />
+                <Text style={{ fontSize: 12, color: "#5B21B6", fontWeight: "600" }}>Billet de courtoisie — 0 FCFA</Text>
+              </View>
+            )}
+
+            <View style={{ gap: 6 }}>
+              <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Nom passager *</Text>
+              <TextInput
+                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
+                placeholder="Ex: Kouamé Jean"
+                value={seatPaxName}
+                onChangeText={setSeatPaxName}
+              />
+            </View>
+            {seatActionType !== "sp" && (
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 13, color: "#374151", fontWeight: "500" }}>Téléphone</Text>
+                <TextInput
+                  style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14, backgroundColor: "#F9FAFB" }}
+                  placeholder="Ex: 07 12 34 56 78"
+                  value={seatPaxPhone}
+                  onChangeText={setSeatPaxPhone}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={{ backgroundColor: seatActionType === "sp" ? "#7C3AED" : seatActionType === "réserver" ? "#1D4ED8" : G,
+                borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8,
+                opacity: seatSubmitting ? 0.6 : 1 }}
+              onPress={handleSeatSale} disabled={seatSubmitting}>
+              {seatSubmitting
+                ? <ActivityIndicator color="#fff" />
+                : <>
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                  <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+                    {seatActionType === "sp" ? "Émettre SP" : seatActionType === "réserver" ? "Réserver" : "Confirmer la vente"}
+                  </Text>
+                </>
+              }
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1439,6 +1726,22 @@ const S = StyleSheet.create({
   printBtnTxt: { color: "#fff", fontSize: 15, fontWeight: "700" },
   newSaleBtn:    { marginTop: 10, backgroundColor: G, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 14, width: "100%", justifyContent: "center" },
   newSaleBtnTxt: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  /* ── SP styles ── */
+  spBadge:       { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#F5F3FF", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 },
+  spBadgeTxt:    { fontSize: 12, color: "#5B21B6", fontWeight: "700" },
+  spToggle:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 2, borderColor: "#DDD6FE", borderRadius: 12, padding: 12, backgroundColor: "#F5F3FF" },
+  spToggleActive:{ borderColor: "#7C3AED", backgroundColor: "#7C3AED" },
+  spToggleTxt:   { fontSize: 14, fontWeight: "700", color: "#5B21B6" },
+  spToggleSub:   { fontSize: 11, color: "#7C3AED", marginTop: 1 },
+  spTogglePill:  { backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  spTogglePillActive: { backgroundColor: "#EDE9FE" },
+
+  /* ── Seat map toggle ── */
+  viewToggleBtn:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" },
+  viewToggleBtnActive: { borderColor: G, backgroundColor: G_LIGHT },
+  viewToggleTxt:       { fontSize: 13, fontWeight: "600", color: "#9CA3AF" },
+  viewToggleTxtActive: { color: G_DARK },
 
   /* ── Impression tab ── */
   impInfoBox:     { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#FFFBEB", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#FDE68A" },
