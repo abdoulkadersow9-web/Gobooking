@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { getSeatColor, SEAT_LEGEND } from "@/utils/seatColors";
 import { apiFetch } from "@/utils/api";
 
 const INDIGO  = "#3730A3";
@@ -155,12 +156,20 @@ export default function ChefTrips() {
   const [seatsData, setSeatsData]         = useState<any | null>(null);
   const [seatsLoading, setSeatsLoading]   = useState(false);
   const [selectedSeat, setSelectedSeat]   = useState<any | null>(null);
+  const seatPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── Modal Passagers ── */
   const [showPassengers, setShowPassengers]     = useState(false);
   const [passengersTrip, setPassengersTrip]     = useState<Trip | null>(null);
   const [passengersData, setPassengersData]     = useState<any | null>(null);
   const [passengersLoading, setPassengersLoading] = useState(false);
+
+  const refreshSeats = useCallback(async (tripId: string) => {
+    try {
+      const data = await apiFetch<any>(`/agent/chef/trips/${tripId}/seats`, { token: authToken });
+      setSeatsData(data);
+    } catch {}
+  }, [authToken]);
 
   async function openSeatMap(trip: Trip) {
     setSeatsTrip(trip);
@@ -178,6 +187,16 @@ export default function ChefTrips() {
       setSeatsLoading(false);
     }
   }
+
+  /* ── Polling plan de sièges (15s) quand modal ouvert ── */
+  useEffect(() => {
+    if (!showSeats || !seatsTrip) {
+      if (seatPollRef.current) { clearInterval(seatPollRef.current); seatPollRef.current = null; }
+      return;
+    }
+    seatPollRef.current = setInterval(() => refreshSeats(seatsTrip.id), 15_000);
+    return () => { if (seatPollRef.current) { clearInterval(seatPollRef.current); seatPollRef.current = null; } };
+  }, [showSeats, seatsTrip, refreshSeats]);
 
   async function openPassengers(trip: Trip) {
     setPassengersTrip(trip);
@@ -1164,19 +1183,39 @@ export default function ChefTrips() {
               </View>
             ) : seatsData ? (
               <>
-                {/* Stats */}
-                <View style={{ flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                {/* Stats + Légende */}
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                   {[
-                    { label: "Total",     value: seatsData.stats.total,    color: "#374151", bg: "#F3F4F6" },
-                    { label: "Libres",    value: seatsData.stats.free,     color: "#166534", bg: "#DCFCE7" },
-                    { label: "Occupés",   value: seatsData.stats.occupied, color: "#DC2626", bg: "#FEE2E2" },
-                    { label: "Descendus", value: seatsData.stats.released, color: "#7C3AED", bg: "#EDE9FE" },
+                    { label: "Total",     value: seatsData.stats.total,              color: "#374151", bg: "#F3F4F6" },
+                    { label: "Libres",    value: seatsData.stats.free,               color: "#374151", bg: "#F3F4F6" },
+                    { label: "Réservés",  value: seatsData.stats.reserved ?? 0,      color: "#92400E", bg: "#FEF3C7" },
+                    { label: "Vendus",    value: seatsData.stats.occupied,           color: "#991B1B", bg: "#FEE2E2" },
+                    { label: "SP",        value: seatsData.stats.sp ?? 0,            color: "#6D28D9", bg: "#EDE9FE" },
+                    { label: "Descendus", value: seatsData.stats.released,           color: "#15803D", bg: "#DCFCE7" },
                   ].map((item, i) => (
-                    <View key={i} style={{ backgroundColor: item.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center", minWidth: 70 }}>
+                    <View key={i} style={{ backgroundColor: item.bg, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center", minWidth: 60 }}>
                       <Text style={{ fontSize: 18, fontWeight: "800", color: item.color }}>{item.value}</Text>
                       <Text style={{ fontSize: 10, color: item.color }}>{item.label}</Text>
                     </View>
                   ))}
+                </View>
+                {/* Légende sièges */}
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                  {[
+                    { status: "free",     label: "Libre" },
+                    { status: "reserved", label: "Réservé" },
+                    { status: "occupied", label: "Vendu" },
+                    { status: "sp",       label: "SP" },
+                    { status: "released", label: "Descendu" },
+                  ].map(item => {
+                    const c = getSeatColor(item.status);
+                    return (
+                      <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
+                        <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
 
                 {/* Passagers par ville de descente */}
@@ -1204,13 +1243,6 @@ export default function ChefTrips() {
                     rows.get(seat.row)!.push(seat);
                   }
 
-                  const seatColors = {
-                    free:     { bg: "#DCFCE7", border: "#86EFAC", text: "#166534" },
-                    occupied: { bg: "#FEE2E2", border: "#FCA5A5", text: "#DC2626" },
-                    reserved: { bg: "#FEF3C7", border: "#FCD34D", text: "#D97706" },
-                    released: { bg: "#EDE9FE", border: "#C4B5FD", text: "#7C3AED" },
-                  };
-
                   return (
                     <View style={{ alignItems: "center" }}>
                       {/* Avant du bus */}
@@ -1222,9 +1254,9 @@ export default function ChefTrips() {
                         <View key={rowNum} style={{ flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 4 }}>
                           <Text style={{ fontSize: 10, color: "#9CA3AF", width: 18, textAlign: "center" }}>{rowNum}</Text>
                           {rowSeats.sort((a, b) => a.col - b.col).map((seat: any) => {
-                            const colors = seatColors[seat.status as keyof typeof seatColors] ?? seatColors.free;
+                            const colors = getSeatColor(seat.status);
                             const isSelected = selectedSeat?.id === seat.id;
-                            const hasAisle = seat.col === 3; // aisle before col 3
+                            const hasAisle = seat.col === 3;
                             return (
                               <React.Fragment key={seat.id}>
                                 {hasAisle && <View style={{ width: 10 }} />}
@@ -1236,7 +1268,8 @@ export default function ChefTrips() {
                                   }}
                                   onPress={() => setSelectedSeat(isSelected ? null : seat)}>
                                   <Text style={{ fontSize: 10, fontWeight: "700", color: colors.text }}>{seat.number}</Text>
-                                  {seat.status === "released" && <Text style={{ fontSize: 7, color: "#7C3AED" }}>↓off</Text>}
+                                  {seat.status === "released" && <Text style={{ fontSize: 7, color: colors.text }}>↓off</Text>}
+                                  {seat.status === "sp" && <Text style={{ fontSize: 7, color: colors.text }}>SP</Text>}
                                 </Pressable>
                               </React.Fragment>
                             );
@@ -1255,41 +1288,45 @@ export default function ChefTrips() {
                 {/* Détail siège sélectionné */}
                 {selectedSeat && (
                   <View style={{ backgroundColor: "white", borderRadius: 14, padding: 16, marginTop: 16, borderWidth: 2,
-                    borderColor: selectedSeat.status === "occupied" ? "#FCA5A5" : selectedSeat.status === "released" ? "#C4B5FD" : "#86EFAC" }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827", marginBottom: 8 }}>
-                      Siège {selectedSeat.number}
-                    </Text>
+                    borderColor: getSeatColor(selectedSeat.status).border }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>Siège {selectedSeat.number}</Text>
+                      <View style={{ backgroundColor: getSeatColor(selectedSeat.status).bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 11, fontWeight: "700", color: getSeatColor(selectedSeat.status).text }}>
+                          {selectedSeat.status === "sp" ? "SP" :
+                           selectedSeat.status === "released" ? "✓ Descendu" :
+                           selectedSeat.status === "occupied" ? "● Vendu" :
+                           selectedSeat.status === "reserved" ? "◷ Réservé" : "✓ Libre"}
+                        </Text>
+                      </View>
+                    </View>
                     {selectedSeat.booking ? (
                       <>
                         <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
                           <Feather name="user" size={13} color="#6B7280" />
-                          <Text style={{ fontSize: 12, color: "#374151" }}>Réservation : {selectedSeat.booking.ref}</Text>
+                          <Text style={{ fontSize: 12, color: "#374151" }}>
+                            Réf : {selectedSeat.booking.ref}{selectedSeat.booking.isSP ? "  🟣 SP" : ""}
+                          </Text>
                         </View>
-                        {selectedSeat.booking.boardingCity && (
+                        {selectedSeat.booking.boardingCity ? (
                           <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
                             <Feather name="log-in" size={13} color="#166534" />
                             <Text style={{ fontSize: 12, color: "#166534" }}>Monte à : {selectedSeat.booking.boardingCity}</Text>
                           </View>
-                        )}
-                        {selectedSeat.booking.alightingCity && (
+                        ) : null}
+                        {selectedSeat.booking.alightingCity ? (
                           <View style={{ flexDirection: "row", gap: 8, marginBottom: 4 }}>
-                            <Feather name="log-out" size={13} color={selectedSeat.status === "released" ? "#7C3AED" : "#DC2626"} />
-                            <Text style={{ fontSize: 12, color: selectedSeat.status === "released" ? "#7C3AED" : "#DC2626" }}>
+                            <Feather name="log-out" size={13} color={getSeatColor(selectedSeat.status).text} />
+                            <Text style={{ fontSize: 12, color: getSeatColor(selectedSeat.status).text }}>
                               {selectedSeat.status === "released" ? "Descendu à" : "Descend à"} : {selectedSeat.booking.alightingCity}
                             </Text>
                           </View>
-                        )}
-                        <View style={{ marginTop: 6, backgroundColor: selectedSeat.status === "released" ? "#EDE9FE" : "#FEE2E2",
-                          paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, alignSelf: "flex-start" }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: selectedSeat.status === "released" ? "#7C3AED" : "#DC2626" }}>
-                            {selectedSeat.status === "released" ? "✓ Libéré" : "● Occupé"}
-                          </Text>
-                        </View>
+                        ) : null}
                       </>
                     ) : (
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Feather name="check-circle" size={14} color="#166534" />
-                        <Text style={{ fontSize: 12, color: "#166534" }}>Siège disponible</Text>
+                        <Feather name="check-circle" size={14} color="#374151" />
+                        <Text style={{ fontSize: 12, color: "#374151" }}>Siège disponible</Text>
                       </View>
                     )}
                   </View>

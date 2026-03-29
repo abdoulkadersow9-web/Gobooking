@@ -25,7 +25,10 @@ interface Passenger {
   name: string;
   phone: string;
   seat: string;
+  seats?: string[];
   status: string;
+  paymentStatus?: string;
+  isSP?: boolean;
   departureCity: string;
   arrivalCity: string;
   departureTime: string;
@@ -1064,15 +1067,22 @@ export default function EmbarquementScreen() {
 
               <View style={styles.passengerRow}>
                 <View style={styles.passengerAvatar}>
-                  <Ionicons name="person" size={24} color={G} />
+                  <Ionicons name="person" size={24} color={found.isSP ? "#7C3AED" : G} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.passengerName}>{found.name}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={styles.passengerName}>{found.name}</Text>
+                    {found.isSP && (
+                      <View style={{ backgroundColor: "#EDE9FE", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, borderWidth: 1, borderColor: "#7C3AED" }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: "#6D28D9", letterSpacing: 1 }}>SP</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.passengerPhone}>{found.phone}</Text>
                 </View>
-                <View style={styles.seatBadge}>
-                  <Text style={styles.seatText}>{found.seat || "—"}</Text>
-                  <Text style={styles.seatLabel}>Siège</Text>
+                <View style={[styles.seatBadge, found.isSP && { backgroundColor: "#EDE9FE", borderColor: "#7C3AED" }]}>
+                  <Text style={[styles.seatText, found.isSP && { color: "#6D28D9" }]}>{found.seat || "—"}</Text>
+                  <Text style={[styles.seatLabel, found.isSP && { color: "#7C3AED" }]}>Siège</Text>
                 </View>
               </View>
 

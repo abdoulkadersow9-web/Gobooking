@@ -2434,7 +2434,10 @@ router.get("/reservation/:ref", async (req, res) => {
       phone: (firstPassenger as any)?.phone ?? booking.contactPhone ?? "—",
       passengerPhone: (firstPassenger as any)?.phone ?? booking.contactPhone ?? "—",
       seat: (booking.seatNumbers as string[] ?? [])[0] ?? "—",
+      seats: booking.seatNumbers as string[] ?? [],
       status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      isSP: (booking.paymentStatus as string) === "sp",
       price: booking.totalAmount ?? 0,
       departureCity: trip?.from ?? "—",
       arrivalCity: trip?.to ?? "—",
@@ -5904,17 +5907,18 @@ router.get("/chef/trips/:tripId/seats", async (req, res) => {
     const bookings = await db.execute(sql`
       SELECT b.id, b.booking_ref, b.seat_ids, b.seat_numbers, b.passengers,
              b.boarding_city, b.alighting_city, b.passenger_status, b.contact_phone,
-             b.total_amount, b.status as booking_status
+             b.total_amount, b.status as booking_status, b.payment_status
       FROM bookings b
       WHERE b.trip_id = ${tripId}
         AND b.status NOT IN ('cancelled','refunded','annulé','expiré')
       ORDER BY b.created_at
     `);
 
-    // Construire un index seatId → {bookingRef, passengerStatus, alightingCity}
+    // Construire un index seatId → {bookingRef, passengerStatus, alightingCity, isSP}
     const seatIndex = new Map<string, {
       bookingId: string; bookingRef: string; bookingStatus: string;
       passengerStatus: string; alightingCity: string; boardingCity: string;
+      isSP: boolean;
     }>();
     for (const b of bookings.rows as any[]) {
       let seatIds: string[] = [];
@@ -5924,6 +5928,7 @@ router.get("/chef/trips/:tripId/seats", async (req, res) => {
           bookingId: b.id, bookingRef: b.booking_ref, bookingStatus: b.booking_status,
           passengerStatus: b.passenger_status ?? "booked",
           alightingCity: b.alighting_city ?? "", boardingCity: b.boarding_city ?? "",
+          isSP: (b.payment_status as string) === "sp",
         });
       }
     }
@@ -5931,9 +5936,10 @@ router.get("/chef/trips/:tripId/seats", async (req, res) => {
     // Enrichir chaque siège avec son statut effectif
     const enrichedSeats = (seats.rows as any[]).map(seat => {
       const booking = seatIndex.get(seat.id);
-      let effectiveStatus: "free" | "occupied" | "released" | "reserved" = "free";
+      let effectiveStatus: "free" | "occupied" | "released" | "reserved" | "sp" = "free";
       if (booking) {
         if (booking.passengerStatus === "alighted") effectiveStatus = "released";
+        else if (booking.isSP) effectiveStatus = "sp";
         else effectiveStatus = "occupied";
       } else if (seat.status === "reserved") {
         effectiveStatus = "reserved";
@@ -5945,17 +5951,19 @@ router.get("/chef/trips/:tripId/seats", async (req, res) => {
           ref: booking.bookingRef,
           alightingCity: booking.alightingCity, boardingCity: booking.boardingCity,
           passengerStatus: booking.passengerStatus,
+          isSP: booking.isSP,
         } : null,
       };
     });
 
     // Stats globales
     const stats = {
-      total: enrichedSeats.length,
+      total:    enrichedSeats.length,
       free:     enrichedSeats.filter(s => s.status === "free").length,
       occupied: enrichedSeats.filter(s => s.status === "occupied").length,
       released: enrichedSeats.filter(s => s.status === "released").length,
       reserved: enrichedSeats.filter(s => s.status === "reserved").length,
+      sp:       enrichedSeats.filter(s => s.status === "sp").length,
     };
 
     // Passagers par escale de descente
