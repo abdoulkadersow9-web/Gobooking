@@ -1,0 +1,131 @@
+J’ai vérifié les dernières captures de la page Agent Suivi.
+
+Ce n’est pas acceptable.
+
+L’interface est toujours :
+- désordonnée
+- surchargée
+- mal structurée
+- difficile à lire
+
+On est encore sur un niveau basique, pas sur une tour de contrôle professionnelle.
+
+OBJECTIF IMMÉDIAT :
+Repenser totalement l’organisation visuelle pour obtenir une interface claire, structurée et puissante.
+
+---
+
+1. PROBLÈME PRINCIPAL : DÉSORDRE VISUEL
+
+Actuellement :
+- les éléments sont mélangés
+- aucune hiérarchie claire
+- tout a le même niveau d’importance
+
+À FAIRE :
+- organiser la page en sections distinctes
+- espacer fortement chaque bloc
+- supprimer toute sensation de “mélange”
+
+---
+
+2. STRUCTURE OBLIGATOIRE (À RESPECTER)
+
+La page doit être divisée clairement :
+
+1. HEADER KPI (statistiques)
+2. ALERTES CRITIQUES (priorité maximale)
+3. BUS EN COURS (avec vidéo)
+4. CAMÉRAS LIVE
+5. ACTIONS (rapport uniquement)
+
+Chaque section doit être visuellement séparée.
+
+---
+
+3. ALERTES — PRIORITÉ ABSOLUE
+
+Actuellement :
+- elles sont noyées dans le contenu
+
+À FAIRE :
+- les placer en haut, très visibles
+- cartes plus grandes
+- couleurs fortes (rouge / orange)
+- espacement important
+
+---
+
+4. CARTES BUS — SIMPLIFICATION
+
+Actuellement :
+- trop d’informations dans chaque carte
+- lecture difficile
+
+À FAIRE :
+- simplifier
+- garder uniquement :
+  • trajet
+  • statut
+  • progression
+  • alerte
+
+Lisibilité en 1 seconde obligatoire
+
+---
+
+5. CAMÉRAS LIVE — INTÉGRATION CLAIRE
+
+Actuellement :
+- mal intégrées
+- pas assez visibles
+
+À FAIRE :
+- bloc vidéo clair dans chaque bus
+- style sombre (monitoring)
+- indicateurs :
+  • LIVE / REC
+  • signal
+- bouton “Visionner” bien visible
+
+---
+
+6. SUPPRESSION DU BRUIT
+
+À FAIRE :
+- retirer tout élément inutile
+- éviter les répétitions
+- alléger chaque carte
+
+---
+
+7. HIÉRARCHIE VISUELLE
+
+Actuellement :
+- tout se ressemble
+
+À FAIRE :
+- tailles différentes
+- couleurs distinctes
+- importance visuelle claire :
+  • ALERTES > BUS > INFOS
+
+---
+
+8. OBJECTIF FINAL
+
+Créer une interface :
+- claire
+- organisée
+- moderne
+- professionnelle
+- impressionnante
+
+Une vraie tour de contrôle, pas une liste d’informations.
+
+---
+
+PRIORITÉ ABSOLUE :
+Clarté + organisation + lisibilité + impact visuel
+
+Corriger immédiatement.
