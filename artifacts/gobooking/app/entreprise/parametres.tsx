@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -24,6 +25,30 @@ const AMBER       = "#D97706";
 const AMBER_DARK  = "#B45309";
 const AMBER_LIGHT = "#FFFBEB";
 const AMBER_BG    = "#FEF3C7";
+
+const CI_CITIES = [
+  "Abidjan","Abengourou","Aboisso","Adzopé","Agboville","Anyama","Bondoukou",
+  "Bouaflé","Bouaké","Daloa","Daoukro","Dimbokro","Divo","Duékoué","Ferkessédougou",
+  "Gagnoa","Grand-Bassam","Guiglo","Issia","Katiola","Korhogo","Man","Odienné",
+  "San-Pédro","Sassandra","Séguéla","Sinfra","Soubré","Tiassalé","Toumodi","Yamoussoukro",
+];
+
+const TRIP_TYPE_LABELS: Record<string, string> = {
+  standard: "Standard", vip: "VIP", vip_plus: "VIP+",
+};
+const TRIP_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  standard: { bg: "#EEF2FF", text: "#3730A3", border: "#A5B4FC" },
+  vip:      { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
+  vip_plus: { bg: "#F5F3FF", text: "#7C3AED", border: "#C4B5FD" },
+};
+
+interface PricingEntry {
+  id: string;
+  fromCity: string;
+  toCity: string;
+  tripType: string;
+  price: number;
+}
 
 interface Agence {
   id: string;
@@ -135,6 +160,64 @@ export default function ParametresScreen() {
   const [editLicense, setEditLicense] = useState("");
   const [dirty, setDirty]            = useState(false);
 
+  /* ── Grille tarifaire ── */
+  const [pricing, setPricing]           = useState<PricingEntry[]>([]);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [showPricingForm, setShowPricingForm] = useState(false);
+  const [pricingForm, setPricingForm]   = useState({ fromCity: "", toCity: "", tripType: "standard", price: "" });
+  const [pricingSaving, setPricingSaving] = useState(false);
+
+  const loadPricing = useCallback(async () => {
+    if (!token) return;
+    setPricingLoading(true);
+    try {
+      const data = await apiFetch<PricingEntry[]>("/company/pricing", { token });
+      setPricing(data ?? []);
+    } catch { /* ignorer */ }
+    finally { setPricingLoading(false); }
+  }, [token]);
+
+  const savePricingEntry = async () => {
+    if (!pricingForm.fromCity || !pricingForm.toCity) {
+      Alert.alert("Erreur", "Veuillez choisir départ et arrivée."); return;
+    }
+    if (pricingForm.fromCity === pricingForm.toCity) {
+      Alert.alert("Erreur", "Départ et arrivée doivent être différents."); return;
+    }
+    const priceNum = Number(pricingForm.price);
+    if (!priceNum || priceNum <= 0) {
+      Alert.alert("Erreur", "Veuillez entrer un tarif valide."); return;
+    }
+    setPricingSaving(true);
+    try {
+      await apiFetch("/company/pricing", {
+        method: "POST", token,
+        body: { fromCity: pricingForm.fromCity, toCity: pricingForm.toCity, tripType: pricingForm.tripType, price: priceNum },
+      });
+      setShowPricingForm(false);
+      setPricingForm({ fromCity: "", toCity: "", tripType: "standard", price: "" });
+      await loadPricing();
+    } catch (err: any) {
+      Alert.alert("Erreur", err?.message ?? "Impossible d'enregistrer le tarif.");
+    } finally { setPricingSaving(false); }
+  };
+
+  const deletePricingEntry = (entry: PricingEntry) => {
+    Alert.alert(
+      "Supprimer ce tarif ?",
+      `${entry.fromCity} → ${entry.toCity} · ${TRIP_TYPE_LABELS[entry.tripType] ?? entry.tripType}`,
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Supprimer", style: "destructive", onPress: async () => {
+          try {
+            await apiFetch(`/company/pricing/${entry.id}`, { method: "DELETE", token });
+            setPricing(p => p.filter(x => x.id !== entry.id));
+          } catch { Alert.alert("Erreur", "Impossible de supprimer le tarif."); }
+        }},
+      ]
+    );
+  };
+
   const load = useCallback(async () => {
     if (!token) return;
     try {
@@ -155,9 +238,9 @@ export default function ParametresScreen() {
     }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadPricing(); }, [load, loadPricing]);
 
-  const onRefresh = () => { setRefreshing(true); load(); };
+  const onRefresh = () => { setRefreshing(true); load(); loadPricing(); };
 
   const handleChange = (setter: (v: string) => void) => (v: string) => {
     setter(v);
@@ -328,6 +411,56 @@ export default function ParametresScreen() {
             )}
           </View>
 
+          {/* ── Grille tarifaire ─────────────────────────────────── */}
+          <View style={S.section}>
+            <View style={S.sectionHeader}>
+              <Text style={S.sectionTitle}>Grille Tarifaire</Text>
+              <Pressable style={S.addBtn} onPress={() => { setPricingForm({ fromCity: "", toCity: "", tripType: "standard", price: "" }); setShowPricingForm(true); }}>
+                <Feather name="plus" size={14} color={AMBER} />
+                <Text style={S.addBtnText}>Ajouter</Text>
+              </Pressable>
+            </View>
+            <Text style={{ fontSize: 12, color: "#94A3B8", lineHeight: 17 }}>
+              Définissez vos tarifs par trajet et type. Le prix s'auto-remplira lors de la création d'un départ.
+            </Text>
+
+            {pricingLoading ? (
+              <ActivityIndicator size="small" color={AMBER} style={{ marginTop: 8 }} />
+            ) : pricing.length === 0 ? (
+              <View style={{ alignItems: "center", paddingVertical: 20, gap: 6 }}>
+                <Feather name="tag" size={28} color="#CBD5E1" />
+                <Text style={{ fontSize: 13, color: "#94A3B8" }}>Aucun tarif configuré</Text>
+                <Text style={{ fontSize: 11, color: "#CBD5E1", textAlign: "center" }}>
+                  Ajoutez des tarifs pour qu'ils s'auto-remplissent à la création des départs
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {pricing.map(entry => {
+                  const tc = TRIP_TYPE_COLORS[entry.tripType] ?? TRIP_TYPE_COLORS.standard;
+                  return (
+                    <View key={entry.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#E2E8F0", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>
+                          {entry.fromCity} → {entry.toCity}
+                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                          <View style={{ backgroundColor: tc.bg, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, borderWidth: 1, borderColor: tc.border }}>
+                            <Text style={{ fontSize: 10, fontWeight: "700", color: tc.text }}>{TRIP_TYPE_LABELS[entry.tripType] ?? entry.tripType}</Text>
+                          </View>
+                          <Text style={{ fontSize: 13, color: AMBER_DARK, fontWeight: "700" }}>{entry.price.toLocaleString("fr-CI")} FCFA</Text>
+                        </View>
+                      </View>
+                      <Pressable onPress={() => deletePricingEntry(entry)} style={{ padding: 6 }}>
+                        <Feather name="trash-2" size={16} color="#EF4444" />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
           {/* ── Déconnexion ──────────────────────────────────────── */}
           <View style={S.logoutSection}>
             <Text style={S.logoutSectionTitle}>Compte</Text>
@@ -357,6 +490,97 @@ export default function ParametresScreen() {
           <View style={{ height: 32 }} />
         </ScrollView>
       )}
+
+      {/* ── Modal : Ajouter un tarif ── */}
+      <Modal visible={showPricingForm} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+          <LinearGradient colors={[AMBER, AMBER_DARK]} style={{ paddingTop: insets.top + 16, paddingBottom: 16, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Pressable onPress={() => setShowPricingForm(false)} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+              <Feather name="x" size={18} color="white" />
+            </Pressable>
+            <Text style={{ flex: 1, fontSize: 16, fontWeight: "700", color: "white" }}>Ajouter un tarif</Text>
+          </LinearGradient>
+
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} keyboardShouldPersistTaps="handled">
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: -8 }}>Ville de départ</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {CI_CITIES.map(c => {
+                  const active = pricingForm.fromCity === c;
+                  return (
+                    <Pressable key={c}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: active ? AMBER : "#E2E8F0", backgroundColor: active ? AMBER_BG : "#fff" }}
+                      onPress={() => setPricingForm(f => ({ ...f, fromCity: c }))}>
+                      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? AMBER_DARK : "#64748B" }}>{c}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: -8 }}>Destination</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {CI_CITIES.filter(c => c !== pricingForm.fromCity).map(c => {
+                  const active = pricingForm.toCity === c;
+                  return (
+                    <Pressable key={c}
+                      style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1.5, borderColor: active ? AMBER : "#E2E8F0", backgroundColor: active ? AMBER_BG : "#fff" }}
+                      onPress={() => setPricingForm(f => ({ ...f, toCity: c }))}>
+                      <Text style={{ fontSize: 13, fontWeight: active ? "700" : "400", color: active ? AMBER_DARK : "#64748B" }}>{c}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: -8 }}>Type de départ</Text>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {(["standard","vip","vip_plus"] as const).map(t => {
+                const tc = TRIP_TYPE_COLORS[t];
+                const active = pricingForm.tripType === t;
+                return (
+                  <Pressable key={t}
+                    style={{ flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 12, borderWidth: 2, borderColor: active ? tc.border : "#E2E8F0", backgroundColor: active ? tc.bg : "#FAFAFA" }}
+                    onPress={() => setPricingForm(f => ({ ...f, tripType: t }))}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: active ? tc.text : "#9CA3AF" }}>{TRIP_TYPE_LABELS[t]}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#64748B", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: -8 }}>Tarif (FCFA)</Text>
+            <TextInput
+              style={{ backgroundColor: "#fff", borderRadius: 12, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, color: "#0F172A" }}
+              value={pricingForm.price} placeholder="Ex : 3500" placeholderTextColor="#CBD5E1"
+              keyboardType="number-pad"
+              onChangeText={v => setPricingForm(f => ({ ...f, price: v }))}
+            />
+
+            {pricingForm.fromCity && pricingForm.toCity && (
+              <View style={{ backgroundColor: AMBER_BG, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "#FDE68A" }}>
+                <Feather name="info" size={15} color={AMBER_DARK} />
+                <Text style={{ fontSize: 12, color: AMBER_DARK, flex: 1, lineHeight: 17 }}>
+                  Ce tarif s'appliquera automatiquement pour {pricingForm.fromCity} → {pricingForm.toCity} ({TRIP_TYPE_LABELS[pricingForm.tripType]}).
+                  Les trajets inverses utilisent également ce tarif.
+                </Text>
+              </View>
+            )}
+
+            <Pressable
+              style={[{ backgroundColor: AMBER, borderRadius: 14, paddingVertical: 15, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }, pricingSaving && { opacity: 0.7 }]}
+              onPress={savePricingEntry} disabled={pricingSaving}>
+              {pricingSaving ? <ActivityIndicator color="white" /> : (
+                <>
+                  <Feather name="check-circle" size={18} color="white" />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>Enregistrer ce tarif</Text>
+                </>
+              )}
+            </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

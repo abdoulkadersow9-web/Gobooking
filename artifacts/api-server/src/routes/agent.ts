@@ -4955,14 +4955,17 @@ router.post("/chef/trips", async (req, res) => {
     if (!ctx) return res.status(403).json({ error: "Accès refusé" });
     const { user, agent } = ctx;
 
-    const { from, to, date, departureTime, arrivalTime, price, busId } = req.body as {
+    const { from, to, date, departureTime, arrivalTime, price: priceInput, busId, tripType = "standard" } = req.body as {
       from: string; to: string; date: string;
       departureTime: string; arrivalTime: string;
-      price: number; busId?: string;
+      price?: number; busId?: string; tripType?: string;
     };
 
     if (!from || !to || !date || !departureTime) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
+    }
+    if (from === to) {
+      return res.status(400).json({ error: "La ville de départ et d'arrivée doivent être différentes" });
     }
 
     // Vérifier disponibilité du bus si fourni
@@ -4973,7 +4976,46 @@ router.post("/chef/trips", async (req, res) => {
       if (busCheck.currentTripId) return res.status(409).json({ error: `Ce car est déjà affecté au trajet ${busCheck.currentTripId}` });
     }
 
+    // Auto-lookup du prix depuis la grille tarifaire de la compagnie
+    let finalPrice = priceInput ?? 0;
+    if (!priceInput || priceInput <= 0) {
+      try {
+        const { companyPricingTable: pricingTable } = await import("@workspace/db");
+        const { and: andOp, eq: eqOp } = await import("drizzle-orm");
+        const [directEntry] = await db.select().from(pricingTable)
+          .where(andOp(
+            eqOp(pricingTable.companyId, agent.companyId),
+            eqOp(pricingTable.fromCity,  from),
+            eqOp(pricingTable.toCity,    to),
+            eqOp(pricingTable.tripType,  tripType || "standard"),
+          )).limit(1);
+        if (directEntry) {
+          finalPrice = directEntry.price;
+        } else {
+          const [reverseEntry] = await db.select().from(pricingTable)
+            .where(andOp(
+              eqOp(pricingTable.companyId, agent.companyId),
+              eqOp(pricingTable.fromCity,  to),
+              eqOp(pricingTable.toCity,    from),
+              eqOp(pricingTable.tripType,  tripType || "standard"),
+            )).limit(1);
+          if (reverseEntry) {
+            finalPrice = reverseEntry.price;
+          } else {
+            // Fallback grille globale
+            const { getTicketPrice } = await import("../lib/priceGrid");
+            const globalPrice = getTicketPrice(from, to);
+            if (globalPrice != null) {
+              const mult = tripType === "vip" ? 1.4 : tripType === "vip_plus" ? 1.8 : 1;
+              finalPrice = Math.round(globalPrice * mult / 100) * 100;
+            }
+          }
+        }
+      } catch (e) { console.error("[chef/trips] pricing lookup:", e); }
+    }
+
     const tripId = "trip-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const normalizedTripType = ["standard","vip","vip_plus"].includes(tripType ?? "") ? tripType : "standard";
 
     let busName = "À définir";
     let busType = "Standard";
@@ -4987,19 +5029,19 @@ router.post("/chef/trips", async (req, res) => {
     await db.execute(sql`
       INSERT INTO trips (id, company_id, agent_id, bus_id, from_city, to_city, date,
         departure_time, arrival_time, price, bus_type, bus_name, total_seats,
-        guichet_seats, online_seats, duration, amenities, stops, policies, status)
+        guichet_seats, online_seats, duration, amenities, stops, policies, trip_type, status)
       VALUES (
         ${tripId}, ${agent.companyId}, ${agent.id}, ${busId ?? null},
         ${from}, ${to}, ${date}, ${departureTime}, ${arrivalTime ?? "—"},
-        ${price ?? 0}, ${busType}, ${busName}, ${totalSeats},
+        ${finalPrice}, ${busType}, ${busName}, ${totalSeats},
         ${Math.floor(totalSeats * 0.7)}, ${Math.floor(totalSeats * 0.3)},
-        '?', '[]'::json, '[]'::json, '[]'::json, 'scheduled'
+        '?', '[]'::json, '[]'::json, '[]'::json, ${normalizedTripType}, 'scheduled'
       )
     `);
 
     // Générer les sièges pour ce trajet
     try {
-      const seatPrice = price ?? 0;
+      const seatPrice = finalPrice;
       const cols = 4;
       const seatRows = Math.ceil(totalSeats / cols);
       const colLetters = ["A","B","C","D"];
@@ -5055,7 +5097,7 @@ router.post("/chef/trips", async (req, res) => {
     await chefAudit({
       userId: user.id, userName: user.name, agenceId: agent.agenceId!,
       action: "chef_create_trip", targetId: tripId, targetType: "trip",
-      newData: { from, to, date, departureTime, arrivalTime: req.body.arrivalTime, price: price ?? 0, busId: busId ?? null, busName },
+      newData: { from, to, date, departureTime, arrivalTime: req.body.arrivalTime, price: finalPrice, tripType: normalizedTripType, busId: busId ?? null, busName },
     });
 
     console.log(`[Chef] Départ créé ${tripId} : ${from}→${to} ${date} ${departureTime} par chef ${user.name}`);

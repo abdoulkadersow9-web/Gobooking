@@ -25,6 +25,7 @@ export const tripsTable = pgTable("trips", {
   stops: json("stops").$type<{ name: string; time: string }[]>().notNull().default([]),
   policies: json("policies").$type<string[]>().notNull().default([]),
   routeId:   text("route_id"),
+  tripType: varchar("trip_type", { length: 20 }).notNull().default("standard"),
   status: varchar("status", { length: 30 }).notNull().default("scheduled"),
   startedAt: timestamp("started_at"),
   arrivedAt: timestamp("arrived_at"),

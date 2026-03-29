@@ -35,3 +35,4 @@ export * from "./agent_reports";
 export * from "./bagage_items";
 export * from "./trip_waypoints";
 export * from "./trip_transfers";
+export * from "./company_pricing";

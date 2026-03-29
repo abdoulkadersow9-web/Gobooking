@@ -57,7 +57,14 @@ type FormState = {
   from: string; to: string; date: string;
   departureTime: string; arrivalTime: string;
   price: string; busId: string; reason: string;
+  tripType: "standard" | "vip" | "vip_plus";
 };
+
+const TRIP_TYPES: { key: "standard" | "vip" | "vip_plus"; label: string; icon: string; color: string; bg: string }[] = [
+  { key: "standard", label: "Standard",  icon: "truck",   color: "#3730A3", bg: "#EEF2FF" },
+  { key: "vip",      label: "VIP",       icon: "star",    color: "#B45309", bg: "#FEF3C7" },
+  { key: "vip_plus", label: "VIP+",      icon: "zap",     color: "#7C3AED", bg: "#F5F3FF" },
+];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 
@@ -124,8 +131,10 @@ export default function ChefTrips() {
 
   const [form, setForm] = useState<FormState>({
     from: "", to: "", date: today(), departureTime: "07:00",
-    arrivalTime: "12:00", price: "", busId: "", reason: "",
+    arrivalTime: "12:00", price: "", busId: "", reason: "", tripType: "standard",
   });
+  const [priceSource, setPriceSource] = useState<"manual" | "company" | "global" | null>(null);
+  const [priceLookupLoading, setPriceLookupLoading] = useState(false);
 
   const [xferForm, setXferForm] = useState({
     newBusId: "", location: "", detail: "",
@@ -237,19 +246,47 @@ export default function ChefTrips() {
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
+  /* ── Auto-lookup du prix quand from/to/tripType changent ── */
+  useEffect(() => {
+    if (!form.from || !form.to || form.from === form.to || editId) return;
+    let cancelled = false;
+    const run = async () => {
+      setPriceLookupLoading(true);
+      try {
+        const r = await apiFetch<{ price: number | null; source: string }>(
+          `/company/pricing/lookup?from=${encodeURIComponent(form.from)}&to=${encodeURIComponent(form.to)}&type=${form.tripType}`,
+          { token: authToken }
+        );
+        if (!cancelled && r.price != null) {
+          setForm(f => ({ ...f, price: String(r.price) }));
+          setPriceSource(r.source === "company" || r.source === "company_reverse" ? "company" : "global");
+        } else if (!cancelled && r.price == null) {
+          setForm(f => ({ ...f, price: "" }));
+          setPriceSource(null);
+        }
+      } catch { /* si le lookup échoue, laisser le champ tel quel */ }
+      finally { if (!cancelled) setPriceLookupLoading(false); }
+    };
+    const t = setTimeout(run, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [form.from, form.to, form.tripType, editId, authToken]);
+
   /* ── Créer / Modifier un départ ── */
   function openCreate() {
     setEditId(null);
-    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "12:00", price: "", busId: "", reason: "" });
+    setPriceSource(null);
+    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "12:00", price: "", busId: "", reason: "", tripType: "standard" });
     setShowForm(true);
   }
 
   function openEdit(trip: Trip) {
     setEditId(trip.id);
+    setPriceSource("manual");
     setForm({
       from: trip.from_city, to: trip.to_city, date: trip.date,
       departureTime: trip.departure_time, arrivalTime: trip.arrival_time,
       price: String(trip.price ?? ""), busId: trip.bus_id ?? "", reason: "",
+      tripType: (trip as any).trip_type ?? "standard",
     });
     setShowForm(true);
   }
@@ -282,6 +319,7 @@ export default function ChefTrips() {
             from: form.from, to: form.to, date: form.date,
             departureTime: form.departureTime, arrivalTime: form.arrivalTime,
             price: form.price ? Number(form.price) : 0,
+            tripType: form.tripType,
             busId: form.busId || undefined,
           }),
         });
@@ -768,11 +806,51 @@ export default function ChefTrips() {
               </View>
             </ScrollView>
 
-            <Text style={s.label}>Tarif (FCFA)</Text>
+            {/* ─── Type de départ ─── */}
+            <Text style={s.label}>Type de départ</Text>
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              {TRIP_TYPES.map(tt => {
+                const active = form.tripType === tt.key;
+                return (
+                  <Pressable key={tt.key}
+                    style={{
+                      flex: 1, alignItems: "center", paddingVertical: 10,
+                      borderRadius: 12, borderWidth: 2,
+                      borderColor: active ? tt.color : "#E5E7EB",
+                      backgroundColor: active ? tt.bg : "#FAFAFA",
+                    }}
+                    onPress={() => {
+                      setPriceSource(null);
+                      setForm(f => ({ ...f, tripType: tt.key }));
+                    }}>
+                    <Feather name={tt.icon as any} size={18} color={active ? tt.color : "#9CA3AF"} />
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: active ? tt.color : "#6B7280", marginTop: 3 }}>
+                      {tt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* ─── Tarif ─── */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <Text style={s.label}>Tarif (FCFA)</Text>
+              {priceLookupLoading && <ActivityIndicator size="small" color={INDIGO2} />}
+              {!priceLookupLoading && priceSource === "company" && (
+                <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 10, color: "#166534", fontWeight: "700" }}>✓ Grille compagnie</Text>
+                </View>
+              )}
+              {!priceLookupLoading && priceSource === "global" && (
+                <View style={{ backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                  <Text style={{ fontSize: 10, color: "#92400E", fontWeight: "700" }}>⚡ Grille globale</Text>
+                </View>
+              )}
+            </View>
             <TextInput
-              style={s.input} value={form.price} placeholder="Ex : 2500"
+              style={s.input} value={form.price} placeholder={priceLookupLoading ? "Chargement…" : "Ex : 2500"}
               placeholderTextColor="#9CA3AF" keyboardType="number-pad"
-              onChangeText={v => setForm(f => ({ ...f, price: v }))}
+              onChangeText={v => { setPriceSource("manual"); setForm(f => ({ ...f, price: v })); }}
             />
 
             {/* Car — cars de l'agence uniquement */}

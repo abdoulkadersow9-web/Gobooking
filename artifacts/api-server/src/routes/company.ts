@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable, agentReportsTable, tripWaypointsTable } from "@workspace/db";
+import { db, usersTable, companiesTable, busesTable, agentsTable, tripsTable, bookingsTable, parcelsTable, seatsTable, walletTransactionsTable, boardingRequestsTable, invoicesTable, scansTable, busPositionsTable, agentAlertsTable, smsLogsTable, marketingLogsTable, agencesTable, routesTable, stopsTable, colisLogsTable, fuelLogsTable, tripExpensesTable, agentReportsTable, tripWaypointsTable, companyPricingTable } from "@workspace/db";
 import { eq, desc, and, inArray, gte, sql, lt } from "drizzle-orm";
 import { sendBulkSMS } from "../lib/smsService";
 import { tokenStore } from "./auth";
@@ -3572,6 +3572,140 @@ router.get("/trips/:tripId/transfers", async (req, res) => {
     res.json({ transfers: result.rows });
   } catch (err) {
     console.error("[company/transfers]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   GRILLE TARIFAIRE — /company/pricing
+   Chaque compagnie définit ses tarifs par trajet + type de départ
+══════════════════════════════════════════════════════════════════════════ */
+
+/* GET /company/pricing — liste tous les tarifs de la compagnie */
+router.get("/pricing", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const entries = await db.select().from(companyPricingTable)
+      .where(eq(companyPricingTable.companyId, ctx.companyId))
+      .orderBy(companyPricingTable.fromCity, companyPricingTable.toCity, companyPricingTable.tripType);
+
+    res.json(entries);
+  } catch (err) {
+    console.error("[company/pricing GET]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* GET /company/pricing/lookup?from=X&to=Y&type=standard — prix auto pour un trajet */
+router.get("/pricing/lookup", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { from, to, type = "standard" } = req.query as { from: string; to: string; type?: string };
+    if (!from || !to) { res.status(400).json({ error: "from et to requis" }); return; }
+
+    // Cherche A→B direct
+    const [direct] = await db.select().from(companyPricingTable)
+      .where(and(
+        eq(companyPricingTable.companyId, ctx.companyId),
+        eq(companyPricingTable.fromCity, from),
+        eq(companyPricingTable.toCity,   to),
+        eq(companyPricingTable.tripType, type),
+      )).limit(1);
+
+    if (direct) { res.json({ price: direct.price, source: "company" }); return; }
+
+    // Cherche B→A (symétrique)
+    const [reverse] = await db.select().from(companyPricingTable)
+      .where(and(
+        eq(companyPricingTable.companyId, ctx.companyId),
+        eq(companyPricingTable.fromCity, to),
+        eq(companyPricingTable.toCity,   from),
+        eq(companyPricingTable.tripType, type),
+      )).limit(1);
+
+    if (reverse) { res.json({ price: reverse.price, source: "company_reverse" }); return; }
+
+    // Fallback: grille globale GoBooking (muliplié selon le type)
+    const { getTicketPrice } = await import("../lib/priceGrid");
+    const globalPrice = getTicketPrice(from, to);
+    if (globalPrice != null) {
+      const multiplier = type === "vip" ? 1.4 : type === "vip_plus" ? 1.8 : 1;
+      res.json({ price: Math.round(globalPrice * multiplier / 100) * 100, source: "global" });
+      return;
+    }
+
+    res.json({ price: null, source: "none" });
+  } catch (err) {
+    console.error("[company/pricing lookup]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* POST /company/pricing — créer ou mettre à jour un tarif */
+router.post("/pricing", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { fromCity, toCity, tripType = "standard", price } = req.body as {
+      fromCity: string; toCity: string; tripType?: string; price: number;
+    };
+
+    if (!fromCity || !toCity || price == null || Number(price) < 0) {
+      res.status(400).json({ error: "fromCity, toCity et price sont requis" }); return;
+    }
+    if (fromCity === toCity) {
+      res.status(400).json({ error: "Départ et arrivée doivent être différents" }); return;
+    }
+
+    // Mettre à jour si déjà existant
+    const existing = await db.select().from(companyPricingTable)
+      .where(and(
+        eq(companyPricingTable.companyId, ctx.companyId),
+        eq(companyPricingTable.fromCity, fromCity),
+        eq(companyPricingTable.toCity,   toCity),
+        eq(companyPricingTable.tripType, tripType),
+      )).limit(1);
+
+    if (existing.length > 0) {
+      await db.update(companyPricingTable)
+        .set({ price: Number(price), updatedAt: new Date() })
+        .where(eq(companyPricingTable.id, existing[0].id));
+      res.json({ ...existing[0], price: Number(price) });
+    } else {
+      const id = "pr-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const [row] = await db.insert(companyPricingTable).values({
+        id, companyId: ctx.companyId, fromCity, toCity,
+        tripType: tripType || "standard", price: Number(price),
+      }).returning();
+      res.status(201).json(row);
+    }
+  } catch (err) {
+    console.error("[company/pricing POST]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* DELETE /company/pricing/:id — supprimer un tarif */
+router.delete("/pricing/:id", async (req, res) => {
+  try {
+    const ctx = await requireCompanyWithCompanyId(req.headers.authorization);
+    if (!ctx) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [row] = await db.select().from(companyPricingTable)
+      .where(and(
+        eq(companyPricingTable.id, req.params.id),
+        eq(companyPricingTable.companyId, ctx.companyId),
+      )).limit(1);
+
+    if (!row) { res.status(404).json({ error: "Tarif introuvable" }); return; }
+    await db.delete(companyPricingTable).where(eq(companyPricingTable.id, req.params.id));
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });
