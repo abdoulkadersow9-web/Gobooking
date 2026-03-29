@@ -915,6 +915,58 @@ export default function SuiviScreen() {
                       </View>
                     </View>
 
+                    {/* ── INLINE CAMERA PREVIEW ────────────────────────── */}
+                    {camOk && trip && (
+                      <TouchableOpacity onPress={() => setCameraTrip(trip)} activeOpacity={0.88} style={S.ctCamPreview}>
+                        {/* Dark camera frame background */}
+                        <View style={S.ctCamPreviewBg}>
+                          {[0,1,2,3,4,5,6].map(i => (
+                            <View key={i} style={[S.ctScanLine, { top: i * 22 }]} />
+                          ))}
+                        </View>
+                        {/* Corner brackets — control room style */}
+                        <View style={[S.ctCamCornerTL]} />
+                        <View style={[S.ctCamCornerTR]} />
+                        <View style={[S.ctCamCornerBL]} />
+                        <View style={[S.ctCamCornerBR]} />
+                        {/* REC badge top-left */}
+                        <View style={S.ctRecBadge}>
+                          <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444",
+                            transform: [{ scale: pulseAnim }] }} />
+                          <Text style={S.ctRecTxt}>REC</Text>
+                        </View>
+                        {/* LIVE badge top-right */}
+                        <View style={S.ctLiveBadge}>
+                          <Text style={S.ctLiveTxt}>LIVE</Text>
+                        </View>
+                        {/* Center: bus silhouette */}
+                        <View style={S.ctCamCenterArea}>
+                          <Ionicons name="bus" size={40} color="rgba(255,255,255,0.08)" />
+                        </View>
+                        {/* Signal bars + % bottom-right */}
+                        {liveCam && (
+                          <View style={S.ctSignalWrap}>
+                            <Text style={S.ctSignalPct}>{liveCam.signal}%</Text>
+                            {[1,2,3,4].map(bar => (
+                              <View key={bar} style={[S.ctSignalBar,
+                                { height: bar * 5, backgroundColor: liveCam.signal > bar * 25 ? CAM_GR : "rgba(255,255,255,0.12)" }]} />
+                            ))}
+                          </View>
+                        )}
+                        {/* Bottom overlay: bus info + play button */}
+                        <View style={S.ctCamBottom}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={S.ctCamBottomBus} numberOfLines={1}>{bus.busName}</Text>
+                            <Text style={S.ctCamBottomRoute} numberOfLines={1}>{trip.from} → {trip.to}</Text>
+                          </View>
+                          <View style={S.ctCamPlayBtn}>
+                            <Ionicons name="play-circle" size={14} color={CAM_GR} />
+                            <Text style={S.ctCamPlayTxt}>VISIONNER EN DIRECT</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+
                     {/* ── CONTENT BODY ─────────────────────────────────── */}
                     <View style={{ padding: 14, gap: 11 }}>
 
@@ -962,20 +1014,12 @@ export default function SuiviScreen() {
                         </View>
                       )}
 
-                      {/* Row 4: Footer chips */}
+                      {/* Row 4: Footer chips — GPS + no-cam indicator */}
                       <View style={S.ctFooter}>
-                        {camOk && trip ? (
-                          <TouchableOpacity style={S.ctCamBtn} onPress={() => setCameraTrip(trip)} activeOpacity={0.8}>
-                            <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR,
-                              opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.25] }) }} />
-                            <Text style={S.ctCamTxt}>LIVE</Text>
-                            <Ionicons name="videocam" size={13} color={CAM_GR} />
-                            {liveCam && <Text style={S.ctCamFrames}>{liveCam.signal}%</Text>}
-                          </TouchableOpacity>
-                        ) : (
+                        {!camOk && (
                           <View style={S.ctNoCam}>
                             <Ionicons name="videocam-off-outline" size={12} color="#CBD5E1" />
-                            <Text style={S.ctNoCamTxt}>Cam off</Text>
+                            <Text style={S.ctNoCamTxt}>Caméra hors ligne</Text>
                           </View>
                         )}
                         {bus.currentLocation && (
@@ -1202,7 +1246,7 @@ const CP = StyleSheet.create({
 
 /* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#DDE4ED" },
+  safe: { flex: 1, backgroundColor: "#C8D3DF" },
 
   /* ── Header ─────────────────────────────────────────────────── */
   header:     { backgroundColor: RED_D },
@@ -1212,21 +1256,21 @@ const S = StyleSheet.create({
   headerRight:{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
   headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.18)",
                 justifyContent: "center", alignItems: "center", flexShrink: 0,
-                borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   headerTitle:{ color: "#fff", fontSize: 18, fontWeight: "900", letterSpacing: -0.5 },
   headerSub:  { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 1, letterSpacing: 0.3 },
 
   /* KPI bar — premium dashboard numbers */
-  headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 14,
+  headerStats:{ flexDirection: "row", paddingHorizontal: 4, paddingTop: 8, paddingBottom: 16,
                 borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.09)",
-                backgroundColor: "rgba(0,0,0,0.25)" },
-  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 10, gap: 5,
+                backgroundColor: "rgba(0,0,0,0.3)" },
+  kpiTile:    { flex: 1, alignItems: "center", paddingVertical: 12, gap: 5,
                 borderBottomWidth: 3, borderBottomColor: "rgba(255,255,255,0.1)",
                 marginHorizontal: 2 },
-  kpiNum:     { color: "#fff", fontSize: 32, fontWeight: "900", lineHeight: 36, letterSpacing: -1.5 },
-  kpiLbl:     { color: "rgba(255,255,255,0.55)", fontSize: 8, fontWeight: "900", letterSpacing: 1.2 },
+  kpiNum:     { color: "#fff", fontSize: 34, fontWeight: "900", lineHeight: 38, letterSpacing: -1.5 },
+  kpiLbl:     { color: "rgba(255,255,255,0.5)", fontSize: 8, fontWeight: "900", letterSpacing: 1.3 },
   kpiRow:     { flexDirection: "row", alignItems: "center", gap: 4 },
-  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 6 },
+  kpiDiv:     { width: 1, backgroundColor: "rgba(255,255,255,0.1)", marginVertical: 4 },
 
   syncPill:   { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.1)",
                 borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5,
@@ -1237,16 +1281,16 @@ const S = StyleSheet.create({
                 justifyContent: "center", alignItems: "center",
                 borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
 
-  /* Alarm bar — cinematic */
+  /* Alarm bar — cinematic red band */
   alarmBar:        { flexDirection: "row", alignItems: "center", gap: 8,
-                     backgroundColor: "#7F1D1D", paddingHorizontal: 16, paddingVertical: 12,
-                     borderBottomWidth: 2, borderBottomColor: "#991B1B" },
-  alarmPulse:      { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FCA5A5", flexShrink: 0 },
-  alarmBarTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.5 },
-  alarmBarBus:     { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700", flex: 1 },
+                     backgroundColor: "#7F1D1D", paddingHorizontal: 16, paddingVertical: 14,
+                     borderBottomWidth: 2, borderBottomColor: "#450A0A" },
+  alarmPulse:      { width: 11, height: 11, borderRadius: 6, backgroundColor: "#FCA5A5", flexShrink: 0 },
+  alarmBarTxt:     { color: "#fff", fontSize: 13, fontWeight: "900", letterSpacing: 0.6 },
+  alarmBarBus:     { color: "rgba(255,255,255,0.72)", fontSize: 11, fontWeight: "700", flex: 1 },
   alarmUrgentBadge:{ backgroundColor: "#DC2626", borderRadius: 7,
-                     paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: "#FCA5A5" },
-  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
+                     paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#FCA5A5" },
+  alarmUrgentTxt:  { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.8 },
 
   /* Center / Loading */
   center:     { flex: 1, justifyContent: "center", alignItems: "center", gap: 16, padding: 36 },
@@ -1254,12 +1298,13 @@ const S = StyleSheet.create({
   loadingSub: { fontSize: 12, color: "#94A3B8", textAlign: "center", lineHeight: 18 },
 
   /* Scroll */
-  scroll: { padding: 14, gap: 18, paddingBottom: 56 },
+  scroll: { padding: 14, gap: 20, paddingBottom: 64 },
 
   /* Sync row */
   syncRow:    { flexDirection: "row", alignItems: "center", gap: 8,
-                backgroundColor: "#fff", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
-                borderWidth: 1, borderColor: "#E2E8F0" },
+                backgroundColor: "rgba(255,255,255,0.88)", borderRadius: 10,
+                paddingHorizontal: 12, paddingVertical: 8,
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
   syncRowTxt: { fontSize: 11, color: "#64748B", fontWeight: "600", flex: 1 },
 
   /* Sections */
@@ -1336,10 +1381,42 @@ const S = StyleSheet.create({
                  backgroundColor: "#FAF5FF", borderRadius: 8, paddingHorizontal: 9, paddingVertical: 6,
                  borderWidth: 1, borderColor: "#E9D5FF" },
   ctGpsTxt:    { fontSize: 10, color: "#7C3AED", fontWeight: "600", flex: 1 },
-  ctTriggerBtn:{ flexDirection: "row", alignItems: "center", gap: 4,
-                 backgroundColor: RED_L, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
-                 borderWidth: 1, borderColor: RED_M },
-  ctTriggerTxt:{ fontSize: 10, color: RED, fontWeight: "800" },
+  /* ── Inline camera preview block ───────────────────────────── */
+  ctCamPreview:    { height: 148, backgroundColor: "#020408", position: "relative", overflow: "hidden" },
+  ctCamPreviewBg:  { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
+  ctScanLine:      { position: "absolute", left: 0, right: 0, height: 1,
+                     backgroundColor: "rgba(255,255,255,0.025)" },
+  ctCamCornerTL:   { position: "absolute", top: 10, left: 10, width: 18, height: 18,
+                     borderTopWidth: 2, borderLeftWidth: 2, borderColor: CAM_GR },
+  ctCamCornerTR:   { position: "absolute", top: 10, right: 10, width: 18, height: 18,
+                     borderTopWidth: 2, borderRightWidth: 2, borderColor: CAM_GR },
+  ctCamCornerBL:   { position: "absolute", bottom: 36, left: 10, width: 18, height: 18,
+                     borderBottomWidth: 2, borderLeftWidth: 2, borderColor: CAM_GR },
+  ctCamCornerBR:   { position: "absolute", bottom: 36, right: 10, width: 18, height: 18,
+                     borderBottomWidth: 2, borderRightWidth: 2, borderColor: CAM_GR },
+  ctRecBadge:      { position: "absolute", top: 10, left: 10, flexDirection: "row", alignItems: "center", gap: 5,
+                     backgroundColor: "rgba(0,0,0,0.78)", borderRadius: 6,
+                     paddingHorizontal: 8, paddingVertical: 4 },
+  ctRecTxt:        { color: "#EF4444", fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
+  ctLiveBadge:     { position: "absolute", top: 10, right: 10, backgroundColor: "#DC2626",
+                     borderRadius: 5, paddingHorizontal: 8, paddingVertical: 4 },
+  ctLiveTxt:       { color: "#fff", fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
+  ctCamCenterArea: { position: "absolute", top: 0, left: 0, right: 0, bottom: 34,
+                     justifyContent: "center", alignItems: "center" },
+  ctSignalWrap:    { position: "absolute", bottom: 40, right: 12,
+                     flexDirection: "row", alignItems: "flex-end", gap: 2 },
+  ctSignalPct:     { color: CAM_GR, fontSize: 9, fontWeight: "800", marginRight: 4 },
+  ctSignalBar:     { width: 4, borderRadius: 2 },
+  ctCamBottom:     { position: "absolute", bottom: 0, left: 0, right: 0,
+                     backgroundColor: "rgba(0,0,0,0.85)", paddingHorizontal: 12, paddingVertical: 8,
+                     flexDirection: "row", alignItems: "center", gap: 8 },
+  ctCamBottomBus:  { color: "#fff", fontSize: 11, fontWeight: "800", flex: 1 },
+  ctCamBottomRoute:{ color: "rgba(255,255,255,0.48)", fontSize: 9 },
+  ctCamPlayBtn:    { flexDirection: "row", alignItems: "center", gap: 5,
+                     backgroundColor: "rgba(34,197,94,0.15)", borderRadius: 7,
+                     paddingHorizontal: 9, paddingVertical: 5,
+                     borderWidth: 1, borderColor: "rgba(34,197,94,0.35)" },
+  ctCamPlayTxt:    { color: CAM_GR, fontSize: 9, fontWeight: "900", letterSpacing: 0.4 },
 
   ctAlertInline:   { flexDirection: "row", alignItems: "center", gap: 8,
                      backgroundColor: "#FFF1F2", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9,
