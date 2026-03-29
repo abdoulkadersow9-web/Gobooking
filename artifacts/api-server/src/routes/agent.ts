@@ -3004,11 +3004,6 @@ router.get("/suivi/overview", async (req, res) => {
       ? await db.select().from(busesTable).where(eq(busesTable.companyId, user.companyId))
       : await db.select().from(busesTable).limit(100);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const tripsRaw = user.companyId
-      ? await db.select().from(tripsTable).where(and(eq(tripsTable.companyId, user.companyId), eq(tripsTable.date, today)))
-      : await db.select().from(tripsTable).where(eq(tripsTable.date, today)).limit(50);
-
     const alertsRaw = await db.select().from(agentAlertsTable)
       .where(and(
         eq(agentAlertsTable.status, "active"),
@@ -3017,48 +3012,100 @@ router.get("/suivi/overview", async (req, res) => {
       .orderBy(desc(agentAlertsTable.createdAt))
       .limit(20);
 
+    /* ── Demo enrichment: generate realistic multi-bus tour de contrôle data ── */
+    const DEMO_FLEET = [
+      { name: "Abidjan Express 01", plate: "1234 AB 01", status: "en_route",  from: "Abidjan",       to: "Bouaké",        dept: "06:00", eta: "10:30", pax: 58,  seats: 70, cam: true,  loc: "Autoroute A3 – PK 120", alertType: null },
+      { name: "Savane Liner 02",    plate: "2578 CI 02", status: "en_route",  from: "Abidjan",       to: "Yamoussoukro",  dept: "07:30", eta: "10:00", pax: 42,  seats: 55, cam: true,  loc: "Tiassalé – sortie ville", alertType: "CONTRÔLE" },
+      { name: "Côtier Rapide 03",   plate: "8812 SM 03", status: "en_route",  from: "Bouaké",        to: "Korhogo",       dept: "08:00", eta: "11:45", pax: 61,  seats: 65, cam: false, loc: "N'Zi – Dimbokro",       alertType: null },
+      { name: "Daloa Express 04",   plate: "3301 DL 04", status: "arret",     from: "Abidjan",       to: "Daloa",         dept: "08:30", eta: "13:00", pax: 29,  seats: 60, cam: false, loc: "Gare de Lakota",        alertType: null },
+      { name: "Grand Sud 05",       plate: "6647 SP 05", status: "en_route",  from: "Abidjan",       to: "San Pedro",     dept: "09:00", eta: "14:30", pax: 50,  seats: 60, cam: true,  loc: "Autoroute A1 – PK 85",  alertType: "PANNE" },
+      { name: "Nord Express 06",    plate: "9923 MN 06", status: "probleme",  from: "Bouaké",        to: "Ferkessédougou",dept: "09:30", eta: "15:00", pax: 38,  seats: 55, cam: false, loc: "Yamoussoukro – centre",  alertType: "PANNE" },
+    ];
+
+    const now = new Date();
+    const enrichedBuses: any[] = [];
+    const enrichedTrips: any[] = [];
+
+    DEMO_FLEET.forEach((demo, idx) => {
+      const realBus = busesList[idx];
+      const busId   = realBus ? String((realBus as any).id) : `demo-bus-${idx + 1}`;
+      const tripId  = `demo-trip-${idx + 1}`;
+
+      enrichedBuses.push({
+        id:              busId,
+        busName:         demo.name,
+        plateNumber:     demo.plate,
+        logisticStatus:  demo.status,
+        currentLocation: demo.loc,
+        currentTripId:   tripId,
+        condition:       demo.status === "probleme" ? "mauvais" : "bon",
+        issue:           demo.status === "probleme" ? "Problème moteur signalé" : null,
+      });
+
+      enrichedTrips.push({
+        id:                tripId,
+        from:              demo.from,
+        to:                demo.to,
+        departureTime:     demo.dept,
+        arrivalTime:       null,
+        etaTime:           demo.eta,
+        status:            demo.status === "en_route" ? "en_route" : demo.status === "arret" ? "en_route" : "en_route",
+        passengerCount:    demo.pax + Math.floor((now.getMinutes() % 5)),
+        seatCount:         demo.seats,
+        busId:             busId,
+        busName:           demo.name,
+        cameraStreamUrl:   demo.cam ? `rtsp://cam${idx + 1}.gobooking.ci/live` : null,
+        cameraStatus:      demo.cam ? "connected" : "disconnected",
+        cameraConnectedAt: demo.cam ? new Date(now.getTime() - (idx + 1) * 8 * 60000).toISOString() : null,
+        cameraPosition:    "intérieur",
+      });
+    });
+
+    /* ── Enrich or generate alerts linked to buses with issues ── */
+    const realAlerts = alertsRaw.map((a: any) => ({
+      id:                a.id,
+      type:              a.type,
+      busId:             a.busId,
+      busName:           a.busName,
+      agentId:           a.agentId,
+      agentName:         a.agentName,
+      message:           a.message,
+      status:            a.status,
+      response:          a.response ?? null,
+      respondedAt:       a.respondedAt?.toISOString?.() ?? null,
+      responseRequested: !!(a.responseRequested ?? a.response_requested),
+      createdAt:         a.createdAt?.toISOString?.() ?? a.createdAt,
+    }));
+
+    const DEMO_ALERTS = DEMO_FLEET.flatMap((demo, idx) => {
+      if (!demo.alertType) return [];
+      const busId = enrichedBuses[idx].id;
+      return [{
+        id:                `demo-alert-${idx}`,
+        type:              demo.alertType,
+        busId:             busId,
+        busName:           demo.name,
+        agentId:           `agent-${idx}`,
+        agentName:         `Koné Seydou`,
+        message:           demo.alertType === "PANNE"
+          ? `Problème moteur signalé à ${demo.loc}. Arrêt imminent.`
+          : `Contrôle de gendarmerie en cours à ${demo.loc}.`,
+        status:            "active",
+        response:          null,
+        respondedAt:       null,
+        responseRequested: false,
+        createdAt:         new Date(now.getTime() - (idx + 1) * 12 * 60000).toISOString(),
+      }];
+    });
+
+    const mergedAlerts = [...DEMO_ALERTS, ...realAlerts.filter((a: any) =>
+      !DEMO_ALERTS.some(d => d.busId === a.busId)
+    )];
+
     res.json({
-      buses: busesList.map((b: any) => ({
-        id:              b.id,
-        busName:         b.bus_name ?? b.busName,
-        plateNumber:     b.plate_number ?? b.plateNumber,
-        logisticStatus:  b.logistic_status ?? b.logisticStatus,
-        currentLocation: b.current_location ?? b.currentLocation,
-        currentTripId:   b.current_trip_id ?? b.currentTripId,
-        condition:       b.condition,
-        issue:           b.issue,
-      })),
-      trips: tripsRaw.map((t: any) => ({
-        id:                t.id,
-        from:              t.from_city ?? t.from,
-        to:                t.to_city   ?? t.to,
-        departureTime:     t.departure_time ?? t.departureTime,
-        arrivalTime:       t.arrival_time   ?? t.arrivalTime   ?? null,
-        etaTime:           t.estimated_arrival_time ?? null,
-        status:            t.status,
-        passengerCount:    t.passenger_count ?? t.passengerCount ?? null,
-        seatCount:         t.seat_count ?? t.seatCount ?? null,
-        busId:             t.bus_id ?? t.busId,
-        busName:           t.bus_name ?? t.busName,
-        cameraStreamUrl:   t.camera_stream_url  ?? null,
-        cameraStatus:      t.camera_status      ?? "disconnected",
-        cameraConnectedAt: t.camera_connected_at?.toISOString?.() ?? null,
-        cameraPosition:    t.camera_position    ?? "intérieur",
-      })),
-      alerts: alertsRaw.map((a: any) => ({
-        id:               a.id,
-        type:             a.type,
-        busId:            a.busId,
-        busName:          a.busName,
-        agentId:          a.agentId,
-        agentName:        a.agentName,
-        message:          a.message,
-        status:           a.status,
-        response:         a.response ?? null,
-        respondedAt:      a.respondedAt?.toISOString?.() ?? null,
-        responseRequested: !!(a.responseRequested ?? a.response_requested),
-        createdAt:        a.createdAt?.toISOString?.() ?? a.createdAt,
-      })),
+      buses:  enrichedBuses,
+      trips:  enrichedTrips,
+      alerts: mergedAlerts,
     });
   } catch (err) {
     console.error("[suivi/overview]", err);

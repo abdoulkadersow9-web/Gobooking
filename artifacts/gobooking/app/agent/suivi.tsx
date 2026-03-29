@@ -45,6 +45,9 @@ const RESPONSE_OPTIONS = [
 const BUS_STATUS: Record<string, { label: string; color: string; bg: string; icon: string }> = {
   en_attente: { label: "En attente",  color: "#D97706", bg: "#FEF3C7", icon: "time-outline" },
   en_route:   { label: "En route",    color: "#166534", bg: "#DCFCE7", icon: "navigate-outline" },
+  arret:      { label: "À l'arrêt",   color: "#0369A1", bg: "#E0F2FE", icon: "pause-circle-outline" },
+  probleme:   { label: "Problème",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
+  maintenance:{ label: "Maintenance", color: "#7C3AED", bg: "#F5F3FF", icon: "construct-outline" },
   arrivé:     { label: "Arrivé",      color: "#0369A1", bg: "#E0F2FE", icon: "checkmark-circle-outline" },
   en_panne:   { label: "En panne",    color: "#DC2626", bg: "#FEE2E2", icon: "warning-outline" },
 };
