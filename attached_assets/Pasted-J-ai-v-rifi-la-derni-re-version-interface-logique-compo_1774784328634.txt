@@ -1,0 +1,122 @@
+J’ai vérifié la dernière version (interface + logique + comportement du système).
+
+Il y a une amélioration visuelle, mais le système n’est toujours pas cohérent ni intelligent.
+
+---
+
+PROBLÈME PRINCIPAL :
+
+Le système ne suit pas une logique globale.
+
+Les paramétrages ne sont pas reliés automatiquement aux autres pages.
+
+Chaque partie fonctionne isolément, alors que tout doit être connecté.
+
+---
+
+EXIGENCE PRINCIPALE :
+
+Mettre en place une logique intelligente et globale.
+
+Tout paramétrage doit impacter automatiquement toutes les pages concernées.
+
+---
+
+LOGIQUE OBLIGATOIRE À RESPECTER :
+
+1. CENTRALISATION DES PARAMÉTRAGES
+
+Tous les éléments suivants doivent être définis à un seul endroit :
+
+- alertes
+- trajets
+- départs
+- bus
+- statuts
+
+Puis utilisés automatiquement partout.
+
+---
+
+2. CRÉATION DES DÉPARTS (POINT CLÉ)
+
+Le chef d’agence crée un départ.
+
+À ce moment :
+
+- toutes les informations doivent être enregistrées
+- les règles d’alerte doivent être attachées automatiquement
+- le bus est lié au trajet
+- le suivi commence automatiquement
+
+---
+
+3. AUTOMATISATION DES ALERTES
+
+Les alertes ne doivent pas être manuelles.
+
+Elles doivent être générées automatiquement selon :
+
+- vitesse
+- retard
+- arrêt anormal
+- problème signalé
+
+---
+
+4. IMPACT GLOBAL OBLIGATOIRE
+
+Quand une donnée est créée ou modifiée :
+
+Elle doit apparaître automatiquement dans :
+
+- espace agent suivi
+- espace compagnie
+- espace admin
+- tableaux de bord
+- historique
+
+Sans duplication manuelle.
+
+---
+
+5. COHÉRENCE ENTRE LES ÉCRANS
+
+Même donnée = même affichage partout.
+
+Pas de différences entre pages.
+
+Pas de logique cassée.
+
+---
+
+6. INTERFACE (RAPPEL)
+
+Continuer à améliorer :
+
+- fluidité
+- lisibilité
+- structure simple (max 5 éléments visibles)
+
+Mais priorité à la logique système.
+
+---
+
+OBJECTIF FINAL :
+
+Créer un système intelligent et connecté :
+
+- création → suivi automatique
+- paramétrage → propagation globale
+- alerte → déclenchement automatique
+- affichage → cohérent partout
+
+---
+
+IMPORTANT :
+
+Arrêter les ajustements isolés.
+
+Mettre en place une architecture logique globale.
+
+Une fois cette base stable, on passe à la suite.

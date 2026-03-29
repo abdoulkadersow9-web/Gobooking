@@ -16,13 +16,15 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 
 /* ─── Types ─────────────────────────────────────────────────────────── */
-type AlertType   = "urgence" | "panne" | "controle" | "sos";
-type AlertStatus = "active" | "resolved";
+type AlertType   = "urgence" | "panne" | "controle" | "sos"
+                 | "bus_offline" | "bus_arret" | "vitesse_anormale" | "alerte";
+type AlertStatus = "active" | "resolved" | "resolue";
 
 interface CompanyAlert {
   id: string;
   type: AlertType;
   status: AlertStatus;
+  agentId: string | null;
   agentName: string | null;
   busName: string | null;
   tripId: string | null;
@@ -33,12 +35,16 @@ interface CompanyAlert {
   resolvedAt: string | null;
 }
 
-/* ─── Config ─────────────────────────────────────────────────────────── */
-const ALERT_CFG: Record<AlertType, { label: string; icon: string; bg: string; light: string; text: string }> = {
-  urgence:  { label: "URGENCE",  icon: "alert-octagon", bg: "#EF4444", light: "#FEE2E2", text: "#DC2626" },
-  panne:    { label: "PANNE",    icon: "tool",          bg: "#F59E0B", light: "#FEF3C7", text: "#D97706" },
-  controle: { label: "CONTRÔLE", icon: "shield",        bg: "#3B82F6", light: "#EFF6FF", text: "#2563EB" },
-  sos:      { label: "SOS",      icon: "life-buoy",     bg: "#7C3AED", light: "#F5F3FF", text: "#6D28D9" },
+/* ─── Config (types agents + types système auto-scheduleur) ──────────── */
+const ALERT_CFG: Record<string, { label: string; icon: string; bg: string; light: string; text: string }> = {
+  urgence:          { label: "URGENCE",        icon: "alert-octagon", bg: "#EF4444", light: "#FEE2E2", text: "#DC2626" },
+  panne:            { label: "PANNE",          icon: "tool",          bg: "#F59E0B", light: "#FEF3C7", text: "#D97706" },
+  controle:         { label: "CONTRÔLE",       icon: "shield",        bg: "#3B82F6", light: "#EFF6FF", text: "#2563EB" },
+  sos:              { label: "SOS",            icon: "life-buoy",     bg: "#7C3AED", light: "#F5F3FF", text: "#6D28D9" },
+  bus_offline:      { label: "HORS LIGNE",     icon: "wifi-off",      bg: "#EF4444", light: "#FEE2E2", text: "#DC2626" },
+  bus_arret:        { label: "ARRÊT ANORMAL",  icon: "pause-circle",  bg: "#F59E0B", light: "#FEF3C7", text: "#D97706" },
+  vitesse_anormale: { label: "EXCÈS VITESSE",  icon: "zap",           bg: "#EF4444", light: "#FEE2E2", text: "#DC2626" },
+  alerte:           { label: "ALERTE",         icon: "alert-triangle", bg: "#EF4444", light: "#FEE2E2", text: "#DC2626" },
 };
 
 function timeAgo(isoStr: string | null): string {
@@ -54,6 +60,7 @@ function timeAgo(isoStr: string | null): string {
 function AlertCard({ alert, onResolve }: { alert: CompanyAlert; onResolve: (id: string) => void }) {
   const cfg      = ALERT_CFG[alert.type] ?? ALERT_CFG.urgence;
   const isActive = alert.status === "active";
+  const isSystem = alert.agentId === "system";
 
   return (
     <View style={[styles.card, isActive && styles.cardActive, { borderLeftColor: cfg.bg }]}>
@@ -61,9 +68,16 @@ function AlertCard({ alert, onResolve }: { alert: CompanyAlert; onResolve: (id: 
       {isActive && <View style={[styles.activeDot, { backgroundColor: cfg.bg }]} />}
 
       <View style={styles.cardHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: cfg.bg }]}>
-          <Feather name={cfg.icon as any} size={13} color="#fff" />
-          <Text style={styles.typeBadgeText}>{cfg.label}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, flexWrap: "wrap" }}>
+          <View style={[styles.typeBadge, { backgroundColor: cfg.bg }]}>
+            <Feather name={cfg.icon as any} size={13} color="#fff" />
+            <Text style={styles.typeBadgeText}>{cfg.label}</Text>
+          </View>
+          {isSystem && (
+            <View style={{ backgroundColor: "#1E293B", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 }}>
+              <Text style={{ color: "#94A3B8", fontSize: 10, fontWeight: "700" }}>SYSTÈME AUTO</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.timeText}>{timeAgo(alert.createdAt)}</Text>
       </View>
@@ -72,7 +86,7 @@ function AlertCard({ alert, onResolve }: { alert: CompanyAlert; onResolve: (id: 
       <View style={styles.cardBody}>
         {alert.agentName && (
           <View style={styles.detailRow}>
-            <Feather name="user" size={13} color="#64748B" />
+            <Feather name={isSystem ? "cpu" : "user"} size={13} color="#64748B" />
             <Text style={styles.detailText}>{alert.agentName}</Text>
           </View>
         )}

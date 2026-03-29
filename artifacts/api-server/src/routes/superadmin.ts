@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable, agencesTable } from "@workspace/db";
-import { eq, desc, sql, and, count, gte, lte, between } from "drizzle-orm";
+import { db, usersTable, companiesTable, busesTable, agentsTable, citiesTable, tripsTable, bookingsTable, parcelsTable, paymentsTable, commissionSettingsTable, walletTransactionsTable, invoicesTable, auditLogsTable, agencesTable, agentAlertsTable } from "@workspace/db";
+import { eq, desc, sql, and, count, gte, lte, between, inArray } from "drizzle-orm";
 import { getAuditLogs } from "../audit";
 import crypto from "crypto";
 import { tokenStore } from "./auth";
@@ -1051,6 +1051,94 @@ router.get("/recent-activity", async (req, res) => {
     res.json({ recentBookings, recentParcels, recentUsers });
   } catch (err) {
     console.error("Recent activity error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ALERTS — GET /superadmin/alerts
+   Retourne les alertes actives de toutes les compagnies depuis agent_alerts
+   Utilisé par le dashboard admin web pour afficher les vraies alertes
+══════════════════════════════════════════════════════════════════════════ */
+router.get("/alerts", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const status = (req.query.status as string) || "active";
+
+    const conditions = status === "all"
+      ? []
+      : [eq(agentAlertsTable.status, status === "resolved" ? "resolved" : "active")];
+
+    const alerts = await db.select({
+      id:          agentAlertsTable.id,
+      type:        agentAlertsTable.type,
+      status:      agentAlertsTable.status,
+      agentId:     agentAlertsTable.agentId,
+      agentName:   agentAlertsTable.agentName,
+      companyId:   agentAlertsTable.companyId,
+      tripId:      agentAlertsTable.tripId,
+      busId:       agentAlertsTable.busId,
+      busName:     agentAlertsTable.busName,
+      message:     agentAlertsTable.message,
+      response:    agentAlertsTable.response,
+      createdAt:   agentAlertsTable.createdAt,
+      resolvedAt:  agentAlertsTable.resolvedAt,
+      resolvedBy:  agentAlertsTable.resolvedBy,
+    })
+    .from(agentAlertsTable)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(agentAlertsTable.createdAt))
+    .limit(limit);
+
+    // Enrichir avec le nom de la compagnie
+    const companyIds = [...new Set(alerts.map(a => a.companyId).filter(Boolean))] as string[];
+    const companies = companyIds.length
+      ? await db.select({ id: companiesTable.id, name: companiesTable.name })
+          .from(companiesTable).where(inArray(companiesTable.id, companyIds))
+      : [];
+    const companyMap = new Map(companies.map(c => [c.id, c.name]));
+
+    res.json(alerts.map(a => ({
+      id:          a.id,
+      type:        a.type,
+      status:      a.status,
+      agentId:     a.agentId,
+      agentName:   a.agentName ?? (a.agentId === "system" ? "Système GoBooking" : null),
+      companyId:   a.companyId,
+      companyName: a.companyId ? (companyMap.get(a.companyId) ?? null) : null,
+      tripId:      a.tripId,
+      busId:       a.busId,
+      busName:     a.busName,
+      message:     a.message,
+      response:    a.response,
+      createdAt:   a.createdAt?.toISOString() ?? null,
+      resolvedAt:  a.resolvedAt?.toISOString() ?? null,
+      resolvedBy:  a.resolvedBy,
+      isSystem:    a.agentId === "system",
+    })));
+  } catch (err) {
+    console.error("[superadmin/alerts]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PATCH /superadmin/alerts/:id/resolve — résoudre une alerte (admin)
+══════════════════════════════════════════════════════════════════════════ */
+router.patch("/alerts/:id/resolve", async (req, res) => {
+  try {
+    const admin = await requireSuperAdmin(req.headers.authorization);
+    if (!admin) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    await db.update(agentAlertsTable)
+      .set({ status: "resolue" as any, resolvedAt: new Date(), resolvedBy: admin.name ?? "superadmin" })
+      .where(eq(agentAlertsTable.id, req.params.id));
+
+    res.json({ success: true });
+  } catch (err) {
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

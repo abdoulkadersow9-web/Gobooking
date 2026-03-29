@@ -250,6 +250,14 @@ export function useSuperAdminBookingStats() {
   });
 }
 
+export function useSuperAdminAlerts(status = "active") {
+  return useQuery({
+    queryKey: ["superadmin-alerts", status],
+    queryFn: () => apiFetch<any[]>(`/superadmin/alerts?status=${status}&limit=50`),
+    refetchInterval: 20000,
+  });
+}
+
 export function useSuperAdminParcels() {
   return useQuery({
     queryKey: ["superadmin-parcels"],

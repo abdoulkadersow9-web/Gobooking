@@ -2183,11 +2183,14 @@ router.get("/alerts", async (req, res) => {
 
     res.json(alerts.map(a => ({
       id: a.id, type: a.type, status: a.status,
-      agentName: a.agentName, busName: a.busName,
+      agentId: a.agentId,
+      agentName: a.agentName ?? (a.agentId === "system" ? "Système GoBooking" : null),
+      busName: a.busName,
       tripId: a.tripId, lat: a.lat, lon: a.lon,
       message: a.message,
       createdAt: a.createdAt?.toISOString() ?? null,
       resolvedAt: a.resolvedAt?.toISOString() ?? null,
+      isSystem: a.agentId === "system",
     })));
   } catch (err) {
     console.error("Company alerts error:", err);
