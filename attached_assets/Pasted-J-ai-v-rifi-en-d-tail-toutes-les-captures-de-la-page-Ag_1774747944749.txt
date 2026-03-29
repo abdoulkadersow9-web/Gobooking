@@ -1,0 +1,138 @@
+J’ai vérifié en détail toutes les captures de la page Agent Suivi.
+
+Actuellement, l’interface n’est pas acceptable :
+- elle est désorganisée
+- les éléments sont mélangés
+- la logique métier n’est pas respectée
+- l’expérience n’est pas professionnelle
+
+OBJECTIF :
+Refaire la page Agent Suivi comme une véritable tour de contrôle moderne, claire et structurée.
+
+IMPORTANT :
+Ne rien casser dans le backend.
+Revoir uniquement l’organisation, le rôle de la page et le rendu visuel.
+
+---
+
+1. PROBLÈME MAJEUR — MÉLANGE DES FONCTIONS
+
+Actuellement, la page contient :
+- scanner ticket ❌
+- ajouter passager ❌
+
+C’est incorrect.
+
+L’agent suivi :
+- NE scanne pas
+- N’ajoute pas de passagers
+
+À FAIRE :
+- Supprimer complètement ces actions
+- Garder uniquement :
+  • visualisation
+  • suivi
+  • gestion des alertes
+  • demande de rapport
+
+---
+
+2. PROBLÈME CRITIQUE — LIVE VIDÉO
+
+Actuellement :
+- “LIVE” est écrit → ce n’est pas acceptable
+
+À FAIRE :
+- Intégrer un vrai bloc visuel (simulation vidéo ou thumbnail)
+- La vidéo doit apparaître directement dans la carte bus
+- Ajouter :
+  • bouton “Visionner en direct”
+  • indicateur REC / LIVE
+  • état signal
+
+OBJECTIF :
+Une vraie sensation de surveillance en temps réel
+
+---
+
+3. STRUCTURE — TOUR DE CONTRÔLE
+
+La page doit être organisée en blocs clairs :
+
+A. Header KPI (OK mais à améliorer)
+B. Alertes critiques (priorité maximale)
+C. Bus en cours (avec vidéo)
+D. Caméras en direct
+E. Actions limitées (rapport uniquement)
+
+---
+
+4. ALERTES AUTOMATIQUES (LOGIQUE MÉTIER)
+
+Les alertes ne doivent pas être manuelles.
+
+À FAIRE :
+- Génération automatique basée sur :
+  • retard
+  • panne
+  • arrêt anormal
+  • position GPS
+  • kilométrage du trajet (défini par chef d’agence)
+
+IMPORTANT :
+- L’agent suivi ne crée pas les alertes
+- Il les reçoit et les traite
+
+---
+
+5. ORGANISATION VISUELLE
+
+Problème actuel :
+- éléments mélangés
+- manque d’alignement
+- trop d’informations au même niveau
+
+À FAIRE :
+- séparation claire des sections
+- espacement régulier
+- hiérarchie visuelle forte
+- suppression de tout élément inutile
+
+---
+
+6. CARTES BUS
+
+À améliorer :
+- ajouter vidéo ou aperçu caméra
+- rendre les infos lisibles en 1 seconde :
+  • trajet
+  • statut
+  • progression
+  • alerte
+
+---
+
+7. EXPÉRIENCE UTILISATEUR
+
+L’agent doit immédiatement comprendre :
+- combien de bus sont en route
+- où sont les problèmes
+- quelles actions sont nécessaires
+
+---
+
+OBJECTIF FINAL :
+
+Créer une interface :
+- moderne
+- fluide
+- claire
+- professionnelle
+- impressionnante
+
+Une vraie tour de contrôle de transport.
+
+PRIORITÉ MAXIMALE :
+Clarté + logique métier + vidéo LIVE + organisation
+
+Corriger immédiatement.

@@ -740,7 +740,125 @@ export default function SuiviScreen() {
             )}
           </View>
 
-          {/* ══ B. TOUR DE CONTRÔLE — Bus en supervision ═══════════════ */}
+          {/* ══ B. ALERTES CRITIQUES — Priorité maximale ══════════════ */}
+          <View style={S.section}>
+            <View style={S.sectionHeader}>
+              <View style={[S.sectionIconBox, { backgroundColor: hasAlerts ? RED_L : "#F0FDF4" }]}>
+                <Ionicons name="warning" size={16} color={hasAlerts ? RED : "#22C55E"} />
+              </View>
+              <Text style={S.sectionTitle}>Alertes actives</Text>
+              {alertCount > 0 && (
+                <View style={S.alertCountPill}>
+                  <Text style={S.alertCountPillTxt}>{alertCount}</Text>
+                </View>
+              )}
+            </View>
+
+            {!alertCount ? (
+              <View style={S.empty}>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#BBF7D0" }}>
+                  <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+                </View>
+                <Text style={S.emptyTxt}>Aucune alerte active</Text>
+                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
+                  Tous les bus roulent normalement
+                </Text>
+              </View>
+            ) : (
+              data!.alerts.map(alert => {
+                const hasResponse  = !!alert.response;
+                const reqRequested = !!alert.responseRequested;
+                const responseOpt  = RESPONSE_OPTIONS.find(r => r.id === alert.response);
+                const isPanne   = alert.type === "PANNE"  || alert.type === "panne";
+                const isCtrl    = alert.type === "CONTRÔLE" || alert.type === "controle";
+                const typeColor = isPanne ? "#DC2626" : isCtrl ? "#B45309" : RED;
+                const typeLabel = isPanne ? "PANNE" : isCtrl ? "CONTRÔLE" : alert.type?.toUpperCase() ?? "ALERTE";
+                return (
+                  <View key={alert.id} style={{ position: "relative" }}>
+                    {isPanne && (
+                      <Animated.View style={{
+                        position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
+                        borderRadius: 24, backgroundColor: "#DC2626",
+                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }),
+                      }} />
+                    )}
+                    <FadeCard style={S.alertCard}>
+                      <View style={[S.alertHeader, { backgroundColor: typeColor }]}>
+                        <View style={S.alertHeaderIcon}>
+                          <Ionicons name={isPanne ? "warning" : isCtrl ? "shield" : "alert-circle"} size={22} color={typeColor} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Text style={S.alertHeaderType}>{typeLabel}</Text>
+                            {isPanne && (
+                              <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
+                                backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
+                            )}
+                          </View>
+                          <Text style={S.alertHeaderBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
+                        </View>
+                        <View style={{ alignItems: "flex-end", gap: 4 }}>
+                          <Text style={S.alertHeaderTime}>
+                            {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          </Text>
+                          {isPanne && (
+                            <View style={S.alertCritBadge}>
+                              <Text style={S.alertCritBadgeTxt}>CRITIQUE</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      <View style={S.alertBody}>
+                        <Text style={S.alertMsg}>{alert.message}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
+                            <Ionicons name="person" size={13} color="#475569" />
+                          </View>
+                          <Text style={S.alertAgent}>{alert.agentName ?? "Agent inconnu"}</Text>
+                        </View>
+                        {hasResponse && responseOpt && (
+                          <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
+                            <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
+                            <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
+                              Réponse : {responseOpt.label}
+                            </Text>
+                          </View>
+                        )}
+                        {reqRequested && !hasResponse && (
+                          <View style={S.alertWaitRow}>
+                            <ActivityIndicator size="small" color="#D97706" />
+                            <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
+                          </View>
+                        )}
+                        <View style={S.alertActions}>
+                          {!reqRequested && (
+                            <TouchableOpacity
+                              style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF", flex: 1 }]}
+                              onPress={() => demanderReponse(alert.id)} disabled={acting}
+                            >
+                              <Ionicons name="chatbubble-ellipses-outline" size={13} color="#1D4ED8" />
+                              <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
+                            </TouchableOpacity>
+                          )}
+                          <TouchableOpacity
+                            style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
+                            onPress={() => doConfirm(alert.id)} disabled={acting}
+                          >
+                            {acting
+                              ? <ActivityIndicator size="small" color="#166534" />
+                              : <Ionicons name="checkmark-circle-outline" size={13} color="#166534" />}
+                            <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </FadeCard>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* ══ C. TOUR DE CONTRÔLE — Bus en supervision ═══════════════ */}
           <View style={S.section}>
             <View style={S.sectionHeader}>
               <View style={[S.sectionIconBox, { backgroundColor: "#EEF2FF" }]}>
@@ -866,10 +984,6 @@ export default function SuiviScreen() {
                             <Text style={S.ctGpsTxt} numberOfLines={1}>{bus.currentLocation}</Text>
                           </View>
                         )}
-                        <TouchableOpacity style={S.ctTriggerBtn} onPress={() => setTriggerBus(bus)} activeOpacity={0.8}>
-                          <Ionicons name="warning-outline" size={12} color={RED} />
-                          <Text style={S.ctTriggerTxt}>Alerte</Text>
-                        </TouchableOpacity>
                       </View>
 
                       {/* Inline alert preview */}
@@ -1006,176 +1120,10 @@ export default function SuiviScreen() {
             )}
           </View>
 
-          {/* ══ D. ALERTES ACTIVES ═════════════════════════════════════ */}
-          <View style={S.section}>
-            <View style={S.sectionHeader}>
-              <View style={[S.sectionIconBox, { backgroundColor: hasAlerts ? RED_L : "#F0FDF4" }]}>
-                <Ionicons name="warning" size={16} color={hasAlerts ? RED : "#22C55E"} />
-              </View>
-              <Text style={S.sectionTitle}>Alertes actives</Text>
-              {alertCount > 0 && (
-                <View style={S.alertCountPill}>
-                  <Text style={S.alertCountPillTxt}>{alertCount}</Text>
-                </View>
-              )}
-            </View>
-
-            {!alertCount ? (
-              <View style={S.empty}>
-                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#BBF7D0" }}>
-                  <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
-                </View>
-                <Text style={S.emptyTxt}>Aucune alerte active</Text>
-                <Text style={{ fontSize: 12, color: "#94A3B8", textAlign: "center" }}>
-                  Tous les bus roulent normalement
-                </Text>
-              </View>
-            ) : (
-              data!.alerts.map(alert => {
-                const hasResponse  = !!alert.response;
-                const reqRequested = !!alert.responseRequested;
-                const responseOpt  = RESPONSE_OPTIONS.find(r => r.id === alert.response);
-                const isPanne   = alert.type === "PANNE"  || alert.type === "panne";
-                const isCtrl    = alert.type === "CONTRÔLE" || alert.type === "controle";
-                const typeColor = isPanne ? "#DC2626" : isCtrl ? "#B45309" : RED;
-                const typeBg    = isPanne ? "#FEE2E2" : isCtrl ? "#FEF3C7" : RED_L;
-                const cardBg    = isPanne ? "#FFF8F8" : isCtrl ? "#FFFBEB" : "#FFF8F8";
-                const typeLabel = isPanne ? "PANNE" : isCtrl ? "CONTRÔLE" : alert.type?.toUpperCase() ?? "ALERTE";
-                return (
-                  <View key={alert.id} style={{ position: "relative" }}>
-                    {/* Glow behind PANNE */}
-                    {isPanne && (
-                      <Animated.View style={{
-                        position: "absolute", top: -4, left: -4, right: -4, bottom: -4,
-                        borderRadius: 24, backgroundColor: "#DC2626",
-                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }),
-                      }} />
-                    )}
-                  <FadeCard style={S.alertCard}>
-                    {/* ── FULL-WIDTH COLORED HEADER ────────────────────── */}
-                    <View style={[S.alertHeader, { backgroundColor: typeColor }]}>
-                      <View style={S.alertHeaderIcon}>
-                        <Ionicons name={isPanne ? "warning" : isCtrl ? "shield" : "alert-circle"} size={22} color={typeColor} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                          <Text style={S.alertHeaderType}>{typeLabel}</Text>
-                          {isPanne && (
-                            <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
-                              backgroundColor: "#fff", transform: [{ scale: pulseAnim }] }} />
-                          )}
-                        </View>
-                        <Text style={S.alertHeaderBus} numberOfLines={1}>{alert.busName ?? "Bus inconnu"}</Text>
-                      </View>
-                      <View style={{ alignItems: "flex-end", gap: 4 }}>
-                        <Text style={S.alertHeaderTime}>
-                          {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                        </Text>
-                        {isPanne && (
-                          <View style={S.alertCritBadge}>
-                            <Text style={S.alertCritBadgeTxt}>CRITIQUE</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* ── BODY ─────────────────────────────────────────── */}
-                    <View style={S.alertBody}>
-                      <Text style={S.alertMsg}>{alert.message}</Text>
-
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
-                          <Ionicons name="person" size={13} color="#475569" />
-                        </View>
-                        <Text style={S.alertAgent}>{alert.agentName ?? "Agent inconnu"}</Text>
-                      </View>
-
-                      {hasResponse && responseOpt && (
-                        <View style={[S.alertResponseRow, { backgroundColor: responseOpt.bg }]}>
-                          <Ionicons name="checkmark-circle" size={14} color={responseOpt.color} />
-                          <Text style={[S.alertResponseTxt, { color: responseOpt.color }]}>
-                            Réponse : {responseOpt.label}
-                          </Text>
-                        </View>
-                      )}
-                      {reqRequested && !hasResponse && (
-                        <View style={S.alertWaitRow}>
-                          <ActivityIndicator size="small" color="#D97706" />
-                          <Text style={S.alertWaitTxt}>En attente de réponse de l'agent route…</Text>
-                        </View>
-                      )}
-
-                      <View style={S.alertActions}>
-                        {!reqRequested && (
-                          <TouchableOpacity
-                            style={[S.alertBtn, { borderColor: "#BFDBFE", backgroundColor: "#EFF6FF", flex: 1 }]}
-                            onPress={() => demanderReponse(alert.id)} disabled={acting}
-                          >
-                            <Ionicons name="chatbubble-ellipses-outline" size={13} color="#1D4ED8" />
-                            <Text style={[S.alertBtnTxt, { color: "#1D4ED8" }]}>Demander rapport</Text>
-                          </TouchableOpacity>
-                        )}
-                        <TouchableOpacity
-                          style={[S.alertBtn, { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4", flex: 1 }]}
-                          onPress={() => doConfirm(alert.id)} disabled={acting}
-                        >
-                          {acting
-                            ? <ActivityIndicator size="small" color="#166534" />
-                            : <Ionicons name="checkmark-circle-outline" size={13} color="#166534" />}
-                          <Text style={[S.alertBtnTxt, { color: "#166534" }]}>Marquer résolu</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </FadeCard>
-                  </View>
-                );
-              })
-            )}
-          </View>
-
-          {/* ══ E. ACTIONS RAPIDES ═════════════════════════════════════ */}
-          <View style={S.section}>
-            <View style={S.sectionHeader}>
-              <View style={[S.sectionIconBox, { backgroundColor: "#FFF7ED" }]}>
-                <Feather name="zap" size={14} color="#D97706" />
-              </View>
-              <Text style={S.sectionTitle}>Actions rapides</Text>
-            </View>
-            <View style={S.quickGrid}>
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/scan" as never)} activeOpacity={0.8}>
-                  <View style={[S.quickIcon, { backgroundColor: "#EEF2FF" }]}>
-                    <Ionicons name="qr-code" size={24} color="#4F46E5" />
-                  </View>
-                  <Text style={S.quickBtnTxt}>Scanner ticket</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
-                  onPress={() => Alert.alert("Ajouter passager", "Disponible depuis le guichet ou la réservation.")}>
-                  <View style={[S.quickIcon, { backgroundColor: "#F0FDF4" }]}>
-                    <Ionicons name="person-add" size={24} color="#16A34A" />
-                  </View>
-                  <Text style={S.quickBtnTxt}>Ajouter passager</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <TouchableOpacity style={S.quickBtn} onPress={() => router.push("/agent/rapport" as never)} activeOpacity={0.8}>
-                  <View style={[S.quickIcon, { backgroundColor: "#FFF7ED" }]}>
-                    <Feather name="file-text" size={24} color="#D97706" />
-                  </View>
-                  <Text style={S.quickBtnTxt}>Faire un rapport</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={S.quickBtn} activeOpacity={0.8}
-                  onPress={() => sortedBuses.length
-                    ? setTriggerBus(sortedBuses[0])
-                    : Alert.alert("Aucun bus", "Aucun bus actif disponible.")}>
-                  <View style={[S.quickIcon, { backgroundColor: RED_L }]}>
-                    <Ionicons name="warning" size={24} color={RED} />
-                  </View>
-                  <Text style={S.quickBtnTxt}>Déclencher alerte</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          {/* ══ D. ALERTES ACTIVES (moved to top — see section B) ═══ */}
+          {false && <View style={S.section}>
+            <Text style={S.emptyTxt}>Aucune alerte active</Text>
+          </View>}
 
         </ScrollView>
       )}
