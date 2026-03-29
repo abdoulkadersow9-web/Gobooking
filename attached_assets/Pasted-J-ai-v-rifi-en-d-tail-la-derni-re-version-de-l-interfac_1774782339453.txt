@@ -1,0 +1,113 @@
+J’ai vérifié en détail la dernière version de l’interface (captures à l’appui).
+
+Il y a une amélioration, mais plusieurs problèmes critiques empêchent l’utilisation correcte du système.
+
+---
+
+PROBLÈMES IDENTIFIÉS :
+
+1. Problèmes d’affichage (CRITIQUE)
+- textes qui débordent des cartes
+- textes coupés ou mal alignés
+- éléments qui se chevauchent
+- certaines zones rouges vides ou mal dimensionnées
+
+---
+
+2. Interface non structurée
+- les blocs sont mélangés
+- aucune hiérarchie visuelle claire
+- difficulté à lire rapidement les informations
+
+---
+
+3. Problèmes de fluidité
+- l’écran est chargé mais mal organisé
+- manque d’espacement entre les éléments
+- mauvaise lisibilité globale
+
+---
+
+4. Intégration caméra incorrecte
+- la caméra est mal positionnée
+- elle casse la structure des cartes
+- elle doit être intégrée proprement dans un bloc défini
+
+---
+
+5. Design non professionnel
+- incohérence des tailles (textes, blocs, boutons)
+- couleurs mal équilibrées
+- manque de cohérence globale
+
+---
+
+CORRECTIONS OBLIGATOIRES :
+
+1. FIXER LES OVERFLOWS (PRIORITÉ 1)
+- aucun texte ne doit dépasser
+- utiliser ellipsis (…) si texte long
+- respecter padding et margins
+
+---
+
+2. STRUCTURER CHAQUE CARTE
+
+Chaque bus doit être une carte propre avec :
+
+- Nom du bus (clair)
+- Statut (badge visible)
+- Message court (max 2 lignes)
+- Vitesse / trajet
+- Caméra (zone bien définie)
+
+Tout doit être aligné proprement.
+
+---
+
+3. HIÉRARCHIE VISUELLE CLAIRE
+
+- Titre → gros et visible
+- Infos secondaires → plus petites
+- Alertes → bien mises en avant
+- Espaces entre blocs obligatoires
+
+---
+
+4. ESPACEMENT ET ALIGNEMENT
+
+- ajouter du padding interne
+- ajouter de l’espace entre les cartes
+- alignement gauche strict
+
+---
+
+5. CAMÉRA BIEN INTÉGRÉE
+
+- bloc caméra fixe
+- même taille sur toutes les cartes
+- ne doit jamais casser le layout
+
+---
+
+6. STANDARD DESIGN
+
+Utiliser une structure stable :
+- même hauteur de carte
+- mêmes marges
+- mêmes tailles de texte
+
+---
+
+OBJECTIF :
+
+Une interface propre, fluide, lisible immédiatement,
+comme un vrai centre de contrôle professionnel.
+
+---
+
+IMPORTANT :
+
+Corriger ces problèmes d’UI maintenant avant d’ajouter d’autres fonctionnalités.
+
+Une fois validé, on passe à l’étape suivante.
