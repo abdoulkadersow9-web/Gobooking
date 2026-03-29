@@ -898,7 +898,8 @@ export default function SuiviScreen() {
 
   /* Focus Alert Mode */
   const [alertFocusIdx,  setAlertFocusIdx]  = useState(0);
-  const [fleetExpanded,  setFleetExpanded]  = useState(true);
+  const [fleetExpanded,  setFleetExpanded]  = useState(false);
+  const [showAllAlerts,  setShowAllAlerts]  = useState(false);
   const soundRef = useRef<{ stop: () => void } | null>(null);
 
   /* ── Live simulation frames/signal per camera trip ── */
@@ -1422,80 +1423,93 @@ export default function SuiviScreen() {
         <ScrollView
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
+          contentContainerStyle={S.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OK} />}
         >
-
-          {/* ══════════════════════════════════════════════════════════════
-              ZONE 2 — TOUTES LES ALERTES ACTIVES (si présentes)
-              ══════════════════════════════════════════════════════════════ */}
-          {hasAlerts && (() => {
-            const rank = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
+          {/* ══ SECTION ALERTES ══════════════════════════════════════════ */}
+          {(() => {
+            const rank   = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
             const sorted = [...mergedAlerts].sort((a, b) => rank(a) - rank(b));
+            const visible = showAllAlerts ? sorted : sorted.slice(0, 5);
+            const extra   = sorted.length - 5;
+
             return (
-              <View style={S.focusZone}>
-                {/* En-tête section alertes */}
-                <View style={S.alertsSectionHeader}>
-                  <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: CRIT,
-                    transform: [{ scale: pulseAnim }] }} />
-                  <Text style={S.alertsSectionTitle}>
-                    {alertCount} ALERTE{alertCount > 1 ? "S" : ""} ACTIVE{alertCount > 1 ? "S" : ""}
-                  </Text>
+              <View style={S.section}>
+                {/* Titre section */}
+                <View style={S.sectionHeader}>
+                  {hasAlerts ? (
+                    <>
+                      <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
+                        backgroundColor: CRIT, transform: [{ scale: pulseAnim }] }} />
+                      <Text style={S.sectionTitleAlert}>
+                        {alertCount} ALERTE{alertCount > 1 ? "S" : ""} ACTIVE{alertCount > 1 ? "S" : ""}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Ionicons name="checkmark-circle" size={12} color={OK} />
+                      <Text style={S.sectionTitleOk}>AUCUNE ALERTE ACTIVE</Text>
+                    </>
+                  )}
                 </View>
 
-                {/* Une carte par alerte — toutes visibles */}
-                {sorted.map((alert) => {
+                {/* Aucune alerte */}
+                {!hasAlerts && (
+                  <View style={S.noAlertBox}>
+                    <Ionicons name="shield-checkmark" size={32} color={OK} />
+                    <Text style={S.noAlertTitle}>Système normal</Text>
+                    <Text style={S.noAlertSub}>Tous les bus opèrent sans incident</Text>
+                  </View>
+                )}
+
+                {/* Liste des alertes (max 5, puis voir plus) */}
+                {visible.map((alert) => {
                   const flowStep  = alert.response ? "validate" : alert.responseRequested ? "waiting" : "new";
                   const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
-                  const stepLabel = flowStep === "validate" ? "Réponse reçue"
-                                  : flowStep === "waiting"  ? "En attente"
-                                  :                           "Action requise";
                   const btnLabel  = flowStep === "validate" ? "VALIDER" : "TRAITER";
                   const aTrip     = data?.trips.find(t =>
                     (alert.busId && t.busId === alert.busId) ||
                     (alert.busName && t.busName === alert.busName)
                   );
-                  const aCamOk    = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
-                  const aLive     = aTrip ? liveFrames[aTrip.id] : undefined;
-                  const timeAgo   = Math.round((Date.now() - new Date(alert.createdAt).getTime()) / 60000);
+                  const aCamOk  = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
+                  const aLive   = aTrip ? liveFrames[aTrip.id] : undefined;
+                  const timeAgo = Math.round((Date.now() - new Date(alert.createdAt).getTime()) / 60000);
 
                   return (
-                    <View key={alert.id} style={[S.alertCard, { borderColor: `${stepColor}40` }]}>
-                      {/* En-tête alerte */}
-                      <View style={S.alertCardTop}>
-                        <Animated.View style={{ width: 7, height: 7, borderRadius: 4, flexShrink: 0,
-                          backgroundColor: stepColor,
-                          ...(flowStep === "new" ? { transform: [{ scale: pulseAnim }] } : {}) }} />
-                        <View style={[S.alertStepBadge, { backgroundColor: `${stepColor}18`, borderColor: `${stepColor}35` }]}>
-                          <Text style={[S.alertStepTxt, { color: stepColor }]}>{stepLabel}</Text>
+                    <View key={alert.id} style={[S.alertCard, { borderColor: `${stepColor}35` }]}>
+
+                      {/* ── Ligne 1 : badge + temps ── */}
+                      <View style={S.alertCardRow1}>
+                        <View style={[S.alertBadge, { backgroundColor: `${stepColor}15`, borderColor: `${stepColor}30` }]}>
+                          <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: stepColor, flexShrink: 0,
+                            ...(flowStep === "new" ? { transform: [{ scale: pulseAnim }] } : {}) }} />
+                          <Text style={[S.alertBadgeTxt, { color: stepColor }]}>
+                            {flowStep === "validate" ? "Réponse reçue" : flowStep === "waiting" ? "En attente" : "Action requise"}
+                          </Text>
                         </View>
-                        <View style={{ flex: 1 }} />
-                        <Text style={S.alertTimeAgo}>{timeAgo < 1 ? "À l'instant" : `il y a ${timeAgo} min`}</Text>
+                        <Text style={S.alertTimeTxt}>{timeAgo < 1 ? "À l'instant" : `${timeAgo} min`}</Text>
                       </View>
 
-                      {/* Bus + message */}
-                      <View style={S.alertCardBody}>
-                        <Text style={S.alertCardBus} numberOfLines={1} ellipsizeMode="tail">
-                          {alert.busName ?? "Bus inconnu"}
-                        </Text>
-                        <Text style={S.alertCardMsg} numberOfLines={2} ellipsizeMode="tail">
-                          {alert.message}
-                        </Text>
-                      </View>
+                      {/* ── Ligne 2 : Nom bus ── */}
+                      <Text style={S.alertBusName} numberOfLines={1} ellipsizeMode="tail">
+                        {alert.busName ?? "Bus inconnu"}
+                      </Text>
 
-                      {/* Caméra intégrée si disponible */}
+                      {/* ── Ligne 3 : Message ── */}
+                      <Text style={S.alertMessage} numberOfLines={2} ellipsizeMode="tail">
+                        {alert.message}
+                      </Text>
+
+                      {/* ── Caméra (si disponible) ── */}
                       {aCamOk && aTrip && (
-                        <TouchableOpacity onPress={() => setCameraTrip(aTrip)} activeOpacity={0.9}>
-                          <View style={S.alertCamBar}>
-                            <Animated.View style={{ width: 5, height: 5, borderRadius: 3,
-                              backgroundColor: CRIT,
+                        <TouchableOpacity style={S.alertCamBlock} onPress={() => setCameraTrip(aTrip)} activeOpacity={0.9}>
+                          <View style={S.alertCamHeader}>
+                            <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: CRIT, flexShrink: 0,
                               opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                            <Text style={S.alertCamLabel}>CAMÉRA LIVE</Text>
-                            <View style={{ flex: 1 }} />
-                            <Text style={S.alertCamRoute} numberOfLines={1}>{aTrip.from} → {aTrip.to}</Text>
+                            <Text style={S.alertCamTitleTxt}>CAMÉRA LIVE</Text>
                             <Ionicons name="expand-outline" size={11} color="#374151" />
                           </View>
-                          <View style={{ height: 150, overflow: "hidden", backgroundColor: "#060810" }}>
+                          <View style={S.alertCamFeed}>
                             <LiveCamView
                               signal={aLive?.signal ?? 80}
                               route={`${aTrip.from} → ${aTrip.to}`}
@@ -1505,163 +1519,100 @@ export default function SuiviScreen() {
                         </TouchableOpacity>
                       )}
 
-                      {/* Bouton traiter */}
+                      {/* ── Bouton TRAITER ── */}
                       <TouchableOpacity
-                        style={[S.alertTraiterBtn, { borderColor: stepColor }]}
+                        style={[S.alertTraiterBtn, { backgroundColor: `${stepColor}12`, borderColor: `${stepColor}40` }]}
                         onPress={() => setSelectedAlert(alert)}
-                        activeOpacity={0.85}
+                        activeOpacity={0.82}
                       >
-                        <Ionicons
-                          name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"}
-                          size={18} color={stepColor}
-                        />
+                        <Ionicons name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"} size={16} color={stepColor} />
                         <Text style={[S.alertTraiterTxt, { color: stepColor }]}>{btnLabel} L'ALERTE</Text>
                       </TouchableOpacity>
                     </View>
                   );
                 })}
+
+                {/* Voir plus / voir moins */}
+                {!showAllAlerts && extra > 0 && (
+                  <TouchableOpacity style={S.showMoreBtn} onPress={() => setShowAllAlerts(true)} activeOpacity={0.8}>
+                    <Text style={S.showMoreTxt}>Voir {extra} autre{extra > 1 ? "s" : ""} alerte{extra > 1 ? "s" : ""}</Text>
+                    <Ionicons name="chevron-down" size={13} color="#374151" />
+                  </TouchableOpacity>
+                )}
+                {showAllAlerts && sorted.length > 5 && (
+                  <TouchableOpacity style={S.showMoreBtn} onPress={() => setShowAllAlerts(false)} activeOpacity={0.8}>
+                    <Text style={S.showMoreTxt}>Réduire</Text>
+                    <Ionicons name="chevron-up" size={13} color="#374151" />
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })()}
 
-          {/* ══════════════════════════════════════════════════════════════
-              ZONE 3 — FLOTTE COMPLÈTE (toujours visible)
-              ══════════════════════════════════════════════════════════════ */}
-          <View style={S.fleetZone}>
-            <View style={S.fleetToggleRow}>
-              <Ionicons name="bus-outline" size={13} color="#374151" />
-              <Text style={S.fleetToggleTxt}>FLOTTE EN SERVICE</Text>
-              <Text style={S.fleetToggleCount}>{busCount} BUS</Text>
-            </View>
+          {/* ══ SECTION FLOTTE ═══════════════════════════════════════════ */}
+          <View style={S.section}>
+            {/* Toggle flotte */}
+            <TouchableOpacity style={S.sectionHeader} onPress={() => setFleetExpanded(v => !v)} activeOpacity={0.8}>
+              <Ionicons name="bus-outline" size={12} color="#374151" />
+              <Text style={S.sectionTitleFleet}>FLOTTE — {busCount} BUS</Text>
+              <View style={{ flex: 1 }} />
+              <Ionicons name={fleetExpanded ? "chevron-up" : "chevron-down"} size={14} color="#374151" />
+            </TouchableOpacity>
 
-            {sortedBuses.length === 0 ? (
-              <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
-                <Ionicons name="bus-outline" size={36} color="#1E293B" />
-                <Text style={{ color: "#374151", fontSize: 13, fontWeight: "600" }}>Aucun bus en service</Text>
-              </View>
-            ) : sortedBuses.map(bus => {
-              const trip        = data!.trips.find(t =>
-                t.busId === bus.id || t.busName === bus.busName
-              );
-              const st          = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#1E293B", icon: "bus-outline" };
-              const busAlerts   = mergedAlerts.filter(a => a.busId === bus.id || a.busName === bus.busName);
-              const isCritical  = busAlerts.length > 0;
-              const speed       = busSpeedMap[bus.id];
-              const speedLimit  = bus.maxSpeedKmh ?? 120;
-              const speedWarn   = speed != null && speed > speedLimit;
-              const camOk       = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
-              const camLive     = trip ? liveFrames[trip.id] : undefined;
-              const accentColor = isCritical ? CRIT : speedWarn ? WARN : st.color;
-
-              const occPct = trip?.seatCount && trip.passengerCount != null
-                ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
-              const occColor = occPct != null
-                ? occPct > 90 ? CRIT : occPct > 70 ? WARN : OK : OK;
+            {/* Lignes compactes — bus */}
+            {fleetExpanded && sortedBuses.map(bus => {
+              const trip       = data!.trips.find(t => t.busId === bus.id || t.busName === bus.busName);
+              const st         = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#1E293B", icon: "bus-outline" };
+              const busAlerts  = mergedAlerts.filter(a => a.busId === bus.id || a.busName === bus.busName);
+              const hasBusAlert = busAlerts.length > 0;
+              const speed      = busSpeedMap[bus.id];
+              const speedLimit = bus.maxSpeedKmh ?? 120;
+              const speedWarn  = speed != null && speed > speedLimit;
+              const accent     = hasBusAlert ? CRIT : speedWarn ? WARN : st.color;
 
               return (
-                <View
+                <TouchableOpacity
                   key={bus.id}
-                  style={[S.busCard,
-                    isCritical && { borderColor: `${CRIT}40` },
-                    camOk && !isCritical && { borderColor: `${OK}20` },
-                  ]}
+                  style={[S.fleetRow, hasBusAlert && S.fleetRowAlert]}
+                  onPress={() => setSelectedBus(bus)}
+                  activeOpacity={0.8}
                 >
-                  {/* ─── LIGNE 1 : Statut dot + Nom/Route + Vitesse ─── */}
-                  <TouchableOpacity
-                    style={S.busCardHeader}
-                    onPress={() => setSelectedBus(bus)}
-                    activeOpacity={0.8}
-                  >
-                    {/* Col gauche : dot + info texte */}
-                    <View style={S.busCardLeft}>
-                      <Animated.View style={{
-                        width: 8, height: 8, borderRadius: 4,
-                        backgroundColor: accentColor, flexShrink: 0, marginTop: 3,
-                        ...(isCritical ? { transform: [{ scale: pulseAnim }] } : {}),
-                      }} />
-                      <View style={S.busCardTextBlock}>
-                        <Text style={[S.busCardName, isCritical && { color: "#F1F5F9" }]} numberOfLines={1} ellipsizeMode="tail">
-                          {bus.busName}
-                        </Text>
-                        <Text style={S.busCardPlateInline} numberOfLines={1} ellipsizeMode="tail">
-                          {bus.plateNumber}
-                        </Text>
-                        {trip && (
-                          <Text style={S.busCardRoute} numberOfLines={1} ellipsizeMode="tail">
-                            {trip.from} → {trip.to}{trip.etaTime ? `  ·  ETA ${trip.etaTime}` : ""}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
+                  {/* Dot statut */}
+                  <View style={[S.fleetDot, { backgroundColor: accent }]} />
 
-                    {/* Col droite : vitesse ou statut + chevron */}
-                    <View style={S.busCardRight}>
-                      {speed != null ? (
-                        <View style={S.busCardSpeedBlock}>
-                          <Text style={[S.busCardSpeedNum, { color: speedWarn ? CRIT : "#94A3B8" }]} numberOfLines={1}>
-                            {speed}<Text style={S.busCardSpeedUnit}> km/h</Text>
-                          </Text>
-                          <View style={S.busCardSpeedBar}>
-                            <View style={[S.busCardSpeedFill, {
-                              width: `${Math.min(100, (speed / speedLimit) * 100)}%` as any,
-                              backgroundColor: speedWarn ? CRIT : speed > speedLimit * 0.85 ? WARN : OK,
-                            }]} />
-                          </View>
-                        </View>
-                      ) : (
-                        <View style={[S.busCardStatusBadge, { backgroundColor: `${accentColor}18`, borderColor: `${accentColor}30` }]}>
-                          <Text style={[S.busCardStatusTxt, { color: accentColor }]} numberOfLines={1}>{st.label}</Text>
-                        </View>
-                      )}
-                      <Ionicons name="chevron-forward" size={13} color="#1E293B" />
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* ─── LIGNE 2 : Occupation passagers ─── */}
-                  {occPct != null && trip && (
-                    <View style={S.busCardOccRow}>
-                      <Ionicons name="people-outline" size={10} color="#374151" />
-                      <Text style={S.busCardOccTxt} numberOfLines={1}>
-                        {trip.passengerCount}/{trip.seatCount} passagers
+                  {/* Info texte */}
+                  <View style={S.fleetRowText}>
+                    <Text style={[S.fleetRowName, hasBusAlert && { color: "#F1F5F9" }]} numberOfLines={1} ellipsizeMode="tail">
+                      {bus.busName}
+                    </Text>
+                    {trip ? (
+                      <Text style={S.fleetRowRoute} numberOfLines={1} ellipsizeMode="tail">
+                        {trip.from} → {trip.to}
                       </Text>
-                      <View style={S.busCardOccBar}>
-                        <View style={[S.busCardOccFill, {
-                          width: `${occPct}%` as any,
-                          backgroundColor: occColor,
-                        }]} />
-                      </View>
-                      <Text style={[S.busCardOccPct, { color: occColor }]}>{occPct}%</Text>
-                    </View>
+                    ) : (
+                      <Text style={[S.fleetRowRoute, { color: accent }]}>{st.label}</Text>
+                    )}
+                  </View>
+
+                  {/* Vitesse ou statut */}
+                  {speed != null ? (
+                    <Text style={[S.fleetRowSpeed, { color: speedWarn ? CRIT : "#64748B" }]} numberOfLines={1}>
+                      {speed} km/h
+                    </Text>
+                  ) : (
+                    <Text style={[S.fleetRowSpeed, { color: accent }]} numberOfLines={1}>{st.label}</Text>
                   )}
 
-                  {/* ─── LIGNE 3 : Alerte active (si présente) ─── */}
-                  {isCritical && busAlerts[0] && (
-                    <TouchableOpacity style={S.busCardAlertStrip} onPress={() => setSelectedAlert(busAlerts[0])} activeOpacity={0.8}>
-                      <Ionicons name="warning" size={10} color={CRIT} style={{ flexShrink: 0 }} />
-                      <Text style={S.busCardAlertTxt} numberOfLines={1} ellipsizeMode="tail">{busAlerts[0].message}</Text>
-                      <Text style={S.busCardAlertAction}>TRAITER</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* ─── LIGNE 4 : Caméra LIVE ─── */}
-                  {camOk && trip && (
-                    <TouchableOpacity style={S.busCardCamWrap} onPress={() => setCameraTrip(trip)} activeOpacity={0.9}>
-                      <View style={S.busCardCamBar}>
-                        <Animated.View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: OK, flexShrink: 0,
-                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                        <Text style={S.busCardCamLabel}>CAMÉRA LIVE</Text>
-                        <View style={{ flex: 1 }} />
-                        <Ionicons name="expand-outline" size={11} color="#374151" />
-                      </View>
-                      <View style={S.busCardCamView}>
-                        <LiveCamView signal={camLive?.signal ?? 85} route={`${trip.from} → ${trip.to}`} busId={bus.id} />
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                  <Ionicons name="chevron-forward" size={13} color="#1E293B" />
+                </TouchableOpacity>
               );
             })}
-          </View>{/* /fleetZone */}
+
+            {fleetExpanded && sortedBuses.length === 0 && (
+              <Text style={S.fleetEmpty}>Aucun bus en service</Text>
+            )}
+          </View>
+
         </ScrollView>
       )}
 
@@ -2109,33 +2060,6 @@ const S = StyleSheet.create({
   fixedAlertMsg:  { color: "#64748B", fontSize: 11, fontWeight: "600", flex: 1 },
   fixedAlertTime: { color: "#475569", fontSize: 10, fontWeight: "700", flexShrink: 0 },
 
-  /* ── ZONE 2 — MODE FOCUS ALERTE ────────────────────────────── */
-  focusZone:        { marginHorizontal: 16, marginTop: 16, gap: 0 },
-
-  /* Carte alerte — fond très sombre, bordure colorée subtile */
-  focusCard:        { backgroundColor: "#080C14", borderRadius: 18, borderWidth: 1,
-                      marginBottom: 0,
-                      ...(Platform.OS === "web"
-                        ? { boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }
-                        : { elevation: 6, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 14 }) },
-  focusCardTopRow:  { flexDirection: "row", alignItems: "center", gap: 8,
-                      paddingHorizontal: 18, paddingTop: 18, paddingBottom: 0 },
-  focusCardStepTxt: { fontSize: 10, fontWeight: "900", letterSpacing: 1, flex: 1 },
-  focusCardTime:    { fontSize: 10, color: "#374151", fontWeight: "700" },
-  focusCardBody:    { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 22, gap: 8 },
-  focusCardBus:     { fontSize: 24, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.6, lineHeight: 28 },
-  focusCardMsg:     { fontSize: 14, color: "#64748B", fontWeight: "600", lineHeight: 20 },
-
-  /* Bouton TRAITER — fond sombre + bordure colorée, pas de rouge plein */
-  focusTraiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-                      marginTop: 14, borderRadius: 16, paddingVertical: 20,
-                      backgroundColor: "#080C14",
-                      borderWidth: 1.5,
-                      ...(Platform.OS === "web"
-                        ? {}
-                        : { elevation: 2, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6 }) },
-  focusTraiterTxt:  { fontSize: 17, fontWeight: "900", letterSpacing: 0.4 },
-
   /* ── Horloge header ── */
   clockPill:        { flexDirection: "row", alignItems: "center", gap: 4,
                       backgroundColor: "rgba(255,255,255,0.05)",
@@ -2144,38 +2068,73 @@ const S = StyleSheet.create({
   clockTxt:         { fontSize: 12, fontWeight: "900", color: "#CBD5E1", letterSpacing: 0.5,
                       fontVariant: ["tabular-nums"] as any },
 
-  /* ── Zone 2 : section alertes ── */
-  alertsSectionHeader: { flexDirection: "row", alignItems: "center", gap: 8,
-                          marginBottom: 10 },
-  alertsSectionTitle:  { fontSize: 11, fontWeight: "900", color: CRIT, letterSpacing: 1.2,
-                          textTransform: "uppercase" as any },
+  /* ── Layout principal ── */
+  scrollContent:    { paddingBottom: 48 },
+  section:          { marginHorizontal: 14, marginTop: 16 },
+  sectionHeader:    { flexDirection: "row", alignItems: "center", gap: 8,
+                      paddingVertical: 10, marginBottom: 8,
+                      borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  sectionTitleAlert:{ fontSize: 11, fontWeight: "900", color: CRIT, letterSpacing: 1.3,
+                      flex: 1 },
+  sectionTitleOk:   { fontSize: 11, fontWeight: "900", color: OK, letterSpacing: 1.3, flex: 1 },
+  sectionTitleFleet:{ fontSize: 11, fontWeight: "900", color: "#374151", letterSpacing: 1.3, flex: 1 },
 
-  /* Carte alerte individuelle */
-  alertCard:        { backgroundColor: "#080C14", borderRadius: 16, borderWidth: 1,
+  /* ── Aucune alerte ── */
+  noAlertBox:       { alignItems: "center", paddingVertical: 36, gap: 8 },
+  noAlertTitle:     { fontSize: 16, fontWeight: "800", color: OK },
+  noAlertSub:       { fontSize: 12, color: "#374151", fontWeight: "600" },
+
+  /* ── Carte alerte (la principale) ── */
+  alertCard:        { backgroundColor: "#080C14", borderRadius: 14, borderWidth: 1,
                       overflow: "hidden", marginBottom: 12,
                       ...(Platform.OS === "web"
-                        ? { boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }
-                        : { elevation: 6, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 12 }) },
-  alertCardTop:     { flexDirection: "row", alignItems: "center", gap: 8,
-                      paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
-  alertStepBadge:   { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
-  alertStepTxt:     { fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
-  alertTimeAgo:     { fontSize: 10, color: "#374151", fontWeight: "600" },
-  alertCardBody:    { paddingHorizontal: 16, paddingBottom: 14, gap: 4 },
-  alertCardBus:     { fontSize: 19, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.4 },
-  alertCardMsg:     { fontSize: 13, color: "#64748B", fontWeight: "600", lineHeight: 18 },
-  alertCamBar:      { flexDirection: "row", alignItems: "center", gap: 7,
-                      paddingHorizontal: 14, paddingVertical: 8,
-                      backgroundColor: "rgba(0,0,0,0.4)",
-                      borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)" },
-  alertCamLabel:    { fontSize: 9, fontWeight: "900", color: "#EF4444", letterSpacing: 1.2 },
-  alertCamRoute:    { fontSize: 9, color: "#374151", fontWeight: "600", flexShrink: 1 },
+                        ? { boxShadow: "0 2px 16px rgba(0,0,0,0.4)" }
+                        : { elevation: 4, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 10 }) },
+  alertCardRow1:    { flexDirection: "row", alignItems: "center", gap: 8,
+                      paddingHorizontal: 14, paddingTop: 14, paddingBottom: 4 },
+  alertBadge:       { flexDirection: "row", alignItems: "center", gap: 5,
+                      borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4,
+                      borderWidth: 1, flexShrink: 0 },
+  alertBadgeTxt:    { fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
+  alertTimeTxt:     { fontSize: 10, color: "#374151", fontWeight: "600", marginLeft: "auto" as any },
+  alertBusName:     { fontSize: 18, fontWeight: "900", color: "#F1F5F9",
+                      letterSpacing: -0.3, paddingHorizontal: 14, marginTop: 6 },
+  alertMessage:     { fontSize: 13, color: "#64748B", fontWeight: "600",
+                      lineHeight: 18, paddingHorizontal: 14, marginTop: 4, marginBottom: 12 },
+  /* Caméra dans la carte alerte */
+  alertCamBlock:    { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.05)", overflow: "hidden" },
+  alertCamHeader:   { flexDirection: "row", alignItems: "center", gap: 7,
+                      paddingHorizontal: 12, paddingVertical: 7,
+                      backgroundColor: "rgba(0,0,0,0.35)" },
+  alertCamTitleTxt: { fontSize: 9, fontWeight: "900", color: CRIT, letterSpacing: 1.2, flex: 1 },
+  alertCamFeed:     { height: 110, overflow: "hidden", backgroundColor: "#060810" },
+  /* Bouton TRAITER */
   alertTraiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                      margin: 12, marginTop: 10, paddingVertical: 12,
-                      backgroundColor: "#080C14", borderRadius: 10, borderWidth: 1.5 },
-  alertTraiterTxt:  { fontSize: 14, fontWeight: "900", letterSpacing: 0.4 },
+                      margin: 12, marginTop: 10, paddingVertical: 13,
+                      borderRadius: 10, borderWidth: 1.5 },
+  alertTraiterTxt:  { fontSize: 14, fontWeight: "900", letterSpacing: 0.3 },
+  /* Voir plus */
+  showMoreBtn:      { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+                      paddingVertical: 12, borderRadius: 10, borderWidth: 1,
+                      borderColor: "rgba(255,255,255,0.07)",
+                      backgroundColor: "rgba(255,255,255,0.02)", marginBottom: 4 },
+  showMoreTxt:      { fontSize: 12, fontWeight: "700", color: "#374151" },
 
-  /* ── Bus card extras ── */
+  /* ── Flotte : lignes compactes ── */
+  fleetRow:         { flexDirection: "row", alignItems: "center", gap: 10,
+                      paddingVertical: 12, paddingHorizontal: 12,
+                      backgroundColor: "rgba(255,255,255,0.02)",
+                      borderRadius: 10, marginBottom: 6, borderWidth: 1, borderColor: BDR },
+  fleetRowAlert:    { borderColor: `${CRIT}30`, backgroundColor: `${CRIT}06` },
+  fleetDot:         { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  fleetRowText:     { flex: 1, minWidth: 0, gap: 2 },
+  fleetRowName:     { fontSize: 13, fontWeight: "800", color: "#94A3B8", flexShrink: 1 },
+  fleetRowRoute:    { fontSize: 11, fontWeight: "600", color: "#374151", flexShrink: 1 },
+  fleetRowSpeed:    { fontSize: 12, fontWeight: "800", flexShrink: 0 },
+  fleetEmpty:       { textAlign: "center" as any, color: "#374151", fontSize: 13,
+                      fontWeight: "600", paddingVertical: 20 },
+
+  /* ── Bus card extras (conservé pour BusDetailModal) ── */
   busCardPlateInline: { fontSize: 9, fontWeight: "700", color: "#374151", letterSpacing: 0.5 },
   busCardOccRow:    { flexDirection: "row", alignItems: "center", gap: 6,
                       paddingHorizontal: 14, paddingBottom: 10 },
@@ -2184,64 +2143,6 @@ const S = StyleSheet.create({
                       borderRadius: 2, overflow: "hidden" },
   busCardOccFill:   { height: 3, borderRadius: 2 },
   busCardOccPct:    { fontSize: 9, fontWeight: "800", color: "#374151", minWidth: 28, textAlign: "right" as any },
-
-  /* Caméra intégrée dans la carte alerte */
-  focusCamWrap:     { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
-                      overflow: "hidden" },
-  focusCamBar:      { flexDirection: "row", alignItems: "center", gap: 7,
-                      paddingHorizontal: 14, paddingVertical: 8,
-                      backgroundColor: "rgba(0,0,0,0.4)" },
-  focusCamBarTxt:   { fontSize: 9, fontWeight: "900", color: "#EF4444", letterSpacing: 1.2 },
-  focusCamRoute:    { fontSize: 9, fontWeight: "600", color: "#374151", flexShrink: 1 },
-  focusCamOverlay:  { position: "absolute", bottom: 8, right: 10,
-                      backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6,
-                      padding: 5 },
-
-  /* Liste secondaire des autres alertes */
-  focusOtherList:   { marginTop: 18, gap: 4 },
-  focusOtherLabel:  { fontSize: 10, fontWeight: "700", color: "#374151", letterSpacing: 0.8,
-                      textTransform: "uppercase", marginBottom: 4 },
-  focusOtherRow:    { flexDirection: "row", alignItems: "center", gap: 8,
-                      backgroundColor: "rgba(255,255,255,0.03)",
-                      borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10,
-                      borderWidth: 1, borderColor: BDR },
-  focusOtherBus:    { fontSize: 12, fontWeight: "800", color: "#475569", flexShrink: 0, maxWidth: 90 },
-  focusOtherMsg:    { fontSize: 11, color: "#374151", fontWeight: "600", flex: 1 },
-
-  /* ── Labels de zone (en-têtes cliquables) ───────────────────── */
-  zoneHeader:     { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  zoneTitle:      { fontSize: 11, fontWeight: "900", color: CRIT, letterSpacing: 1.4, flex: 1 },
-  zoneBadge:      { backgroundColor: CRIT, borderRadius: 12, minWidth: 22, height: 22,
-                    justifyContent: "center", alignItems: "center", paddingHorizontal: 7 },
-  zoneBadgeTxt:   { color: "#fff", fontSize: 11, fontWeight: "900" },
-  alertZone:      { margin: 14, marginBottom: 0, gap: 0 },
-
-  /* Carte alerte — action principale */
-  alertZoneCard:  { backgroundColor: "#0D0A0F", borderRadius: 16, overflow: "hidden",
-                    borderWidth: 1, borderColor: `${CRIT}25`,
-                    ...(Platform.OS === "web"
-                      ? { boxShadow: `0 4px 20px rgba(239,68,68,0.12)` }
-                      : { elevation: 5, shadowColor: CRIT, shadowOpacity: 0.2, shadowRadius: 10 }) },
-  alertFlowBar:   { flexDirection: "row", alignItems: "center", justifyContent: "center",
-                    paddingVertical: 8, borderBottomWidth: 1 },
-  alertFlowTxt:   { fontSize: 10, fontWeight: "900", letterSpacing: 1 },
-  alertCardBody:  { flexDirection: "row", padding: 16, paddingBottom: 14, gap: 12 },
-  alertCardBus:   { fontSize: 17, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.3 },
-  alertCardMsg:   { fontSize: 13, color: "#94A3B8", fontWeight: "600", marginTop: 4, lineHeight: 18 },
-  alertCardTime:  { fontSize: 10, color: "#374151", fontWeight: "700", marginTop: 6, letterSpacing: 0.4 },
-  alertTraiterBtn:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-                    backgroundColor: CRIT, margin: 12, marginTop: 0, borderRadius: 12, paddingVertical: 14,
-                    ...(Platform.OS === "web"
-                      ? { boxShadow: `0 4px 16px ${CRIT}50` }
-                      : { elevation: 4, shadowColor: CRIT, shadowOpacity: 0.4, shadowRadius: 8 }) },
-  alertTraiterTxt:{ color: "#fff", fontSize: 15, fontWeight: "900", letterSpacing: 0.3 },
-
-  /* ── ZONE 3 — Flotte (collapsible) ─────────────────────────── */
-  fleetZone:      { marginHorizontal: 16, marginTop: 18, gap: 0 },
-  fleetToggleRow: { flexDirection: "row", alignItems: "center", gap: 8,
-                    paddingVertical: 8, marginBottom: 8 },
-  fleetToggleTxt: { fontSize: 11, fontWeight: "900", color: "#374151", letterSpacing: 1.2 },
-  fleetToggleCount:{ fontSize: 11, fontWeight: "600", color: "#1E293B" },
   busRow:         { flexDirection: "row", alignItems: "center", gap: 12,
                     paddingVertical: 13, paddingHorizontal: 14, marginBottom: 2,
                     backgroundColor: CARD, borderRadius: 12,
