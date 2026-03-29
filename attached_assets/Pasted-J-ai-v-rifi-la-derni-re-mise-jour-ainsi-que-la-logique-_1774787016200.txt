@@ -1,0 +1,198 @@
+J’ai vérifié la dernière mise à jour ainsi que la logique implémentée.
+
+Il y a des améliorations, mais un point critique n’est toujours pas respecté :
+
+Le système manque de cohérence globale entre les pages, les rôles et les agents.
+
+---
+
+EXIGENCE PRINCIPALE :
+
+Toutes les données doivent être identiques, synchronisées et visibles de manière cohérente dans toute l’application.
+
+Même information = même affichage partout.
+
+---
+
+1. COHÉRENCE TOTALE DES DONNÉES
+
+Exemple obligatoire :
+
+Si une réservation est créée côté client :
+
+- elle doit apparaître immédiatement côté :
+  - agent
+  - chef d’agence
+  - compagnie
+  - admin
+
+Avec exactement :
+
+- les mêmes informations
+- le même statut (en attente, validé, etc.)
+- le même prix
+- le même trajet
+
+Aucune différence tolérée.
+
+---
+
+2. SYNCHRONISATION ENTRE LES ESPACES
+
+Les modules suivants doivent être synchronisés :
+
+- réservations
+- colis
+- départs
+- bus en route
+- alertes
+- caméras
+- rapports
+
+Tout doit être relié automatiquement.
+
+---
+
+3. LOGIQUE MULTI-COMPAGNIES (IMPORTANT)
+
+Nous allons travailler avec 5 compagnies pour les simulations :
+
+- UTB Express  
+- ETV Express  
+- Sama Transport  
+- CA Trans Transport  
+- SMT Transport  
+
+---
+
+RÈGLE OBLIGATOIRE :
+
+Chaque compagnie doit être totalement isolée dans ses données.
+
+Exemple :
+
+- UTB Express → voit uniquement ses données  
+- ETV Express → voit uniquement ses données  
+- Sama Transport → voit uniquement ses données  
+
+Aucune donnée ne doit être mélangée entre compagnies.
+
+---
+
+4. FILTRAGE PAR COMPAGNIE ET AGENCE
+
+Toutes les données doivent être filtrées automatiquement selon :
+
+- la compagnie
+- l’agence
+- le rôle (agent, chef d’agence, admin)
+
+Exemple :
+
+Un agent UTB à Abidjan voit uniquement :
+
+- les départs UTB Abidjan
+- les réservations UTB Abidjan
+- les colis UTB Abidjan
+
+---
+
+5. COHÉRENCE CLIENT → AGENT → COMPAGNIE
+
+Exemple concret :
+
+Client réserve un billet UTB Standard :
+
+Alors :
+
+- le client voit sa réservation  
+- l’agent voit la même réservation  
+- la compagnie voit la même réservation  
+- le statut est identique partout  
+
+---
+
+6. SYNCHRONISATION DES PASSAGERS (CRITIQUE)
+
+Exemple obligatoire :
+
+Si un départ UTB contient 20 passagers :
+
+Alors ces informations doivent être exactement les mêmes partout :
+
+- nombre de passagers identique  
+- liste des passagers identique  
+- statuts identiques  
+
+Ces données doivent être visibles en temps réel chez :
+
+- agent bagages  
+- agent embarquement  
+- agent suivi  
+- chef d’agence  
+- agent réservation  
+- agent guichet  
+- et TOUS les agents concernés par le départ selon la logique de la compagnie  
+
+Aucun agent concerné ne doit être oublié.
+
+Tous les agents créés et affectés à un départ doivent :
+
+- avoir accès aux mêmes informations  
+- voir les mêmes données en temps réel  
+- travailler sur une base unique  
+
+Toute modification (embarquement, annulation, ajout) doit être automatiquement synchronisée partout.
+
+---
+
+7. COLIS / EXPÉDITIONS
+
+Même logique :
+
+Si un colis est créé pour une compagnie :
+
+- visible chez l’agent  
+- visible chez la compagnie  
+- visible dans le suivi  
+- même statut partout  
+
+---
+
+8. SUPER ADMIN
+
+Le super admin doit voir :
+
+- toutes les compagnies  
+- toutes les données  
+- toutes les activités  
+
+Mais sans casser la séparation des données entre compagnies.
+
+---
+
+9. OBJECTIF
+
+Créer un système totalement cohérent :
+
+- aucune différence entre les écrans  
+- aucune incohérence de données  
+- aucune duplication manuelle  
+
+Tout doit être synchronisé automatiquement.
+
+---
+
+10. IMPORTANT
+
+Toutes les modifications déjà faites doivent être visibles immédiatement dans toute l’application.
+
+Si ce n’est pas le cas, la logique n’est pas correcte.
+
+---
+
+PRIORITÉ :
+
+Corriger la cohérence globale du système avant de continuer le design.
+
+Une fois validé, on passe à la phase design final.
