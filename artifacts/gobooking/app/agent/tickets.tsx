@@ -866,13 +866,20 @@ export default function TicketsScreen() {
 
               {showSeatMap && (
                 <>
-                  {/* Légende couleurs */}
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                    {SEAT_LEGEND.map(item => {
+                  {/* ── Légende ── */}
+                  <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                    {([
+                      { status: "available", label: "Libre",    icon: "check"  as const },
+                      { status: "reserved",  label: "Réservé",  icon: "clock"  as const },
+                      { status: "occupied",  label: "Vendu",    icon: "x"      as const },
+                      { status: "sp",        label: "SP",        icon: "shield" as const },
+                    ] as const).map(item => {
                       const c = getSeatColor(item.status);
                       return (
-                        <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                          <View style={{ width: 13, height: 13, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
+                        <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <View style={{ width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, backgroundColor: c.bg, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+                            <Feather name={item.icon} size={10} color={c.text} />
+                          </View>
                           <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
                         </View>
                       );
@@ -880,99 +887,149 @@ export default function TicketsScreen() {
                   </View>
 
                   {loadingSeatMap ? (
-                    <ActivityIndicator color={G} style={{ marginVertical: 20 }} />
+                    <View style={{ alignItems: "center", paddingVertical: 28, gap: 10 }}>
+                      <ActivityIndicator color={G} size="large" />
+                      <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Chargement du plan...</Text>
+                    </View>
                   ) : seatMapData.length === 0 ? (
-                    <View style={{ alignItems: "center", padding: 20, gap: 10 }}>
-                      <Ionicons name="bus-outline" size={40} color="#D1D5DB" />
+                    <View style={{ alignItems: "center", padding: 24, gap: 10 }}>
+                      <Feather name="grid" size={40} color="#D1D5DB" />
                       <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Plan de sièges non disponible</Text>
-                      <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)}>
-                        <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+                      <TouchableOpacity onPress={() => fetchSeatMap(selectedTrip.id)}
+                        style={{ backgroundColor: G, paddingHorizontal: 20, paddingVertical: 9, borderRadius: 10 }}>
+                        <Text style={{ color: "#fff", fontWeight: "700", fontSize: 13 }}>Actualiser</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (() => {
                     const maxRow = Math.max(...seatMapData.map((s: any) => s.row ?? 1));
                     const maxCol = Math.max(...seatMapData.map((s: any) => s.column ?? 1));
-                    const SEAT = 48;
-                    const GAP = 6;
-                    const AISLE = 18;
-                    const aisleAfterCol = maxCol >= 4 ? 2 : maxCol === 3 ? 2 : 0;
-                    return (
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={{ alignItems: "flex-start", paddingBottom: 6 }}>
-                          {/* Cabine chauffeur */}
-                          <View style={{
-                            flexDirection: "row", alignItems: "center", justifyContent: "center",
-                            gap: 8, marginBottom: 12, marginLeft: 32,
-                            paddingVertical: 10, paddingHorizontal: 20,
-                            backgroundColor: "#F0FDF4", borderRadius: 12,
-                            borderWidth: 2, borderColor: "#86EFAC",
-                            alignSelf: "stretch",
+                    const SEAT = 44;
+                    const GAP  = 8;
+                    const ROW_LABEL_W = 20;
+                    const AISLE_W = 28;
+
+                    const rows = Array.from({ length: maxRow }, (_, i) => i + 1);
+                    const leftCols  = maxCol >= 4 ? [1, 2] : maxCol === 3 ? [1, 2] : [1];
+                    const rightCols = maxCol >= 4 ? [3, 4] : maxCol === 3 ? [3] : [];
+                    const colLetters = ["A","B","C","D","E","F"];
+
+                    /* compteurs */
+                    const cntAvail = seatMapData.filter((s: any) => s.status === "available").length;
+                    const cntResvd = seatMapData.filter((s: any) => s.status === "reserved").length;
+                    const cntOccup = seatMapData.filter((s: any) => s.status === "occupied" || s.status === "sp").length;
+
+                    const renderSeat = (colIdx: number, rowIdx: number) => {
+                      const seat = seatMapData.find((s: any) => s.row === rowIdx && s.column === colIdx);
+                      if (!seat) return <View key={colIdx} style={{ width: SEAT, height: SEAT }} />;
+                      const c = getSeatColor(seat.status);
+                      const seatIcon: Record<string, any> = {
+                        available: "check", reserved: "clock", occupied: "x", sp: "shield", released: "check-circle",
+                      };
+                      const icon = seatIcon[seat.status] ?? "help-circle";
+                      const initials = seat.clientName
+                        ? seat.clientName.trim().split(/\s+/).map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase()
+                        : null;
+                      return (
+                        <TouchableOpacity
+                          key={colIdx}
+                          activeOpacity={0.72}
+                          style={{
+                            width: SEAT, height: SEAT, borderRadius: 10,
+                            backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border,
+                            alignItems: "center", justifyContent: "center", gap: 2,
+                          }}
+                          onPress={() => {
+                            setClickedSeat(seat);
+                            setSeatActionType("vendre");
+                            setSeatPaxName(seat.status === "available" ? "" : (seat.clientName ?? ""));
+                            setSeatPaxPhone(seat.status === "available" ? "" : (seat.clientPhone ?? ""));
+                            setShowSeatModal(true);
                           }}>
-                            <Ionicons name="bus-outline" size={18} color="#16A34A" />
-                            <Text style={{ fontSize: 12, fontWeight: "800", color: "#16A34A", letterSpacing: 0.5 }}>CHAUFFEUR</Text>
-                          </View>
+                          <Feather name={icon} size={11} color={c.text} />
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: c.text, lineHeight: 12 }}>{seat.number}</Text>
+                          {initials && (
+                            <Text style={{ fontSize: 8, fontWeight: "600", color: c.text, opacity: 0.8, lineHeight: 10 }}>{initials}</Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    };
 
-                          {/* Rangées de sièges */}
-                          {Array.from({ length: maxRow }, (_, ri) => (
-                            <View key={ri} style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: GAP }}>
-                              {/* Numéro de rangée */}
-                              <View style={{ width: 26, alignItems: "center" }}>
-                                <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700" }}>{ri + 1}</Text>
-                              </View>
-
-                              {Array.from({ length: maxCol }, (_, ci) => {
-                                const seat = seatMapData.find((s: any) => s.row === ri + 1 && s.column === ci + 1);
-                                const st = seat?.status ?? null;
-                                const c = st ? getSeatColor(st) : null;
-                                const initials = seat?.clientName
-                                  ? seat.clientName.trim().split(/\s+/).map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase()
-                                  : null;
-                                return (
-                                  <React.Fragment key={ci}>
-                                    {ci === aisleAfterCol && aisleAfterCol > 0 && (
-                                      <View style={{ width: AISLE, alignItems: "center", justifyContent: "center" }}>
-                                        <View style={{ width: 2, height: SEAT * 0.7, backgroundColor: "#E5E7EB", borderRadius: 2 }} />
-                                      </View>
-                                    )}
-                                    {!seat ? (
-                                      <View style={{ width: SEAT, height: SEAT }} />
-                                    ) : (
-                                      <TouchableOpacity
-                                        style={{
-                                          width: SEAT, height: SEAT, borderRadius: 10,
-                                          backgroundColor: c!.bg, borderWidth: 2, borderColor: c!.border,
-                                          alignItems: "center", justifyContent: "center",
-                                          shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 3, shadowOffset: { width: 0, height: 1 },
-                                        }}
-                                        activeOpacity={0.75}
-                                        onPress={() => {
-                                          setClickedSeat(seat);
-                                          setSeatActionType("vendre");
-                                          setSeatPaxName(seat.status === "available" ? "" : (seat.clientName ?? ""));
-                                          setSeatPaxPhone(seat.status === "available" ? "" : (seat.clientPhone ?? ""));
-                                          setShowSeatModal(true);
-                                        }}>
-                                        <Text style={{ fontSize: 10, fontWeight: "800", color: c!.text, lineHeight: 13 }}>{seat.number}</Text>
-                                        {initials && (
-                                          <Text style={{ fontSize: 9, fontWeight: "600", color: c!.text, opacity: 0.85, lineHeight: 11 }}>{initials}</Text>
-                                        )}
-                                      </TouchableOpacity>
-                                    )}
-                                  </React.Fragment>
-                                );
-                              })}
+                    return (
+                      <View style={{ alignItems: "center" }}>
+                        {/* Compteur rapide */}
+                        <View style={{ flexDirection: "row", gap: 12, marginBottom: 14, alignSelf: "center" }}>
+                          {[
+                            { label: "Libres",   count: cntAvail, color: "#059669" },
+                            { label: "Réservés", count: cntResvd, color: "#D97706" },
+                            { label: "Vendus",   count: cntOccup, color: "#DC2626" },
+                          ].map(b => (
+                            <View key={b.label} style={{ alignItems: "center", backgroundColor: "#F9FAFB", borderRadius: 10, paddingVertical: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: "#E5E7EB" }}>
+                              <Text style={{ fontSize: 18, fontWeight: "800", color: b.color, lineHeight: 22 }}>{b.count}</Text>
+                              <Text style={{ fontSize: 10, color: "#6B7280" }}>{b.label}</Text>
                             </View>
                           ))}
-
-                          {/* Actualiser */}
-                          <TouchableOpacity
-                            onPress={() => fetchSeatMap(selectedTrip.id)}
-                            style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, marginLeft: 32 }}>
-                            <Ionicons name="refresh-outline" size={13} color={G} />
-                            <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Actualiser le plan</Text>
-                          </TouchableOpacity>
                         </View>
-                      </ScrollView>
+
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={{ alignItems: "center", paddingHorizontal: 8 }}>
+                          <View style={{ alignItems: "center" }}>
+                            {/* En-têtes colonnes */}
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: 4 }}>
+                              <View style={{ width: ROW_LABEL_W }} />
+                              {leftCols.map((ci, li) => (
+                                <Text key={ci} style={{ width: SEAT, textAlign: "center", fontSize: 12, fontWeight: "700", color: G }}>{colLetters[li]}</Text>
+                              ))}
+                              <View style={{ width: AISLE_W }} />
+                              {rightCols.map((ci, ri) => (
+                                <Text key={ci} style={{ width: SEAT, textAlign: "center", fontSize: 12, fontWeight: "700", color: G }}>{colLetters[leftCols.length + ri]}</Text>
+                              ))}
+                            </View>
+
+                            {/* Cabine conducteur */}
+                            <View style={{
+                              flexDirection: "row", alignItems: "center", justifyContent: "center",
+                              gap: 8, paddingVertical: 10, paddingHorizontal: 20,
+                              backgroundColor: "#EEF2FF", borderRadius: 12, marginBottom: 4,
+                              alignSelf: "stretch", marginLeft: ROW_LABEL_W + GAP,
+                            }}>
+                              <View style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center" }}>
+                                <Feather name="circle" size={22} color={G} />
+                                <Feather name="navigation" size={11} color={G} style={{ position: "absolute" }} />
+                              </View>
+                              <Text style={{ fontSize: 13, fontWeight: "700", color: G }}>Conducteur</Text>
+                            </View>
+
+                            {/* Séparateur pointillé */}
+                            <View style={{
+                              height: 2, borderRadius: 1, backgroundColor: "#CBD5E1",
+                              marginBottom: 10, alignSelf: "stretch",
+                              marginLeft: ROW_LABEL_W + GAP,
+                            }} />
+
+                            {/* Rangées sièges */}
+                            {rows.map(rowIdx => (
+                              <View key={rowIdx} style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: GAP }}>
+                                <Text style={{ width: ROW_LABEL_W, textAlign: "center", fontSize: 11, fontWeight: "600", color: "#9CA3AF" }}>{rowIdx}</Text>
+                                {leftCols.map(ci => renderSeat(ci, rowIdx))}
+                                <View style={{ width: AISLE_W, alignItems: "center" }}>
+                                  <Text style={{ fontSize: 18, color: "#CBD5E1", lineHeight: 18 }}>│</Text>
+                                </View>
+                                {rightCols.map(ci => renderSeat(ci, rowIdx))}
+                              </View>
+                            ))}
+
+                            {/* Bouton actualiser */}
+                            <TouchableOpacity
+                              onPress={() => fetchSeatMap(selectedTrip.id)}
+                              style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14, alignSelf: "center" }}>
+                              <Feather name="refresh-cw" size={13} color={G} />
+                              <Text style={{ fontSize: 12, color: G, fontWeight: "600" }}>Actualiser le plan</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </ScrollView>
+                      </View>
                     );
                   })()}
                 </>
