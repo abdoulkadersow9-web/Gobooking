@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { getSeatColor, SEAT_LEGEND } from "@/utils/seatColors";
 import { apiFetch } from "@/utils/api";
+import { getRouteStops, searchCities, ALL_CI_CITIES } from "@/utils/routeGraph";
 
 const INDIGO  = "#3730A3";
 const INDIGO2 = "#4F46E5";
@@ -219,6 +220,12 @@ export default function ChefTrips() {
   const [waypointTrip, setWaypointTrip]   = useState<Trip | null>(null);
   const [waypointCity, setWaypointCity]   = useState("");
 
+  /* ── City picker (formulaire départ) ── */
+  const [routeStops, setRouteStops]         = useState<string[]>([]);
+  const [cityPickerOpen, setCityPickerOpen] = useState(false);
+  const [cityPickerFor, setCityPickerFor]   = useState<"from" | "to">("from");
+  const [citySearch, setCitySearch]         = useState("");
+
   function openWaypoint(trip: Trip) {
     setWaypointTrip(trip);
     setWaypointCity("");
@@ -277,6 +284,23 @@ export default function ChefTrips() {
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
+  /* ── Auto-détection des villes intermédiaires + heure d'arrivée ── */
+  useEffect(() => {
+    if (!form.from || !form.to || form.from === form.to || editId) {
+      if (!form.from || !form.to) setRouteStops([]);
+      return;
+    }
+    const stops = getRouteStops(form.from, form.to);
+    setRouteStops(stops);
+    // Calcul auto de l'heure d'arrivée estimée (120 min par segment)
+    const [hh, mm] = (form.departureTime || "07:00").split(":").map(Number);
+    const totalMin = hh * 60 + mm + (stops.length + 1) * 120;
+    const arrHH = Math.floor(totalMin / 60) % 24;
+    const arrMM = totalMin % 60;
+    const autoArrival = `${String(arrHH).padStart(2, "0")}:${String(arrMM).padStart(2, "0")}`;
+    setForm(f => ({ ...f, arrivalTime: autoArrival }));
+  }, [form.from, form.to, form.departureTime, editId]);
+
   /* ── Auto-lookup du prix quand from/to/tripType changent ── */
   useEffect(() => {
     if (!form.from || !form.to || form.from === form.to || editId) return;
@@ -306,7 +330,8 @@ export default function ChefTrips() {
   function openCreate() {
     setEditId(null);
     setPriceSource(null);
-    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "12:00", price: "", busId: "", reason: "", tripType: "standard" });
+    setRouteStops([]);
+    setForm({ from: "", to: "", date: today(), departureTime: "07:00", arrivalTime: "", price: "", busId: "", reason: "", tripType: "standard" });
     setShowForm(true);
   }
 
@@ -348,9 +373,11 @@ export default function ChefTrips() {
           method: "POST", token: authToken,
           body: JSON.stringify({
             from: form.from, to: form.to, date: form.date,
-            departureTime: form.departureTime, arrivalTime: form.arrivalTime,
+            departureTime: form.departureTime,
+            arrivalTime: form.arrivalTime || undefined,
             price: form.price ? Number(form.price) : 0,
             tripType: form.tripType,
+            stops: routeStops,
             busId: form.busId || undefined,
           }),
         });
@@ -787,27 +814,93 @@ export default function ChefTrips() {
 
             {!editId && (
               <>
+                {/* ── Ville de départ ── */}
                 <Text style={s.label}>Ville de départ *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {CI_CITIES.map(c => (
-                      <Pressable key={c} style={[s.chip, form.from === c && s.chipActive]} onPress={() => setForm(f => ({ ...f, from: c }))}>
-                        <Text style={[s.chipText, form.from === c && s.chipActiveText]}>{c}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
+                <Pressable
+                  style={[s.input, { justifyContent: "center", flexDirection: "row", alignItems: "center", gap: 8 }]}
+                  onPress={() => { setCityPickerFor("from"); setCitySearch(""); setCityPickerOpen(true); }}>
+                  <Feather name="map-pin" size={16} color={form.from ? INDIGO2 : "#9CA3AF"} />
+                  <Text style={{ flex: 1, fontSize: 15, color: form.from ? "#111827" : "#9CA3AF", fontWeight: form.from ? "600" : "400" }}>
+                    {form.from || "Rechercher une ville de départ..."}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color="#9CA3AF" />
+                </Pressable>
 
-                <Text style={s.label}>Destination *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                  <View style={{ flexDirection: "row", gap: 8 }}>
-                    {CI_CITIES.filter(c => c !== form.from).map(c => (
-                      <Pressable key={c} style={[s.chip, form.to === c && s.chipActive]} onPress={() => setForm(f => ({ ...f, to: c }))}>
-                        <Text style={[s.chipText, form.to === c && s.chipActiveText]}>{c}</Text>
-                      </Pressable>
-                    ))}
+                {/* ── Visualisation du trajet ── */}
+                {form.from && form.to && (
+                  <View style={{ marginVertical: 10, paddingLeft: 8, paddingRight: 4 }}>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+                      {/* Ligne verticale avec points */}
+                      <View style={{ alignItems: "center", width: 20, paddingTop: 4 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#4ADE80" }} />
+                        {routeStops.map((_, i) => (
+                          <View key={i}>
+                            <View style={{ width: 2, height: 20, backgroundColor: "#D1D5DB", marginLeft: 4 }} />
+                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LIGHT, borderWidth: 1.5, borderColor: INDIGO2, marginLeft: 1 }} />
+                          </View>
+                        ))}
+                        <View style={{ width: 2, height: 20, backgroundColor: "#D1D5DB", marginLeft: 4 }} />
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#F87171" }} />
+                      </View>
+                      {/* Textes des villes */}
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: "#065F46", paddingTop: 2 }}>{form.from}</Text>
+                        {routeStops.map((stop, i) => (
+                          <Text key={i} style={{ fontSize: 12, color: INDIGO, fontStyle: "italic", paddingTop: 20 }}>
+                            ↳ {stop}
+                          </Text>
+                        ))}
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: "#991B1B", paddingTop: routeStops.length > 0 ? 20 : 2 }}>
+                          {form.to}
+                        </Text>
+                      </View>
+                    </View>
+                    {routeStops.length > 0 ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, backgroundColor: LIGHT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                        <Feather name="info" size={12} color={INDIGO2} />
+                        <Text style={{ fontSize: 11, color: INDIGO2, fontWeight: "600" }}>
+                          {routeStops.length} escale{routeStops.length > 1 ? "s" : ""} intermédiaire{routeStops.length > 1 ? "s" : ""} — billets séparés par segment
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+                        <Feather name="arrow-right" size={12} color="#6B7280" />
+                        <Text style={{ fontSize: 11, color: "#6B7280" }}>Trajet direct</Text>
+                      </View>
+                    )}
+                    {/* Heure d'arrivée calculée */}
+                    {form.arrivalTime && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6, backgroundColor: "#F0FDF4", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                        <Feather name="clock" size={12} color="#059669" />
+                        <Text style={{ fontSize: 11, color: "#059669", fontWeight: "600" }}>
+                          Arrivée estimée : {form.arrivalTime} (basée sur {routeStops.length + 1} segment{routeStops.length > 0 ? "s" : ""})
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                </ScrollView>
+                )}
+
+                {/* Bouton swap from/to */}
+                {form.from && form.to && (
+                  <Pressable
+                    onPress={() => setForm(f => ({ ...f, from: f.to, to: f.from }))}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10, alignSelf: "center" }}>
+                    <Feather name="refresh-cw" size={14} color={INDIGO2} />
+                    <Text style={{ fontSize: 12, color: INDIGO2, fontWeight: "600" }}>Inverser départ/arrivée</Text>
+                  </Pressable>
+                )}
+
+                {/* ── Destination ── */}
+                <Text style={s.label}>Destination *</Text>
+                <Pressable
+                  style={[s.input, { justifyContent: "center", flexDirection: "row", alignItems: "center", gap: 8 }]}
+                  onPress={() => { setCityPickerFor("to"); setCitySearch(""); setCityPickerOpen(true); }}>
+                  <Feather name="flag" size={16} color={form.to ? INDIGO2 : "#9CA3AF"} />
+                  <Text style={{ flex: 1, fontSize: 15, color: form.to ? "#111827" : "#9CA3AF", fontWeight: form.to ? "600" : "400" }}>
+                    {form.to || "Rechercher une ville d'arrivée..."}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color="#9CA3AF" />
+                </Pressable>
 
                 <Text style={s.label}>Date du départ *</Text>
                 <TextInput
@@ -830,15 +923,30 @@ export default function ChefTrips() {
             </ScrollView>
 
             <Text style={s.label}>Heure d'arrivée estimée</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {["06:00","07:00","08:00","09:00","10:00","11:00","12:00","14:00","16:00","18:00","20:00","22:00"].map(h => (
-                  <Pressable key={h} style={[s.timeChip, form.arrivalTime === h && s.timeChipActive]} onPress={() => setForm(f => ({ ...f, arrivalTime: h }))}>
-                    <Text style={[s.timeChipText, form.arrivalTime === h && { color: "white" }]}>{h}</Text>
-                  </Pressable>
-                ))}
+            {form.arrivalTime && !editId ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, borderWidth: 1.5, borderColor: "#86EFAC", padding: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Feather name="clock" size={16} color="#059669" />
+                  <Text style={{ fontSize: 15, color: "#065F46", fontWeight: "700" }}>{form.arrivalTime}</Text>
+                  <Text style={{ fontSize: 11, color: "#6B7280", marginLeft: 4 }}>calculée auto</Text>
+                </View>
+                <Pressable
+                  style={{ backgroundColor: LIGHT, borderRadius: 10, borderWidth: 1, borderColor: INDIGO2, padding: 10 }}
+                  onPress={() => setForm(f => ({ ...f, arrivalTime: "" }))}>
+                  <Feather name="edit-2" size={14} color={INDIGO2} />
+                </Pressable>
               </View>
-            </ScrollView>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {["06:00","07:00","08:00","09:00","10:00","11:00","12:00","14:00","16:00","18:00","20:00","22:00"].map(h => (
+                    <Pressable key={h} style={[s.timeChip, form.arrivalTime === h && s.timeChipActive]} onPress={() => setForm(f => ({ ...f, arrivalTime: h }))}>
+                      <Text style={[s.timeChipText, form.arrivalTime === h && { color: "white" }]}>{h}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
 
             {/* ─── Type de départ ─── */}
             <Text style={s.label}>Type de départ</Text>
@@ -959,6 +1067,99 @@ export default function ChefTrips() {
             </Pressable>
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* ═══════════════════════════════════════════════════════════
+           MODAL : Sélection de ville (city picker)
+         ═══════════════════════════════════════════════════════════ */}
+      <Modal visible={cityPickerOpen} animationType="slide" transparent onRequestClose={() => setCityPickerOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "88%", minHeight: "70%" }}>
+            {/* Header */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 16, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Feather name={cityPickerFor === "from" ? "map-pin" : "flag"} size={18} color={INDIGO2} />
+                <Text style={{ fontSize: 17, fontWeight: "700", color: "#111827" }}>
+                  {cityPickerFor === "from" ? "Ville de départ" : "Ville d'arrivée"}
+                </Text>
+              </View>
+              <Pressable onPress={() => setCityPickerOpen(false)} style={{ padding: 6, backgroundColor: "#F3F4F6", borderRadius: 8 }}>
+                <Feather name="x" size={20} color="#6B7280" />
+              </Pressable>
+            </View>
+            {/* Barre de recherche */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderColor: "#F3F4F6" }}>
+              <Feather name="search" size={18} color="#9CA3AF" />
+              <TextInput
+                style={{ flex: 1, fontSize: 15, color: "#111827", padding: 0 }}
+                placeholder="Rechercher (ex: Ferké, Bouaké, Ouangolo...)"
+                placeholderTextColor="#9CA3AF"
+                value={citySearch}
+                onChangeText={setCitySearch}
+                autoFocus
+                autoCorrect={false}
+                autoCapitalize="words"
+              />
+              {citySearch.length > 0 && (
+                <Pressable onPress={() => setCitySearch("")} style={{ padding: 2 }}>
+                  <Feather name="x-circle" size={18} color="#9CA3AF" />
+                </Pressable>
+              )}
+            </View>
+            {/* Liste des villes */}
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 30 }}>
+              {searchCities(citySearch, ALL_CI_CITIES).map((city) => {
+                const isSelected = cityPickerFor === "from" ? city === form.from : city === form.to;
+                const isOther    = cityPickerFor === "from" ? city === form.to : city === form.from;
+                return (
+                  <Pressable
+                    key={city}
+                    style={{
+                      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                      paddingHorizontal: 20, paddingVertical: 15,
+                      borderBottomWidth: 1, borderColor: "#F9FAFB",
+                      backgroundColor: isSelected ? LIGHT : "#fff",
+                      opacity: isOther ? 0.35 : 1,
+                    }}
+                    disabled={isOther}
+                    onPress={() => {
+                      if (cityPickerFor === "from") setForm(f => ({ ...f, from: city }));
+                      else setForm(f => ({ ...f, to: city }));
+                      setCityPickerOpen(false);
+                    }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                      <Feather
+                        name={isSelected ? "check-circle" : "map-pin"}
+                        size={18}
+                        color={isSelected ? INDIGO2 : "#9CA3AF"}
+                      />
+                      <Text style={{ fontSize: 15, color: isSelected ? INDIGO : "#111827", fontWeight: isSelected ? "700" : "400" }}>
+                        {city}
+                      </Text>
+                    </View>
+                    {isOther && (
+                      <View style={{ backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#92400E", fontWeight: "700" }}>Déjà sélectionné</Text>
+                      </View>
+                    )}
+                    {isSelected && (
+                      <View style={{ backgroundColor: LIGHT, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 }}>
+                        <Text style={{ fontSize: 10, color: INDIGO2, fontWeight: "700" }}>Sélectionné</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                );
+              })}
+              {searchCities(citySearch, ALL_CI_CITIES).length === 0 && (
+                <View style={{ padding: 40, alignItems: "center", gap: 10 }}>
+                  <Feather name="search" size={36} color="#E5E7EB" />
+                  <Text style={{ fontSize: 15, color: "#9CA3AF", fontWeight: "600" }}>Aucune ville trouvée</Text>
+                  <Text style={{ fontSize: 12, color: "#D1D5DB" }}>pour « {citySearch} »</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* ═══════════════════════════════════════════════════════════

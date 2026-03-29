@@ -5363,11 +5363,23 @@ router.post("/chef/trips", async (req, res) => {
     if (!ctx) return res.status(403).json({ error: "Accès refusé" });
     const { user, agent } = ctx;
 
-    const { from, to, date, departureTime, arrivalTime, price: priceInput, busId, tripType = "standard" } = req.body as {
+    const { from, to, date, departureTime, arrivalTime: arrivalTimeInput, price: priceInput, busId, tripType = "standard", stops: stopsInput } = req.body as {
       from: string; to: string; date: string;
-      departureTime: string; arrivalTime: string;
+      departureTime: string; arrivalTime?: string;
       price?: number; busId?: string; tripType?: string;
+      stops?: string[];
     };
+
+    // Auto-calcul heure d'arrivée si absente (120 min / segment)
+    const intermediateStops: string[] = Array.isArray(stopsInput) ? stopsInput : [];
+    let arrivalTime = arrivalTimeInput;
+    if (!arrivalTime || arrivalTime === "—") {
+      const [hh, mm] = (departureTime || "07:00").split(":").map(Number);
+      const totalMin = (hh || 0) * 60 + (mm || 0) + (intermediateStops.length + 1) * 120;
+      const arrHH = Math.floor(totalMin / 60) % 24;
+      const arrMM = totalMin % 60;
+      arrivalTime = `${String(arrHH).padStart(2, "0")}:${String(arrMM).padStart(2, "0")}`;
+    }
 
     if (!from || !to || !date || !departureTime) {
       return res.status(400).json({ error: "Champs obligatoires manquants" });
@@ -5434,16 +5446,19 @@ router.post("/chef/trips", async (req, res) => {
       if (bus) { busName = bus.busName; busType = bus.busType; totalSeats = bus.capacity; }
     }
 
+    // Construire les stops au format attendu
+    const stopsObj = intermediateStops.map((city, i) => ({ city, order: i + 1 }));
+
     await db.execute(sql`
       INSERT INTO trips (id, company_id, agent_id, bus_id, from_city, to_city, date,
         departure_time, arrival_time, price, bus_type, bus_name, total_seats,
         guichet_seats, online_seats, duration, amenities, stops, policies, trip_type, status)
       VALUES (
         ${tripId}, ${agent.companyId}, ${agent.id}, ${busId ?? null},
-        ${from}, ${to}, ${date}, ${departureTime}, ${arrivalTime ?? "—"},
+        ${from}, ${to}, ${date}, ${departureTime}, ${arrivalTime},
         ${finalPrice}, ${busType}, ${busName}, ${totalSeats},
         ${Math.floor(totalSeats * 0.7)}, ${Math.floor(totalSeats * 0.3)},
-        '?', '[]'::json, '[]'::json, '[]'::json, ${normalizedTripType}, 'scheduled'
+        '?', '[]'::json, ${JSON.stringify(stopsObj)}::json, '[]'::json, ${normalizedTripType}, 'scheduled'
       )
     `);
 
