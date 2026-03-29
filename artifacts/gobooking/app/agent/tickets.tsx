@@ -254,6 +254,7 @@ export default function TicketsScreen() {
   /* ── SP & Seat Map state ── */
   const [isSP, setIsSP]                       = useState(false);
   const [showSeatMap, setShowSeatMap]         = useState(true);
+  const [showBusPlan, setShowBusPlan]         = useState(false);
   const [seatMapData, setSeatMapData]         = useState<any[]>([]);
   const [loadingSeatMap, setLoadingSeatMap]   = useState(false);
   const [clickedSeat, setClickedSeat]         = useState<any | null>(null);
@@ -499,11 +500,12 @@ export default function TicketsScreen() {
     if (activeTab === "impression") fetchImpTrips();
   }, [activeTab]);
 
-  /* ── Auto-fetch seat map quand un trajet est sélectionné ── */
+  /* ── Auto-fetch + ouverture plan plein écran quand trajet sélectionné ── */
   useEffect(() => {
     if (selectedTrip) {
       setSeatMapData([]);
       fetchSeatMap(selectedTrip.id);
+      setShowBusPlan(true);
     }
   }, [selectedTrip?.id]);
 
@@ -1871,6 +1873,194 @@ export default function TicketsScreen() {
           </Modal>
         </>
       )}
+
+      {/* ══════════ PLAN PLEIN ÉCRAN ══════════ */}
+      <Modal
+        visible={showBusPlan}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowBusPlan(false)}>
+        <View style={{ flex: 1, backgroundColor: "#F1F5F9" }}>
+          {/* Header */}
+          <View style={{
+            backgroundColor: "#fff", paddingTop: Platform.OS === "web" ? 16 : 52,
+            paddingBottom: 14, paddingHorizontal: 16,
+            borderBottomWidth: 1, borderColor: "#E2E8F0",
+            flexDirection: "row", alignItems: "center", gap: 12,
+          }}>
+            <TouchableOpacity
+              onPress={() => setShowBusPlan(false)}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" }}>
+              <Feather name="arrow-left" size={18} color="#374151" />
+            </TouchableOpacity>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 16, fontWeight: "700", color: "#111827" }} numberOfLines={1}>
+                {selectedTrip?.from} → {selectedTrip?.to}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 1 }}>
+                {selectedTrip?.date} · {selectedTrip?.departureTime} · {selectedTrip?.busType ?? "Standard"}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => selectedTrip && fetchSeatMap(selectedTrip.id)}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#F0FDF4", alignItems: "center", justifyContent: "center" }}>
+              <Feather name="refresh-cw" size={16} color={G} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Légende */}
+          <View style={{ backgroundColor: "#fff", flexDirection: "row", justifyContent: "center", gap: 14, paddingVertical: 10, borderBottomWidth: 1, borderColor: "#E2E8F0" }}>
+            {([
+              { status: "available", label: "Libre",    icon: "check"  as const },
+              { status: "reserved",  label: "Réservé",  icon: "clock"  as const },
+              { status: "occupied",  label: "Vendu",    icon: "x"      as const },
+              { status: "sp",        label: "SP",        icon: "shield" as const },
+            ] as const).map(item => {
+              const c = getSeatColor(item.status);
+              return (
+                <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <View style={{ width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, backgroundColor: c.bg, borderColor: c.border, alignItems: "center", justifyContent: "center" }}>
+                    <Feather name={item.icon} size={10} color={c.text} />
+                  </View>
+                  <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Plan */}
+          {loadingSeatMap ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14 }}>
+              <ActivityIndicator size="large" color={G} />
+              <Text style={{ color: "#9CA3AF", fontSize: 14 }}>Chargement du plan de sièges...</Text>
+            </View>
+          ) : seatMapData.length === 0 ? (
+            <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 14 }}>
+              <Feather name="grid" size={48} color="#D1D5DB" />
+              <Text style={{ color: "#9CA3AF", fontSize: 15 }}>Plan non disponible</Text>
+              <Text style={{ color: "#9CA3AF", fontSize: 13, textAlign: "center", paddingHorizontal: 32 }}>
+                Aucun siège configuré pour ce trajet.
+              </Text>
+              <TouchableOpacity
+                onPress={() => selectedTrip && fetchSeatMap(selectedTrip.id)}
+                style={{ backgroundColor: G, paddingHorizontal: 24, paddingVertical: 11, borderRadius: 10 }}>
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Actualiser</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (() => {
+            const maxRow = Math.max(...seatMapData.map((s: any) => s.row ?? 1));
+            const maxCol = Math.max(...seatMapData.map((s: any) => s.column ?? 1));
+            const SEAT = 46;
+            const GAP  = 8;
+            const ROW_LABEL_W = 22;
+            const AISLE_W = 30;
+            const rows = Array.from({ length: maxRow }, (_, i) => i + 1);
+            const leftCols  = maxCol >= 4 ? [1, 2] : maxCol === 3 ? [1, 2] : [1];
+            const rightCols = maxCol >= 4 ? [3, 4] : maxCol === 3 ? [3] : [];
+            const colLetters = ["A","B","C","D","E","F"];
+            const cntAvail = seatMapData.filter((s: any) => s.status === "available").length;
+            const cntResvd = seatMapData.filter((s: any) => s.status === "reserved").length;
+            const cntOccup = seatMapData.filter((s: any) => s.status === "occupied" || s.status === "sp").length;
+
+            const seatIcon: Record<string, any> = {
+              available: "check", reserved: "clock", occupied: "x", sp: "shield", released: "check-circle",
+            };
+
+            const renderBusSeat = (colIdx: number, rowIdx: number) => {
+              const seat = seatMapData.find((s: any) => s.row === rowIdx && s.column === colIdx);
+              if (!seat) return <View key={colIdx} style={{ width: SEAT, height: SEAT }} />;
+              const c = getSeatColor(seat.status);
+              const icon = seatIcon[seat.status] ?? "help-circle";
+              const initials = seat.clientName
+                ? seat.clientName.trim().split(/\s+/).map((w: string) => w[0] ?? "").join("").slice(0, 2).toUpperCase()
+                : null;
+              return (
+                <TouchableOpacity
+                  key={colIdx}
+                  activeOpacity={0.72}
+                  style={{ width: SEAT, height: SEAT, borderRadius: 10, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border, alignItems: "center", justifyContent: "center", gap: 1 }}
+                  onPress={() => {
+                    setClickedSeat(seat);
+                    setSeatActionType("vendre");
+                    setSeatPaxName(seat.status === "available" ? "" : (seat.clientName ?? ""));
+                    setSeatPaxPhone(seat.status === "available" ? "" : (seat.clientPhone ?? ""));
+                    setShowSeatModal(true);
+                  }}>
+                  <Feather name={icon} size={12} color={c.text} />
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: c.text, lineHeight: 12 }}>{seat.number}</Text>
+                  {initials && <Text style={{ fontSize: 8, fontWeight: "600", color: c.text, opacity: 0.8, lineHeight: 10 }}>{initials}</Text>}
+                </TouchableOpacity>
+              );
+            };
+
+            return (
+              <ScrollView
+                contentContainerStyle={{ alignItems: "center", paddingVertical: 20, paddingHorizontal: 12 }}
+                showsVerticalScrollIndicator={false}>
+                {/* En-têtes colonnes */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: 4 }}>
+                  <View style={{ width: ROW_LABEL_W }} />
+                  {leftCols.map((ci, li) => (
+                    <Text key={ci} style={{ width: SEAT, textAlign: "center", fontSize: 13, fontWeight: "800", color: G }}>{colLetters[li]}</Text>
+                  ))}
+                  <View style={{ width: AISLE_W }} />
+                  {rightCols.map((ci, ri) => (
+                    <Text key={ci} style={{ width: SEAT, textAlign: "center", fontSize: 13, fontWeight: "800", color: G }}>{colLetters[leftCols.length + ri]}</Text>
+                  ))}
+                </View>
+
+                {/* Cabine conducteur */}
+                <View style={{
+                  flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+                  paddingVertical: 11, paddingHorizontal: 20, backgroundColor: "#EEF2FF",
+                  borderRadius: 12, marginBottom: 4, alignSelf: "stretch", marginLeft: ROW_LABEL_W + GAP,
+                }}>
+                  <View style={{ width: 32, height: 32, alignItems: "center", justifyContent: "center" }}>
+                    <Feather name="circle" size={24} color={G} />
+                    <Feather name="navigation" size={12} color={G} style={{ position: "absolute" }} />
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: G }}>Conducteur</Text>
+                </View>
+
+                {/* Séparateur */}
+                <View style={{ height: 2, backgroundColor: "#CBD5E1", borderRadius: 1, marginBottom: 12, alignSelf: "stretch", marginLeft: ROW_LABEL_W + GAP }} />
+
+                {/* Rangées */}
+                {rows.map(rowIdx => (
+                  <View key={rowIdx} style={{ flexDirection: "row", alignItems: "center", gap: GAP, marginBottom: GAP }}>
+                    <Text style={{ width: ROW_LABEL_W, textAlign: "center", fontSize: 12, fontWeight: "700", color: "#9CA3AF" }}>{rowIdx}</Text>
+                    {leftCols.map(ci => renderBusSeat(ci, rowIdx))}
+                    <View style={{ width: AISLE_W, alignItems: "center" }}>
+                      <Text style={{ fontSize: 20, color: "#CBD5E1", lineHeight: 20 }}>│</Text>
+                    </View>
+                    {rightCols.map(ci => renderBusSeat(ci, rowIdx))}
+                  </View>
+                ))}
+              </ScrollView>
+            );
+          })()}
+
+          {/* Barre inférieure — compteurs + bouton vente rapide */}
+          {seatMapData.length > 0 && (
+            <View style={{
+              backgroundColor: "#fff", paddingVertical: 12, paddingHorizontal: 20,
+              borderTopWidth: 1, borderColor: "#E2E8F0",
+              flexDirection: "row", alignItems: "center", gap: 12,
+            }}>
+              {[
+                { label: "Libres",   count: seatMapData.filter((s:any) => s.status === "available").length, color: "#059669", bg: "#F0FDF4" },
+                { label: "Réservés", count: seatMapData.filter((s:any) => s.status === "reserved").length,  color: "#D97706", bg: "#FFFBEB" },
+                { label: "Vendus",   count: seatMapData.filter((s:any) => s.status === "occupied" || s.status === "sp").length, color: "#DC2626", bg: "#FEF2F2" },
+              ].map(b => (
+                <View key={b.label} style={{ alignItems: "center", backgroundColor: b.bg, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10, flex: 1 }}>
+                  <Text style={{ fontSize: 20, fontWeight: "800", color: b.color, lineHeight: 24 }}>{b.count}</Text>
+                  <Text style={{ fontSize: 10, color: "#6B7280" }}>{b.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
 
       {/* ── Modal: action sur siège ── */}
       <Modal visible={showSeatModal} transparent animationType="slide" onRequestClose={() => setShowSeatModal(false)}>
