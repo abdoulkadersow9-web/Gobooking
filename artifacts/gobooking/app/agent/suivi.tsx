@@ -1433,12 +1433,17 @@ export default function SuiviScreen() {
                             :                           "Action requise";
             const btnLabel  = flowStep === "validate" ? "VALIDER ET CLORE" : "TRAITER L'ALERTE";
             const others    = sorted.slice(1);
+            /* Caméra du bus en alerte */
+            const alertTrip  = data?.trips.find(t => t.busId === top.busId);
+            const alertCamOk = !!(alertTrip?.cameraStatus === "connected" && alertTrip?.cameraStreamUrl);
+            const alertLive  = alertTrip ? liveFrames[alertTrip.id] : undefined;
             return (
               <View style={S.focusZone}>
 
                 {/* ── Carte principale ─────────────────────── */}
                 <View style={[S.focusCard, { borderColor: `${stepColor}50` }]}>
-                  {/* Étiquette étape — discrète */}
+
+                  {/* En-tête : étape + heure */}
                   <View style={S.focusCardTopRow}>
                     <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
                       backgroundColor: stepColor, transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
@@ -1448,11 +1453,47 @@ export default function SuiviScreen() {
                     </Text>
                   </View>
 
-                  {/* Bus + message — épuré */}
+                  {/* Identité + message */}
                   <View style={S.focusCardBody}>
                     <Text style={S.focusCardBus}>{top.busName}</Text>
                     <Text style={S.focusCardMsg}>{top.message}</Text>
                   </View>
+
+                  {/* ── CAMÉRA LIVE — intégrée dans la carte si disponible ── */}
+                  {alertCamOk && alertTrip && (
+                    <View style={S.focusCamWrap}>
+                      {/* Bandeau "LIVE" */}
+                      <View style={S.focusCamBar}>
+                        <Animated.View style={{ width: 6, height: 6, borderRadius: 3,
+                          backgroundColor: "#EF4444",
+                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.15] }) }} />
+                        <Text style={S.focusCamBarTxt}>CAMÉRA LIVE</Text>
+                        <View style={{ flex: 1 }} />
+                        <Text style={S.focusCamRoute} numberOfLines={1}>
+                          {alertTrip.from} → {alertTrip.to}
+                        </Text>
+                      </View>
+                      {/* Flux vidéo */}
+                      <TouchableOpacity
+                        onPress={() => setCameraTrip(alertTrip)}
+                        activeOpacity={0.9}
+                        style={{ position: "relative" }}
+                      >
+                        <LiveCamView
+                          signal={alertLive?.signal ?? 80}
+                          route={`${alertTrip.from} → ${alertTrip.to}`}
+                          busId={top.busId}
+                        />
+                        {/* Overlay "Appuyer pour agrandir" */}
+                        <View style={S.focusCamOverlay}>
+                          <Ionicons name="expand-outline" size={16} color="rgba(255,255,255,0.7)" />
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Espace bas carte */}
+                  <View style={{ height: 4 }} />
                 </View>
 
                 {/* ── Bouton TRAITER — seul élément d'action ── */}
@@ -2047,6 +2088,18 @@ const S = StyleSheet.create({
                         ? {}
                         : { elevation: 2, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6 }) },
   focusTraiterTxt:  { fontSize: 17, fontWeight: "900", letterSpacing: 0.4 },
+
+  /* Caméra intégrée dans la carte alerte */
+  focusCamWrap:     { marginTop: 4, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)",
+                      overflow: "hidden" },
+  focusCamBar:      { flexDirection: "row", alignItems: "center", gap: 7,
+                      paddingHorizontal: 14, paddingVertical: 8,
+                      backgroundColor: "rgba(0,0,0,0.4)" },
+  focusCamBarTxt:   { fontSize: 9, fontWeight: "900", color: "#EF4444", letterSpacing: 1.2 },
+  focusCamRoute:    { fontSize: 9, fontWeight: "600", color: "#374151", flexShrink: 1 },
+  focusCamOverlay:  { position: "absolute", bottom: 8, right: 10,
+                      backgroundColor: "rgba(0,0,0,0.45)", borderRadius: 6,
+                      padding: 5 },
 
   /* Liste secondaire des autres alertes */
   focusOtherList:   { marginTop: 18, gap: 4 },
