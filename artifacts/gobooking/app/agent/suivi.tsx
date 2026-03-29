@@ -445,10 +445,11 @@ const RESP_INFO: Record<string, { label: string; color: string; icon: string }> 
 };
 
 function AlertDetailModal({
-  alert, trip, token, onClose, onRefresh,
+  alert, trip, token, onClose, onRefresh, onClearAutoAlert,
 }: {
   alert: AlertItem; trip?: TripItem;
   token: string | null; onClose: () => void; onRefresh: () => void;
+  onClearAutoAlert?: (id: string) => void;
 }) {
   const [acting, setActing] = useState(false);
   const alType    = alert.type?.toLowerCase() ?? "";
@@ -462,9 +463,12 @@ function AlertDetailModal({
   const doDemanderReponse = async () => {
     setActing(true);
     try {
-      await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/demander-reponse`, {
-        method: "POST", headers: { Authorization: `Bearer ${token}` },
-      });
+      const isAutoAlert = alert.id.startsWith("speed-") || alert.id.startsWith("auto-");
+      if (!isAutoAlert) {
+        await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/demander-reponse`, {
+          method: "POST", headers: { Authorization: `Bearer ${token}` },
+        });
+      }
       onRefresh();
     } catch {} finally { setActing(false); }
   };
@@ -472,6 +476,13 @@ function AlertDetailModal({
   const doConfirm = async () => {
     setActing(true);
     try {
+      /* Alertes auto-vitesse (ID synthétique) : validation locale uniquement */
+      const isAutoAlert = alert.id.startsWith("speed-") || alert.id.startsWith("auto-");
+      if (isAutoAlert) {
+        onClearAutoAlert?.(alert.id);
+        onRefresh(); onClose();
+        return;
+      }
       const res = await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/confirm`, {
         method: "POST", headers: { Authorization: `Bearer ${token}` },
       });
@@ -1121,9 +1132,6 @@ export default function SuiviScreen() {
             }),
           }).catch(() => {});
         }
-      } else if (spd && spd <= max) {
-        autoAlertSent.current.delete(key);
-        setAutoSpeedAlerts(prev => prev.filter(a => a.id !== key));
       }
     });
   }, [busSpeedMap, data?.buses, token]);
@@ -1584,6 +1592,10 @@ export default function SuiviScreen() {
           token={token}
           onClose={() => setSelectedAlert(null)}
           onRefresh={() => load(false)}
+          onClearAutoAlert={(id) => {
+            autoAlertSent.current.delete(id);
+            setAutoSpeedAlerts(prev => prev.filter(a => a.id !== id));
+          }}
         />
       )}
 
