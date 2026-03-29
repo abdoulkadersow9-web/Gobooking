@@ -1,0 +1,225 @@
+J’ai vérifié toutes les dernières versions.
+
+Ce n’est toujours pas acceptable.
+
+Le problème n’est plus seulement visuel.
+Le système n’est pas encore une vraie tour de contrôle professionnelle.
+
+OBJECTIF :
+Créer une plateforme de supervision complète, moderne, interactive et en temps réel.
+
+---
+
+1. PROBLÈME GLOBAL
+
+Actuellement :
+
+- interface désordonnée
+- trop chargée
+- manque de clarté
+- trop de scroll
+- éléments non cliquables
+- logique métier non respectée
+- aucune vraie interaction
+
+Ce n’est pas un système de contrôle.
+
+---
+
+2. STRUCTURE TOUR DE CONTRÔLE (OBLIGATOIRE)
+
+La page doit être organisée comme un dashboard professionnel sans scroll (ou très minimal) :
+
+ZONE 1 :
+- KPI (bus, passagers, alertes, cam live)
+
+ZONE 2 :
+- ALERTES CRITIQUES (toujours visibles)
+
+ZONE 3 :
+- BUS EN COURS (cartes simples et lisibles)
+
+ZONE 4 :
+- CAMÉRAS LIVE (aperçu direct)
+
+OBJECTIF :
+Vue globale immédiate sans effort
+
+---
+
+3. DESIGN INTERNATIONAL (OBLIGATOIRE)
+
+Actuellement :
+- trop de couleurs
+- trop chargé
+- pas propre
+
+À FAIRE :
+
+- design minimaliste
+- 2 à 3 couleurs max
+- fond sombre propre
+- espacement large
+- alignement parfait
+- interface fluide et moderne
+
+---
+
+4. CAMÉRAS LIVE (IMMERSION RÉELLE)
+
+Actuellement :
+- icônes + texte (pas acceptable)
+
+À FAIRE :
+
+- afficher une vraie simulation vidéo :
+  • route en mouvement
+  • intérieur bus
+  • flux dynamique
+
+- supprimer les textes inutiles dans la zone vidéo
+- ajouter overlay discret :
+  • LIVE / REC
+  • signal
+
+OBJECTIF :
+voir le terrain en direct
+
+---
+
+5. INTERFACE INTERACTIVE (CRITIQUE)
+
+Actuellement :
+- éléments non cliquables
+- impossible d’agir
+
+À FAIRE :
+
+- chaque carte doit être cliquable
+- ouvrir un détail clair (popup/page)
+- afficher toutes les infos du trajet
+
+---
+
+6. LOGIQUE MÉTIER – RÈGLES AUTOMATIQUES
+
+Chaque trajet doit avoir des règles :
+
+Exemple :
+- vitesse max 110 km/h ou 120 km/h
+
+Si une règle est enfreinte :
+
+→ alerte automatique immédiate
+
+Sans intervention humaine
+
+---
+
+7. SYSTÈME D’ALERTE COMPLET (OBLIGATOIRE)
+
+Déclencher automatiquement :
+
+- dépassement de vitesse
+- retard
+- panne
+- arrêt anormal
+
+Afficher immédiatement dans le dashboard
+
+---
+
+8. ALERTE SONORE (CRITIQUE)
+
+Lorsqu’une alerte se déclenche :
+
+- un son fort doit être lancé automatiquement
+- le son doit alerter :
+  • l’agent suivi
+  • l’agent routier
+
+Le son ne doit pas s’arrêter seul
+
+---
+
+9. SYSTÈME DE RÉPONSE
+
+Processus obligatoire :
+
+1. l’alerte est envoyée à l’agent routier
+2. l’agent routier répond (explication du problème)
+3. la réponse arrive dans le dashboard
+
+---
+
+10. VALIDATION PAR L’AGENT SUIVI
+
+Quand la réponse arrive :
+
+- l’agent suivi clique
+- il vérifie
+- il valide
+
+---
+
+11. ARRÊT DE L’ALERTE
+
+L’alerte + le son s’arrêtent UNIQUEMENT si :
+
+- l’agent suivi a validé
+
+Sinon :
+- l’alerte reste active
+- le système continue
+
+---
+
+12. INTÉGRATION LOGISTIQUE
+
+Si panne détectée :
+
+→ envoyer automatiquement l’information à l’agent logistique
+
+---
+
+13. SIMPLIFICATION VISUELLE
+
+À FAIRE :
+
+- supprimer le bruit visuel
+- éviter les répétitions
+- alléger les cartes
+- lecture en 1 seconde
+
+---
+
+14. OBJECTIF FINAL
+
+Créer une interface :
+
+- claire
+- moderne
+- minimaliste
+- interactive
+- immersive
+- professionnelle
+- en temps réel
+
+Une vraie tour de contrôle transport.
+
+---
+
+RÉSUMÉ :
+
+Moins de design inutile  
+Plus de logique  
+Plus d’interaction  
+Plus de réalisme  
+
+---
+
+PRIORITÉ ABSOLUE :
+
+Transformer cette interface en système réel de supervision.
+
+Corriger immédiatement sans casser la logique existante.

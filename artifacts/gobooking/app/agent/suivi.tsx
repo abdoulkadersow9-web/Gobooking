@@ -94,7 +94,8 @@ function buildVideoHtml(streamUrl: string): string {
 /* ── Types ─────────────────────────────────────────────────────── */
 interface BusItem {
   id: string; busName: string; plateNumber: string;
-  logisticStatus: string; currentLocation?: string; issue?: string;
+  logisticStatus: string; status?: string;
+  currentLocation?: string; issue?: string;
   currentTripId?: string;
 }
 interface TripItem {
@@ -433,6 +434,394 @@ function CamPill({ trip, onView }: { trip: TripItem; onView: () => void }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   ALERT DETAIL MODAL — Cycle complet : voir, répondre, valider
+   ══════════════════════════════════════════════════════════════════ */
+const RESP_INFO: Record<string, { label: string; color: string; icon: string }> = {
+  panne:    { label: "Panne mécanique", color: "#EF4444", icon: "construct-outline"   },
+  controle: { label: "Contrôle routier", color: "#F59E0B", icon: "shield-outline"     },
+  pause:    { label: "Pause normale",    color: "#10B981", icon: "pause-circle-outline"},
+};
+
+function AlertDetailModal({
+  alert, trip, token, onClose, onRefresh,
+}: {
+  alert: AlertItem; trip?: TripItem;
+  token: string | null; onClose: () => void; onRefresh: () => void;
+}) {
+  const [acting, setActing] = useState(false);
+  const alType    = alert.type?.toLowerCase() ?? "";
+  const isUrgent  = alType === "urgence" || alType === "sos";
+  const typeColor = isUrgent ? "#EF4444" : alType === "panne" ? "#F59E0B" : "#EF4444";
+  const typeLabel = (alert.type ?? "ALERTE").toUpperCase();
+  const responded = !!alert.response;
+  const waiting   = alert.responseRequested && !responded;
+  const respInfo  = alert.response ? RESP_INFO[alert.response] : null;
+
+  const doDemanderReponse = async () => {
+    setActing(true);
+    try {
+      await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/demander-reponse`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      });
+      onRefresh();
+    } catch {} finally { setActing(false); }
+  };
+
+  const doConfirm = async () => {
+    setActing(true);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/suivi/alerts/${alert.id}/confirm`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) { onRefresh(); onClose(); }
+    } catch {} finally { setActing(false); }
+  };
+
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.72)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: "#080C14", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          borderTopWidth: 1, borderColor: "rgba(255,255,255,0.07)" }}>
+          {/* Handle */}
+          <View style={{ width: 36, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.12)",
+            alignSelf: "center", marginTop: 12, marginBottom: 16 }} />
+          {/* Header */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 16 }}>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 11,
+                backgroundColor: `${typeColor}18`, justifyContent: "center", alignItems: "center",
+                borderWidth: 1, borderColor: `${typeColor}35` }}>
+                <Ionicons name="warning" size={18} color={typeColor} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: typeColor, fontSize: 10, fontWeight: "900", letterSpacing: 1.5 }}>{typeLabel}</Text>
+                <Text style={{ color: "#E2E8F0", fontSize: 16, fontWeight: "800", marginTop: 1 }} numberOfLines={1}>
+                  {alert.busName ?? "Bus inconnu"}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={onClose} style={{ width: 32, height: 32, borderRadius: 8,
+              backgroundColor: "rgba(255,255,255,0.07)", justifyContent: "center", alignItems: "center" }}>
+              <Feather name="x" size={15} color="rgba(255,255,255,0.5)" />
+            </TouchableOpacity>
+          </View>
+          {/* Message */}
+          <View style={{ marginHorizontal: 20, backgroundColor: `${typeColor}0D`, borderRadius: 10,
+            padding: 14, borderWidth: 1, borderColor: `${typeColor}1F`, marginBottom: 14 }}>
+            <Text style={{ color: "#E2E8F0", fontSize: 13, fontWeight: "600", lineHeight: 20 }}>
+              {alert.message || "Alerte signalée"}
+            </Text>
+            <Text style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginTop: 6 }}>
+              {new Date(alert.createdAt).toLocaleString("fr-FR")}
+            </Text>
+          </View>
+          {/* Route */}
+          {trip && (
+            <View style={{ marginHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <Ionicons name="navigate-outline" size={13} color="#374151" />
+              <Text style={{ color: "#4B5563", fontSize: 12, fontWeight: "600" }}>
+                {trip.from} → {trip.to}
+              </Text>
+            </View>
+          )}
+          {/* Response section */}
+          <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
+            {!responded && !waiting && (
+              <View style={{ backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 14,
+                borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" }}>
+                <Text style={{ color: "#4B5563", fontSize: 12, marginBottom: 12 }}>
+                  Aucune réponse de l'agent routier.
+                </Text>
+                <TouchableOpacity onPress={doDemanderReponse} disabled={acting}
+                  style={{ backgroundColor: "#111827", borderRadius: 8, paddingVertical: 11,
+                    alignItems: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" }}>
+                  {acting ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={{ color: "#E2E8F0", fontSize: 13, fontWeight: "700" }}>
+                        Demander une réponse à l'agent
+                      </Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+            {waiting && (
+              <View style={{ backgroundColor: "rgba(234,179,8,0.07)", borderRadius: 10, padding: 14,
+                borderWidth: 1, borderColor: "rgba(234,179,8,0.18)",
+                flexDirection: "row", alignItems: "center", gap: 12 }}>
+                <ActivityIndicator size="small" color="#EAB308" />
+                <Text style={{ color: "#EAB308", fontSize: 13, fontWeight: "600", flex: 1 }}>
+                  En attente de réponse de l'agent en route…
+                </Text>
+              </View>
+            )}
+            {responded && respInfo && (
+              <View style={{ backgroundColor: `${respInfo.color}0D`, borderRadius: 10, padding: 14,
+                borderWidth: 1, borderColor: `${respInfo.color}22`,
+                flexDirection: "row", gap: 12, alignItems: "center" }}>
+                <View style={{ width: 40, height: 40, borderRadius: 10,
+                  backgroundColor: `${respInfo.color}15`, justifyContent: "center", alignItems: "center" }}>
+                  <Ionicons name={respInfo.icon as any} size={18} color={respInfo.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: respInfo.color, fontSize: 9, fontWeight: "900", letterSpacing: 1 }}>
+                    RÉPONSE REÇUE
+                  </Text>
+                  <Text style={{ color: "#E2E8F0", fontSize: 14, fontWeight: "800", marginTop: 2 }}>
+                    {respInfo.label}
+                  </Text>
+                  {alert.respondedAt && (
+                    <Text style={{ color: "rgba(255,255,255,0.35)", fontSize: 10, marginTop: 3 }}>
+                      {new Date(alert.respondedAt).toLocaleTimeString("fr-FR")}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
+          {/* Actions */}
+          <View style={{ flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingBottom: 32 }}>
+            <TouchableOpacity onPress={doConfirm} disabled={acting}
+              style={{ flex: 1, backgroundColor: responded ? "rgba(22,163,74,0.15)" : "rgba(239,68,68,0.15)",
+                borderRadius: 12, paddingVertical: 14, alignItems: "center",
+                flexDirection: "row", justifyContent: "center", gap: 8,
+                borderWidth: 1, borderColor: responded ? "rgba(22,163,74,0.25)" : "rgba(239,68,68,0.25)" }}>
+              {acting ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Ionicons name={responded ? "checkmark-circle-outline" : "close-circle-outline"}
+                      size={18} color={responded ? "#16A34A" : "#EF4444"} />
+                    <Text style={{ color: responded ? "#16A34A" : "#EF4444", fontSize: 14, fontWeight: "800" }}>
+                      {responded ? "Valider et clore" : "Clore l'alerte"}
+                    </Text>
+                  </>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BUS DETAIL MODAL — Fiche complète bus + télémétrie + alertes
+   ══════════════════════════════════════════════════════════════════ */
+function BusDetailModal({
+  bus, trip, alerts, speed, token,
+  onClose, onTriggerAlert, onOpenCamera, onSelectAlert, onRefresh,
+}: {
+  bus: BusItem; trip?: TripItem; alerts: AlertItem[];
+  speed?: number; token: string | null;
+  onClose: () => void; onTriggerAlert: () => void;
+  onOpenCamera: () => void; onSelectAlert: (a: AlertItem) => void;
+  onRefresh: () => void;
+}) {
+  const st        = BUS_STATUS[bus.status ?? ""] ?? { label: bus.status ?? "—", color: "#64748B", bg: "#F1F5F9", icon: "bus-outline" };
+  const occ       = trip?.passengerCount != null && trip?.seatCount
+    ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
+  const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+  const spd       = speed ?? 0;
+  const speedWarn = bus.status === "en_route" && spd > 120;
+
+  return (
+    <Modal visible transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: "#080C14", maxHeight: "92%",
+          borderTopLeftRadius: 24, borderTopRightRadius: 24,
+          borderTopWidth: 1, borderColor: "rgba(255,255,255,0.07)" }}>
+          {/* Handle */}
+          <View style={{ width: 36, height: 3, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.12)",
+            alignSelf: "center", marginTop: 12, marginBottom: 14 }} />
+          {/* Header */}
+          <View style={{ flexDirection: "row", alignItems: "flex-start", paddingHorizontal: 20, marginBottom: 18 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#F1F5F9", fontSize: 21, fontWeight: "900", letterSpacing: -0.5, lineHeight: 26 }}>
+                {bus.busName}
+              </Text>
+              {bus.plateNumber && (
+                <Text style={{ color: "#374151", fontSize: 11, fontWeight: "600", marginTop: 2, letterSpacing: 0.5 }}>
+                  {bus.plateNumber}
+                </Text>
+              )}
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
+              {alerts.length > 0 && (
+                <View style={{ backgroundColor: "rgba(239,68,68,0.1)", borderRadius: 7,
+                  paddingHorizontal: 9, paddingVertical: 4,
+                  borderWidth: 1, borderColor: "rgba(239,68,68,0.2)" }}>
+                  <Text style={{ color: "#EF4444", fontSize: 10, fontWeight: "800" }}>
+                    {alerts.length} ALERTE{alerts.length > 1 ? "S" : ""}
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity onPress={onClose}
+                style={{ width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: "rgba(255,255,255,0.07)", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="x" size={15} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: "80%" }}>
+            {/* Telemetry strip */}
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 20, marginBottom: 18 }}>
+              {/* Status */}
+              <View style={{ flex: 1.2, backgroundColor: "#0D1117", borderRadius: 10, padding: 12,
+                alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st.color }} />
+                <Text style={{ color: st.color, fontSize: 9, fontWeight: "800", letterSpacing: 0.4, textAlign: "center" }}
+                  numberOfLines={1}>{st.label.toUpperCase()}</Text>
+              </View>
+              {/* Speed */}
+              {bus.status === "en_route" && (
+                <View style={{ flex: 1.4, backgroundColor: speedWarn ? "rgba(239,68,68,0.07)" : "#0D1117",
+                  borderRadius: 10, padding: 12, alignItems: "center",
+                  borderWidth: 1, borderColor: speedWarn ? "rgba(239,68,68,0.22)" : "rgba(255,255,255,0.05)" }}>
+                  <Text style={{ color: speedWarn ? "#EF4444" : "#E2E8F0", fontSize: 22, fontWeight: "900",
+                    letterSpacing: -1, lineHeight: 26 }}>{spd}</Text>
+                  <Text style={{ color: speedWarn ? "#EF4444" : "#374151", fontSize: 8, fontWeight: "700", letterSpacing: 0.5 }}>
+                    {speedWarn ? "⚠ KM/H" : "KM/H"}
+                  </Text>
+                </View>
+              )}
+              {/* Occupancy */}
+              {occ != null && (
+                <View style={{ flex: 1, backgroundColor: "#0D1117", borderRadius: 10, padding: 12,
+                  alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
+                  <Text style={{ color: occ >= 90 ? "#EF4444" : occ >= 70 ? "#F59E0B" : "#E2E8F0",
+                    fontSize: 22, fontWeight: "900", letterSpacing: -1, lineHeight: 26 }}>{occ}</Text>
+                  <Text style={{ color: "#374151", fontSize: 8, fontWeight: "700", letterSpacing: 0.5 }}>PASSAGERS %</Text>
+                </View>
+              )}
+              {/* Camera */}
+              <View style={{ flex: 1, backgroundColor: camOk ? "rgba(16,185,129,0.05)" : "#0D1117",
+                borderRadius: 10, padding: 12, alignItems: "center", gap: 5,
+                borderWidth: 1, borderColor: camOk ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.05)" }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: camOk ? "#10B981" : "#1F2937" }} />
+                <Text style={{ color: camOk ? "#10B981" : "#374151", fontSize: 8, fontWeight: "700" }}>CAM</Text>
+              </View>
+            </View>
+
+            {/* Trip details */}
+            {trip && (
+              <View style={{ marginHorizontal: 20, backgroundColor: "#0D1117", borderRadius: 12,
+                padding: 16, marginBottom: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.05)" }}>
+                <Text style={{ color: "#1F2937", fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginBottom: 14 }}>
+                  TRAJET EN COURS
+                </Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <View style={{ alignItems: "center", gap: 3, paddingTop: 3 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981" }} />
+                    <View style={{ width: 1, height: 24, backgroundColor: "rgba(255,255,255,0.08)" }} />
+                    <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: "#EF4444" }} />
+                  </View>
+                  <View style={{ flex: 1, gap: 10 }}>
+                    <Text style={{ color: "#E2E8F0", fontSize: 15, fontWeight: "700" }}>{trip.from}</Text>
+                    <Text style={{ color: "#E2E8F0", fontSize: 15, fontWeight: "700" }}>{trip.to}</Text>
+                  </View>
+                  {trip.departureTime && (
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ color: "#1F2937", fontSize: 9, fontWeight: "700", letterSpacing: 0.5 }}>DÉPART</Text>
+                      <Text style={{ color: "#9CA3AF", fontSize: 14, fontWeight: "700", marginTop: 3 }}>
+                        {trip.departureTime.slice(11, 16)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                {occ != null && trip.passengerCount != null && trip.seatCount && (
+                  <View style={{ marginTop: 14, gap: 7 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: "#374151", fontSize: 10, fontWeight: "600" }}>Remplissage</Text>
+                      <Text style={{ color: "#6B7280", fontSize: 10, fontWeight: "700" }}>
+                        {trip.passengerCount} / {trip.seatCount} passagers
+                      </Text>
+                    </View>
+                    <View style={{ height: 3, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+                      <View style={{ height: 3, borderRadius: 2, width: `${occ}%` as any,
+                        backgroundColor: occ >= 90 ? "#EF4444" : occ >= 70 ? "#F59E0B" : "#10B981" }} />
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Active alerts */}
+            {alerts.length > 0 && (
+              <View style={{ marginHorizontal: 20, marginBottom: 14 }}>
+                <Text style={{ color: "#1F2937", fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginBottom: 10 }}>
+                  ALERTES ACTIVES
+                </Text>
+                {alerts.map(a => {
+                  const hasResp = !!a.response;
+                  const isWait  = a.responseRequested && !hasResp;
+                  return (
+                    <TouchableOpacity key={a.id} onPress={() => onSelectAlert(a)} activeOpacity={0.8}
+                      style={{ backgroundColor: "rgba(239,68,68,0.05)", borderRadius: 10, padding: 12,
+                        marginBottom: 8, borderWidth: 1, borderColor: "rgba(239,68,68,0.18)",
+                        flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444", flexShrink: 0 }} />
+                      <Text style={{ flex: 1, color: "#E2E8F0", fontSize: 12, fontWeight: "600" }} numberOfLines={1}>
+                        {a.message || "Alerte active"}
+                      </Text>
+                      {hasResp && <Text style={{ color: "#10B981", fontSize: 9, fontWeight: "800" }}>RÉPONDU</Text>}
+                      {isWait  && <Text style={{ color: "#EAB308", fontSize: 9, fontWeight: "800" }}>EN ATTENTE</Text>}
+                      <Ionicons name="chevron-forward" size={13} color="#374151" />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Camera live preview */}
+            {camOk && trip && (
+              <View style={{ marginHorizontal: 20, marginBottom: 14 }}>
+                <Text style={{ color: "#1F2937", fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginBottom: 10 }}>
+                  CAMÉRA EN DIRECT
+                </Text>
+                <TouchableOpacity onPress={onOpenCamera} activeOpacity={0.85}
+                  style={{ borderRadius: 10, overflow: "hidden" }}>
+                  <LiveCamView signal={90} route={`${trip.from} → ${trip.to}`} busId={bus.id} />
+                  <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                    justifyContent: "center", alignItems: "center",
+                    backgroundColor: "rgba(0,0,0,0.25)" }}>
+                    <View style={{ width: 50, height: 50, borderRadius: 25,
+                      backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "center", alignItems: "center",
+                      borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" }}>
+                      <Ionicons name="play" size={22} color="#fff" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={{ height: 20 }} />
+          </ScrollView>
+
+          {/* Action buttons */}
+          <View style={{ flexDirection: "row", gap: 10, padding: 20,
+            borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}>
+            <TouchableOpacity onPress={onTriggerAlert}
+              style={{ flex: 1, backgroundColor: "rgba(239,68,68,0.1)", borderRadius: 12,
+                paddingVertical: 14, alignItems: "center",
+                borderWidth: 1, borderColor: "rgba(239,68,68,0.2)" }}>
+              <Text style={{ color: "#EF4444", fontSize: 13, fontWeight: "800" }}>
+                Déclencher alerte
+              </Text>
+            </TouchableOpacity>
+            {camOk && (
+              <TouchableOpacity onPress={onOpenCamera}
+                style={{ flex: 1, backgroundColor: "rgba(16,185,129,0.07)", borderRadius: 12,
+                  paddingVertical: 14, alignItems: "center",
+                  borderWidth: 1, borderColor: "rgba(16,185,129,0.18)" }}>
+                <Text style={{ color: "#10B981", fontSize: 13, fontWeight: "800" }}>
+                  Voir en direct
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════
    MAIN SCREEN
    ══════════════════════════════════════════════════════════════════ */
 
@@ -465,6 +854,13 @@ export default function SuiviScreen() {
   const hasAlerts      = !!(data?.alerts?.length);
   const activeCamCount = data?.trips?.filter(t => t.cameraStatus === "connected").length ?? 0;
   const hasCameras     = activeCamCount > 0;
+
+  /* ── New interactive state ── */
+  const [selectedBus,   setSelectedBus]   = useState<BusItem | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<AlertItem | null>(null);
+  const [soundMuted,    setSoundMuted]    = useState(false);
+  const [busSpeedMap,   setBusSpeedMap]   = useState<Record<string, number>>({});
+  const soundRef = useRef<{ stop: () => void } | null>(null);
 
   /* ── Live simulation frames/signal per camera trip ── */
   type LiveCamData = { frames: number; signal: number };
@@ -595,6 +991,70 @@ export default function SuiviScreen() {
     }, 1000);
     return () => clearInterval(iv);
   }, [hasCameras, activeCamTrips]);
+
+  /* ── Sound alert: plays when active alerts + not muted (web only) ── */
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (hasAlerts && !soundMuted) {
+      try {
+        const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const beep = (when: number) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = "square";
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0, when);
+          gain.gain.linearRampToValueAtTime(0.18, when + 0.01);
+          gain.gain.linearRampToValueAtTime(0, when + 0.13);
+          osc.start(when);
+          osc.stop(when + 0.13);
+        };
+        const schedule = () => {
+          const t = ctx.currentTime;
+          beep(t);
+          beep(t + 0.22);
+          beep(t + 0.44);
+        };
+        schedule();
+        const iv = setInterval(schedule, 4200);
+        soundRef.current = { stop: () => { clearInterval(iv); ctx.close().catch(() => {}); } };
+      } catch {}
+    } else {
+      soundRef.current?.stop();
+      soundRef.current = null;
+    }
+    return () => { soundRef.current?.stop(); soundRef.current = null; };
+  }, [hasAlerts, soundMuted]);
+
+  /* ── Speed simulation per bus (en_route only) ── */
+  useEffect(() => {
+    if (!data?.buses) return;
+    setBusSpeedMap(prev => {
+      const next: Record<string, number> = { ...prev };
+      data.buses.forEach(b => {
+        if ((b.status === "en_route" || b.status === "en_route_alerte") && !next[b.id])
+          next[b.id] = 65 + Math.floor(Math.random() * 40);
+      });
+      return next;
+    });
+    const iv = setInterval(() => {
+      setBusSpeedMap(prev => {
+        const next: Record<string, number> = {};
+        data.buses.forEach(b => {
+          if (b.status === "en_route" || b.status === "en_route_alerte") {
+            const cur = prev[b.id] ?? 75;
+            next[b.id] = Math.max(45, Math.min(128, cur + Math.floor((Math.random() - 0.45) * 9)));
+          }
+        });
+        return next;
+      });
+    }, 2800);
+    return () => clearInterval(iv);
+  }, [data?.buses]);
 
   /* When watching a camera live, refresh its trip data every 8s to detect disconnect */
   useEffect(() => {
@@ -731,6 +1191,13 @@ export default function SuiviScreen() {
                 <Text style={S.syncTxt}>{syncLabel}</Text>
               </View>
             )}
+            {hasAlerts && (
+              <TouchableOpacity onPress={() => setSoundMuted(m => !m)} style={[S.iconBtn,
+                soundMuted && { backgroundColor: "rgba(239,68,68,0.2)", borderColor: "rgba(239,68,68,0.3)" }]}>
+                <Ionicons name={soundMuted ? "volume-mute" : "volume-high"} size={16}
+                  color={soundMuted ? "#EF4444" : "rgba(255,255,255,0.7)"} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={() => load(true)} style={S.iconBtn}>
               <Feather name="refresh-cw" size={14} color="#fff" />
             </TouchableOpacity>
@@ -828,16 +1295,30 @@ export default function SuiviScreen() {
                 const isPanne = alert.type === "PANNE" || alert.type === "panne";
                 const isCtrl  = alert.type === "CONTRÔLE" || alert.type === "controle";
                 const typeColor = isPanne ? "#DC2626" : isCtrl ? "#B45309" : RED;
+                const hasResponse = !!alert.response;
+                const isWaiting   = alert.responseRequested && !hasResponse;
                 return (
-                  <View key={alert.id} style={S.fixedAlertRow}>
+                  <TouchableOpacity key={alert.id} style={S.fixedAlertRow}
+                    onPress={() => setSelectedAlert(alert)} activeOpacity={0.75}>
                     <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: typeColor,
                       transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
                     <Text style={S.fixedAlertBus} numberOfLines={1}>{alert.busName}</Text>
                     <Text style={S.fixedAlertMsg} numberOfLines={1}>{alert.message}</Text>
+                    {hasResponse && (
+                      <View style={{ backgroundColor: "rgba(16,185,129,0.15)", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+                        <Text style={{ color: "#10B981", fontSize: 8, fontWeight: "800" }}>RÉP.</Text>
+                      </View>
+                    )}
+                    {isWaiting && (
+                      <View style={{ backgroundColor: "rgba(234,179,8,0.15)", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 }}>
+                        <Text style={{ color: "#EAB308", fontSize: 8, fontWeight: "800" }}>ATT.</Text>
+                      </View>
+                    )}
                     <Text style={S.fixedAlertTime}>
                       {new Date(alert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                     </Text>
-                  </View>
+                    <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.25)" />
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -913,18 +1394,34 @@ export default function SuiviScreen() {
                 ? Math.round((trip.passengerCount / trip.seatCount) * 100) : null;
               const occColor  = occ != null ? (occ >= 90 ? "#DC2626" : occ >= 70 ? "#D97706" : "#16A34A") : "#16A34A";
               const camOk     = !!(trip?.cameraStatus === "connected" && trip?.cameraStreamUrl);
+              const speed     = busSpeedMap[bus.id];
+              const speedWarn = speed != null && speed > 120;
               return (
-                <View style={[S.gridCard, { borderLeftColor: busAlerts.length ? RED : st.color }]}>
+                <TouchableOpacity
+                  style={[S.gridCard, { borderLeftColor: busAlerts.length ? RED : speedWarn ? "#EF4444" : st.color }]}
+                  onPress={() => setSelectedBus(bus)}
+                  activeOpacity={0.85}>
                   {/* Name */}
                   <Text style={S.gridCardName} numberOfLines={1}>{bus.busName}</Text>
-                  {/* Status */}
-                  <View style={[S.gridStatusChip, { backgroundColor: st.bg }]}>
+                  {/* Status chip */}
+                  <View style={[S.gridStatusChip]}>
                     <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: st.color }} />
                     <Text style={[S.gridStatusTxt, { color: st.color }]}>{st.label.toUpperCase()}</Text>
                   </View>
                   {/* Route */}
                   {trip && (
                     <Text style={S.gridRoute} numberOfLines={1}>{trip.from} → {trip.to}</Text>
+                  )}
+                  {/* Speed — only en_route */}
+                  {speed != null && (
+                    <View style={{ flexDirection: "row", alignItems: "baseline", gap: 2, marginTop: 1 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "900", color: speedWarn ? "#EF4444" : "#E2E8F0", letterSpacing: -0.5, lineHeight: 22 }}>
+                        {speed}
+                      </Text>
+                      <Text style={{ fontSize: 9, color: speedWarn ? "#EF4444" : "#374151", fontWeight: "700" }}>
+                        {speedWarn ? "⚠ km/h" : "km/h"}
+                      </Text>
+                    </View>
                   )}
                   {/* Occupancy */}
                   {occ != null && (
@@ -943,15 +1440,19 @@ export default function SuiviScreen() {
                       <Text style={S.gridAlertTxt} numberOfLines={1}>{busAlerts[0].message}</Text>
                     </View>
                   )}
-                  {/* Camera indicator — compact */}
-                  {camOk && (
-                    <View style={S.gridCamDot}>
-                      <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
-                        opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
-                      <Text style={S.gridCamTxt}>CAM</Text>
-                    </View>
-                  )}
-                </View>
+                  {/* Camera indicator + chevron */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+                    {camOk && (
+                      <View style={S.gridCamDot}>
+                        <Animated.View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: CAM_GR,
+                          opacity: pulseAnim.interpolate({ inputRange: [1, 1.04], outputRange: [1, 0.2] }) }} />
+                        <Text style={S.gridCamTxt}>CAM</Text>
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }} />
+                    <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.15)" />
+                  </View>
+                </TouchableOpacity>
               );
             }}
           />
@@ -996,6 +1497,39 @@ export default function SuiviScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Alert Detail Modal ──────────────────────────────────── */}
+      {selectedAlert && (
+        <AlertDetailModal
+          alert={selectedAlert}
+          trip={data?.trips.find(t => t.busId === selectedAlert.busId)}
+          token={token}
+          onClose={() => setSelectedAlert(null)}
+          onRefresh={() => load(false)}
+        />
+      )}
+
+      {/* ── Bus Detail Modal ─────────────────────────────────────── */}
+      {selectedBus && (
+        <BusDetailModal
+          bus={selectedBus}
+          trip={data?.trips.find(t => t.busId === selectedBus.id)}
+          alerts={data?.alerts.filter(a => a.busId === selectedBus.id) ?? []}
+          speed={busSpeedMap[selectedBus.id]}
+          token={token}
+          onClose={() => setSelectedBus(null)}
+          onTriggerAlert={() => { setTriggerBus(selectedBus); setSelectedBus(null); }}
+          onOpenCamera={() => {
+            const trip = data?.trips.find(t => t.busId === selectedBus.id);
+            if (trip?.cameraStatus === "connected" && trip?.cameraStreamUrl) {
+              setSelectedBus(null);
+              setCameraTrip(trip);
+            }
+          }}
+          onSelectAlert={(a) => { setSelectedBus(null); setSelectedAlert(a); }}
+          onRefresh={() => load(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
