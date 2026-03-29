@@ -1541,8 +1541,32 @@ router.get("/seats/:tripId", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
-    const seats = await db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId));
-    res.json(seats);
+
+    const [seats, spBookings] = await Promise.all([
+      db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId)),
+      db.select({ seatNumbers: bookingsTable.seatNumbers })
+        .from(bookingsTable)
+        .where(and(
+          eq(bookingsTable.tripId, req.params.tripId),
+          eq(bookingsTable.paymentStatus, "sp"),
+          eq(bookingsTable.status, "confirmed"),
+        )),
+    ]);
+
+    const spNums = new Set<string>(
+      spBookings.flatMap(b =>
+        Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers] : [])
+      ).filter(Boolean)
+    );
+
+    const enriched = seats.map(seat => ({
+      ...seat,
+      status: seat.status === "occupied" && spNums.has(seat.number as string)
+        ? "sp"
+        : seat.status,
+    }));
+
+    res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: "Failed" });
   }

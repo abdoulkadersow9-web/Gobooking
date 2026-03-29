@@ -15,6 +15,7 @@ import { useRealtime, useTripLive } from "@/hooks/useRealtime";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
+import { getSeatColor, SEAT_LEGEND } from "@/utils/seatColors";
 import {
   generateBordereauRoute,
   computeAudit,
@@ -460,6 +461,13 @@ export default function TicketsScreen() {
     if (activeTab === "impression") fetchImpTrips();
   }, [activeTab]);
 
+  /* ── Polling seat map (15s) when plan is visible ── */
+  useEffect(() => {
+    if (!showSeatMap || !selectedTrip) return;
+    const interval = setInterval(() => fetchSeatMap(selectedTrip.id), 15_000);
+    return () => clearInterval(interval);
+  }, [showSeatMap, selectedTrip, fetchSeatMap]);
+
   if (!isAgent) {
     return (
       <SafeAreaView style={S.denied}>
@@ -802,17 +810,15 @@ export default function TicketsScreen() {
                 <>
                   {/* Légende */}
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-                    {[
-                      { color: "#F3F4F6", label: "Libre" },
-                      { color: "#FDE68A", label: "Réservé" },
-                      { color: "#FCA5A5", label: "Vendu" },
-                      { color: "#C4B5FD", label: "SP" },
-                    ].map(l => (
-                      <View key={l.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: l.color, borderWidth: 1, borderColor: "#E5E7EB" }} />
-                        <Text style={{ fontSize: 11, color: "#6B7280" }}>{l.label}</Text>
-                      </View>
-                    ))}
+                    {SEAT_LEGEND.map(item => {
+                      const c = getSeatColor(item.status);
+                      return (
+                        <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
+                          <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
+                        </View>
+                      );
+                    })}
                   </View>
 
                   {loadingSeatMap ? (
@@ -838,13 +844,12 @@ export default function TicketsScreen() {
                                 const seat = seatMapData.find((s: any) => s.row === ri + 1 && s.column === ci + 1);
                                 if (!seat) return <View key={ci} style={{ width: 40, height: 40 }} />;
                                 const st = seat.status;
-                                const bg = st === "sold" ? "#FCA5A5" : st === "reserved" ? "#FDE68A" : st === "sp" ? "#C4B5FD" : "#F3F4F6";
-                                const txtColor = st === "sold" ? "#991B1B" : st === "sp" ? "#5B21B6" : st === "reserved" ? "#92400E" : "#374151";
+                                const c = getSeatColor(st);
                                 const isFree = st === "available";
                                 return (
                                   <TouchableOpacity
                                     key={ci}
-                                    style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: bg, borderWidth: 1.5, borderColor: isFree ? "#E5E7EB" : "#D1D5DB", alignItems: "center", justifyContent: "center" }}
+                                    style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border, alignItems: "center", justifyContent: "center" }}
                                     disabled={!isFree}
                                     onPress={() => {
                                       if (!isFree) return;
@@ -853,7 +858,7 @@ export default function TicketsScreen() {
                                       setSeatPaxName(""); setSeatPaxPhone("");
                                       setShowSeatModal(true);
                                     }}>
-                                    <Text style={{ fontSize: 11, fontWeight: "700", color: txtColor }}>{seat.number}</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: c.text }}>{seat.number}</Text>
                                   </TouchableOpacity>
                                 );
                               })}

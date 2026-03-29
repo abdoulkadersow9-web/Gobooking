@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Pressable, Modal,
@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus } from "@/utils/offline";
 import OfflineBanner from "@/components/OfflineBanner";
+import { getSeatColor, SEAT_LEGEND } from "@/utils/seatColors";
 
 const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -279,6 +280,13 @@ export default function VenteScreen() {
     fetchTrips();
     if (selectedTrip) { fetchDashboard(selectedTrip.id); fetchSeatMap(selectedTrip.id); }
   }, [fetchTrips, fetchDashboard, fetchSeatMap, selectedTrip]));
+
+  /* ── Polling seat map (15s) when plan is visible ── */
+  useEffect(() => {
+    if (!showSeatMap || !selectedTrip) return;
+    const interval = setInterval(() => fetchSeatMap(selectedTrip.id), 15_000);
+    return () => clearInterval(interval);
+  }, [showSeatMap, selectedTrip, fetchSeatMap]);
 
   /* ── Select trip → go to detail view ── */
   const selectTrip = (trip: Trip) => {
@@ -719,21 +727,12 @@ export default function VenteScreen() {
 
           {/* ── PLAN DES SIÈGES ── */}
           {showSeatMap && (() => {
-            const spSeatNums = new Set<string>(
-              (d?.passengers ?? []).filter(p => p.status === "sp").flatMap(p => p.seatNumbers)
-            );
             const rows = [...new Set(seatMapData.map(s => s.row))].sort((a, b) => a - b);
             const seatByRowCol: Record<string, Record<number, any>> = {};
             for (const seat of seatMapData) {
               if (!seatByRowCol[seat.row]) seatByRowCol[seat.row] = {};
               seatByRowCol[seat.row][seat.column] = seat;
             }
-            const seatColor = (seat: any) => {
-              if (seat.status === "available") return { bg: G_LIGHT,  border: G,        text: G_DARK };
-              if (seat.status === "reserved")  return { bg: "#FEF3C7", border: "#D97706", text: "#92400E" };
-              if (spSeatNums.has(seat.number)) return { bg: "#EDE9FE", border: "#7C3AED", text: "#6D28D9" };
-              return { bg: "#FEE2E2", border: "#DC2626", text: "#991B1B" };
-            };
             const maxCols = Math.max(...seatMapData.map(s => s.column), 0);
             const midPoint = Math.ceil(maxCols / 2);
             return (
@@ -747,17 +746,15 @@ export default function VenteScreen() {
                 </View>
                 {/* Legend */}
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
-                  {[
-                    { bg: G_LIGHT,   border: G,        text: "Disponible" },
-                    { bg: "#FEE2E2", border: "#DC2626", text: "Occupé" },
-                    { bg: "#FEF3C7", border: "#D97706", text: "Réservé" },
-                    { bg: "#EDE9FE", border: "#7C3AED", text: "SP" },
-                  ].map(item => (
-                    <View key={item.text} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: item.bg, borderWidth: 1.5, borderColor: item.border }} />
-                      <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.text}</Text>
-                    </View>
-                  ))}
+                  {SEAT_LEGEND.map(item => {
+                    const c = getSeatColor(item.status);
+                    return (
+                      <View key={item.label} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <View style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c.bg, borderWidth: 1.5, borderColor: c.border }} />
+                        <Text style={{ fontSize: 11, color: "#6B7280" }}>{item.label}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
                 {/* Driver row */}
                 <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
@@ -776,7 +773,7 @@ export default function VenteScreen() {
                       <View style={{ flex: 1, flexDirection: "row", gap: 4 }}>
                         {colNums.map((col, ci) => {
                           const seat = colMap[col];
-                          const c = seatColor(seat);
+                          const c = getSeatColor(seat.status);
                           const isAvail = seat.status === "available";
                           const isMidGap = col > midPoint && colNums[ci - 1] <= midPoint;
                           return (
@@ -798,7 +795,7 @@ export default function VenteScreen() {
                   );
                 })}
                 <Text style={{ fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 8 }}>
-                  Appuyez sur un siège vert pour le vendre, réserver ou marquer SP
+                  Appuyez sur un siège libre (gris) pour le vendre, réserver ou marquer SP
                 </Text>
               </View>
             );
