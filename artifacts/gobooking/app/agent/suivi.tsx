@@ -1421,87 +1421,67 @@ export default function SuiviScreen() {
               Une seule alerte en grand. Flotte effacée derrière.
               ══════════════════════════════════════════════════════════════ */}
           {hasAlerts && (() => {
-            const safeIdx   = Math.max(0, Math.min(alertFocusIdx, mergedAlerts.length - 1));
-            const focusAlert = mergedAlerts[safeIdx];
-            if (!focusAlert) return null;
-            const flowStep  = focusAlert.response          ? "validate"
-                            : focusAlert.responseRequested ? "waiting"
-                            :                                "new";
+            /* Alerte la plus critique : new > waiting > validate */
+            const rank = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
+            const sorted = [...mergedAlerts].sort((a, b) => rank(a) - rank(b));
+            const top = sorted[0];
+            if (!top) return null;
+            const flowStep  = top.response ? "validate" : top.responseRequested ? "waiting" : "new";
             const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
-            const stepIcon  = flowStep === "validate" ? "checkmark-circle" : flowStep === "waiting" ? "time" : "alert-circle";
-            const stepLabel = flowStep === "validate" ? "Réponse reçue — prêt à valider"
+            const stepLabel = flowStep === "validate" ? "Réponse reçue"
                             : flowStep === "waiting"  ? "En attente de réponse"
-                            :                           "Nouvelle alerte — action requise";
+                            :                           "Action requise";
             const btnLabel  = flowStep === "validate" ? "VALIDER ET CLORE" : "TRAITER L'ALERTE";
+            const others    = sorted.slice(1);
             return (
               <View style={S.focusZone}>
-                {/* Compteur d'alertes + navigation */}
-                <View style={S.focusNav}>
-                  <TouchableOpacity
-                    onPress={() => setAlertFocusIdx(i => Math.max(0, i - 1))}
-                    disabled={safeIdx === 0}
-                    style={[S.focusNavBtn, safeIdx === 0 && { opacity: 0.25 }]}
-                    hitSlop={12}
-                  >
-                    <Ionicons name="chevron-back" size={16} color="#94A3B8" />
-                  </TouchableOpacity>
 
-                  <View style={S.focusNavCenter}>
+                {/* ── Carte principale ─────────────────────── */}
+                <View style={[S.focusCard, { borderColor: `${stepColor}50` }]}>
+                  {/* Étiquette étape — discrète */}
+                  <View style={S.focusCardTopRow}>
                     <Animated.View style={{ width: 7, height: 7, borderRadius: 4,
-                      backgroundColor: CRIT, transform: [{ scale: pulseAnim }] }} />
-                    <Text style={S.focusNavTxt}>
-                      ALERTE {safeIdx + 1} / {mergedAlerts.length}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => setAlertFocusIdx(i => Math.min(mergedAlerts.length - 1, i + 1))}
-                    disabled={safeIdx === mergedAlerts.length - 1}
-                    style={[S.focusNavBtn, safeIdx === mergedAlerts.length - 1 && { opacity: 0.25 }]}
-                    hitSlop={12}
-                  >
-                    <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Carte alerte principale — grande, aérée */}
-                <View style={S.focusCard}>
-                  {/* En-tête coloré par étape */}
-                  <View style={[S.focusCardTop, { backgroundColor: `${stepColor}18`, borderBottomColor: `${stepColor}25` }]}>
-                    <Ionicons name={stepIcon as any} size={16} color={stepColor} />
+                      backgroundColor: stepColor, transform: [{ scale: pulseAnim }], flexShrink: 0 }} />
                     <Text style={[S.focusCardStepTxt, { color: stepColor }]}>{stepLabel}</Text>
-                  </View>
-
-                  {/* Contenu — bus + message */}
-                  <View style={S.focusCardBody}>
-                    <Text style={S.focusCardBus}>{focusAlert.busName}</Text>
-                    <Text style={S.focusCardMsg}>{focusAlert.message}</Text>
                     <Text style={S.focusCardTime}>
-                      {new Date(focusAlert.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(top.createdAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
                     </Text>
                   </View>
 
-                  {/* Bouton principal — dominant */}
-                  <TouchableOpacity
-                    style={[S.focusTraiterBtn, { backgroundColor: stepColor }]}
-                    onPress={() => setSelectedAlert(focusAlert)}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"} size={20} color="#fff" />
-                    <Text style={S.focusTraiterTxt}>{btnLabel}</Text>
-                    {flowStep !== "validate" && (
-                      <Animated.View style={{ width: 8, height: 8, borderRadius: 4,
-                        backgroundColor: "rgba(255,255,255,0.6)", transform: [{ scale: pulseAnim }] }} />
-                    )}
-                  </TouchableOpacity>
+                  {/* Bus + message — épuré */}
+                  <View style={S.focusCardBody}>
+                    <Text style={S.focusCardBus}>{top.busName}</Text>
+                    <Text style={S.focusCardMsg}>{top.message}</Text>
+                  </View>
                 </View>
 
-                {/* Points de navigation si plusieurs alertes */}
-                {mergedAlerts.length > 1 && (
-                  <View style={S.focusDots}>
-                    {mergedAlerts.map((_, i) => (
-                      <TouchableOpacity key={i} onPress={() => setAlertFocusIdx(i)} hitSlop={8}>
-                        <View style={[S.focusDot, i === safeIdx && S.focusDotActive]} />
+                {/* ── Bouton TRAITER — seul élément d'action ── */}
+                <TouchableOpacity
+                  style={[S.focusTraiterBtn, { borderColor: stepColor }]}
+                  onPress={() => setSelectedAlert(top)}
+                  activeOpacity={0.88}
+                >
+                  <Ionicons
+                    name={flowStep === "validate" ? "checkmark-done" : "shield-checkmark"}
+                    size={22} color={stepColor}
+                  />
+                  <Text style={[S.focusTraiterTxt, { color: stepColor }]}>{btnLabel}</Text>
+                </TouchableOpacity>
+
+                {/* ── Autres alertes en liste secondaire discrète ── */}
+                {others.length > 0 && (
+                  <View style={S.focusOtherList}>
+                    <Text style={S.focusOtherLabel}>
+                      {others.length} autre{others.length > 1 ? "s" : ""} alerte{others.length > 1 ? "s" : ""}
+                    </Text>
+                    {others.map(a => (
+                      <TouchableOpacity key={a.id} style={S.focusOtherRow}
+                        onPress={() => setSelectedAlert(a)} activeOpacity={0.75}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3,
+                          backgroundColor: a.response ? OK : a.responseRequested ? WARN : CRIT, flexShrink: 0 }} />
+                        <Text style={S.focusOtherBus} numberOfLines={1}>{a.busName}</Text>
+                        <Text style={S.focusOtherMsg} numberOfLines={1}>{a.message}</Text>
+                        <Ionicons name="chevron-forward" size={11} color="#1E293B" />
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -1511,19 +1491,16 @@ export default function SuiviScreen() {
           })()}
 
           {/* ══════════════════════════════════════════════════════════════
-              ZONE 3 — FLOTTE (collapsible, réduite en mode alerte)
+              ZONE 3 — FLOTTE (visible uniquement sans alerte)
               ══════════════════════════════════════════════════════════════ */}
-          <View style={[S.fleetZone, hasAlerts && { marginTop: 12 }]}>
-            {/* En-tête cliquable pour expand/collapse */}
-            <TouchableOpacity style={S.fleetToggleRow} onPress={() => setFleetExpanded(e => !e)} activeOpacity={0.75}>
+          {!hasAlerts && <View style={S.fleetZone}>
+            <View style={S.fleetToggleRow}>
               <Ionicons name="bus-outline" size={13} color="#374151" />
-              <Text style={S.fleetToggleTxt}>FLOTTE</Text>
+              <Text style={S.fleetToggleTxt}>FLOTTE EN SERVICE</Text>
               <Text style={S.fleetToggleCount}>{busCount} BUS</Text>
-              <View style={{ flex: 1 }} />
-              <Ionicons name={fleetExpanded ? "chevron-up" : "chevron-down"} size={14} color="#374151" />
-            </TouchableOpacity>
+            </View>
 
-            {fleetExpanded && (sortedBuses.length === 0 ? (
+            {(sortedBuses.length === 0 ? (
               <View style={{ alignItems: "center", paddingVertical: 32, gap: 8 }}>
                 <Ionicons name="bus-outline" size={36} color="#1E293B" />
                 <Text style={{ color: "#374151", fontSize: 13, fontWeight: "600" }}>Aucun bus en service</Text>
@@ -1596,7 +1573,7 @@ export default function SuiviScreen() {
               );
             }))}
 
-          </View>{/* /fleetZone */}
+          </View>}{/* /fleetZone */}
         </ScrollView>
       )}
 
@@ -2045,43 +2022,42 @@ const S = StyleSheet.create({
   fixedAlertTime: { color: "#475569", fontSize: 10, fontWeight: "700", flexShrink: 0 },
 
   /* ── ZONE 2 — MODE FOCUS ALERTE ────────────────────────────── */
-  focusZone:      { marginHorizontal: 16, marginTop: 16, gap: 0 },
+  focusZone:        { marginHorizontal: 16, marginTop: 16, gap: 0 },
 
-  /* Barre de navigation inter-alertes */
-  focusNav:       { flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-                    marginBottom: 12 },
-  focusNavBtn:    { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center",
-                    backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: BDR },
-  focusNavCenter: { flexDirection: "row", alignItems: "center", gap: 8 },
-  focusNavTxt:    { fontSize: 11, fontWeight: "900", color: "#475569", letterSpacing: 0.8 },
+  /* Carte alerte — fond très sombre, bordure colorée subtile */
+  focusCard:        { backgroundColor: "#080C14", borderRadius: 18, borderWidth: 1,
+                      marginBottom: 0,
+                      ...(Platform.OS === "web"
+                        ? { boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }
+                        : { elevation: 6, shadowColor: "#000", shadowOpacity: 0.4, shadowRadius: 14 }) },
+  focusCardTopRow:  { flexDirection: "row", alignItems: "center", gap: 8,
+                      paddingHorizontal: 18, paddingTop: 18, paddingBottom: 0 },
+  focusCardStepTxt: { fontSize: 10, fontWeight: "900", letterSpacing: 1, flex: 1 },
+  focusCardTime:    { fontSize: 10, color: "#374151", fontWeight: "700" },
+  focusCardBody:    { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 22, gap: 8 },
+  focusCardBus:     { fontSize: 24, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.6, lineHeight: 28 },
+  focusCardMsg:     { fontSize: 14, color: "#64748B", fontWeight: "600", lineHeight: 20 },
 
-  /* Carte principale — grande, aérée, lisible d'un coup d'oeil */
-  focusCard:      { backgroundColor: "#0D0A0F", borderRadius: 20, overflow: "hidden",
-                    borderWidth: 1, borderColor: `${CRIT}30`,
-                    ...(Platform.OS === "web"
-                      ? { boxShadow: `0 8px 32px rgba(239,68,68,0.18)` }
-                      : { elevation: 8, shadowColor: CRIT, shadowOpacity: 0.25, shadowRadius: 16 }) },
-  focusCardTop:   { flexDirection: "row", alignItems: "center", gap: 8,
-                    paddingHorizontal: 18, paddingVertical: 11,
-                    borderBottomWidth: 1 },
-  focusCardStepTxt:{ fontSize: 11, fontWeight: "900", letterSpacing: 0.8 },
-  focusCardBody:  { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 24, gap: 10 },
-  focusCardBus:   { fontSize: 22, fontWeight: "900", color: "#F1F5F9", letterSpacing: -0.5, lineHeight: 26 },
-  focusCardMsg:   { fontSize: 15, color: "#94A3B8", fontWeight: "600", lineHeight: 22 },
-  focusCardTime:  { fontSize: 11, color: "#374151", fontWeight: "700", letterSpacing: 0.3 },
+  /* Bouton TRAITER — fond sombre + bordure colorée, pas de rouge plein */
+  focusTraiterBtn:  { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
+                      marginTop: 14, borderRadius: 16, paddingVertical: 20,
+                      backgroundColor: "#080C14",
+                      borderWidth: 1.5,
+                      ...(Platform.OS === "web"
+                        ? {}
+                        : { elevation: 2, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 6 }) },
+  focusTraiterTxt:  { fontSize: 17, fontWeight: "900", letterSpacing: 0.4 },
 
-  /* Bouton TRAITER — pleine largeur, impossible à rater */
-  focusTraiterBtn:{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
-                    marginHorizontal: 14, marginBottom: 16, borderRadius: 14, paddingVertical: 17,
-                    ...(Platform.OS === "web"
-                      ? {}
-                      : { elevation: 6, shadowOpacity: 0.4, shadowRadius: 10 }) },
-  focusTraiterTxt:{ color: "#fff", fontSize: 16, fontWeight: "900", letterSpacing: 0.3 },
-
-  /* Points de navigation */
-  focusDots:      { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 12 },
-  focusDot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.15)" },
-  focusDotActive: { backgroundColor: CRIT, width: 20 },
+  /* Liste secondaire des autres alertes */
+  focusOtherList:   { marginTop: 18, gap: 4 },
+  focusOtherLabel:  { fontSize: 10, fontWeight: "700", color: "#374151", letterSpacing: 0.8,
+                      textTransform: "uppercase", marginBottom: 4 },
+  focusOtherRow:    { flexDirection: "row", alignItems: "center", gap: 8,
+                      backgroundColor: "rgba(255,255,255,0.03)",
+                      borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10,
+                      borderWidth: 1, borderColor: BDR },
+  focusOtherBus:    { fontSize: 12, fontWeight: "800", color: "#475569", flexShrink: 0, maxWidth: 90 },
+  focusOtherMsg:    { fontSize: 11, color: "#374151", fontWeight: "600", flex: 1 },
 
   /* ── Labels de zone (en-têtes cliquables) ───────────────────── */
   zoneHeader:     { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
