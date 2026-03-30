@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Di1eHHEKgc2RJpFn-ZBgl"
+uri = "file://screenshots/splash-screen-final.jpg"
+type = "image"
+title = "GoBooking — Écran d'ouverture (Splash Screen)"
