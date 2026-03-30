@@ -30,21 +30,28 @@ function StatCard({
   color: string; sub?: string; href?: string;
 }) {
   const inner = (
-    <div className="bg-card rounded-2xl p-4 border border-border shadow-sm relative overflow-hidden group hover:shadow-md transition-all active:scale-95">
-      <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full opacity-8 group-hover:scale-125 transition-transform duration-500"
+    <div
+      className="bg-card rounded-2xl p-4 border border-border shadow-sm relative overflow-hidden group hover:shadow-lg transition-all duration-200 active:scale-95 cursor-pointer"
+      style={{ borderLeft: `3px solid ${color}` }}
+    >
+      <div className="absolute -right-5 -top-5 w-24 h-24 rounded-full opacity-[0.07] group-hover:scale-110 transition-transform duration-500"
         style={{ backgroundColor: color }} />
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl opacity-60" style={{ backgroundColor: color }} />
       <div className="flex items-start justify-between relative z-10">
-        <div>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">{label}</p>
-          <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
-          {sub && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 leading-none">{label}</p>
+          <p className="text-3xl font-bold leading-tight" style={{ color }}>{value}</p>
+          {sub && <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{sub}</p>}
         </div>
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm" style={{ backgroundColor: color + "15", color }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm shrink-0 ml-2" style={{ backgroundColor: color + "18", color }}>
           {icon}
         </div>
       </div>
-      {href && <div className="absolute right-3.5 bottom-3.5" style={{ color }}><ArrowUpRight size={12} /></div>}
+      {href && (
+        <div className="mt-2 flex items-center gap-0.5 relative z-10" style={{ color }}>
+          <span className="text-[10px] font-bold">Voir</span>
+          <ArrowUpRight size={11} />
+        </div>
+      )}
     </div>
   );
   return href ? <Link href={href}>{inner}</Link> : inner;
@@ -441,12 +448,14 @@ function QuickActions() {
           const Icon = a.icon;
           return (
             <Link key={a.href} href={a.href}>
-              <div className="rounded-xl border border-border p-3 flex flex-col items-center gap-2 hover:shadow-md transition-all active:scale-95 cursor-pointer"
-                style={{ backgroundColor: a.bg }}>
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: a.color + "20" }}>
-                  <Icon size={20} style={{ color: a.color }} />
+              <div
+                className="rounded-xl border p-3 flex flex-col items-center gap-2 hover:shadow-md transition-all duration-200 active:scale-95 cursor-pointer group"
+                style={{ backgroundColor: a.bg, borderColor: a.color + "30" }}
+              >
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-200" style={{ backgroundColor: a.color + "22" }}>
+                  <Icon size={22} style={{ color: a.color }} />
                 </div>
-                <span className="text-[11px] font-semibold text-foreground text-center leading-tight">{a.label}</span>
+                <span className="text-[11px] font-bold text-center leading-tight" style={{ color: a.color }}>{a.label}</span>
               </div>
             </Link>
           );

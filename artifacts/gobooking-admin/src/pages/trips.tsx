@@ -231,62 +231,117 @@ export default function Trips() {
         ) : trips?.length === 0 ? (
           <p className="text-center py-8 text-muted-foreground">Aucun trajet planifié.</p>
         ) : (
-          trips?.map((trip: any) => (
-            <div key={trip.id} className="bg-card rounded-2xl p-5 border border-border flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:shadow-md transition-all">
-              
-              <div className="flex items-start gap-4 flex-1">
-                <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center text-muted-foreground shrink-0">
-                  <Map size={24} />
+          trips?.map((trip: any) => {
+            const isEnRoute   = trip.status === "en_route";
+            const isScheduled = trip.status === "scheduled";
+            const isCompleted = trip.status === "completed";
+            const borderColor = isEnRoute ? "#059669" : isScheduled ? "#D97706" : "#94A3B8";
+            const iconBg      = isEnRoute ? "#DCFCE7" : isScheduled ? "#FEF3C7" : "#F1F5F9";
+            const iconColor   = isEnRoute ? "#059669" : isScheduled ? "#D97706" : "#64748B";
+            const totalSeats  = trip.totalSeats ?? trip.total_seats ?? 0;
+            const occupied    = trip.passengerCount ?? trip.passenger_count ?? 0;
+            const available   = Math.max(0, totalSeats - occupied);
+            const pct         = totalSeats > 0 ? Math.round((occupied / totalSeats) * 100) : 0;
+            const isFull      = available === 0 && totalSeats > 0;
+            const isLow       = available > 0 && available <= 5;
+            const seatsColor  = isFull ? "#DC2626" : isLow ? "#D97706" : "#059669";
+
+            return (
+            <div key={trip.id}
+              className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-lg transition-all duration-200"
+              style={{ borderLeft: `4px solid ${borderColor}` }}
+            >
+              <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div className="flex items-start gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{ backgroundColor: iconBg }}>
+                    <Bus size={22} style={{ color: iconColor }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+                      <h3 className="text-lg font-bold text-foreground">
+                        <span className="text-emerald-700">{trip.from}</span>
+                        <span className="text-muted-foreground font-normal mx-2">→</span>
+                        <span className="text-red-700">{trip.to}</span>
+                      </h3>
+                      {isScheduled && <Badge variant="warning">Prévu</Badge>}
+                      {isEnRoute   && <Badge variant="accent">En route</Badge>}
+                      {isCompleted && <Badge variant="success">Terminé</Badge>}
+                      {trip.delay_minutes > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                          +{trip.delay_minutes} min retard
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} />
+                        <span className="font-medium">{trip.date}</span>
+                        <span className="opacity-50">·</span>
+                        <span className="font-bold text-foreground">{trip.departureTime}</span>
+                        {trip.arrivalTime && <><span className="opacity-50">→</span><span>{trip.arrivalTime}</span></>}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Bus size={13} />
+                        <strong className="text-foreground">{trip.busName ?? "—"}</strong>
+                        {trip.busType && <span className="text-xs bg-muted px-1.5 py-0.5 rounded font-medium">{trip.busType}</span>}
+                      </span>
+                      <span className="font-semibold" style={{ color: "#F97316" }}>
+                        {formatCurrency(trip.price)} / pax
+                      </span>
+                    </div>
+
+                    {totalSeats > 0 && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-[140px]">
+                          <div
+                            className="h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, backgroundColor: seatsColor }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: seatsColor }}>
+                          {available} libre{available !== 1 ? "s" : ""} / {totalSeats}
+                        </span>
+                        {isFull && <span className="text-[10px] font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full border border-red-200">COMPLET</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="text-lg font-bold text-foreground">{trip.from} <span className="text-muted-foreground font-normal mx-1">→</span> {trip.to}</h3>
-                    {trip.status === "scheduled" ? <Badge variant="warning">Prévu</Badge> :
-                     trip.status === "en_route"  ? <Badge variant="accent">En route</Badge> :
-                     <Badge variant="success">Terminé</Badge>}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock size={14}/> {trip.date} • {trip.departureTime}</span>
-                    <span>Bus: <strong className="text-foreground">{trip.busName}</strong> ({trip.busType})</span>
-                    <span>Tarif: <strong className="text-primary">{formatCurrency(trip.price)}</strong> / passager</span>
-                  </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-border">
+                  {!isCompany && isScheduled && (
+                    <Button variant="accent" onClick={() => handleAction(trip.id, "start")} disabled={actionPending} size="sm" className="gap-1.5">
+                      <PlayCircle size={15} /> Démarrer
+                    </Button>
+                  )}
+                  {!isCompany && isEnRoute && (
+                    <Button size="sm" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 gap-1.5" variant="outline" onClick={() => handleAction(trip.id, "end")} disabled={actionPending}>
+                      <CheckSquare size={15} /> Arrivé
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setAgentsTripId(trip.id)} className="gap-1.5 text-violet-600 border-violet-200 hover:bg-violet-50">
+                    <Users size={14} /> Équipe
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setAuditTripId(trip.id)} className="gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50">
+                    <ClipboardCheck size={14} /> Contrôles
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setSegmentsTripId(trip.id)} className="gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50">
+                    <MapPin size={14} /> Escales
+                  </Button>
+                  {!isCompany && (isScheduled || isEnRoute) && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => { setDelayTripId(trip.id); setDelayForm({ minutes: 15, reason: "Retard au départ", detail: "" }); }} className="gap-1.5 text-orange-700 border-orange-200 hover:bg-orange-50">
+                        <AlertCircle size={14} /> Retard
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => { setTransferTripId(trip.id); setTransferForm({ newBusId: "", reason: "Panne mécanique", detail: "", location: "" }); }} className="gap-1.5 text-red-700 border-red-200 hover:bg-red-50">
+                        <ArrowRightLeft size={14} /> Transfert
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
-
-              <div className="flex items-center gap-3 w-full md:w-auto pt-4 md:pt-0 border-t md:border-t-0 border-border">
-                {!isCompany && trip.status === "scheduled" && (
-                  <Button variant="accent" onClick={() => handleAction(trip.id, "start")} disabled={actionPending} className="w-full md:w-auto">
-                    <PlayCircle size={16} className="mr-2" /> Démarrer
-                  </Button>
-                )}
-                {!isCompany && trip.status === "en_route" && (
-                  <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 w-full md:w-auto" onClick={() => handleAction(trip.id, "end")} disabled={actionPending}>
-                    <CheckSquare size={16} className="mr-2" /> Marquer Arrivé
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => setAgentsTripId(trip.id)} className="flex items-center gap-2 text-violet-600 border-violet-300 hover:bg-violet-50">
-                  <Users size={15} /> Équipe
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setAuditTripId(trip.id)} className="flex items-center gap-2 text-amber-700 border-amber-300 hover:bg-amber-50">
-                  <ClipboardCheck size={15} /> Contrôles
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setSegmentsTripId(trip.id)} className="flex items-center gap-2 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
-                  <MapPin size={15} /> Escales
-                </Button>
-                {!isCompany && (trip.status === "scheduled" || trip.status === "en_route") && (
-                  <>
-                    <Button variant="outline" size="sm" onClick={() => { setDelayTripId(trip.id); setDelayForm({ minutes: 15, reason: "Retard au départ", detail: "" }); }} className="flex items-center gap-2 text-orange-700 border-orange-300 hover:bg-orange-50">
-                      <AlertCircle size={15} /> Retard
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => { setTransferTripId(trip.id); setTransferForm({ newBusId: "", reason: "Panne mécanique", detail: "", location: "" }); }} className="flex items-center gap-2 text-red-700 border-red-300 hover:bg-red-50">
-                      <ArrowRightLeft size={15} /> Transfert
-                    </Button>
-                  </>
-                )}
-              </div>
-
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

@@ -1,0 +1,189 @@
+Merci de lire attentivement et d’appliquer ce point stratégique immédiatement.
+
+### ORIENTATION GLOBALE DU PRODUIT (TRÈS IMPORTANT)
+
+À partir de maintenant, l’objectif n’est plus seulement de corriger ou développer des fonctionnalités.
+
+👉 L’objectif est de transformer GoBooking en une application :
+- moderne
+- fluide
+- professionnelle
+- cohérente
+- niveau top 1 ou top 2 mondial des applications de réservation et gestion transport
+
+---
+
+## 1. CONSIGNE PRINCIPALE
+
+Vous devez :
+
+👉 améliorer toutes les pages existantes
+👉 sans casser la logique actuelle
+👉 sans modifier le fonctionnement métier déjà validé
+
+Mais :
+
+- rendre toutes les interfaces modernes  
+- rendre toutes les pages propres  
+- rendre l’expérience utilisateur fluide  
+- rendre chaque écran professionnel  
+
+---
+
+## 2. APPLICATION DIRECTE (OBLIGATOIRE)
+
+Toutes les améliorations doivent être :
+
+- visibles immédiatement dans l’application  
+- testables en temps réel  
+- réellement appliquées (pas seulement dans le code)  
+
+👉 Ce que je veux :
+- voir les changements  
+- cliquer  
+- tester  
+- valider  
+
+---
+
+## 3. STANDARD À ATTEINDRE
+
+Inspirez-vous clairement des meilleures applications au monde :
+
+- applications de réservation (transport, vols, hôtels)
+- applications SaaS modernes
+- dashboards professionnels
+
+👉 Niveau attendu :
+TOP 1 ou TOP 2 mondial
+
+Il ne doit pas y avoir d’exception.
+
+---
+
+## 4. AMÉLIORATION DES PAGES (TOUTES LES PAGES)
+
+Appliquer sur :
+
+- espace agent (tous les rôles)
+- espace chef d’agence
+- espace compagnie
+- espace admin
+- espace client
+
+Pour chaque page :
+
+- meilleure hiérarchie visuelle  
+- meilleure lisibilité  
+- boutons clairs  
+- actions visibles  
+- icônes modernes  
+- alignements propres  
+- espacement professionnel  
+- navigation fluide  
+
+---
+
+## 5. RESPECT ABSOLU DE LA LOGIQUE MÉTIER
+
+⚠️ TRÈS IMPORTANT :
+
+- ne rien casser  
+- ne pas modifier la logique existante  
+- ne pas supprimer des fonctionnalités validées  
+
+👉 seulement améliorer :
+- l’affichage  
+- l’expérience  
+- la fluidité  
+- la clarté  
+
+---
+
+## 6. APPLICATION TOUT-EN-UN (VISION PRODUIT)
+
+GoBooking doit devenir :
+
+👉 une application tout-en-un
+
+Cela signifie :
+
+- gestion transport  
+- gestion billets  
+- gestion colis  
+- gestion agents  
+- gestion caisses  
+- gestion opérations  
+
+Tout doit être connecté dans un seul système.
+
+---
+
+## 7. APPLICATION MULTI-SUPPORT (TRÈS IMPORTANT)
+
+L’application doit être pensée pour fonctionner partout :
+
+- téléphone (mobile)
+- ordinateur (web dashboard)
+- tablettes
+- terminaux agents (TPU / appareils terrain)
+
+👉 Adapter les interfaces pour chaque usage :
+- agents terrain → simple, rapide, efficace  
+- bureau → détaillé, complet  
+- client → fluide, intuitif  
+
+---
+
+## 8. PERFORMANCE & FLUIDITÉ
+
+Chaque page doit être :
+
+- rapide  
+- sans bug  
+- sans surcharge  
+- sans confusion  
+
+👉 Objectif :
+l’utilisateur doit se sentir à l’aise immédiatement
+
+---
+
+## 9. CONSIGNE FINALE
+
+Ne pas faire des modifications isolées.
+
+👉 Travail global sur toute l’application :
+- cohérence
+- design
+- expérience
+- performance
+
+---
+
+## 10. ATTENTE
+
+Après implémentation :
+
+- envoyer des captures réelles de l’application  
+- montrer les améliorations visibles  
+- permettre un test immédiat  
+
+---
+
+### OBJECTIF FINAL
+
+Construire une application :
+
+- professionnelle
+- moderne
+- fluide
+- robuste
+- tout-en-un
+- adaptée au terrain réel
+
+👉 niveau des meilleures solutions internationales
+
+---
+
+Merci d’appliquer cela immédiatement dans l’application réelle.

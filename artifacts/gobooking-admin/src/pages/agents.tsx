@@ -78,9 +78,15 @@ function AgentCard({ agent, isCompany, roleKey }: { agent: any; isCompany: boole
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col gap-3">
+    <div
+      className="bg-card border border-border rounded-xl p-4 shadow-sm hover:shadow-lg transition-all duration-200 flex flex-col gap-3 overflow-hidden relative"
+      style={{ borderTop: `3px solid ${cfg.color}` }}
+    >
+      {/* Subtle background accent */}
+      <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full opacity-5" style={{ backgroundColor: cfg.color }} />
+
       {/* En-tête */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 relative">
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex-shrink-0">
             <AgentAvatar agent={agent} cfg={cfg} size={40} />
