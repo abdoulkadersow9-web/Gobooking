@@ -775,12 +775,13 @@ router.post("/reservations", async (req, res) => {
         assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
       }
       if (assignedSeatIds.length > 0) {
-        await db.execute(sql`
-          UPDATE seats SET status = ${seatStatus}
-          WHERE id = ANY(${assignedSeatIds}::text[])
-        `);
+        await db.update(seatsTable)
+          .set({ status: seatStatus as any })
+          .where(inArray(seatsTable.id, assignedSeatIds));
       }
-    } catch {}
+    } catch (seatErr: any) {
+      console.error("[reservations] seat update failed:", seatErr?.message ?? seatErr);
+    }
 
     const [booking] = await db.insert(bookingsTable).values({
       id,
@@ -1619,7 +1620,7 @@ router.get("/seats/:tripId", async (req, res) => {
       if (isSP) nums.forEach(n => spNums.add(n));
       for (const n of nums) {
         if (!seatInfoMap.has(n)) {
-          const pax = passengers.find((p: any) => p?.seatNumber === n);
+          const pax = passengers.find((p: any) => p?.seatNumber === n) ?? passengers[0];
           seatInfoMap.set(n, {
             clientName:    pax?.name          ?? "—",
             clientPhone:   b.contactPhone     ?? "",
@@ -1638,13 +1639,20 @@ router.get("/seats/:tripId", async (req, res) => {
         const num = (seat.number ?? "") as string;
         const isSP = spNums.has(num);
         const info = seatInfoMap.get(num);
+        // Normalize DB status variants to standard client values
+        const rawStatus = seat.status ?? "available";
+        const normalizedStatus: string =
+          (rawStatus === "occupied" || rawStatus === "booked" || rawStatus === "vendu") && isSP ? "sp" :
+          (rawStatus === "booked"  || rawStatus === "vendu")  ? "occupied" :
+          (rawStatus === "reserved" || rawStatus === "pending") ? "reserved" :
+          rawStatus;
         return {
           id:            seat.id,
           number:        num,
           row:           seat.row,
           column:        seat.column,
           type:          seat.type,
-          status:        seat.status === "occupied" && isSP ? "sp" : (seat.status ?? "available"),
+          status:        normalizedStatus,
           clientName:    info?.clientName    ?? null,
           clientPhone:   info?.clientPhone   ?? null,
           bookingRef:    info?.bookingRef    ?? null,
@@ -4626,12 +4634,12 @@ router.get("/validation-depart/trip/:tripId", async (req, res) => {
       return {
         bookingId:  b.id,
         bookingRef: b.bookingRef,
-        name:       uRows[0]?.name ?? "Inconnu",
-        phone:      uRows[0]?.phone ?? "",
+        name:       uRows[0]?.name ?? (Array.isArray(b.passengers) ? (b.passengers as any[])[0]?.name : null) ?? "Inconnu",
+        phone:      uRows[0]?.phone ?? b.contactPhone ?? "",
         status:     b.status,
         seatNums:   b.seatNumbers ?? [],
-        price:      (b as any).total_price ?? (b as any).totalPrice ?? 0,
-        bagageStatus: (b as any).bagage_status ?? null,
+        price:      b.totalAmount ?? 0,
+        bagageStatus: b.bagageStatus ?? null,
       };
     }));
 
@@ -4730,8 +4738,8 @@ router.post("/trips/:tripId/transit-join", async (req, res) => {
     if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
     const trip = tripRows[0];
 
-    if (!["en_route", "scheduled", "confirmed"].includes(trip.status ?? "")) {
-      res.status(400).json({ error: "Ce trajet n'est pas actif ou en route" }); return;
+    if (["cancelled", "annulé"].includes(trip.status ?? "")) {
+      res.status(400).json({ error: "Ce trajet est annulé" }); return;
     }
 
     const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);

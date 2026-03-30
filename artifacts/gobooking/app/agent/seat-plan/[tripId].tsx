@@ -155,33 +155,50 @@ export default function AgentSeatPlanScreen() {
       return;
     }
     setSubmitting(true);
+    const targetSeatNumber = selected.number;
+    const targetActionType = actionType;
+    const targetName = paxName.trim();
+    const targetPhone = paxPhone.trim();
     try {
-      const res = await apiFetch<{ bookingRef?: string; id?: string }>(
+      const res = await apiFetch<{ bookingRef?: string; id?: string; seatNumbers?: string[] }>(
         "/agent/reservations",
         {
           token:  token ?? undefined,
           method: "POST",
           body: {
             tripId,
-            clientName:          paxName.trim(),
-            clientPhone:         paxPhone.trim(),
+            clientName:          targetName,
+            clientPhone:         targetPhone,
             seatCount:           1,
-            paymentMethod:       actionType === "sp" ? "sp" : payMethod,
-            isSP:                actionType === "sp",
-            isReservation:       actionType === "réserver",
-            preferredSeatNumber: selected.number,
+            paymentMethod:       targetActionType === "sp" ? "sp" : payMethod,
+            isSP:                targetActionType === "sp",
+            isReservation:       targetActionType === "réserver",
+            preferredSeatNumber: targetSeatNumber,
           },
         }
       );
+
+      /* ── Optimistic update: reflect change locally immediately ── */
+      const newStatus: AgentSeat["status"] =
+        targetActionType === "sp"       ? "sp"       :
+        targetActionType === "réserver" ? "reserved"  : "occupied";
+      const bookedSeatNum = res.seatNumbers?.[0] ?? targetSeatNumber;
+      setSeats(prev => prev.map(s =>
+        s.number === bookedSeatNum
+          ? { ...s, status: newStatus, clientName: targetName, clientPhone: targetPhone, bookingRef: res.bookingRef ?? null }
+          : s
+      ));
+
       const label =
-        actionType === "sp"       ? "SP créé"     :
-        actionType === "réserver" ? "Réservé"      : "Vendu";
+        targetActionType === "sp"       ? "SP créé"     :
+        targetActionType === "réserver" ? "Réservé"      : "Vendu";
+      setSelected(null);
       Alert.alert(
         "✓ Succès",
-        `Siège ${selected.number} — ${label}\nRéf: ${res.bookingRef ?? res.id ?? "—"}`,
+        `Siège ${bookedSeatNum} — ${label}\nRéf: ${res.bookingRef ?? res.id ?? "—"}`,
       );
-      setSelected(null);
-      loadSeats(true);
+      /* Background server sync after 2s */
+      setTimeout(() => loadSeats(true), 2_000);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de traiter la demande");
     } finally {
