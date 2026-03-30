@@ -1,0 +1,223 @@
+Merci de bien analyser et appliquer ce point de logique métier de manière propre, complète et sans casser l’existant.
+
+### LOGIQUE TRÈS IMPORTANTE À AJOUTER ET À CONNECTER
+
+L’application doit maintenant intégrer clairement la logique de caisse, points, versements, validation et historique selon les agents concernés.
+
+Tous les agents n’ont pas le même fonctionnement.  
+Il faut donc respecter la logique métier réelle par rôle.
+
+---
+
+## 1. AGENTS QUI ONT UNE CAISSE
+
+Les agents concernés par une caisse sont :
+
+- agent bagages  
+- agent guichet / ticketing  
+- agent colis  
+- agent route  
+
+Ces agents doivent avoir une logique complète de :
+- recette  
+- caisse  
+- validation des points  
+- envoi au chef d’agence  
+- historique  
+
+---
+
+## 2. AGENT BAGAGES
+
+### Logique :
+- travaille par départ  
+- ajoute bagages + paiements sur un départ  
+
+### Après départ :
+- voit sa caisse  
+- total encaissé  
+- versement  
+
+### Validation :
+- valider caisse → envoyer au chef d’agence  
+
+### Historique :
+- départs  
+- recettes  
+- points  
+- validations  
+
+---
+
+## 3. AGENT GUICHET / TICKETING
+
+### Logique :
+- vend billets physiques  
+- lié aux départs + bordereaux + dépenses  
+
+### Après départ :
+- voit recette  
+- billets vendus  
+- dépenses  
+- bordereaux  
+
+### Validation :
+- valide → envoi chef d’agence  
+
+### Historique :
+- ventes  
+- bordereaux  
+- dépenses  
+- points  
+
+---
+
+## 4. AGENT COLIS
+
+### Logique spécifique :
+- tous les colis ne partent pas le même jour  
+- séparation :
+  - colis enregistrés  
+  - colis en attente  
+  - colis embarqués  
+
+### Caisse :
+- journalière (pas uniquement par départ)  
+
+### Fin de journée :
+- total encaissé  
+- colis traités  
+- validation points  
+
+### Historique :
+- colis  
+- encaissements  
+- points  
+
+---
+
+## 5. AGENT ROUTE (TRÈS IMPORTANT)
+
+### Logique réelle terrain :
+L’agent route vend des tickets en cours de trajet (en route).
+
+👉 Il encaisse directement l’argent.
+
+### Fonctionnement :
+
+Pendant le trajet :
+- vente de tickets en route  
+- encaissement direct  
+
+### À l’arrivée :
+L’agent route doit voir :
+- nombre de tickets vendus en route  
+- montant total encaissé  
+- détail des ventes  
+
+### Validation :
+Quand il clique sur :
+- ma caisse  
+- faire mes points  
+- valider  
+
+👉 alors :
+- ses données sont enregistrées  
+- sa caisse est fermée  
+- les informations sont envoyées au chef d’agence  
+
+### Historique :
+- tickets vendus en route  
+- trajets effectués  
+- montants encaissés  
+- validations  
+
+---
+
+## 6. AGENTS SANS CAISSE
+
+Exemples :
+- agent embarquement  
+
+### Logique :
+- pas de caisse  
+- pas de versement  
+
+Mais :
+- historique obligatoire  
+- traçabilité des actions  
+
+---
+
+## 7. CHEF D’AGENCE
+
+Doit recevoir automatiquement :
+
+- caisse agent bagages  
+- caisse agent ticket  
+- caisse agent colis  
+- caisse agent route  
+
+### Pour chaque agent :
+- montant  
+- statut  
+- validation  
+
+### Actions :
+- valider  
+- rejeter  
+- commenter  
+
+---
+
+## 8. RÈGLE GLOBALE
+
+Tout doit être connecté :
+
+- départs  
+- ventes  
+- bordereaux  
+- dépenses  
+- caisses  
+- versements  
+- validations  
+- historiques  
+
+Aucune donnée ne doit être isolée.
+
+---
+
+## 9. CONSIGNE IMPORTANTE
+
+Ne pas faire une logique unique.
+
+👉 Adapter selon le rôle :
+
+- bagages  
+- ticket  
+- colis  
+- route  
+- embarquement  
+
+---
+
+## 10. RÉSULTAT ATTENDU
+
+Un système :
+
+- clair  
+- structuré  
+- connecté  
+- fiable  
+- traçable  
+- professionnel  
+
+Avec :
+- caisse par agent concerné  
+- validation des points  
+- envoi automatique au chef d’agence  
+- historique complet  
+
+---
+
+Merci d’appliquer cette logique de façon complète dans toute l’application.

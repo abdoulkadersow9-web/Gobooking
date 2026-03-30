@@ -123,6 +123,18 @@ const ALL_MODULES = [
     roles: ["bagage", "agent_bagage"],
   },
   {
+    id: "caisse",
+    label: "Ma Caisse",
+    sub: "Points · Versements · Validation",
+    desc: "Consulter la caisse du départ ou de la journée, faire ses points et envoyer au chef d'agence",
+    icon: "dollar-sign" as const,
+    path: "/agent/caisse",
+    color: "#065F46",
+    gradient: ["#ECFDF5", "#D1FAE5"] as [string, string],
+    border: "#6EE7B7",
+    roles: ["agent_ticket", "guichet", "vente", "agent_guichet", "agent_bagage", "bagage", "agent_route", "route", "agent_colis", "colis", "reception_colis"],
+  },
+  {
     id: "validation_depart",
     label: "Validation Départ",
     sub: "Bordereau · Dépenses · Départ",

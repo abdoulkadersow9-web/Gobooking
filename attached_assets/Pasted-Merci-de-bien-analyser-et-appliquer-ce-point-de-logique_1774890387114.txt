@@ -1,0 +1,249 @@
+Merci de bien analyser et appliquer ce point de logique métier de manière propre, complète et sans casser l’existant.
+
+### LOGIQUE TRÈS IMPORTANTE À AJOUTER ET À CONNECTER
+
+L’application doit maintenant intégrer clairement la logique de caisse, points, versements, validation et historique selon les agents concernés.
+
+Tous les agents n’ont pas le même fonctionnement.  
+Il faut donc respecter la logique métier réelle par rôle.
+
+---
+
+## 1. AGENTS QUI ONT UNE CAISSE
+
+Les agents concernés par une caisse sont notamment :
+
+- agent bagages
+- agent guichet / ticketing
+- agent colis
+
+Ces agents doivent avoir une logique complète de :
+- recette
+- caisse
+- validation des points
+- envoi au chef d’agence
+- historique
+
+---
+
+## 2. AGENT BAGAGES
+
+### Logique attendue :
+L’agent bagages travaille selon les départs.
+
+Quand un départ est en cours ou validé :
+- il ajoute les bagages / charges / paiements liés à ce départ
+- sa recette est donc liée au départ concerné
+
+### Après chaque départ :
+L’agent bagages doit pouvoir voir :
+- sa caisse du départ
+- le total encaissé
+- le total des opérations liées à ce départ
+- son versement
+
+### Validation :
+Quand il clique sur :
+- valider ma caisse
+- faire mes points
+- fermer mes points
+
+alors :
+- ses points doivent être enregistrés
+- ses données doivent être envoyées automatiquement au chef d’agence
+- le chef d’agence doit pouvoir voir, contrôler et valider
+
+### Historique :
+L’agent bagages doit avoir :
+- historique des départs traités
+- historique des recettes
+- historique des points fermés
+- historique des validations
+
+---
+
+## 3. AGENT GUICHET / TICKETING
+
+### Logique attendue :
+L’agent ticket vend les billets physiques à la gare.
+
+Sa caisse doit être liée :
+- aux ventes guichet
+- au départ concerné
+- aux bordereaux
+- aux dépenses enregistrées
+- aux validations faites dans le flow du départ
+
+### Après chaque départ :
+L’agent ticket doit voir :
+- la recette du départ
+- les billets vendus
+- les dépenses liées
+- le bordereau concerné
+- le total net de sa caisse
+
+### Validation :
+Quand l’agent ticket valide :
+- son bordereau
+- ses dépenses
+- sa caisse
+- ses points
+
+alors :
+- tout doit être enregistré
+- tout doit remonter au chef d’agence
+- le chef d’agence doit voir les montants et valider
+
+### Historique :
+L’agent ticket doit avoir :
+- historique des ventes
+- historique des départs traités
+- historique des bordereaux
+- historique des dépenses
+- historique des points fermés
+- historique des validations
+
+---
+
+## 4. AGENT COLIS
+
+### Logique particulière :
+L’agent colis ne fonctionne pas exactement comme les autres agents liés uniquement au départ.
+
+Pourquoi :
+- tous les colis enregistrés aujourd’hui ne partent pas forcément aujourd’hui
+- certains colis attendent un autre bus
+- certains colis sont enregistrés mais pas encore embarqués
+
+### Donc :
+la logique colis doit être séparée de la logique simple “1 départ = 1 caisse complète”.
+
+### Ce qu’il faut faire :
+L’agent colis doit pouvoir distinguer :
+- colis enregistrés
+- colis en attente
+- colis affectés à un car
+- colis effectivement partis
+- colis livrés / retirés
+
+### Sa caisse :
+L’agent colis doit avoir une caisse journalière, pas seulement par départ.
+
+À la fin de sa journée ou de son service, il doit pouvoir voir :
+- toutes ses opérations du jour
+- le total encaissé
+- les colis effectivement partis
+- les colis encore en attente
+- le montant à reverser
+
+### Validation :
+Quand il clique sur :
+- ma caisse
+- valider ma caisse
+- fermer mes points
+
+alors :
+- ses points journaliers doivent être enregistrés
+- ses données doivent être envoyées au chef d’agence
+- le chef d’agence doit pouvoir contrôler et valider
+
+### Historique :
+L’agent colis doit avoir :
+- historique des colis enregistrés
+- historique des colis partis
+- historique des encaissements
+- historique des caisses validées
+- historique des points fermés
+
+---
+
+## 5. AGENTS SANS CAISSE
+
+Certains agents n’ont pas de logique de caisse.
+
+Exemple :
+- agent embarquement
+- autres agents de contrôle ou d’exécution sans encaissement direct
+
+### Pour ces agents :
+- pas de module “ma caisse”
+- pas de fermeture de points financiers
+- pas de versement
+
+Mais ils doivent quand même avoir :
+- leur historique
+- leurs actions tracées
+- les départs traités
+- les validations effectuées
+- la traçabilité complète de leurs opérations
+
+---
+
+## 6. CHEF D’AGENCE
+
+Le chef d’agence doit recevoir automatiquement les points et validations des agents concernés.
+
+Il doit pouvoir voir séparément :
+
+- caisse agent bagages
+- caisse agent ticket
+- caisse agent colis
+
+Et pour chaque agent :
+- montant déclaré
+- montant encaissé
+- versement
+- statut validé / en attente / rejeté
+- historique complet
+
+### Le chef d’agence doit pouvoir :
+- valider
+- rejeter
+- commenter si besoin
+- garder l’historique des validations
+
+---
+
+## 7. RÈGLE GLOBALE
+
+Tout doit être connecté :
+
+- départs
+- recettes
+- bordereaux
+- dépenses
+- caisses
+- versements
+- validations
+- historiques
+
+Aucune donnée ne doit être isolée.
+
+Chaque agent doit voir uniquement ce qui le concerne, selon son rôle réel.
+
+---
+
+## 8. CONSIGNE IMPORTANTE
+
+Ne pas faire une logique générique pour tous les agents.
+
+Il faut respecter la différence métier entre :
+- agent bagages
+- agent ticket
+- agent colis
+- agent embarquement
+
+---
+
+## 9. RÉSULTAT ATTENDU
+
+Je veux un système propre, clair et professionnel avec :
+
+- caisse par rôle concerné
+- validation des points
+- envoi automatique au chef d’agence
+- historique complet
+- traçabilité totale
+- cohérence réelle avec le fonctionnement terrain
+
+Merci d’appliquer cette logique de façon sérieuse, structurée et reliée à toute l’application.

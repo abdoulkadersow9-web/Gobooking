@@ -132,7 +132,17 @@ export default function ChefTrips() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [saving,      setSaving]      = useState(false);
-  const [activeTab,   setActiveTab]   = useState<"trips" | "historique">("trips");
+  const [activeTab,   setActiveTab]   = useState<"trips" | "caisses" | "historique">("trips");
+
+  /* ── Caisses agents ── */
+  const [caisses,        setCaisses]        = useState<any[]>([]);
+  const [caissesLoading, setCaissesLoading] = useState(false);
+  const [caissesStats,   setCaissesStats]   = useState({ pending: 0, validated: 0, rejected: 0 });
+  const [validatingId,   setValidatingId]   = useState<string | null>(null);
+  const [showValidModal, setShowValidModal] = useState(false);
+  const [selectedCaisse, setSelectedCaisse] = useState<any | null>(null);
+  const [chefComment,    setChefComment]    = useState("");
+  const [caissesFilter,  setCaissesFilter]  = useState<"all" | "sent" | "validated" | "rejected">("all");
 
   /* ── Modaux ── */
   const [showForm,     setShowForm]     = useState(false);  // Créer / modifier
@@ -283,6 +293,43 @@ export default function ChefTrips() {
 
   useEffect(() => { load(); }, [load]);
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
+
+  /* ── Charger les caisses agents ── */
+  const loadCaisses = useCallback(async () => {
+    if (!authToken || user?.agentRole !== "chef_agence") return;
+    setCaissesLoading(true);
+    try {
+      const data = await apiFetch<any>("/agent/chef/caisses", { token: authToken });
+      setCaisses(data.sessions ?? []);
+      setCaissesStats(data.stats ?? { pending: 0, validated: 0, rejected: 0 });
+    } catch (e: any) {
+      console.error("[chef/caisses]", e);
+    } finally {
+      setCaissesLoading(false);
+    }
+  }, [authToken, user]);
+
+  useEffect(() => { if (activeTab === "caisses") loadCaisses(); }, [activeTab, loadCaisses]);
+
+  const handleValidateCaisse = async (decision: "validated" | "rejected") => {
+    if (!selectedCaisse || !authToken) return;
+    setValidatingId(selectedCaisse.id);
+    try {
+      await apiFetch(`/agent/chef/caisses/${selectedCaisse.id}/validate`, {
+        token: authToken, method: "POST",
+        body: { decision, comment: chefComment },
+      });
+      setShowValidModal(false);
+      setSelectedCaisse(null);
+      setChefComment("");
+      Alert.alert("✅ Fait", `Caisse ${decision === "validated" ? "validée" : "rejetée"}`);
+      loadCaisses();
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible de valider");
+    } finally {
+      setValidatingId(null);
+    }
+  };
 
   /* ── Auto-détection des villes intermédiaires + heure d'arrivée ── */
   useEffect(() => {
@@ -497,8 +544,12 @@ export default function ChefTrips() {
 
         {/* Tabs */}
         <View style={s.tabBar}>
-          {([["trips","Départs"],["historique","Historique"]] as const).map(([key, label]) => (
-            <Pressable key={key} style={[s.tab, activeTab === key && s.tabActive]} onPress={() => setActiveTab(key)}>
+          {([
+            ["trips","Départs"],
+            ["caisses", caissesStats.pending > 0 ? `Caisses (${caissesStats.pending})` : "Caisses"],
+            ["historique","Historique"],
+          ] as const).map(([key, label]) => (
+            <Pressable key={key} style={[s.tab, activeTab === key && s.tabActive]} onPress={() => setActiveTab(key as any)}>
               <Text style={[s.tabText, activeTab === key && s.tabTextActive]}>{label}</Text>
             </Pressable>
           ))}
@@ -742,6 +793,164 @@ export default function ChefTrips() {
               })
             )}
           </>
+        )}
+
+        {/* ──── TAB : CAISSES AGENTS ──── */}
+        {activeTab === "caisses" && (
+          <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+            {/* Stats rapides */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              {([
+                ["En attente", caissesStats.pending,   "#D97706", "#FEF3C7"],
+                ["Validées",   caissesStats.validated, "#059669", "#ECFDF5"],
+                ["Rejetées",   caissesStats.rejected,  "#DC2626", "#FEE2E2"],
+              ] as const).map(([label, count, color, bg]) => (
+                <View key={label} style={{ flex: 1, backgroundColor: bg, borderRadius: 12, padding: 10, alignItems: "center" }}>
+                  <Text style={{ fontSize: 22, fontWeight: "900", color }}>{count}</Text>
+                  <Text style={{ fontSize: 11, color, fontWeight: "600", marginTop: 2 }}>{label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Filtre */}
+            <View style={{ flexDirection: "row", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+              {(["all","sent","validated","rejected"] as const).map(f => (
+                <Pressable
+                  key={f}
+                  onPress={() => setCaissesFilter(f)}
+                  style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: caissesFilter === f ? INDIGO2 : "#E5E7EB" }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: caissesFilter === f ? "#fff" : "#374151" }}>
+                    {f === "all" ? "Tous" : f === "sent" ? "⏳ En attente" : f === "validated" ? "✅ Validées" : "❌ Rejetées"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {caissesLoading ? (
+              <ActivityIndicator size="large" color={INDIGO2} style={{ marginTop: 40 }} />
+            ) : (
+              (() => {
+                const filtered = caisses.filter(c =>
+                  caissesFilter === "all" ? true : c.status === caissesFilter
+                );
+                if (filtered.length === 0) return (
+                  <View style={s.emptyState}>
+                    <Feather name="inbox" size={40} color="#9CA3AF" />
+                    <Text style={s.emptyText}>Aucune caisse {caissesFilter !== "all" ? `"${caissesFilter}"` : ""} pour le moment</Text>
+                  </View>
+                );
+
+                /* Grouper par catégorie d'agent */
+                const groups: Record<string, any[]> = {};
+                const catLabel: Record<string, string> = {
+                  ticket: "Agent Guichet",
+                  bagage: "Agent Bagage",
+                  route:  "Agent Route",
+                  colis:  "Agent Colis",
+                };
+                const roleToCategory = (r: string) => {
+                  if (["agent_ticket","guichet","vente","agent_guichet"].includes(r)) return "ticket";
+                  if (["agent_bagage","bagage"].includes(r)) return "bagage";
+                  if (["agent_route","route"].includes(r)) return "route";
+                  if (["agent_colis","colis","reception_colis"].includes(r)) return "colis";
+                  return "autre";
+                };
+                for (const c of filtered) {
+                  const cat = roleToCategory(c.agentRole);
+                  if (!groups[cat]) groups[cat] = [];
+                  groups[cat].push(c);
+                }
+
+                return (
+                  <View>
+                    {Object.entries(groups).map(([cat, items]) => (
+                      <View key={cat} style={{ marginBottom: 16 }}>
+                        <Text style={[s.sectionTitle, { marginBottom: 8 }]}>
+                          {catLabel[cat] ?? cat} ({items.length})
+                        </Text>
+                        {items.map(c => {
+                          const isPending   = c.status === "sent";
+                          const isValidated = c.status === "validated";
+                          const isRejected  = c.status === "rejected";
+                          const statusColor = isValidated ? "#059669" : isRejected ? "#DC2626" : "#D97706";
+                          const statusLabel = isValidated ? "✅ Validée" : isRejected ? "❌ Rejetée" : "⏳ En attente";
+                          return (
+                            <View key={c.id} style={[s.auditCard, { marginBottom: 8 }]}>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>
+                                      {c.agentName ?? "Agent"}
+                                    </Text>
+                                    <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                                      {c.tripFrom && c.tripTo ? `${c.tripFrom} → ${c.tripTo}` : c.sessionDate ?? ""}
+                                      {c.tripDeparture ? " · " + c.tripDeparture : ""}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
+                                      Soumis: {new Date(c.sentAt ?? c.createdAt).toLocaleDateString("fr-CI", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                    </Text>
+                                    {c.agentComment && (
+                                      <Text style={{ fontSize: 12, color: "#374151", marginTop: 4, fontStyle: "italic" }}>
+                                        💬 {c.agentComment}
+                                      </Text>
+                                    )}
+                                    {c.chefComment && (
+                                      <Text style={{ fontSize: 12, color: statusColor, marginTop: 4, fontWeight: "600" }}>
+                                        Chef: {c.chefComment}
+                                      </Text>
+                                    )}
+                                  </View>
+                                  <View style={{ alignItems: "flex-end", marginLeft: 8 }}>
+                                    <Text style={{ fontSize: 17, fontWeight: "900", color: "#111827" }}>
+                                      {(c.totalAmount ?? 0).toLocaleString("fr-FR")} F
+                                    </Text>
+                                    <View style={{ backgroundColor: statusColor + "20", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 }}>
+                                      <Text style={{ fontSize: 11, fontWeight: "700", color: statusColor }}>{statusLabel}</Text>
+                                    </View>
+                                    <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 4 }}>
+                                      {c.transactionCount ?? 0} op.
+                                    </Text>
+                                  </View>
+                                </View>
+                                {/* Boutons action (si en attente) */}
+                                {isPending && (
+                                  <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                                    <Pressable
+                                      onPress={() => { setSelectedCaisse(c); setChefComment(""); setShowValidModal(true); }}
+                                      style={{ flex: 1, backgroundColor: "#ECFDF5", borderRadius: 10, paddingVertical: 8, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#6EE7B7" }}
+                                    >
+                                      <Feather name="check" size={14} color="#059669" />
+                                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#059669" }}>Valider</Text>
+                                    </Pressable>
+                                    <Pressable
+                                      onPress={() => {
+                                        Alert.alert("Rejeter la caisse", "Voulez-vous rejeter cette caisse ?", [
+                                          { text: "Annuler", style: "cancel" },
+                                          { text: "Rejeter", style: "destructive", onPress: async () => {
+                                            setSelectedCaisse(c);
+                                            await handleValidateCaisse("rejected");
+                                          }},
+                                        ]);
+                                      }}
+                                      style={{ flex: 1, backgroundColor: "#FEE2E2", borderRadius: 10, paddingVertical: 8, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#FCA5A5" }}
+                                    >
+                                      <Feather name="x" size={14} color="#DC2626" />
+                                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#DC2626" }}>Rejeter</Text>
+                                    </Pressable>
+                                  </View>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()
+            )}
+          </View>
         )}
 
         {/* ──── TAB : HISTORIQUE ──── */}
@@ -1646,6 +1855,62 @@ export default function ChefTrips() {
             ) : null}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* ── Modal Validation Caisse Chef ── */}
+      <Modal visible={showValidModal} transparent animationType="slide" onRequestClose={() => setShowValidModal(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#fff", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: "#111827" }}>Valider la caisse</Text>
+              <Pressable onPress={() => setShowValidModal(false)} hitSlop={8}>
+                <Feather name="x" size={22} color="#374151" />
+              </Pressable>
+            </View>
+            {selectedCaisse && (
+              <View style={{ backgroundColor: "#F0FDF4", borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: "#6EE7B7" }}>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#111827" }}>
+                  {selectedCaisse.agentName ?? "Agent"} — {selectedCaisse.tripFrom && selectedCaisse.tripTo ? `${selectedCaisse.tripFrom} → ${selectedCaisse.tripTo}` : selectedCaisse.sessionDate}
+                </Text>
+                <Text style={{ fontSize: 22, fontWeight: "900", color: "#065F46", marginTop: 4 }}>
+                  {(selectedCaisse.totalAmount ?? 0).toLocaleString("fr-FR")} FCFA
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                  {selectedCaisse.transactionCount ?? 0} opérations
+                </Text>
+                {selectedCaisse.agentComment && (
+                  <Text style={{ fontSize: 12, color: "#374151", marginTop: 6, fontStyle: "italic" }}>💬 {selectedCaisse.agentComment}</Text>
+                )}
+              </View>
+            )}
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 }}>Commentaire (optionnel)</Text>
+            <TextInput
+              value={chefComment}
+              onChangeText={setChefComment}
+              placeholder="Ex: OK, montant vérifié"
+              style={{ borderWidth: 1.5, borderColor: "#D1D5DB", borderRadius: 12, padding: 12, fontSize: 14, color: "#111827", minHeight: 64, textAlignVertical: "top", backgroundColor: "#F9FAFB", marginBottom: 16 }}
+              multiline
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={() => handleValidateCaisse("validated")}
+                disabled={!!validatingId}
+                style={{ flex: 1, backgroundColor: "#059669", borderRadius: 14, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+              >
+                {validatingId ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="check-circle" size={18} color="#fff" />}
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Valider</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => handleValidateCaisse("rejected")}
+                disabled={!!validatingId}
+                style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 14, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+              >
+                {validatingId ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="x-circle" size={18} color="#fff" />}
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>Rejeter</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
 
     </SafeAreaView>
