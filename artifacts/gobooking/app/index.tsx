@@ -1,7 +1,9 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
+  Dimensions,
   Easing,
   Image,
   Platform,
@@ -12,10 +14,18 @@ import {
 
 import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
-const ND = Platform.OS !== "web";
+const { width: SCREEN_W } = Dimensions.get("window");
+const ND          = Platform.OS !== "web";
+const MIN_SPLASH  = 1900; // ms — durée minimale du splash (permet l'animation complète)
 
-/* ── Anneau pulsant décoratif ── */
-function PulseRing({ delay, size }: { delay: number; size: number }) {
+/* ══════════════════════════════════════════
+   COMPOSANTS GRAPHIQUES
+══════════════════════════════════════════ */
+
+/* ── Anneau d'expansion (ripple) ── */
+function Ripple({
+  delay, size, maxOpacity,
+}: { delay: number; size: number; maxOpacity: number }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -23,111 +33,84 @@ function PulseRing({ delay, size }: { delay: number; size: number }) {
       Animated.sequence([
         Animated.delay(delay),
         Animated.timing(anim, {
-          toValue: 1,
-          duration: 1800,
-          easing: Easing.out(Easing.quad),
+          toValue: 1, duration: 2400,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: ND,
         }),
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 0,
-          useNativeDriver: ND,
-        }),
+        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: ND }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
 
-  const scale  = anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-  const opacity = anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.28, 0] });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 1.5] });
+  const op    = anim.interpolate({
+    inputRange: [0, 0.12, 0.65, 1],
+    outputRange: [0, maxOpacity, maxOpacity * 0.3, 0],
+  });
 
   return (
     <Animated.View
       style={{
         position: "absolute",
-        width: size,
-        height: size,
-        borderRadius: size / 2,
+        width: size, height: size, borderRadius: size / 2,
         borderWidth: 1.5,
         borderColor: "rgba(255,255,255,0.9)",
         transform: [{ scale }],
-        opacity,
+        opacity: op,
         pointerEvents: "none" as any,
       }}
     />
   );
 }
 
-/* ── Dot unique animé ── */
-function Dot({ delay }: { delay: number }) {
-  const anim = useRef(new Animated.Value(0.3)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.timing(anim, { toValue: 1,   duration: 380, useNativeDriver: ND }),
-        Animated.timing(anim, { toValue: 0.3, duration: 380, useNativeDriver: ND }),
-        Animated.delay(Math.max(0, 480 - delay)),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
+/* ── Barre de progression shimmer ── */
+function ProgressBar({ progress }: { progress: Animated.Value }) {
+  const pct = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+  const shimOp = progress.interpolate({
+    inputRange: [0, 0.1, 0.9, 1],
+    outputRange: [0, 0.9, 0.9, 0.5],
+  });
   return (
-    <Animated.View
-      style={{
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        backgroundColor: "white",
-        opacity: anim,
-      }}
-    />
-  );
-}
-
-/* ── Loader 3 dots ── */
-function DotLoader() {
-  return (
-    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-      <Dot delay={0} />
-      <Dot delay={160} />
-      <Dot delay={320} />
+    <View style={S.barTrack}>
+      <Animated.View style={[S.barFill, { width: pct, opacity: shimOp }]} />
     </View>
   );
 }
 
-const MIN_SPLASH_MS = Platform.OS === "web" ? 0 : 500;
-
+/* ══════════════════════════════════════════
+   ÉCRAN PRINCIPAL
+══════════════════════════════════════════ */
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
 
-  const containerOpacity = useRef(new Animated.Value(1)).current;
-  const logoScale        = useRef(new Animated.Value(0.7)).current;
-  const logoOpacity      = useRef(new Animated.Value(0)).current;
-  const textOpacity      = useRef(new Animated.Value(0)).current;
-  const textTranslateY   = useRef(new Animated.Value(18)).current;
-  const loaderOpacity    = useRef(new Animated.Value(0)).current;
+  /* Valeurs d'animation */
+  const containerOp = useRef(new Animated.Value(1)).current;
+  const glowOp      = useRef(new Animated.Value(0)).current;
+  const glowScale   = useRef(new Animated.Value(0.5)).current;
+  const logoScale   = useRef(new Animated.Value(0.25)).current;
+  const logoOp      = useRef(new Animated.Value(0)).current;
+  const logoBg      = useRef(new Animated.Value(0)).current;
+  const nameOp      = useRef(new Animated.Value(0)).current;
+  const nameY       = useRef(new Animated.Value(28)).current;
+  const tagOp       = useRef(new Animated.Value(0)).current;
+  const tagY        = useRef(new Animated.Value(12)).current;
+  const progress    = useRef(new Animated.Value(0)).current;
+  const barOp       = useRef(new Animated.Value(0)).current;
 
-  const navigatedRef  = useRef(false);
-  const minDoneRef    = useRef(false);
-  const authDoneRef   = useRef(false);
-  const userRef       = useRef(user);
-
+  /* Navigation guards */
+  const navigatedRef = useRef(false);
+  const minDoneRef   = useRef(false);
+  const authDoneRef  = useRef(false);
+  const userRef      = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
 
   const doNavigate = useRef(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
-    if (Platform.OS === "web") {
-      const u = userRef.current;
-      if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
-      else   router.replace("/(auth)/login");
-      return;
-    }
-    Animated.timing(containerOpacity, {
-      toValue: 0, duration: 160, useNativeDriver: ND,
+    Animated.timing(containerOp, {
+      toValue: 0, duration: 240, easing: Easing.in(Easing.quad), useNativeDriver: ND,
     }).start(() => {
       const u = userRef.current;
       if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
@@ -139,52 +122,115 @@ export default function SplashScreen() {
     if (minDoneRef.current && authDoneRef.current) doNavigate();
   }
 
+  /* ── Lancement des animations ── */
   useEffect(() => {
-    if (Platform.OS !== "web") {
+    Animated.parallel([
+      /* 1. Lueur (glow orb) */
       Animated.parallel([
-        Animated.spring(logoScale,   { toValue: 1, tension: 120, friction: 7,  useNativeDriver: ND }),
-        Animated.timing(logoOpacity, { toValue: 1, duration: 220, useNativeDriver: ND }),
-        Animated.sequence([
-          Animated.delay(180),
-          Animated.parallel([
-            Animated.timing(textOpacity,    { toValue: 1, duration: 200, useNativeDriver: ND }),
-            Animated.timing(textTranslateY, { toValue: 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: ND }),
-          ]),
-          Animated.timing(loaderOpacity, { toValue: 1, duration: 150, useNativeDriver: ND }),
-        ]),
-      ]).start();
-    }
+        Animated.timing(glowOp,    { toValue: 0.55, duration: 500, useNativeDriver: ND }),
+        Animated.spring(glowScale, { toValue: 1, tension: 50, friction: 10, useNativeDriver: ND }),
+      ]),
 
-    const t = setTimeout(() => {
-      minDoneRef.current = true;
-      tryNavigate();
-    }, MIN_SPLASH_MS);
+      /* 2. Logo — spring élastique depuis 0.25 */
+      Animated.sequence([
+        Animated.delay(120),
+        Animated.parallel([
+          Animated.spring(logoScale, {
+            toValue: 1, tension: 85, friction: 7, useNativeDriver: ND,
+          }),
+          Animated.timing(logoOp, { toValue: 1, duration: 350, useNativeDriver: ND }),
+          Animated.timing(logoBg, { toValue: 1, duration: 400, useNativeDriver: ND }),
+        ]),
+      ]),
+
+      /* 3. Nom de l'app — glissement vers le haut */
+      Animated.sequence([
+        Animated.delay(420),
+        Animated.parallel([
+          Animated.timing(nameOp, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
+          Animated.timing(nameY,  { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
+        ]),
+      ]),
+
+      /* 4. Tagline */
+      Animated.sequence([
+        Animated.delay(660),
+        Animated.parallel([
+          Animated.timing(tagOp, { toValue: 1, duration: 300, useNativeDriver: ND }),
+          Animated.timing(tagY,  { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
+        ]),
+      ]),
+
+      /* 5. Barre de progression */
+      Animated.sequence([
+        Animated.delay(750),
+        Animated.parallel([
+          Animated.timing(barOp, { toValue: 1, duration: 200, useNativeDriver: ND }),
+          Animated.timing(progress, {
+            toValue: 0.82,
+            duration: MIN_SPLASH - 900,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: false,
+          }),
+        ]),
+      ]),
+    ]).start();
+
+    const t = setTimeout(() => { minDoneRef.current = true; tryNavigate(); }, MIN_SPLASH);
     return () => clearTimeout(t);
   }, []);
 
+  /* Auth terminé → compléter la barre */
   useEffect(() => {
     if (!isLoading) {
       authDoneRef.current = true;
+      Animated.timing(progress, {
+        toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false,
+      }).start();
       tryNavigate();
     }
   }, [isLoading, user]);
 
+  /* Fond dynamique du logo */
+  const logoBgColor = logoBg.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["rgba(255,255,255,0.04)", "rgba(255,255,255,0.10)"],
+  });
+
   return (
-    <Animated.View style={[S.container, { opacity: containerOpacity }]}>
-      {/* Anneaux pulsants */}
-      <View style={[S.ringsWrap, { pointerEvents: "none" }]}>
-        <PulseRing delay={0}    size={220} />
-        <PulseRing delay={500}  size={310} />
-        <PulseRing delay={1000} size={400} />
+    <Animated.View style={[S.container, { opacity: containerOp }]}>
+      {/* ── Fond dégradé ── */}
+      <LinearGradient
+        colors={["#0A1660", "#081040", "#04091F"]}
+        locations={[0, 0.55, 1]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.25, y: 0 }}
+        end={{ x: 0.75, y: 1 }}
+      />
+
+      {/* ── Lueur centrale (glow) ── */}
+      <Animated.View
+        style={[S.glowOrb, { opacity: glowOp, transform: [{ scale: glowScale }] }]}
+        pointerEvents="none"
+      />
+
+      {/* ── Anneaux ripple ── */}
+      <View style={S.ringsWrap} pointerEvents="none">
+        <Ripple delay={0}    size={240} maxOpacity={0.22} />
+        <Ripple delay={700}  size={360} maxOpacity={0.14} />
+        <Ripple delay={1400} size={480} maxOpacity={0.08} />
       </View>
 
-      {/* Logo */}
+      {/* ── Logo ── */}
       <Animated.View
-        style={{
-          opacity: logoOpacity,
-          transform: [{ scale: logoScale }],
-          ...S.logoWrap,
-        }}
+        style={[
+          S.logoWrap,
+          {
+            opacity: logoOp,
+            transform: [{ scale: logoScale }],
+            backgroundColor: logoBgColor,
+          },
+        ]}
       >
         <Image
           source={require("../assets/logo.png")}
@@ -193,82 +239,127 @@ export default function SplashScreen() {
         />
       </Animated.View>
 
-      {/* Texte */}
-      <Animated.View
-        style={{
-          opacity: textOpacity,
-          transform: [{ translateY: textTranslateY }],
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <Text style={S.appName}>GoBooking</Text>
-        <Text style={S.tagline}>Voyagez partout en Côte d'Ivoire</Text>
+      {/* ── Texte ── */}
+      <View style={S.textBlock}>
+        <Animated.Text
+          style={[S.appName, { opacity: nameOp, transform: [{ translateY: nameY }] }]}
+        >
+          GoBooking
+        </Animated.Text>
+        <Animated.Text
+          style={[S.tagline, { opacity: tagOp, transform: [{ translateY: tagY }] }]}
+        >
+          Voyagez partout en Côte d'Ivoire
+        </Animated.Text>
+      </View>
+
+      {/* ── Barre de progression ── */}
+      <Animated.View style={[S.barWrap, { opacity: barOp }]}>
+        <ProgressBar progress={progress} />
       </Animated.View>
 
-      {/* Loader dots */}
-      <Animated.View style={[S.loaderWrap, { opacity: loaderOpacity }]}>
-        <DotLoader />
-      </Animated.View>
-
-      <Text style={S.version}>v2.0 · Côte d'Ivoire</Text>
+      {/* ── Version ── */}
+      <Animated.Text style={[S.version, { opacity: tagOp }]}>
+        v2.0 · Côte d'Ivoire
+      </Animated.Text>
     </Animated.View>
   );
 }
 
+/* ══════════════════════════════════════════
+   STYLES
+══════════════════════════════════════════ */
 const S = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0E1E6E",
+    backgroundColor: "#04091F",
     justifyContent: "center",
     alignItems: "center",
-    gap: 28,
+    gap: 20,
+  },
+  glowOrb: {
+    position: "absolute",
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "#1A3ED8",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 100,
+    elevation: 0,
   },
   ringsWrap: {
     position: "absolute",
-    width: 400,
-    height: 400,
+    width: 500,
+    height: 500,
     alignItems: "center",
     justifyContent: "center",
   },
   logoWrap: {
-    width: 130,
-    height: 130,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    width: 124,
+    height: 124,
+    borderRadius: 34,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 10,
-    shadowColor: "#FFFFFF",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 30,
+    padding: 12,
+    shadowColor: "#5B8DEF",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+    elevation: 16,
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 92,
+    height: 92,
+  },
+  textBlock: {
+    alignItems: "center",
+    gap: 8,
   },
   appName: {
-    fontSize: 34,
+    fontSize: 38,
     fontWeight: "800",
-    color: "white",
-    letterSpacing: -0.8,
+    color: "#FFFFFF",
+    letterSpacing: -1.2,
+    textShadowColor: "rgba(91,141,239,0.5)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 20,
   },
   tagline: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 0.4,
+    fontSize: 13.5,
+    color: "rgba(255,255,255,0.42)",
+    letterSpacing: 0.6,
     textAlign: "center",
   },
-  loaderWrap: {
+  barWrap: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 80 : 110,
+    bottom: Platform.OS === "web" ? 100 : 130,
+    alignItems: "center",
+  },
+  barTrack: {
+    width: 110,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    overflow: "hidden",
+  },
+  barFill: {
+    height: "100%",
+    borderRadius: 1,
+    backgroundColor: "#5B8DEF",
+    shadowColor: "#5B8DEF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
   },
   version: {
     position: "absolute",
-    bottom: Platform.OS === "web" ? 30 : 52,
+    bottom: Platform.OS === "web" ? 40 : 64,
     fontSize: 11,
-    color: "rgba(255,255,255,0.2)",
-    letterSpacing: 0.5,
+    color: "rgba(255,255,255,0.16)",
+    letterSpacing: 0.7,
   },
 });
