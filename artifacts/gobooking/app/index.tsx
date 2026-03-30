@@ -98,7 +98,7 @@ function DotLoader() {
   );
 }
 
-const MIN_SPLASH_MS = 500;
+const MIN_SPLASH_MS = Platform.OS === "web" ? 0 : 500;
 
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
@@ -120,6 +120,12 @@ export default function SplashScreen() {
   const doNavigate = useRef(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
+    if (Platform.OS === "web") {
+      const u = userRef.current;
+      if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
+      else   router.replace("/(auth)/login");
+      return;
+    }
     Animated.timing(containerOpacity, {
       toValue: 0, duration: 160, useNativeDriver: ND,
     }).start(() => {
@@ -134,21 +140,21 @@ export default function SplashScreen() {
   }
 
   useEffect(() => {
-    /* Start intro animation immediately */
-    Animated.parallel([
-      Animated.spring(logoScale,   { toValue: 1, tension: 120, friction: 7,  useNativeDriver: ND }),
-      Animated.timing(logoOpacity, { toValue: 1, duration: 220, useNativeDriver: ND }),
-      Animated.sequence([
-        Animated.delay(180),
-        Animated.parallel([
-          Animated.timing(textOpacity,    { toValue: 1, duration: 200, useNativeDriver: ND }),
-          Animated.timing(textTranslateY, { toValue: 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: ND }),
+    if (Platform.OS !== "web") {
+      Animated.parallel([
+        Animated.spring(logoScale,   { toValue: 1, tension: 120, friction: 7,  useNativeDriver: ND }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 220, useNativeDriver: ND }),
+        Animated.sequence([
+          Animated.delay(180),
+          Animated.parallel([
+            Animated.timing(textOpacity,    { toValue: 1, duration: 200, useNativeDriver: ND }),
+            Animated.timing(textTranslateY, { toValue: 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: ND }),
+          ]),
+          Animated.timing(loaderOpacity, { toValue: 1, duration: 150, useNativeDriver: ND }),
         ]),
-        Animated.timing(loaderOpacity, { toValue: 1, duration: 150, useNativeDriver: ND }),
-      ]),
-    ]).start();
+      ]).start();
+    }
 
-    /* Minimum display timer */
     const t = setTimeout(() => {
       minDoneRef.current = true;
       tryNavigate();
