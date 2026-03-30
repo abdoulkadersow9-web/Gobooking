@@ -191,6 +191,11 @@ export default function MesReservationsScreen() {
           contentContainerStyle={S.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />}
           ListFooterComponent={<View style={{ height: 32 }} />}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+          removeClippedSubviews={true}
+          showsVerticalScrollIndicator={false}
         />
       )}
 

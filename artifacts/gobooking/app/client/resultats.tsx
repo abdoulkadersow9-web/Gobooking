@@ -446,6 +446,11 @@ export default function ResultatsScreen() {
           renderItem={renderTrip}
           contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={50}
           ListHeaderComponent={
             <View style={s.resultsHeader}>
               <Text style={s.resultsCount}>

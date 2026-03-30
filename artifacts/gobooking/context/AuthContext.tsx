@@ -202,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               try {
                 const freshUser = await apiFetch<User>("/auth/me", {
                   token: storedToken,
-                  timeoutMs: 10_000,
+                  timeoutMs: 6_000,
                 });
 
                 /* ── RACE GUARD: only act if this session is still the active one ── */
@@ -243,7 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const freshUser = await apiFetch<User>("/auth/me", {
             token: storedToken,
-            timeoutMs: 10_000,
+            timeoutMs: 6_000,
           });
 
           if (activeSessionToken.current !== storedToken) return;
