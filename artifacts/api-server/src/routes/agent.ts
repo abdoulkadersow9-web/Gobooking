@@ -1897,6 +1897,94 @@ router.get("/trip/:tripId/boarding-status", async (req, res) => {
   }
 });
 
+/* ─── POST /agent/trips/:tripId/release-absent-seats — selectively release absent seats to guichet ─── */
+router.post("/trips/:tripId/release-absent-seats", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const { bookingIds } = req.body as { bookingIds: string[] };
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+      res.status(400).json({ error: "Aucune réservation sélectionnée" }); return;
+    }
+
+    const tripId = req.params.tripId;
+    const tripRows = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+    if (!tripRows.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
+    const trip = tripRows[0];
+
+    let freedSeats = 0;
+    const processedRefs: string[] = [];
+
+    for (const bookingId of bookingIds) {
+      const bRows = await db.select().from(bookingsTable)
+        .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.tripId, tripId))).limit(1);
+      if (!bRows.length) continue;
+      const b = bRows[0];
+
+      /* Only release non-boarded bookings */
+      if (b.status === "boarded" || b.status === "validated" || b.status === "absent") continue;
+
+      /* Mark as absent */
+      await db.update(bookingsTable).set({ status: "absent" }).where(eq(bookingsTable.id, bookingId));
+
+      const seatCount = Array.isArray(b.seatNumbers) ? b.seatNumbers.length : ((b as any).seatCount ?? 1);
+      freedSeats += seatCount;
+      processedRefs.push(b.bookingRef ?? bookingId);
+
+      /* Free seats in seatsTable */
+      if (Array.isArray(b.seatNumbers) && b.seatNumbers.length > 0) {
+        for (const seatNum of b.seatNumbers as string[]) {
+          await db.update(seatsTable)
+            .set({ status: "available", bookingId: null } as any)
+            .where(and(eq(seatsTable.tripId, tripId), eq(seatsTable.seatNumber, seatNum)))
+            .catch(() => {});
+        }
+      }
+
+      /* Notify passenger of cancellation */
+      if (b.userId) {
+        const uRows = await db.select({ pushToken: usersTable.pushToken })
+          .from(usersTable).where(eq(usersTable.id, b.userId)).limit(1);
+        sendExpoPush(
+          uRows[0]?.pushToken,
+          "GoBooking — Réservation annulée (absent)",
+          `Votre réservation ${b.bookingRef ?? bookingId} a été annulée (non-présentation). Des places sont disponibles au guichet.`
+        ).catch(() => {});
+      }
+    }
+
+    /* Increase trip guichetSeats by freed count so guichet can sell immediately */
+    if (freedSeats > 0) {
+      await db.execute(sql`
+        UPDATE trips SET guichet_seats = COALESCE(guichet_seats, 0) + ${freedSeats}
+        WHERE id = ${tripId}
+      `);
+    }
+
+    /* Get updated guichetSeats */
+    const updatedRows = await db.select({ guichetSeats: tripsTable.guichetSeats })
+      .from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+
+    auditLog(
+      { userId: user.id, userRole: user.role, userName: user.name, req },
+      ACTIONS.BOOKING_CANCEL, tripId, "trip",
+      { action: "release_absent_seats_to_guichet", freedSeats, processedRefs, tripFrom: trip.from, tripTo: trip.to }
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      freedSeats,
+      processedRefs,
+      newGuichetSeats: updatedRows[0]?.guichetSeats ?? 0,
+      message: `${freedSeats} siège(s) libéré(s) — disponibles immédiatement au guichet`,
+    });
+  } catch (err) {
+    console.error("release-absent-seats error:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── POST /agent/trips/:tripId/close-departure — cancel absents + free seats ─── */
 router.post("/trips/:tripId/close-departure", async (req, res) => {
   try {
@@ -4826,6 +4914,26 @@ router.post("/validation-depart/validate/:tripId", async (req, res) => {
 
     /* 1. Set trip en_route */
     await db.execute(sql`UPDATE trips SET status = 'en_route', started_at = NOW() WHERE id = ${tripId}`);
+
+    /* 1b. Auto-transfer remaining guichet seats → online (bus departing, guichet closes) */
+    const guichetBookings = await db.select().from(bookingsTable)
+      .where(and(
+        eq(bookingsTable.tripId, tripId),
+        eq(bookingsTable.bookingSource, "guichet"),
+        inArray(bookingsTable.status, ["boarded", "validated", "confirmed", "payé"])
+      ));
+    const usedGuichetSeats = guichetBookings.reduce(
+      (acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length : ((b as any).seatCount ?? 1)), 0
+    );
+    const remainingGuichet = Math.max(0, (trip.guichetSeats ?? 0) - usedGuichetSeats);
+    if (remainingGuichet > 0) {
+      await db.execute(sql`
+        UPDATE trips
+        SET online_seats  = COALESCE(online_seats, 0) + ${remainingGuichet},
+            guichet_seats = GREATEST(0, COALESCE(guichet_seats, 0) - ${remainingGuichet})
+        WHERE id = ${tripId}
+      `);
+    }
 
     /* 2. Mark absent passengers (confirmed but not boarded) */
     await db.execute(sql`

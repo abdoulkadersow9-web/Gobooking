@@ -164,6 +164,11 @@ export default function EmbarquementScreen() {
   const [closingDeparture, setClosingDeparture] = useState(false);
   const [departureResult, setDepartureResult]   = useState<{ cancelledCount: number; freedSeats: number } | null>(null);
 
+  /* ── Absent seat release (guichet) ───────────────── */
+  const [selectedAbsents, setSelectedAbsents]   = useState<Set<string>>(new Set());
+  const [releasingSeats, setReleasingSeats]     = useState(false);
+  const [releaseResult, setReleaseResult]       = useState<{ freedSeats: number; newGuichetSeats: number } | null>(null);
+
   /* ── En Route passengers ──────────────────────────── */
   const [activeTripId, setActiveTripId]         = useState<string | null>(null);
   const [enRouteList, setEnRouteList]           = useState<EnRoutePassenger[]>([]);
@@ -206,6 +211,8 @@ export default function EmbarquementScreen() {
     setActiveTripIdForGps(trip.id);
     setShowTripSelector(false);
     setDepartureResult(null);
+    setReleaseResult(null);
+    setSelectedAbsents(new Set());
     await loadBoardingStatus(trip.id);
   };
 
@@ -220,6 +227,62 @@ export default function EmbarquementScreen() {
     } finally {
       setBoardingLoading(false);
     }
+  };
+
+  /* ── Toggle absent passenger selection ───────────── */
+  const toggleAbsent = (bookingId: string) => {
+    setSelectedAbsents(prev => {
+      const next = new Set(prev);
+      if (next.has(bookingId)) next.delete(bookingId);
+      else next.add(bookingId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllAbsents = () => {
+    const absentPassengers = boardingStatus?.passengers.filter(p => !p.boarded) ?? [];
+    if (selectedAbsents.size === absentPassengers.length) {
+      setSelectedAbsents(new Set());
+    } else {
+      setSelectedAbsents(new Set(absentPassengers.map(p => p.bookingId)));
+    }
+  };
+
+  /* ── Release selected absent seats → guichet ─────── */
+  const releaseAbsentSeats = async () => {
+    if (!selectedTrip || selectedAbsents.size === 0) return;
+
+    const ids = Array.from(selectedAbsents);
+    const absentPax = boardingStatus?.passengers.filter(p => !p.boarded && selectedAbsents.has(p.bookingId)) ?? [];
+    const totalSeats = absentPax.reduce((acc, p) => acc + Math.max(p.seats.length, 1), 0);
+
+    Alert.alert(
+      "Libérer des places",
+      `Libérer ${totalSeats} siège(s) pour ${ids.length} passager(s) absent(s) ?\n\nCes places seront disponibles immédiatement au guichet pour revente.`,
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Libérer au guichet",
+          style: "default",
+          onPress: async () => {
+            setReleasingSeats(true);
+            try {
+              const result = await apiFetch<{ freedSeats: number; newGuichetSeats: number; message: string }>(
+                `/agent/trips/${selectedTrip.id}/release-absent-seats`,
+                { method: "POST", token: token ?? undefined, body: { bookingIds: ids } }
+              );
+              setReleaseResult({ freedSeats: result.freedSeats, newGuichetSeats: result.newGuichetSeats });
+              setSelectedAbsents(new Set());
+              await loadBoardingStatus(selectedTrip.id);
+            } catch (e: any) {
+              Alert.alert("Erreur", e?.message ?? "Impossible de libérer les places");
+            } finally {
+              setReleasingSeats(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   /* ── Close departure: cancel absents + free seats ─── */
@@ -1206,38 +1269,137 @@ export default function EmbarquementScreen() {
                 </View>
               )}
 
-              {/* Absents section */}
+              {/* Release result banner */}
+              {releaseResult && (
+                <View style={{ backgroundColor: "#EFF6FF", borderRadius: 12, padding: 14, borderWidth: 2, borderColor: "#3B82F6", gap: 4 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Ionicons name="storefront-outline" size={22} color="#1D4ED8" />
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: "#1D4ED8" }}>Places libérées → Guichet</Text>
+                  </View>
+                  <Text style={{ fontSize: 13, color: "#1E40AF" }}>
+                    {releaseResult.freedSeats} siège(s) disponibles au guichet pour revente immédiate
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#3B82F6" }}>
+                    Si non vendus avant le départ → basculement automatique en ligne
+                  </Text>
+                </View>
+              )}
+
+              {/* ── Absents section with selective release ── */}
               {boardingStatus.stats.absent > 0 && (
                 <>
-                  <Text style={[styles.sectionTitle, { color: "#D97706" }]}>
-                    Passagers absents ({boardingStatus.stats.absent})
-                  </Text>
-                  {boardingStatus.passengers.filter(p => !p.boarded).map(p => (
-                    <View key={p.bookingId} style={[styles.resultCard, { borderColor: "#FCD34D", borderWidth: 1.5 }]}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                        <View style={[styles.passengerAvatar, { backgroundColor: "#FEF3C7" }]}>
-                          <Ionicons name="person" size={22} color="#D97706" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.passengerName}>{p.name}</Text>
-                          <Text style={styles.passengerPhone}>{p.phone}</Text>
-                          {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s): {p.seats.join(", ")}</Text>}
-                        </View>
-                        <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                          <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>Absent</Text>
-                        </View>
-                      </View>
-                      <View style={{ flexDirection: "row", gap: 8 }}>
-                        <TouchableOpacity style={styles.callBtn} onPress={() => callPassenger(p.phone)}>
-                          <Ionicons name="call-outline" size={15} color="#0369A1" />
-                          <Text style={styles.callBtnText}>Appeler</Text>
-                        </TouchableOpacity>
-                        <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", textAlignVertical: "center", alignSelf: "center" }}>
-                          Réf: {p.bookingRef}
-                        </Text>
-                      </View>
+                  {/* Section header with select-all */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                    <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="alert-circle" size={16} color="#D97706" />
+                      <Text style={[styles.sectionTitle, { color: "#D97706", marginBottom: 0 }]}>
+                        Passagers absents ({boardingStatus.stats.absent})
+                      </Text>
                     </View>
-                  ))}
+                    <TouchableOpacity
+                      onPress={toggleSelectAllAbsents}
+                      style={{ backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#FCD34D" }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>
+                        {selectedAbsents.size === boardingStatus.passengers.filter(p => !p.boarded).length
+                          ? "Désélect. tout"
+                          : "Tout sélect."}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Instruction */}
+                  <View style={{ backgroundColor: "#FFFBEB", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "#FDE68A", flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <Ionicons name="information-circle-outline" size={16} color="#D97706" style={{ marginTop: 1 }} />
+                    <Text style={{ fontSize: 12, color: "#92400E", flex: 1, lineHeight: 18 }}>
+                      Sélectionnez les absents dont vous souhaitez libérer les sièges. Les places seront immédiatement disponibles au guichet pour revente.
+                    </Text>
+                  </View>
+
+                  {boardingStatus.passengers.filter(p => !p.boarded).map(p => {
+                    const isSelected = selectedAbsents.has(p.bookingId);
+                    return (
+                      <TouchableOpacity
+                        key={p.bookingId}
+                        activeOpacity={0.8}
+                        onPress={() => toggleAbsent(p.bookingId)}
+                        style={[
+                          styles.resultCard,
+                          { borderWidth: 1.5 },
+                          isSelected
+                            ? { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" }
+                            : { borderColor: "#FCD34D" },
+                        ]}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                          {/* Checkbox */}
+                          <View style={{
+                            width: 24, height: 24, borderRadius: 6, borderWidth: 2,
+                            borderColor: isSelected ? "#3B82F6" : "#D1D5DB",
+                            backgroundColor: isSelected ? "#3B82F6" : "#fff",
+                            alignItems: "center", justifyContent: "center",
+                          }}>
+                            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+                          </View>
+
+                          <View style={[styles.passengerAvatar, { backgroundColor: isSelected ? "#DBEAFE" : "#FEF3C7" }]}>
+                            <Ionicons name="person" size={20} color={isSelected ? "#1D4ED8" : "#D97706"} />
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.passengerName}>{p.name}</Text>
+                            <Text style={styles.passengerPhone}>{p.phone}</Text>
+                            {p.seats.length > 0 && (
+                              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
+                                {p.seats.length} siège{p.seats.length > 1 ? "s" : ""}: {p.seats.join(", ")}
+                              </Text>
+                            )}
+                          </View>
+
+                          {isSelected ? (
+                            <View style={{ backgroundColor: "#DBEAFE", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#1D4ED8" }}>Sélect.</Text>
+                            </View>
+                          ) : (
+                            <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: "#D97706" }}>Absent</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={{ flexDirection: "row", gap: 8, paddingTop: 4 }}>
+                          <TouchableOpacity
+                            style={styles.callBtn}
+                            onPress={(e) => { e.stopPropagation?.(); callPassenger(p.phone); }}
+                          >
+                            <Ionicons name="call-outline" size={15} color="#0369A1" />
+                            <Text style={styles.callBtnText}>Appeler</Text>
+                          </TouchableOpacity>
+                          <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", alignSelf: "center" }}>
+                            Réf: {p.bookingRef}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Release to guichet button */}
+                  {selectedAbsents.size > 0 && !departureResult && (
+                    <TouchableOpacity
+                      style={[styles.validateBtn, { backgroundColor: "#1D4ED8" }, releasingSeats && { opacity: 0.6 }]}
+                      onPress={releaseAbsentSeats}
+                      disabled={releasingSeats}
+                    >
+                      {releasingSeats ? <ActivityIndicator color="#fff" /> : (
+                        <>
+                          <Ionicons name="storefront-outline" size={20} color="#fff" />
+                          <Text style={styles.validateBtnText}>
+                            Libérer {selectedAbsents.size} absent{selectedAbsents.size > 1 ? "s" : ""} → Guichet
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
 
                   {/* Close departure button */}
                   {!departureResult && (
