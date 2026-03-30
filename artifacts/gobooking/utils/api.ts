@@ -1,6 +1,6 @@
 export const BASE_URL = `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`;
 
-const DEFAULT_TIMEOUT_MS = 12_000;
+const DEFAULT_TIMEOUT_MS = 8_000;
 
 /**
  * fetch() avec AbortController timeout.

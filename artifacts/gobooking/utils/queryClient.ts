@@ -4,10 +4,16 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      staleTime: 90_000,
+      gcTime: 15 * 60_000,
       refetchOnWindowFocus: false,
-      refetchOnMount: true,
+      refetchOnMount: "always",
+      refetchOnReconnect: true,
+      networkMode: "offlineFirst",
+    },
+    mutations: {
+      retry: 0,
+      networkMode: "always",
     },
   },
 });

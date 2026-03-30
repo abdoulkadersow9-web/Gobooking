@@ -191,15 +191,15 @@ function RootLayoutNav() {
         screenOptions={{
           headerShown: false,
           animation: "slide_from_right",
-          animationDuration: 260,
+          animationDuration: 200,
           gestureEnabled: true,
           gestureDirection: "horizontal",
         }}
       >
         {/* Root screens — no previous screen exists, swipe-back must be disabled */}
-        <Stack.Screen name="index" options={{ animation: "fade", gestureEnabled: false }} />
-        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom", gestureEnabled: false }} />
-        <Stack.Screen name="(tabs)" options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="index" options={{ animation: "none", gestureEnabled: false }} />
+        <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom", animationDuration: 260, gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ animation: "fade", animationDuration: 180, gestureEnabled: false }} />
       </Stack>
     </View>
   );
@@ -215,12 +215,15 @@ export default function RootLayout() {
     ...Feather.font,
   });
 
-  /* Hide splash as soon as possible — fonts OR error (don't block on font success) */
+  /* Hide the native splash screen immediately — our custom animated
+     splash in index.tsx takes over and handles the transition. */
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded, fontError]);
+    SplashScreen.hideAsync();
+  }, []);
+
+  /* Supress unused warning — fonts still warm up in background */
+  void fontsLoaded;
+  void fontError;
 
   /* Notification listeners — deferred until after first interactions complete
      so they don't compete with the initial render pipeline. */
