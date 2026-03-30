@@ -1236,14 +1236,13 @@ const styles = StyleSheet.create({
   livePillText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FCA5A5", letterSpacing: 0.8 },
 
   // Section divider
-  sectionDivider: { height: 10, backgroundColor: "#E2E5F4", marginVertical: 0 },
+  sectionDivider: { height: 8, backgroundColor: "#F1F4FA", marginVertical: 0 },
 
   // Activity section
-  section: { paddingHorizontal: 16, paddingTop: 24, paddingBottom: 14 },
+  section: { paddingHorizontal: 16, paddingTop: 28, paddingBottom: 14 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
   sectionTitle: {
-    fontSize: 20, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.5,
-    borderLeftWidth: 4, borderLeftColor: "#1650D0", paddingLeft: 12,
+    fontSize: 19, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.5,
   },
   sectionLink: { fontSize: 13, fontFamily: "Inter_700Bold", color: Colors.light.primary },
   activityLoading: { height: 140, justifyContent: "center", alignItems: "center" },
@@ -1289,14 +1288,14 @@ const styles = StyleSheet.create({
   // Quick actions grid
   quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 12, paddingHorizontal: 16, paddingTop: 0, paddingBottom: 4 },
   quickCard: {
-    width: "47%", backgroundColor: "white", borderRadius: 26, padding: 22, gap: 14,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.10, shadowRadius: 26, elevation: 7,
-    borderWidth: 1, borderColor: "#E8ECFA", borderTopWidth: 4,
-    ..._ws("0 10px 26px rgba(22,80,208,0.10)"),
+    width: "47%", backgroundColor: "white", borderRadius: 24, padding: 20, gap: 12,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.09, shadowRadius: 18, elevation: 5,
+    borderWidth: 1, borderColor: "#EEF2FB", borderTopWidth: 3,
+    ..._ws("0 6px 18px rgba(22,80,208,0.09)"),
   },
-  quickIcon: { width: 60, height: 60, borderRadius: 22, justifyContent: "center", alignItems: "center" },
-  quickLabel: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
-  quickSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7A8FAA", lineHeight: 19 },
+  quickIcon: { width: 56, height: 56, borderRadius: 18, justifyContent: "center", alignItems: "center" },
+  quickLabel: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#06101F", letterSpacing: -0.3 },
+  quickSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#7A8FAA", lineHeight: 17 },
 
   // Dashboard shortcut cards
   dashCard: { flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "white", borderRadius: 22, padding: 20, marginBottom: 14, shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6, borderWidth: 1, borderColor: "#E8ECFA", ..._ws("0 8px 20px rgba(22,80,208,0.09)") },
@@ -1311,17 +1310,17 @@ const styles = StyleSheet.create({
   routeCard: {
     flexDirection: "row", alignItems: "center", gap: 14,
     backgroundColor: "white", borderRadius: 18,
-    paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07, shadowRadius: 14, elevation: 4,
-    borderWidth: 1, borderColor: "#ECEEF8",
-    ..._ws("0 4px 14px rgba(22,80,208,0.07)"),
+    paddingVertical: 15, paddingHorizontal: 16, marginBottom: 10,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    borderWidth: 1, borderColor: "#EEF2FB",
+    ..._ws("0 3px 12px rgba(22,80,208,0.06)"),
   },
-  routeCardPressed: { opacity: 0.85, transform: [{ scale: 0.972 }] },
+  routeCardPressed: { opacity: 0.82, transform: [{ scale: 0.975 }] },
   routeCardIcon: {
-    width: 42, height: 42, borderRadius: 13,
+    width: 44, height: 44, borderRadius: 14,
     backgroundColor: "#EEF4FF", justifyContent: "center", alignItems: "center",
-    borderWidth: 1, borderColor: "#C7D9FF", flexShrink: 0,
+    borderWidth: 1.5, borderColor: "#C7D9FF", flexShrink: 0,
   },
   routeCardCenter: { flex: 1, minWidth: 0, gap: 5 },
   routeCitiesRow: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1331,9 +1330,9 @@ const styles = StyleSheet.create({
   routeMetaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   routeCardMeta: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#A4B4C6" },
   routeCardRight: { alignItems: "flex-end", gap: 6, flexShrink: 0 },
-  routeCardPrice: { fontSize: 14, fontFamily: "Inter_700Bold", color: Colors.light.primary, letterSpacing: -0.3 },
+  routeCardPrice: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#F97316", letterSpacing: -0.3 },
   routeChevronCircle: {
-    width: 28, height: 28, borderRadius: 14,
+    width: 30, height: 30, borderRadius: 15,
     backgroundColor: Colors.light.primary,
     justifyContent: "center", alignItems: "center",
   },

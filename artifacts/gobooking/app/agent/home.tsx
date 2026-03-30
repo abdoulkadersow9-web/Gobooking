@@ -398,20 +398,20 @@ const S = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 36, gap: 12 },
 
-  card:        { borderRadius: 18, overflow: "hidden", shadowColor: "#0B3C5D", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  cardPressed: { opacity: 0.88, transform: [{ scale: 0.981 }] },
-  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 20, paddingHorizontal: 18, gap: 14, position: "relative" },
-  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 5, borderTopLeftRadius: 18, borderBottomLeftRadius: 18 },
+  card:        { borderRadius: 20, overflow: "hidden", shadowColor: "#0B3C5D", shadowOpacity: 0.10, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 5, borderWidth: 1, borderColor: "rgba(0,0,0,0.04)" },
+  cardPressed: { opacity: 0.86, transform: [{ scale: 0.978 }] },
+  cardGradient:{ flexDirection: "row", alignItems: "center", paddingVertical: 22, paddingHorizontal: 18, gap: 15, position: "relative" },
+  cardAccent:  { position: "absolute", left: 0, top: 0, bottom: 0, width: 4, borderTopLeftRadius: 20, borderBottomLeftRadius: 20 },
 
-  cardIconBox: { width: 56, height: 56, borderRadius: 15, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
+  cardIconBox: { width: 58, height: 58, borderRadius: 16, justifyContent: "center", alignItems: "center", borderWidth: 1.5, flexShrink: 0 },
   cardBody:    { flex: 1, gap: 3 },
   cardLabel:   { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
 
-  cardArrow:   { width: 34, height: 34, borderRadius: 17, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  cardArrow:   { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
-  extraRow:    { flexDirection: "row", gap: 10, marginTop: 2 },
-  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 13, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  extraRow:    { flexDirection: "row", gap: 10, marginTop: 4 },
+  extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 16, paddingVertical: 14, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   extraBtnText:{ fontSize: 13, fontWeight: "700", color: NAVY },
 
 });

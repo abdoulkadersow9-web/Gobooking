@@ -695,10 +695,10 @@ const styles = StyleSheet.create({
   filterTabTextActive: { color: "white", fontFamily: "Inter_700Bold", lineHeight: 16 },
 
   card:         {
-    backgroundColor: "white", borderRadius: 20, padding: 18, marginBottom: 16,
-    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 5,
-    borderWidth: 1, borderColor: "#ECEEF8", borderLeftWidth: 4,
-    ..._ws("0 4px 16px rgba(22,80,208,0.07)"),
+    backgroundColor: "white", borderRadius: 22, padding: 18, marginBottom: 16,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.09, shadowRadius: 20, elevation: 6,
+    borderWidth: 1, borderColor: "#EEF2FB", borderLeftWidth: 4,
+    ..._ws("0 6px 20px rgba(22,80,208,0.09)"),
   },
   cardPressed:  { transform: [{ scale: 0.984 }], opacity: 0.94 },
   cardExpired:  { borderColor: "#FECACA", backgroundColor: "#FFFAFA" },

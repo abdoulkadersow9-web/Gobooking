@@ -2996,9 +2996,9 @@ const SC = StyleSheet.create({
   connLabel: { fontSize: 11, fontWeight: "700", color: "#374151", textAlign: "center", lineHeight: 15 },
 
   /* Status card */
-  statusCard: { backgroundColor: "#fff", borderRadius: 14, padding: 16, marginBottom: 18,
-                borderWidth: 1, borderColor: "#E2E8F0",
-                shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
+  statusCard: { backgroundColor: "#fff", borderRadius: 18, padding: 18, marginBottom: 18,
+                borderWidth: 1, borderColor: "#E8ECFA",
+                shadowColor: "#1650D0", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 5 },
   statusRow:  { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7 },
   statusLabel:{ fontSize: 13, color: "#64748B", flex: 1 },
   statusValue:{ fontSize: 13, fontWeight: "700", maxWidth: 185, textAlign: "right" },

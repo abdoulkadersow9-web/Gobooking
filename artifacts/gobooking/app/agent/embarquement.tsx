@@ -1596,10 +1596,10 @@ const styles = StyleSheet.create({
 
   sectionTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
 
-  card: { backgroundColor: "#fff", borderRadius: 14, padding: 18, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
-  cardTitle: { fontSize: 15, fontWeight: "600", color: "#111827", marginBottom: 14 },
+  card: { backgroundColor: "#fff", borderRadius: 18, padding: 18, elevation: 4, shadowColor: "#059669", shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, borderWidth: 1, borderColor: "#F0FDF4" },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 14, letterSpacing: -0.2 },
 
-  scanBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 20, paddingHorizontal: 16, borderRadius: 16, shadowColor: G, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 6 },
+  scanBtn: { backgroundColor: G, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 20, paddingHorizontal: 16, borderRadius: 18, shadowColor: G, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.38, shadowRadius: 12, elevation: 7 },
   scanBtnText: { color: "#fff", fontSize: 18, fontWeight: "800", letterSpacing: 0.3 },
 
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 14 },
@@ -1613,9 +1613,9 @@ const styles = StyleSheet.create({
   centerBox: { alignItems: "center", padding: 24, gap: 10 },
   loadingText: { color: "#6B7280", fontSize: 14 },
 
-  resultCard: { backgroundColor: "#fff", borderRadius: 14, padding: 18, elevation: 2, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, gap: 10 },
-  notFoundCard: { borderWidth: 1.5, borderColor: "#FCA5A5", alignItems: "center" },
-  validatedCard: { borderWidth: 2, borderColor: G },
+  resultCard: { backgroundColor: "#fff", borderRadius: 18, padding: 18, elevation: 5, shadowColor: "#059669", shadowOpacity: 0.1, shadowRadius: 16, shadowOffset: { width: 0, height: 5 }, gap: 12, borderWidth: 1, borderColor: "#E9FBF2" },
+  notFoundCard: { borderWidth: 1.5, borderColor: "#FCA5A5", alignItems: "center", shadowColor: "#EF4444", shadowOpacity: 0.07, elevation: 3 },
+  validatedCard: { borderWidth: 2, borderColor: G, shadowColor: G, shadowOpacity: 0.12, elevation: 6 },
 
   notFoundText: { fontSize: 16, fontWeight: "700", color: "#EF4444", marginTop: 4 },
   notFoundSub: { fontSize: 13, color: "#6B7280", textAlign: "center" },
@@ -1623,13 +1623,13 @@ const styles = StyleSheet.create({
   validatedBadge: { alignItems: "center", gap: 6 },
   validatedText: { fontSize: 17, fontWeight: "700", color: G },
 
-  passengerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  passengerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: G_LIGHT, alignItems: "center", justifyContent: "center" },
-  passengerName: { fontSize: 16, fontWeight: "700", color: "#111827" },
-  passengerPhone: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-  seatBadge: { backgroundColor: G_LIGHT, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, alignItems: "center" },
-  seatText: { fontSize: 18, fontWeight: "800", color: G },
-  seatLabel: { fontSize: 10, color: G, fontWeight: "500", marginTop: 1 },
+  passengerRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  passengerAvatar: { width: 48, height: 48, borderRadius: 14, backgroundColor: "#DCFCE7", alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#86EFAC" },
+  passengerName: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  passengerPhone: { fontSize: 13, color: "#6B7280", marginTop: 2, fontWeight: "500" },
+  seatBadge: { backgroundColor: "#ECFDF5", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, alignItems: "center", borderWidth: 1.5, borderColor: G },
+  seatText: { fontSize: 20, fontWeight: "800", color: G },
+  seatLabel: { fontSize: 10, color: G, fontWeight: "600", marginTop: 2 },
 
   tripInfo: { flexDirection: "row", alignItems: "center", gap: 6 },
   tripInfoText: { fontSize: 13, color: "#374151", flex: 1 },
@@ -1648,9 +1648,9 @@ const styles = StyleSheet.create({
   retryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "#D1FAE5", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16 },
   retryBtnText: { color: G, fontSize: 14, fontWeight: "600" },
 
-  tips: { backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 6 },
-  tipsTitle: { fontSize: 13, fontWeight: "700", color: "#374151", marginBottom: 4 },
-  tip: { fontSize: 13, color: "#6B7280", lineHeight: 20 },
+  tips: { backgroundColor: "#fff", borderRadius: 18, padding: 18, gap: 8, borderWidth: 1, borderColor: "#F0FDF4", shadowColor: "#059669", shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  tipsTitle: { fontSize: 13, fontWeight: "800", color: "#374151", marginBottom: 2 },
+  tip: { fontSize: 13, color: "#6B7280", lineHeight: 21 },
 
   cameraWrap: { flex: 1, position: "relative" },
   webCamera: { flex: 1, backgroundColor: "#111", alignItems: "center", justifyContent: "center" },

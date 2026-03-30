@@ -218,26 +218,34 @@ export default function ResultatsScreen() {
 
   const renderTrip = ({ item }: { item: Trip }) => {
     const isLow = item.availableSeats <= 5;
+    const isPremium = item.busType === "Premium";
     const qState = quickStates[item.id] ?? "idle";
+    const accentColors: [string, string] = isPremium
+      ? ["#D97706", "#F59E0B"]
+      : isLow
+      ? ["#DC2626", "#EF4444"]
+      : [Colors.light.primary, "#3B82F6"];
     return (
       <View style={s.card}>
+        <LinearGradient colors={accentColors} style={s.cardAccent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+        <View style={s.cardInner}>
         <View style={s.cardHeader}>
-          <View style={s.companyBadge}>
+          <View style={[s.companyBadge, isPremium && { backgroundColor: "#D97706" }]}>
             <Text style={s.companyInitials}>
               {(item.companyName ?? item.busName ?? "?").substring(0, 2).toUpperCase()}
             </Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.companyName}>{item.companyName ?? item.busName}</Text>
-            <View style={[s.typePill, item.busType === "Premium" && { backgroundColor: "#FEF3C7" }]}>
-              <Text style={[s.typeText, item.busType === "Premium" && { color: "#D97706" }]}>
+            <View style={[s.typePill, isPremium && { backgroundColor: "#FEF3C7" }]}>
+              <Text style={[s.typeText, isPremium && { color: "#D97706" }]}>
                 {item.busType}
               </Text>
             </View>
           </View>
           <View style={s.pricePill}>
             <Text style={s.priceAmount}>{(item.price ?? 0).toLocaleString()}</Text>
-            <Text style={s.priceCurrency}> FCFA</Text>
+            <Text style={s.priceCurrency}>FCFA</Text>
           </View>
         </View>
 
@@ -251,11 +259,11 @@ export default function ResultatsScreen() {
             <View style={s.routeLine}>
               <View style={s.routeDotLeft} />
               <View style={s.routeDash} />
-              <Feather name="arrow-right" size={13} color={Colors.light.primary} />
+              <Feather name="arrow-right" size={14} color={Colors.light.primary} />
               <View style={s.routeDash} />
               <View style={s.routeDotRight} />
             </View>
-            <Text style={s.directText}>Direct</Text>
+            <Text style={s.directText}>DIRECT</Text>
           </View>
           <View style={[s.timeBlock, { alignItems: "flex-end" }]}>
             <Text style={s.timeText}>{item.arrivalTime}</Text>
@@ -269,7 +277,7 @@ export default function ResultatsScreen() {
           <View style={[s.seatsPill, isLow && s.seatsPillLow]}>
             <Feather name="users" size={11} color={isLow ? "#DC2626" : "#059669"} />
             <Text style={[s.seatsText, isLow && { color: "#DC2626" }]}>
-              {item.availableSeats} places
+              {item.availableSeats} place{item.availableSeats !== 1 ? "s" : ""}
             </Text>
           </View>
           {item.amenities.slice(0, 3).map((a) => (
@@ -281,21 +289,21 @@ export default function ResultatsScreen() {
 
         <View style={s.actions}>
           <Pressable
-            style={[s.quickBtn, qState === "success" && { backgroundColor: "#16A34A" }]}
+            style={({ pressed }) => [s.quickBtn, qState === "success" && { backgroundColor: "#16A34A" }, pressed && { opacity: 0.85 }]}
             onPress={() => handleQuickBook(item)}
             disabled={qState === "loading" || qState === "success"}
           >
             {qState === "loading" ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Feather name={qState === "success" ? "check-circle" : "calendar"} size={14} color="white" />
+              <Feather name={qState === "success" ? "check-circle" : "calendar"} size={15} color="white" />
             )}
             <Text style={s.btnText}>
               {qState === "loading" ? "En cours…" : qState === "success" ? "Réservé !" : "Réserver"}
             </Text>
           </Pressable>
-          <Pressable style={s.seatBtn} onPress={() => handleSelectSeat(item)}>
-            <Feather name="grid" size={14} color="white" />
+          <Pressable style={({ pressed }) => [s.seatBtn, pressed && { opacity: 0.85 }]} onPress={() => handleSelectSeat(item)}>
+            <Feather name="grid" size={15} color="white" />
             <Text style={s.btnText}>Choisir siège</Text>
           </Pressable>
         </View>
@@ -305,6 +313,7 @@ export default function ResultatsScreen() {
             <Text style={s.demoBadgeText}>EXEMPLE</Text>
           </View>
         )}
+        </View>
       </View>
     );
   };
@@ -511,41 +520,48 @@ const s = StyleSheet.create({
   demoBanner: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFFBEB", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   demoBannerText: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#D97706" },
 
-  card: { backgroundColor: "white", borderRadius: 18, padding: 16, marginBottom: 12, shadowColor: "#0B3C5D", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3 },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 14 },
-  companyBadge: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.light.primary, justifyContent: "center", alignItems: "center" },
-  companyInitials: { fontSize: 14, fontFamily: "Inter_700Bold", color: "white" },
-  companyName: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  typePill: { alignSelf: "flex-start", backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 2, marginTop: 2 },
+  card: {
+    backgroundColor: "white", borderRadius: 22, marginBottom: 14,
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.11, shadowRadius: 22, elevation: 6,
+    borderWidth: 1, borderColor: "#EEF4FF", overflow: "hidden",
+  },
+  cardAccent: { height: 4, width: "100%" },
+  cardInner: { padding: 18 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  companyBadge: { width: 44, height: 44, borderRadius: 14, backgroundColor: Colors.light.primary, justifyContent: "center", alignItems: "center" },
+  companyInitials: { fontSize: 15, fontFamily: "Inter_700Bold", color: "white" },
+  companyName: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.2 },
+  typePill: { alignSelf: "flex-start", backgroundColor: "#EEF2FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginTop: 3 },
   typeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: Colors.light.primary },
-  pricePill: { flexDirection: "row", alignItems: "baseline" },
-  priceAmount: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.light.primary },
-  priceCurrency: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#64748B" },
+  pricePill: { alignItems: "flex-end" },
+  priceAmount: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#F97316", letterSpacing: -0.5 },
+  priceCurrency: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#94A3B8", marginTop: 2 },
 
-  routeRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  routeRow: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   timeBlock: { alignItems: "flex-start" },
-  timeText: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#0F172A" },
-  cityText: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#64748B", marginTop: 2 },
-  routeMid: { flex: 1, alignItems: "center", gap: 3 },
-  durationText: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#64748B" },
-  routeLine: { flexDirection: "row", alignItems: "center", gap: 4, width: "100%" },
-  routeDotLeft: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" },
-  routeDash: { flex: 1, height: 1, backgroundColor: "#E2E8F0" },
-  routeDotRight: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.light.primary },
-  directText: { fontSize: 9, fontFamily: "Inter_500Medium", color: "#94A3B8" },
+  timeText: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#0F172A", letterSpacing: -0.5 },
+  cityText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#64748B", marginTop: 3 },
+  routeMid: { flex: 1, alignItems: "center", gap: 4 },
+  durationText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#94A3B8" },
+  routeLine: { flexDirection: "row", alignItems: "center", gap: 3, width: "100%" },
+  routeDotLeft: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981" },
+  routeDash: { flex: 1, height: 1.5, backgroundColor: "#E2E8F0" },
+  routeDotRight: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.light.primary },
+  directText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#94A3B8", letterSpacing: 0.3 },
 
-  divider: { height: 1, backgroundColor: "#F1F5F9", marginBottom: 12 },
-  cardFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
-  seatsPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  divider: { height: 1, backgroundColor: "#F1F5F9", marginBottom: 14 },
+  cardFooter: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14, flexWrap: "wrap" },
+  seatsPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
   seatsPillLow: { backgroundColor: "#FEF2F2" },
-  seatsText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#059669" },
-  amenityDot: { backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  amenityText: { fontSize: 10, fontFamily: "Inter_500Medium", color: "#64748B" },
+  seatsText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#059669" },
+  amenityDot: { backgroundColor: "#F8FAFC", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#E2E8F0" },
+  amenityText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: "#64748B" },
 
-  actions: { flexDirection: "row", gap: 8 },
-  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: Colors.light.primary, borderRadius: 12, paddingVertical: 11 },
-  seatBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: Colors.light.accent, borderRadius: 12, paddingVertical: 11 },
-  btnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "white" },
+  actions: { flexDirection: "row", gap: 10 },
+  quickBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: Colors.light.primary, borderRadius: 14, paddingVertical: 13 },
+  seatBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#F97316", borderRadius: 14, paddingVertical: 13 },
+  btnText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "white" },
 
   demoBadge: { position: "absolute", top: 10, right: 10, backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   demoBadgeText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#D97706" },

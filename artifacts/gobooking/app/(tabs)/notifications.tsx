@@ -356,20 +356,21 @@ const S = StyleSheet.create({
   },
 
   card: {
-    flexDirection: "row", gap: 12, backgroundColor: "white",
-    borderRadius: 16, padding: 14, overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 1,
+    flexDirection: "row", gap: 14, backgroundColor: "white",
+    borderRadius: 18, padding: 15, overflow: "hidden",
+    shadowColor: "#1650D0", shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+    borderWidth: 1, borderColor: "#EEF2F8",
   },
-  cardUnread: { backgroundColor: "#FAFBFF", borderWidth: 1, borderColor: "#C7D2FE" },
-  cardPressed: { opacity: 0.92, transform: [{ scale: 0.99 }] },
+  cardUnread: { backgroundColor: "#FAFBFF", borderWidth: 1.5, borderColor: "#C7D2FE" },
+  cardPressed: { opacity: 0.90, transform: [{ scale: 0.988 }] },
 
   strip: {
     position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
-    borderTopLeftRadius: 16, borderBottomLeftRadius: 16,
+    borderTopLeftRadius: 18, borderBottomLeftRadius: 18,
   },
 
-  iconWrap: { width: 48, height: 48, borderRadius: 14, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+  iconWrap: { width: 50, height: 50, borderRadius: 15, justifyContent: "center", alignItems: "center", flexShrink: 0 },
 
   content: { flex: 1, gap: 4 },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
