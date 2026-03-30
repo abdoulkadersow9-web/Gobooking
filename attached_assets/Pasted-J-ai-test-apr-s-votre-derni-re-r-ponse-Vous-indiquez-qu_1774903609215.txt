@@ -1,0 +1,115 @@
+J’ai testé après votre dernière réponse.
+
+Vous indiquez que tout est déjà implémenté et en production.
+
+Mais dans l’application réelle, ce n’est pas visible et pas exploitable.
+
+---
+
+## PROBLÈME GLOBAL
+
+Toutes les logiques que nous avons définies :
+
+- gestion des absents  
+- séparation réservations (en route / à venir)  
+- caisses  
+- validations  
+- flux agents  
+
+👉 ne sont pas visibles dans l’interface.
+
+---
+
+## CE QUI N’EST PAS ACCEPTABLE
+
+Je ne veux plus de logique uniquement dans le code.
+
+👉 Si ce n’est pas visible dans l’application :
+👉 alors ce n’est pas considéré comme fait.
+
+---
+
+## PROBLÈMES OBSERVÉS
+
+1. Page réservation
+- aucune séparation visible :
+  - en route
+  - à venir  
+- tout est mélangé  
+- page confuse  
+
+2. Page chef d’agence
+- ne s’ouvre pas correctement  
+- aucune donnée exploitable  
+- impossible de tester  
+
+3. Pages agents
+- les nouvelles logiques ne sont pas visibles  
+- aucune action claire  
+- aucun impact réel  
+
+---
+
+## CONSIGNE TRÈS IMPORTANTE
+
+À partir de maintenant :
+
+👉 Toute logique développée doit être :
+
+- visible dans l’interface  
+- testable immédiatement  
+- connectée aux pages existantes  
+- harmonisée avec le design  
+
+---
+
+## À FAIRE IMMÉDIATEMENT
+
+1. Appliquer toutes les logiques dans les pages réelles
+   - réservation (en route / à venir)
+   - embarquement (absents / libération)
+   - caisses
+   - validations  
+
+2. Connecter backend + frontend
+   - afficher les vraies données  
+   - rendre les actions fonctionnelles  
+
+3. Corriger les pages cassées
+   - chef d’agence doit fonctionner  
+   - navigation fluide  
+   - pages exploitables  
+
+---
+
+## RÈGLE ABSOLUE
+
+- ne rien changer à la logique métier  
+- ne rien casser  
+- améliorer et afficher uniquement  
+
+---
+
+## OBJECTIF
+
+Passer de :
+
+❌ code invisible  
+➡️  
+✅ application réelle utilisable et testable  
+
+---
+
+## ATTENTE
+
+Je veux maintenant :
+
+- voir les modifications dans l’application  
+- tester les fonctionnalités  
+- valider les flux  
+
+👉 Pas de réponse “c’est fait” sans preuve visuelle.
+
+---
+
+Merci d’appliquer cela immédiatement dans l’application réelle.
