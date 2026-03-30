@@ -203,6 +203,9 @@ export default function ColisScreen() {
             </View>
           </View>
         </View>
+        <TouchableOpacity onPress={() => router.push("/agent/caisse" as never)} style={[S.logoutBtn, { backgroundColor: "rgba(6,95,70,0.85)", marginRight: 8 }]} hitSlop={8}>
+          <Ionicons name="cash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={logout} style={S.logoutBtn} hitSlop={8}>
           <Ionicons name="log-out-outline" size={18} color="#fff" />
         </TouchableOpacity>

@@ -155,7 +155,7 @@ router.get("/caisse/summary", async (req, res) => {
         passengerCount:   passCount,
         byPayment,
         transactions,
-        canClose:      trip?.status === "completed" || trip?.status === "arrived" || trip?.status === "in_progress",
+        canClose:      true,
       });
       return;
     }
@@ -223,7 +223,7 @@ router.get("/caisse/summary", async (req, res) => {
         transactionCount: rows.length,
         byPayment,
         transactions,
-        canClose:         trip?.status === "completed" || trip?.status === "arrived" || trip?.status === "in_progress",
+        canClose:         true,
       });
       return;
     }
@@ -290,7 +290,7 @@ router.get("/caisse/summary", async (req, res) => {
         transactionCount: rows.length,
         byPayment,
         transactions,
-        canClose:         trip?.status === "completed" || trip?.status === "arrived" || trip?.status === "in_progress",
+        canClose:         true,
       });
       return;
     }

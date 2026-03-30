@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -122,6 +122,7 @@ function busAvailLabel(b: Bus): { label: string; color: string; bg: string; sele
 
 export default function ChefTrips() {
   const { token, user, logoutIfActiveToken } = useAuth();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const authToken = token ?? "";
 
   /* ── État global ── */
@@ -132,7 +133,9 @@ export default function ChefTrips() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [saving,      setSaving]      = useState(false);
-  const [activeTab,   setActiveTab]   = useState<"trips" | "caisses" | "historique">("trips");
+  const [activeTab,   setActiveTab]   = useState<"trips" | "caisses" | "historique">(
+    (params.tab === "caisses" || params.tab === "historique") ? params.tab : "trips"
+  );
 
   /* ── Caisses agents ── */
   const [caisses,        setCaisses]        = useState<any[]>([]);

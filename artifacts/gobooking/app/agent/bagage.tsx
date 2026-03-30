@@ -834,6 +834,12 @@ export default function AgentBagage() {
             Liste{selectedTrip ? ` (${items.length})` : ""}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[SL.tab, { borderBottomWidth: 2, borderBottomColor: "#065F46" }]}
+          onPress={() => router.push("/agent/caisse" as never)}>
+          <Feather name="dollar-sign" size={15} color="#065F46" />
+          <Text style={[SL.tabText, { color: "#065F46", fontWeight: "700" }]}>Ma Caisse</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Breadcrumb */}

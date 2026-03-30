@@ -50,19 +50,22 @@ export default function ChefHome() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingCaisses, setPendingCaisses] = useState(0);
 
   const load = useCallback(async () => {
     /* Guard: skip fetch during role transitions (screen still mounted while navigating away) */
     if (!authToken || user?.agentRole !== "chef_agence") { setLoading(false); return; }
     try {
-      const [d, b, t] = await Promise.all([
+      const [d, b, t, cs] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
         apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
+        apiFetch<{ stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
       ]);
       setDash(d);
       setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
+      setPendingCaisses(cs.stats?.pending ?? 0);
     } catch (e: any) {
       /* 401 = token truly invalid → logout.  403 = RBAC (wrong role) → never logout */
       if (e?.httpStatus === 401) {
@@ -188,7 +191,7 @@ export default function ChefHome() {
         {/* ── Actions rapides ── */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Actions rapides</Text>
-          <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
             <Pressable style={[s.actionBtn, { backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
               <Feather name="plus-circle" size={16} color="white" />
               <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Nouveau départ</Text>
@@ -198,6 +201,29 @@ export default function ChefHome() {
               <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Trajets</Text>
             </Pressable>
           </View>
+          {/* Caisses agents */}
+          <Pressable
+            style={{ backgroundColor: "#065F46", borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 }}
+            onPress={() => router.push({ pathname: "/agent/chef-trips", params: { tab: "caisses" } } as never)}
+          >
+            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
+              <Feather name="dollar-sign" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Caisses des agents</Text>
+              <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>
+                {pendingCaisses > 0
+                  ? `${pendingCaisses} caisse${pendingCaisses > 1 ? "s" : ""} en attente de validation`
+                  : "Valider ou rejeter les caisses soumises par vos agents"}
+              </Text>
+            </View>
+            {pendingCaisses > 0 && (
+              <View style={{ backgroundColor: "#FCD34D", borderRadius: 12, minWidth: 24, height: 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, marginRight: 4 }}>
+                <Text style={{ color: "#92400E", fontWeight: "800", fontSize: 13 }}>{pendingCaisses}</Text>
+              </View>
+            )}
+            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
+          </Pressable>
         </View>
 
         {/* ── Cars disponibles ── */}

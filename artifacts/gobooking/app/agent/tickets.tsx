@@ -236,7 +236,7 @@ export default function TicketsScreen() {
   const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
 
   /* ── Tab ── */
-  const [activeTab, setActiveTab] = useState<"vente" | "depart" | "impression">("vente");
+  const [activeTab, setActiveTab] = useState<"vente" | "depart" | "impression" | "caisse">("vente");
 
   /* ── Vente state ── */
   const [trips, setTrips]           = useState<Trip[]>([]);
@@ -711,6 +711,10 @@ export default function TicketsScreen() {
         <TouchableOpacity style={[S.tab, activeTab === "impression" && S.tabActive]} onPress={() => setActiveTab("impression")}>
           <Feather name="printer" size={14} color={activeTab === "impression" ? G_DARK : "#9CA3AF"} />
           <Text style={[S.tabTxt, activeTab === "impression" && S.tabTxtActive]} numberOfLines={1}>Impression</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[S.tab, { borderBottomWidth: 2, borderBottomColor: "#065F46" }]} onPress={() => router.push("/agent/caisse" as never)}>
+          <Feather name="dollar-sign" size={15} color="#065F46" />
+          <Text style={[S.tabTxt, { color: "#065F46", fontWeight: "700" }]} numberOfLines={1}>Ma Caisse</Text>
         </TouchableOpacity>
       </View>
 
