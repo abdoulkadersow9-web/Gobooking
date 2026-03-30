@@ -14,6 +14,7 @@ export const modules: ModuleMap = {
   "./components/mockups/suivi-tc-preview.tsx": () => import("../components/mockups/suivi-tc-preview.tsx"),
   "./components/mockups/ticket-scanner.tsx": () => import("../components/mockups/ticket-scanner.tsx"),
   "./components/mockups/trip-results.tsx": () => import("../components/mockups/trip-results.tsx"),
+  "./components/mockups/agent-seat-plan/AgentSeatPlan.tsx": () => import("../components/mockups/agent-seat-plan/AgentSeatPlan.tsx"),
   "./components/mockups/gobooking-ui/AppHeader.tsx": () => import("../components/mockups/gobooking-ui/AppHeader.tsx"),
   "./components/mockups/gobooking-ui/Badges.tsx": () => import("../components/mockups/gobooking-ui/Badges.tsx"),
   "./components/mockups/gobooking-ui/BottomNav.tsx": () => import("../components/mockups/gobooking-ui/BottomNav.tsx"),
