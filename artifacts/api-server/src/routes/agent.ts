@@ -1717,9 +1717,22 @@ router.get("/trips", async (req, res) => {
 
     if (!companyId) { res.status(403).json({ error: "Agent non affilié à une compagnie" }); return; }
 
-    const trips = await db.select().from(tripsTable)
+    /* Only return trips relevant for guichet: last 2 days (late departures)
+       through next 30 days (advance bookings). Filter out arrived/cancelled. */
+    const todayDate = new Date();
+    const twoDaysAgo = new Date(todayDate.getTime() - 2 * 86400000).toISOString().split("T")[0];
+    const thirtyDaysAhead = new Date(todayDate.getTime() + 30 * 86400000).toISOString().split("T")[0];
+
+    const allTrips = await db.select().from(tripsTable)
         .where(and(eq(tripsTable.companyId, companyId)))
         .orderBy(desc(tripsTable.date));
+
+    const trips = allTrips.filter(t => {
+      const d = t.date ?? "";
+      if (d < twoDaysAgo || d > thirtyDaysAhead) return false;
+      if (["arrived", "cancelled", "completed"].includes(t.status ?? "")) return false;
+      return true;
+    });
 
     const enriched = await Promise.all(trips.map(async (trip) => {
       const availableCount = await db.select().from(seatsTable)

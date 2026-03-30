@@ -681,11 +681,17 @@ export default function TicketsScreen() {
     );
   }
 
-  /* ── Trip classification: en route vs à venir ── */
+  /* ── Trip classification: en route vs boarding vs à venir ── */
   const _now      = new Date();
   const _nowMins  = _now.getHours() * 60 + _now.getMinutes();
   const _today    = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
+  const _yesterday = (() => { const d = new Date(_now); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+
   const _isEnRoute = (t: Trip) => {
+    /* Only trips from today or yesterday can be "en route" (late buses).
+       Old trips from days ago are ignored even if status = en_route. */
+    const isRecentDate = t.date === _today || t.date === _yesterday;
+    if (!isRecentDate) return false;
     if (t.status === "en_route" || t.status === "en_cours") return true;
     if (t.date === _today) {
       const [h, m] = (t.departureTime || "99:99").split(":").map(Number);
@@ -693,8 +699,11 @@ export default function TicketsScreen() {
     }
     return false;
   };
-  const tripsEnRoute = trips.filter(t => _isEnRoute(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
-  const tripsFuture  = trips.filter(t => !_isEnRoute(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
+  const _isBoarding = (t: Trip) => t.status === "boarding" && (t.date === _today || t.date === _yesterday);
+
+  const tripsEnRoute  = trips.filter(t => _isEnRoute(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
+  const tripsBoarding = trips.filter(t => _isBoarding(t) && !_isEnRoute(t));
+  const tripsFuture   = trips.filter(t => !_isEnRoute(t) && !_isBoarding(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
 
   /* ── Main screen ── */
   return (
@@ -714,6 +723,42 @@ export default function TicketsScreen() {
           <Ionicons name="log-out-outline" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* ── STATUT EN DIRECT — bandeau toujours visible ── */}
+      {!loadingTrips && trips.length > 0 && (
+        <View style={{
+          flexDirection: "row", alignItems: "center", gap: 8,
+          backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 10,
+        }}>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#34D399" }} />
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8", letterSpacing: 0.5 }}>EN DIRECT</Text>
+          <View style={{ flex: 1, flexDirection: "row", gap: 6 }}>
+            {tripsEnRoute.length > 0 && (
+              <View style={{ backgroundColor: "#DC2626", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#FCA5A5" }} />
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
+                  {tripsEnRoute.length} EN ROUTE
+                </Text>
+              </View>
+            )}
+            {tripsBoarding.length > 0 && (
+              <View style={{ backgroundColor: "#D97706", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="bus" size={10} color="#FEF3C7" />
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
+                  {tripsBoarding.length} EMBARQUEMENT
+                </Text>
+              </View>
+            )}
+            {tripsFuture.length > 0 && (
+              <View style={{ backgroundColor: "#1650D0", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
+                  {tripsFuture.length} À VENIR
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* ── Tab bar ── */}
       <View style={S.tabBar}>
@@ -860,7 +905,92 @@ export default function TicketsScreen() {
                   </>
                 )}
 
-                {/* ══ Section B : Départs À VENIR ══ */}
+                {/* ══ Section B : En EMBARQUEMENT ══ */}
+                {tripsBoarding.length > 0 && (
+                  <>
+                    <View style={{
+                      flexDirection: "row", alignItems: "center", gap: 8,
+                      backgroundColor: "#FEF3C7", borderRadius: 10,
+                      paddingHorizontal: 12, paddingVertical: 9,
+                      borderWidth: 1.5, borderColor: "#FCD34D", marginBottom: 4,
+                      marginTop: tripsEnRoute.length > 0 ? 4 : 0,
+                    }}>
+                      <Ionicons name="bus" size={13} color="#D97706" />
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#92400E", letterSpacing: 0.5, flex: 1 }}>
+                        EN EMBARQUEMENT — Passagers à bord
+                      </Text>
+                      <View style={{ backgroundColor: "#D97706", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{tripsBoarding.length}</Text>
+                      </View>
+                    </View>
+                    <View style={{ gap: 10, marginBottom: 8 }}>
+                      {tripsBoarding.map(trip => {
+                        const isSelected = selectedTrip?.id === trip.id;
+                        const hasSeats   = trip.guichetSeats !== undefined && trip.guichetSeats > 0;
+                        const hasOnline  = (trip.onlineSeats ?? 0) > 0;
+                        return (
+                          <View key={trip.id} style={[S.tripCard, isSelected && S.tripCardSel, {
+                            borderLeftWidth: 4, borderLeftColor: "#D97706",
+                          }]}>
+                            <TouchableOpacity activeOpacity={0.75} onPress={() => setSelectedTrip(isSelected ? null : trip)}>
+                              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                                <View style={{ flex: 1, gap: 4 }}>
+                                  <Text style={S.tripCardRoute} numberOfLines={1}>
+                                    {trip.from}{"  "}<Text style={{ color: "#9CA3AF", fontSize: 14 }}>→</Text>{"  "}{trip.to}
+                                  </Text>
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                    <Ionicons name="time-outline" size={13} color="#9CA3AF" />
+                                    <Text style={S.tripCardTime}>{trip.departureTime} · {trip.date}</Text>
+                                  </View>
+                                </View>
+                                <View style={{ alignItems: "flex-end", marginLeft: 12 }}>
+                                  <Text style={S.tripCardPrice}>{trip.price?.toLocaleString()}</Text>
+                                  <Text style={S.tripCardFcfa}>FCFA</Text>
+                                </View>
+                              </View>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                  <Ionicons name="bus" size={10} color="#D97706" />
+                                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>Embarquement</Text>
+                                </View>
+                                {hasSeats ? (
+                                  <View style={S.tripBadgeGreen}>
+                                    <Ionicons name="ticket-outline" size={11} color={G_DARK} />
+                                    <Text style={S.tripBadgeGreenTxt}>{trip.guichetSeats} guichet</Text>
+                                  </View>
+                                ) : null}
+                                {!hasSeats && !hasOnline && trip.availableSeats !== undefined && (
+                                  <View style={S.tripBadgeGreen}>
+                                    <Text style={S.tripBadgeGreenTxt}>{trip.availableSeats} places dispo.</Text>
+                                  </View>
+                                )}
+                                <View style={{ flex: 1 }} />
+                                <View style={[S.tripSelIcon, isSelected && S.tripSelIconActive]}>
+                                  <Ionicons name={isSelected ? "checkmark" : "chevron-down"} size={14} color={isSelected ? "#fff" : "#9CA3AF"} />
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                            {isSelected && (
+                              <>
+                                <View style={S.tripCardDivider} />
+                                <TouchableOpacity
+                                  activeOpacity={0.85}
+                                  onPress={() => router.push({ pathname: "/agent/seat-plan/[tripId]" as any, params: { tripId: trip.id, from: trip.from, to: trip.to, date: trip.date, time: trip.departureTime, busType: trip.busType ?? "" } })}
+                                  style={S.tripSeatPlanBtn}>
+                                  <Ionicons name="grid-outline" size={16} color="#fff" />
+                                  <Text style={S.tripSeatPlanBtnTxt}>Voir le plan de sièges</Text>
+                                  <Ionicons name="arrow-forward" size={15} color="#fff" />
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
+
+                {/* ══ Section C : Départs À VENIR ══ */}
                 {tripsFuture.length > 0 && (
                   <>
                     {/* À venir section header */}
@@ -869,7 +999,7 @@ export default function TicketsScreen() {
                       backgroundColor: G_LIGHT, borderRadius: 10,
                       paddingHorizontal: 12, paddingVertical: 9,
                       borderWidth: 1.5, borderColor: "#FDE68A", marginBottom: 4,
-                      marginTop: tripsEnRoute.length > 0 ? 4 : 0,
+                      marginTop: (tripsEnRoute.length > 0 || tripsBoarding.length > 0) ? 4 : 0,
                     }}>
                       <Ionicons name="time-outline" size={13} color={G} />
                       <Text style={{ fontSize: 12, fontWeight: "800", color: G_DARK, letterSpacing: 0.5, flex: 1 }}>

@@ -1038,6 +1038,39 @@ export default function EmbarquementScreen() {
         </View>
       </View>
 
+      {/* ── ALERTE ABSENTS — toujours visible si des passagers manquent ── */}
+      {boardingStatus && boardingStatus.stats.absent > 0 && !departureResult && (
+        <TouchableOpacity
+          onPress={() => {
+            setActiveTab("depart");
+            if (selectedTrip) loadBoardingStatus(selectedTrip.id);
+          }}
+          activeOpacity={0.85}
+          style={{
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: "#FEF3C7",
+            paddingHorizontal: 14, paddingVertical: 10,
+            borderBottomWidth: 2, borderBottomColor: "#FCD34D",
+          }}
+        >
+          <View style={{
+            width: 34, height: 34, borderRadius: 17,
+            backgroundColor: "#D97706", alignItems: "center", justifyContent: "center",
+          }}>
+            <Ionicons name="alert" size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: "800", color: "#92400E" }}>
+              {boardingStatus.stats.absent} PASSAGER{boardingStatus.stats.absent > 1 ? "S" : ""} ABSENT{boardingStatus.stats.absent > 1 ? "S" : ""}
+            </Text>
+            <Text style={{ fontSize: 11, color: "#B45309" }}>
+              {boardingStatus.stats.boarded}/{boardingStatus.stats.total} embarqués · Appuyez pour gérer →
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#D97706" />
+        </TouchableOpacity>
+      )}
+
       {/* ── Billets tab ── */}
       {activeTab === "billets" && (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
