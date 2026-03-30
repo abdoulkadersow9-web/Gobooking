@@ -1,0 +1,134 @@
+Complément très important à intégrer dans la logique existante, sans rien casser.
+
+---
+
+## LOGIQUE EMBARQUEMENT – GESTION DES ABSENTS & LIBÉRATION DES PLACES
+
+Cette logique doit être appliquée exactement comme en situation réelle terrain.
+
+---
+
+## 1. AVANT LE DÉPART (RAPPEL EXISTANT)
+
+- une alerte est envoyée aux agents avant le départ  
+- chaque agent doit valider sa page  
+- l’agent embarquement reçoit la liste complète des passagers  
+
+---
+
+## 2. PENDANT L’EMBARQUEMENT
+
+L’agent embarquement :
+
+- voit la liste des passagers attendus  
+- scanne / valide les passagers présents  
+- identifie les absents en temps réel  
+
+---
+
+## 3. GESTION DES ABSENTS (TRÈS IMPORTANT)
+
+Lorsque des passagers sont absents :
+
+👉 l’agent embarquement doit avoir une action :
+
+### “Gérer les absents / Libérer des places”
+
+---
+
+## 4. FONCTIONNEMENT
+
+Exemple :
+
+- 40 passagers attendus  
+- 3 absents  
+
+👉 l’agent peut :
+
+- sélectionner les sièges des absents  
+- choisir combien de places libérer (ex : 2 sur 3)  
+
+---
+
+## 5. LIBÉRATION VERS LE GUICHET
+
+Lorsque l’agent valide :
+
+- les places sélectionnées deviennent :
+  👉 disponibles au guichet  
+
+👉 le guichet peut immédiatement vendre ces places  
+
+---
+
+## 6. CAS IMPORTANT
+
+Si :
+
+- toutes les places libérées ne sont pas vendues au guichet  
+
+👉 alors automatiquement :
+
+- les places restantes passent en :
+  👉 disponible en ligne
+
+---
+
+## 7. PASSAGE EN MODE “EN ROUTE”
+
+Quand le bus démarre :
+
+- toutes les places restantes non vendues deviennent :
+  👉 en ligne  
+
+---
+
+## 8. TRANSFERT DE RESPONSABILITÉ
+
+À partir du moment où le car est en route :
+
+- l’agent embarquement n’intervient plus  
+- l’agent guichet n’intervient plus  
+
+👉 ce sont :
+
+- l’agent route  
+- l’agent réservation  
+
+qui prennent le relais
+
+---
+
+## 9. RÈGLES IMPORTANTES
+
+- ne pas modifier la logique actuelle  
+- ne pas casser le système existant  
+- intégrer cette logique dans le flux actuel  
+
+---
+
+## 10. CONTRÔLE & SÉCURITÉ
+
+Rappel :
+
+- seul le chef d’agence peut annuler un ticket  
+- aucun agent ne doit pouvoir annuler librement  
+- toutes les actions doivent être tracées  
+
+---
+
+## 11. OBJECTIF
+
+Créer un système :
+
+- intelligent  
+- dynamique  
+- connecté  
+- sans perte de places  
+- sans confusion  
+
+👉 optimisation maximale du remplissage des cars  
+
+---
+
+Merci d’intégrer cette logique directement dans l’application avec affichage réel, actions visibles et testables.
