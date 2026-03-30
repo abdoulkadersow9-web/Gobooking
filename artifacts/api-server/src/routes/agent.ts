@@ -747,6 +747,28 @@ router.post("/reservations", async (req, res) => {
     const seatStatus = isReservation ? "reserved" : "occupied";
     try {
       if (preferredSeatNumber) {
+        /* ── Server-side anti-double guard ────────────────────────────
+           Check if the requested seat is already booked online/mobile.
+           Reject the request to prevent silent seat swaps.          */
+        const onlineConflict = await db.select({ id: bookingsTable.id, ref: bookingsTable.bookingRef })
+          .from(bookingsTable)
+          .where(and(
+            eq(bookingsTable.tripId, tripId),
+            inArray(bookingsTable.bookingSource as any, ["mobile", "online"]),
+            inArray(bookingsTable.status, ["confirmed", "reserved", "boarded", "validated", "payé"]),
+            sql`${bookingsTable.seatNumbers}::jsonb @> ${JSON.stringify([preferredSeatNumber])}::jsonb`,
+          ))
+          .limit(1);
+
+        if (onlineConflict.length > 0) {
+          res.status(409).json({
+            error: `Siège ${preferredSeatNumber} déjà réservé en ligne (réf: ${onlineConflict[0].ref}). Choisissez un autre siège.`,
+            code: "SEAT_ONLINE_CONFLICT",
+            seat: preferredSeatNumber,
+          });
+          return;
+        }
+
         // Siège spécifique demandé (depuis le plan des sièges)
         const specificSeat = await db.execute(sql`
           SELECT id, number FROM seats
@@ -757,12 +779,13 @@ router.post("/reservations", async (req, res) => {
           assignedSeatIds    = [(specificSeat.rows[0] as any).id];
           assignedSeatNumbers = [(specificSeat.rows[0] as any).number];
         } else {
-          // Siège non disponible → auto-assigner
-          const freeSeats = await db.execute(sql`
-            SELECT id, number FROM seats WHERE trip_id = ${tripId} AND status = 'available' ORDER BY "row","column" LIMIT ${count}
-          `);
-          assignedSeatIds    = (freeSeats.rows as any[]).map(s => s.id);
-          assignedSeatNumbers = (freeSeats.rows as any[]).map(s => s.number);
+          // Siège non disponible → retourner erreur explicite
+          res.status(409).json({
+            error: `Siège ${preferredSeatNumber} non disponible. Il vient peut-être d'être réservé.`,
+            code: "SEAT_NOT_AVAILABLE",
+            seat: preferredSeatNumber,
+          });
+          return;
         }
       } else {
         const freeSeats = await db.execute(sql`

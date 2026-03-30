@@ -1,0 +1,78 @@
+J’ai vérifié les nouvelles captures.
+
+Les améliorations annoncées dans Replit sont visibles dans le texte, mais dans l’application réelle, pendant le test, ce n’est pas encore appliqué correctement.
+
+### PROBLÈME PRINCIPAL
+
+Vous indiquez que :
+- les places en ligne sont bloquées
+- la logique guichet / en ligne est corrigée
+- les villes ont été ajoutées
+
+Mais dans le test réel de l’application :
+- le blocage ne se ressent pas correctement
+- le comportement utilisateur n’est pas encore fiable
+- les actions ne donnent pas encore un résultat réel et immédiat
+
+### CE QUI EST ATTENDU
+
+Je ne veux pas seulement voir la logique écrite dans le rapport.
+
+Je veux que ce soit réellement appliqué dans l’application, visible immédiatement pendant le test.
+
+### À CORRIGER IMMÉDIATEMENT
+
+1. Blocage réel des sièges en ligne
+- un siège “en ligne” doit être réellement bloqué côté agent guichet
+- l’agent ne doit pas pouvoir cliquer dessus
+- l’agent ne doit pas pouvoir réserver ni vendre dessus
+- le siège doit être visuellement différent ET techniquement non interactif
+
+2. Application réelle dans le test
+- toutes les corrections doivent être testables immédiatement dans l’interface
+- pas seulement présentes dans le code ou dans le résumé
+- quand on clique, on doit voir le vrai résultat
+
+3. Synchronisation réelle
+- réservation en ligne = siège bloqué immédiatement au guichet
+- vente guichet = siège bloqué immédiatement ailleurs
+- mise à jour visible sans incohérence
+
+4. Fiabilité complète
+- aucune possibilité de doublon
+- aucune action faussement disponible
+- aucune logique partiellement appliquée
+
+### DEMANDE IMPORTANTE
+
+Je veux maintenant un rendu niveau application professionnelle réelle.
+
+Inspirez-vous clairement des meilleurs standards UX des grandes applications de réservation et d’exploitation transport :
+- actions immédiates
+- état réel visible
+- interface propre
+- comportement cohérent
+- aucune ambiguïté pour l’agent
+
+### CONSIGNE
+
+Ne me renvoyez pas seulement un message disant que c’est corrigé.
+
+Je veux :
+- correction réellement appliquée dans l’application
+- test réel visible
+- captures réelles prouvant que :
+  - les sièges en ligne sont vraiment bloqués
+  - les sièges guichet fonctionnent
+  - les actions réserver / vendre marchent
+  - les états changent en temps réel
+
+### OBJECTIF FINAL
+
+Finir rapidement l’application, mais proprement :
+- logique réelle
+- comportement réel
+- affichage réel
+- système fiable et professionnel
+
+Merci d’appliquer cela immédiatement sur l’application réelle et d’envoyer ensuite les captures de test final.
