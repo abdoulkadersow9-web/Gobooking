@@ -1795,10 +1795,15 @@ router.get("/trips/today", async (req, res) => {
           eq(bookingsTable.tripId, trip.id),
           inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"])
         ));
-      const totalPax = bookings.reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length : 1), 0);
+      /* Count seats if assigned, otherwise count 1 per booking (guichet reservations often have no seat numbers) */
+      const countSeats = (b: typeof bookings[0]) => {
+        const s = Array.isArray(b.seatNumbers) ? (b.seatNumbers as string[]).length : 0;
+        return s > 0 ? s : 1;
+      };
+      const totalPax = bookings.reduce((acc, b) => acc + countSeats(b), 0);
       const boardedPax = bookings
         .filter(b => b.status === "boarded" || b.status === "validated")
-        .reduce((acc, b) => acc + (Array.isArray(b.seatNumbers) ? b.seatNumbers.length : 1), 0);
+        .reduce((acc, b) => acc + countSeats(b), 0);
 
       return {
         id: trip.id,
@@ -1874,6 +1879,9 @@ router.get("/trip/:tripId/boarding-status", async (req, res) => {
     const boarded = passengers.filter(p => p.boarded);
     const absent = passengers.filter(p => !p.boarded);
 
+    /* Count seats; fallback to 1 per passenger when no seat numbers assigned */
+    const paxSeats = (p: typeof passengers[0]) => p.seats.length > 0 ? p.seats.length : 1;
+
     res.json({
       trip: {
         id: trip.id, from: trip.from, to: trip.to,
@@ -1886,9 +1894,9 @@ router.get("/trip/:tripId/boarding-status", async (req, res) => {
         total: passengers.length,
         boarded: boarded.length,
         absent: absent.length,
-        totalSeats: passengers.reduce((acc, p) => acc + p.seats.length, 0),
-        boardedSeats: boarded.reduce((acc, p) => acc + p.seats.length, 0),
-        absentSeats: absent.reduce((acc, p) => acc + p.seats.length, 0),
+        totalSeats: passengers.reduce((acc, p) => acc + paxSeats(p), 0),
+        boardedSeats: boarded.reduce((acc, p) => acc + paxSeats(p), 0),
+        absentSeats: absent.reduce((acc, p) => acc + paxSeats(p), 0),
       },
     });
   } catch (err) {

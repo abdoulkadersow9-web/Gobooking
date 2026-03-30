@@ -1504,10 +1504,25 @@ export default function EmbarquementScreen() {
               </View>
             ) : (
               <ScrollView style={{ maxHeight: 420 }}>
-                {todayTrips.map(trip => {
+                {[...todayTrips]
+                  .sort((a, b) => {
+                    const pri = (s: string) => s === "boarding" ? 0 : s === "en_route" ? 1 : s === "scheduled" ? 2 : s === "in_progress" ? 1 : 3;
+                    return pri(a.status) - pri(b.status) || a.departureTime.localeCompare(b.departureTime);
+                  })
+                  .map(trip => {
                   const isSelected = selectedTrip?.id === trip.id;
-                  const tripStatusColor = trip.status === "en_route" ? G : trip.status === "scheduled" ? "#D97706" : "#6B7280";
-                  const tripStatusLabel = trip.status === "en_route" ? "En route" : trip.status === "scheduled" ? "Programmé" : trip.status;
+                  const tripStatusColor =
+                    trip.status === "en_route" || trip.status === "in_progress" ? G :
+                    trip.status === "boarding" ? "#7C3AED" :
+                    trip.status === "scheduled" ? "#D97706" :
+                    "#6B7280";
+                  const tripStatusLabel =
+                    trip.status === "en_route" || trip.status === "in_progress" ? "En route" :
+                    trip.status === "boarding" ? "Embarquement" :
+                    trip.status === "scheduled" ? "Programmé" :
+                    trip.status === "completed" ? "Terminé" :
+                    trip.status === "arrived" ? "Arrivé" :
+                    trip.status ?? "Inconnu";
 
                   return (
                     <TouchableOpacity

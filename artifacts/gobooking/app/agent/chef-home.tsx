@@ -55,7 +55,11 @@ export default function ChefHome() {
 
   const load = useCallback(async () => {
     if (!authToken) { setLoading(false); return; }
-    if (user && user.agentRole !== "chef_agence") {
+    /* Guard: only block if user is fully loaded AND has an explicitly wrong role.
+       If user is null/pending (agentRole undefined), let the API call through — the server
+       will reject it with 403 if unauthorized. This prevents a race condition where
+       load() fires before the user object is hydrated from SecureStore. */
+    if (user?.agentRole && user.agentRole !== "chef_agence") {
       setLoading(false);
       setLoadError(`Rôle détecté : ${user.agentRole}. Ce tableau de bord est réservé au chef d'agence.`);
       return;
