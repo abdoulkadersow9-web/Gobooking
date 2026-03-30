@@ -1537,21 +1537,70 @@ router.get("/reports", async (req, res) => {
   }
 });
 
+/* ── Seat auto-generation helper ──────────────────────────────────────────
+   Generates a standard 4-column (A/B/C/D) seat layout for a trip that has
+   total_seats configured but no seats persisted yet.  Persists to DB so all
+   agents see the same data in real time.
+───────────────────────────────────────────────────────────────────────── */
+async function ensureSeatsExist(tripId: string): Promise<void> {
+  const existing = await db.select({ id: seatsTable.id })
+    .from(seatsTable)
+    .where(eq(seatsTable.tripId, tripId))
+    .limit(1);
+  if (existing.length > 0) return; // already has seats
+
+  const trips = await db.select().from(tripsTable).where(eq(tripsTable.id, tripId)).limit(1);
+  const trip  = trips[0];
+  if (!trip) return;
+
+  const totalSeats = trip.totalSeats ?? 0;
+  if (totalSeats <= 0) return;
+
+  const COLS      = ["A", "B", "C", "D"] as const;
+  const COL_TYPES = ["window", "aisle", "aisle", "window"] as const;
+  const toInsert: any[] = [];
+  let count = 0;
+
+  for (let row = 1; count < totalSeats; row++) {
+    for (let ci = 0; ci < COLS.length && count < totalSeats; ci++, count++) {
+      const num = `${row}${COLS[ci]}`;
+      toInsert.push({
+        id:      `${tripId}-${num}`,
+        tripId,
+        number:  num,
+        row,
+        column:  ci + 1,
+        type:    COL_TYPES[ci],
+        status:  "available",
+        price:   trip.price ?? 0,
+      });
+    }
+  }
+
+  if (toInsert.length > 0) {
+    await db.insert(seatsTable).values(toInsert).onConflictDoNothing();
+    console.log(`[ensureSeats] Generated ${toInsert.length} seats for trip ${tripId}`);
+  }
+}
+
 router.get("/seats/:tripId", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);
     if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
 
+    // Auto-generate seats if the trip has none yet
+    await ensureSeatsExist(req.params.tripId);
+
     const [seats, allBookings] = await Promise.all([
       db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId)),
       db.select({
-        seatNumbers:   bookingsTable.seatNumbers,
-        clientName:    bookingsTable.clientName,
-        clientPhone:   bookingsTable.clientPhone,
-        bookingRef:    bookingsTable.bookingRef,
-        paymentStatus: bookingsTable.paymentStatus,
-        status:        bookingsTable.status,
-        paymentMethod: bookingsTable.paymentMethod,
+        seatNumbers:  bookingsTable.seatNumbers,
+        passengers:   bookingsTable.passengers,
+        contactPhone: bookingsTable.contactPhone,
+        bookingRef:   bookingsTable.bookingRef,
+        paymentStatus:bookingsTable.paymentStatus,
+        status:       bookingsTable.status,
+        paymentMethod:bookingsTable.paymentMethod,
       })
         .from(bookingsTable)
         .where(and(
@@ -1564,38 +1613,48 @@ router.get("/seats/:tripId", async (req, res) => {
     const seatInfoMap = new Map<string, { clientName: string; clientPhone: string; bookingRef: string; paymentMethod: string; isSP: boolean }>();
 
     for (const b of allBookings) {
-      const nums: string[] = Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers as string] : []);
+      const nums: string[]       = Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers as string] : []);
+      const passengers: any[]    = Array.isArray(b.passengers)  ? b.passengers  : [];
       const isSP = b.paymentStatus === "sp";
       if (isSP) nums.forEach(n => spNums.add(n));
       for (const n of nums) {
         if (!seatInfoMap.has(n)) {
+          const pax = passengers.find((p: any) => p?.seatNumber === n);
           seatInfoMap.set(n, {
-            clientName:    b.clientName ?? "—",
-            clientPhone:   b.clientPhone ?? "",
-            bookingRef:    b.bookingRef ?? "",
-            paymentMethod: b.paymentMethod ?? "",
+            clientName:    pax?.name          ?? "—",
+            clientPhone:   b.contactPhone     ?? "",
+            bookingRef:    b.bookingRef       ?? "",
+            paymentMethod: b.paymentMethod    ?? "",
             isSP,
           });
         }
       }
     }
 
-    const enriched = seats.map(seat => {
-      const num = seat.number as string;
-      const isSP = spNums.has(num);
-      const info = seatInfoMap.get(num);
-      return {
-        ...seat,
-        status: seat.status === "occupied" && isSP ? "sp" : seat.status,
-        clientName:    info?.clientName    ?? null,
-        clientPhone:   info?.clientPhone   ?? null,
-        bookingRef:    info?.bookingRef    ?? null,
-        paymentMethod: info?.paymentMethod ?? null,
-      };
-    });
+    const enriched = seats
+      .slice()
+      .sort((a, b) => (a.row !== b.row ? a.row - b.row : (a.column ?? 0) - (b.column ?? 0)))
+      .map(seat => {
+        const num = (seat.number ?? "") as string;
+        const isSP = spNums.has(num);
+        const info = seatInfoMap.get(num);
+        return {
+          id:            seat.id,
+          number:        num,
+          row:           seat.row,
+          column:        seat.column,
+          type:          seat.type,
+          status:        seat.status === "occupied" && isSP ? "sp" : (seat.status ?? "available"),
+          clientName:    info?.clientName    ?? null,
+          clientPhone:   info?.clientPhone   ?? null,
+          bookingRef:    info?.bookingRef    ?? null,
+          paymentMethod: info?.paymentMethod ?? null,
+        };
+      });
 
     res.json(enriched);
-  } catch (err) {
+  } catch (err: any) {
+    console.error("[seats/:tripId]", err?.message ?? err);
     res.status(500).json({ error: "Failed" });
   }
 });
@@ -5987,6 +6046,9 @@ router.get("/chef/trips/:tripId/seats", async (req, res) => {
     if (!tripRows.rows.length) return res.status(404).json({ error: "Trajet introuvable" });
     const trip = tripRows.rows[0] as any;
     if (trip.company_id !== agent.companyId) return res.status(403).json({ error: "Accès refusé" });
+
+    // Auto-generate seats if none exist yet
+    await ensureSeatsExist(tripId);
 
     // Tous les sièges du trajet
     const seats = await db.execute(sql`
