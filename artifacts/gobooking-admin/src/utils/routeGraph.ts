@@ -106,16 +106,18 @@ export function getRouteStops(from: string, to: string): string[] {
 
 export const ALL_CI_CITIES: string[] = [
   "Abengourou", "Abidjan", "Aboisso", "Adzopé", "Agboville", "Agnibilékrou",
-  "Anyama", "Bettié", "Biankouma", "Bingerville", "Bocanda", "Bondoukou",
-  "Bongouanou", "Bonoua", "Bouna", "Bouaflé", "Bouaké", "Boundiali",
-  "Dabou", "Daloa", "Danané", "Daoukro", "Dimbokro", "Divo",
-  "Duékoué", "Ferkessédougou", "Fresco", "Gagnoa", "Grand-Bassam",
-  "Grand-Béréby", "Grand-Lahou", "Guiglo", "Issia", "Jacqueville",
-  "Katiola", "Kong", "Korhogo", "Lakota", "Man", "Mankono",
-  "Mbahiakro", "Méagui", "Minignan", "Niakaramandougou", "Niablé",
-  "Odienné", "Oumé", "San-Pédro", "Sassandra", "Séguéla", "Sikensi",
+  "Anyama", "Bangolo", "Béoumi", "Bettié", "Biankouma", "Bingerville",
+  "Bocanda", "Bondoukou", "Bongouanou", "Bonoua", "Bouna", "Bouaflé", "Bouaké",
+  "Boundiali", "Dabakala", "Dabou", "Daloa", "Danané", "Daoukro",
+  "Diawala", "Dimbokro", "Divo", "Duékoué",
+  "Ferkessédougou", "Fresco", "Gagnoa", "Grand-Bassam",
+  "Grand-Béréby", "Grand-Lahou", "Guiglo", "Guitry", "Issia", "Jacqueville",
+  "Kafolo", "Kani", "Katiola", "Kong", "Korhogo", "Lakota",
+  "M'Bahiakro", "Man", "Mankono", "Méagui", "Minignan",
+  "Niakaramandougou", "Niablé", "Niellé", "Odienné", "Ouangolodougou",
+  "Oumé", "San-Pédro", "Sassandra", "Séguéla", "Sikensi",
   "Sinématiali", "Sinfra", "Soubré", "Tabou", "Tafiré", "Taï",
-  "Tengréla", "Tiassalé", "Tiébissou", "Touba", "Toulepleu", "Toumodi",
+  "Tanda", "Tengréla", "Tiassalé", "Tiébissou", "Touba", "Toulepleu", "Toumodi",
   "Vavoua", "Yamoussoukro", "Zouan-Hounien", "Zuénoula",
 ].sort();
 

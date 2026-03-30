@@ -23,6 +23,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/utils/api";
 import DashboardCharts from "@/components/DashboardCharts";
 import { downloadCompanyInvoice, type CompanyInvoiceData } from "@/utils/invoicePdf";
+import { CI_CITIES } from "@/utils/ciCities";
 
 const PRIMARY = Colors.light.primary;
 const DARK = Colors.light.primaryDark;
@@ -176,7 +177,6 @@ const BOOKING_STATUS: Record<string, { label: string; color: string; bg: string 
 const PAYMENT_LABELS: Record<string, string> = {
   orange: "Orange Money", mtn: "MTN MoMo", wave: "Wave", visa: "Visa/MC",
 };
-const CI_CITIES = ["Abidjan", "Bouaké", "Yamoussoukro", "Korhogo", "San Pedro", "Man", "Daloa", "Divo", "Gagnoa", "Abengourou"];
 const BUS_CAPACITIES = [49, 59, 63];
 const BUS_TYPES = ["Standard", "Premium", "VIP"];
 

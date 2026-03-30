@@ -39,7 +39,8 @@ interface AgentSeat {
   number:         string;
   row:            number;
   column:         number;
-  status:         "available" | "reserved" | "occupied" | "sp";
+  status:         "available" | "reserved" | "occupied" | "sp" | "online";
+  isOnline?:      boolean;
   clientName?:    string | null;
   clientPhone?:   string | null;
   bookingRef?:    string | null;
@@ -51,13 +52,15 @@ const ICON_MAP: Record<string, any> = {
   reserved:  "clock",
   occupied:  "x",
   sp:        "shield",
+  online:    "lock",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   available: "Libre",
-  reserved:  "Réservé",
-  occupied:  "Vendu",
+  reserved:  "Réservé guichet",
+  occupied:  "Vendu guichet",
   sp:        "SP",
+  online:    "En ligne (bloqué)",
 };
 
 /* ═══════════════════════════════════════════════════════════════
@@ -127,6 +130,15 @@ export default function AgentSeatPlanScreen() {
   const onSeatPress = (seat: AgentSeat) => {
     if (selected?.id === seat.id) {
       setSelected(null);
+      return;
+    }
+    /* Online seats: show info alert, never open booking form */
+    if (seat.status === "online" || seat.isOnline) {
+      Alert.alert(
+        "🔒 Siège réservé en ligne",
+        `Siège ${seat.number}\nRéf: ${seat.bookingRef ?? "—"}\n\nCe siège a été réservé via l'application mobile ou en ligne. Il ne peut pas être modifié au guichet.`,
+        [{ text: "OK", style: "default" }],
+      );
       return;
     }
     setSelected(seat);
@@ -208,16 +220,18 @@ export default function AgentSeatPlanScreen() {
 
   /* ── Derived ── */
   const rows     = Array.from(new Set(seats.map(s => s.row))).sort((a, b) => a - b);
-  const cntAvail = seats.filter(s => s.status === "available").length;
-  const cntResvd = seats.filter(s => s.status === "reserved").length;
-  const cntOccup = seats.filter(s => s.status === "occupied" || s.status === "sp").length;
+  const cntAvail  = seats.filter(s => s.status === "available").length;
+  const cntResvd  = seats.filter(s => s.status === "reserved").length;
+  const cntOccup  = seats.filter(s => s.status === "occupied" || s.status === "sp").length;
+  const cntOnline = seats.filter(s => s.status === "online" || s.isOnline).length;
 
   /* ── Render seat ── */
   const renderSeat = (seat: AgentSeat) => {
-    const c         = getSeatColor(seat.status);
-    const icon      = ICON_MAP[seat.status] ?? "help-circle";
+    const c          = getSeatColor(seat.status);
+    const icon       = ICON_MAP[seat.status] ?? "help-circle";
     const isSelected = selected?.id === seat.id;
-    const initials  = seat.clientName
+    const isOnline   = seat.status === "online" || seat.isOnline;
+    const initials   = seat.clientName
       ? seat.clientName.trim().split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase()
       : null;
 
@@ -232,7 +246,8 @@ export default function AgentSeatPlanScreen() {
                 shadowColor: G, shadowOpacity: 0.45, shadowRadius: 8, elevation: 6,
                 transform: [{ scale: 1.10 }] }
             : { backgroundColor: c.bg, borderColor: c.border },
-          pressed && !isSelected && { transform: [{ scale: 0.90 }], opacity: 0.85 },
+          isOnline && { opacity: 0.80 },
+          pressed && !isSelected && !isOnline && { transform: [{ scale: 0.90 }], opacity: 0.85 },
         ]}
       >
         {isSelected && <View style={styles.seatSelectedRing} />}
@@ -240,8 +255,11 @@ export default function AgentSeatPlanScreen() {
         <Text style={[styles.seatNum, { color: isSelected ? "#fff" : c.text }]}>
           {seat.number}
         </Text>
-        {initials && !isSelected && (
+        {initials && !isSelected && !isOnline && (
           <Text style={[styles.seatInitials, { color: c.text }]}>{initials}</Text>
+        )}
+        {isOnline && !isSelected && (
+          <Text style={[styles.seatInitials, { color: c.text, fontSize: 7 }]}>WEB</Text>
         )}
       </Pressable>
     );
@@ -364,9 +382,10 @@ export default function AgentSeatPlanScreen() {
       {!loading && seats.length > 0 && (
         <View style={styles.counters}>
           {[
-            { label: "Libres",   count: cntAvail, color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
-            { label: "Réservés", count: cntResvd, color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
-            { label: "Vendus",   count: cntOccup, color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+            { label: "Libres",    count: cntAvail,  color: "#059669", bg: "#F0FDF4", border: "#BBF7D0" },
+            { label: "Réservés",  count: cntResvd,  color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
+            { label: "Vendus",    count: cntOccup,  color: "#DC2626", bg: "#FEF2F2", border: "#FECACA" },
+            { label: "En ligne",  count: cntOnline, color: "#2563EB", bg: "#EFF6FF", border: "#BFDBFE" },
           ].map(b => (
             <View key={b.label} style={[styles.counterBox, { backgroundColor: b.bg, borderColor: b.border }]}>
               <Text style={[styles.counterNum, { color: b.color }]}>{b.count}</Text>

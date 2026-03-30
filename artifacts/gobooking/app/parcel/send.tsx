@@ -23,12 +23,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useParcel } from "@/context/ParcelContext";
 import { apiFetch } from "@/utils/api";
-
-const CITIES = [
-  "Abidjan", "Bouaké", "Yamoussoukro", "Korhogo",
-  "San Pedro", "Daloa", "Man", "Gagnoa",
-  "Divo", "Abengourou", "Soubré", "Bondoukou",
-];
+import { CI_CITIES as CITIES } from "@/utils/ciCities";
 
 const PARCEL_TYPES = [
   { id: "documents", label: "Documents", icon: "file-text" },

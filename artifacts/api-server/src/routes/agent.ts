@@ -1595,29 +1595,33 @@ router.get("/seats/:tripId", async (req, res) => {
     const [seats, allBookings] = await Promise.all([
       db.select().from(seatsTable).where(eq(seatsTable.tripId, req.params.tripId)),
       db.select({
-        seatNumbers:  bookingsTable.seatNumbers,
-        passengers:   bookingsTable.passengers,
-        contactPhone: bookingsTable.contactPhone,
-        bookingRef:   bookingsTable.bookingRef,
-        paymentStatus:bookingsTable.paymentStatus,
-        status:       bookingsTable.status,
-        paymentMethod:bookingsTable.paymentMethod,
+        seatNumbers:   bookingsTable.seatNumbers,
+        passengers:    bookingsTable.passengers,
+        contactPhone:  bookingsTable.contactPhone,
+        bookingRef:    bookingsTable.bookingRef,
+        paymentStatus: bookingsTable.paymentStatus,
+        status:        bookingsTable.status,
+        paymentMethod: bookingsTable.paymentMethod,
+        bookingSource: bookingsTable.bookingSource,
       })
         .from(bookingsTable)
         .where(and(
           eq(bookingsTable.tripId, req.params.tripId),
-          eq(bookingsTable.status, "confirmed"),
+          inArray(bookingsTable.status, ["confirmed", "reserved", "boarded", "validated", "payé"]),
         )),
     ]);
 
-    const spNums = new Set<string>();
-    const seatInfoMap = new Map<string, { clientName: string; clientPhone: string; bookingRef: string; paymentMethod: string; isSP: boolean }>();
+    const spNums     = new Set<string>();
+    const onlineNums = new Set<string>(); // Seats booked from mobile/online — blocked for guichet
+    const seatInfoMap = new Map<string, { clientName: string; clientPhone: string; bookingRef: string; paymentMethod: string; isSP: boolean; isOnline: boolean }>();
 
     for (const b of allBookings) {
-      const nums: string[]       = Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers as string] : []);
-      const passengers: any[]    = Array.isArray(b.passengers)  ? b.passengers  : [];
-      const isSP = b.paymentStatus === "sp";
-      if (isSP) nums.forEach(n => spNums.add(n));
+      const nums: string[]    = Array.isArray(b.seatNumbers) ? b.seatNumbers : (b.seatNumbers ? [b.seatNumbers as string] : []);
+      const passengers: any[] = Array.isArray(b.passengers)  ? b.passengers  : [];
+      const isSP      = b.paymentStatus === "sp";
+      const isOnline  = ["mobile", "online"].includes(b.bookingSource ?? "");
+      if (isSP)     nums.forEach(n => spNums.add(n));
+      if (isOnline) nums.forEach(n => onlineNums.add(n));
       for (const n of nums) {
         if (!seatInfoMap.has(n)) {
           const pax = passengers.find((p: any) => p?.seatNumber === n) ?? passengers[0];
@@ -1627,6 +1631,7 @@ router.get("/seats/:tripId", async (req, res) => {
             bookingRef:    b.bookingRef       ?? "",
             paymentMethod: b.paymentMethod    ?? "",
             isSP,
+            isOnline,
           });
         }
       }
@@ -1641,11 +1646,21 @@ router.get("/seats/:tripId", async (req, res) => {
         const info = seatInfoMap.get(num);
         // Normalize DB status variants to standard client values
         const rawStatus = seat.status ?? "available";
-        const normalizedStatus: string =
-          (rawStatus === "occupied" || rawStatus === "booked" || rawStatus === "vendu") && isSP ? "sp" :
-          (rawStatus === "booked"  || rawStatus === "vendu")  ? "occupied" :
-          (rawStatus === "reserved" || rawStatus === "pending") ? "reserved" :
-          rawStatus;
+        const isOnlineBooked = onlineNums.has(num);
+        let normalizedStatus: string;
+        if ((rawStatus === "occupied" || rawStatus === "booked" || rawStatus === "vendu" || rawStatus === "reserved") && isSP) {
+          normalizedStatus = "sp";
+        } else if ((rawStatus === "occupied" || rawStatus === "booked" || rawStatus === "vendu") && isOnlineBooked) {
+          normalizedStatus = "online"; // Blocked for guichet — reserved from mobile/web
+        } else if (rawStatus === "reserved" && isOnlineBooked) {
+          normalizedStatus = "online";
+        } else if (rawStatus === "booked" || rawStatus === "vendu") {
+          normalizedStatus = "occupied";
+        } else if (rawStatus === "pending") {
+          normalizedStatus = "reserved";
+        } else {
+          normalizedStatus = rawStatus;
+        }
         return {
           id:            seat.id,
           number:        num,
@@ -1653,6 +1668,7 @@ router.get("/seats/:tripId", async (req, res) => {
           column:        seat.column,
           type:          seat.type,
           status:        normalizedStatus,
+          isOnline:      isOnlineBooked,
           clientName:    info?.clientName    ?? null,
           clientPhone:   info?.clientPhone   ?? null,
           bookingRef:    info?.bookingRef    ?? null,
