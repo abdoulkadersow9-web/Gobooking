@@ -693,8 +693,8 @@ export default function TicketsScreen() {
     }
     return false;
   };
-  const tripsEnRoute = trips.filter(_isEnRoute);
-  const tripsFuture  = trips.filter(t => !_isEnRoute(t));
+  const tripsEnRoute = trips.filter(t => _isEnRoute(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
+  const tripsFuture  = trips.filter(t => !_isEnRoute(t) && !["completed","cancelled","arrived"].includes(t.status ?? ""));
 
   /* ── Main screen ── */
   return (

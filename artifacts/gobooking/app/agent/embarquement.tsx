@@ -92,7 +92,9 @@ export default function EmbarquementScreen() {
   const networkStatus   = useNetworkStatus(BASE_URL);
 
   const isEmbarquementAgent = !user?.agentRole ||
-    user.agentRole === "agent_embarquement" || user.agentRole === "embarquement";
+    user.agentRole === "agent_embarquement" || user.agentRole === "embarquement" ||
+    user.agentRole === "agent_guichet" || user.agentRole === "guichet" ||
+    user.agentRole === "vente" || user.agentRole === "agent_ticket";
 
   /* ── Agent GPS broadcasting ─────────────────────────── */
   const [activeTripIdForGps, setActiveTripIdForGps] = useState<string | null>(null);

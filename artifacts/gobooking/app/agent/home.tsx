@@ -48,7 +48,7 @@ const ALL_MODULES = [
     color: GREEN,
     gradient: ["#F0FDF4", "#DCFCE7"] as [string, string],
     border: "#4ADE80",
-    roles: ["embarquement", "agent_embarquement"],
+    roles: ["embarquement", "agent_embarquement", "agent_guichet", "guichet", "vente", "agent_ticket"],
   },
   {
     id: "colis",

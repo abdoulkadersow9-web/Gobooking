@@ -90,7 +90,7 @@ function getRoleStyle(userRole: string, agentRole: string | null): RoleStyle {
 const STATIC_DEMO_ROLES: DemoRole[] = [
   { email: "admin@test.com",          password: "test123",  userRole: "admin",    agentRole: null               },
   { email: "compagnie@test.com",      password: "test123",  userRole: "compagnie", agentRole: null              },
-  { email: "chef.test@gobooking.ci",  password: "chef1234", userRole: "agent",    agentRole: "chef_agence"      },
+  { email: "chef.test@gobooking.ci",  password: "test123",  userRole: "agent",    agentRole: "chef_agence"      },
   { email: "agent@test.com",          password: "test123",  userRole: "agent",    agentRole: "agent_guichet"    },
   { email: "reservation@test.com",    password: "test123",  userRole: "agent",    agentRole: "agent_reservation" },
   { email: "embarquement@test.com",   password: "test123",  userRole: "agent",    agentRole: "agent_embarquement" },

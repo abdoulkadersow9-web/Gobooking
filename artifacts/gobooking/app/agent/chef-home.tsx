@@ -51,28 +51,34 @@ export default function ChefHome() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingCaisses, setPendingCaisses] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    /* Guard: skip fetch during role transitions (screen still mounted while navigating away) */
-    if (!authToken || user?.agentRole !== "chef_agence") { setLoading(false); return; }
+    if (!authToken) { setLoading(false); return; }
+    if (user && user.agentRole !== "chef_agence") {
+      setLoading(false);
+      setLoadError(`Rôle détecté : ${user.agentRole}. Ce tableau de bord est réservé au chef d'agence.`);
+      return;
+    }
+    setLoadError(null);
     try {
       const [d, b, t, cs] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
         apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
-        apiFetch<{ stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
+        apiFetch<{ sessions: any[]; stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
       ]);
       setDash(d);
       setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
-      setPendingCaisses(cs.stats?.pending ?? 0);
+      setPendingCaisses((cs as any).stats?.pending ?? 0);
     } catch (e: any) {
-      /* 401 = token truly invalid → logout.  403 = RBAC (wrong role) → never logout */
       if (e?.httpStatus === 401) {
         logoutIfActiveToken(authToken);
         return;
       }
       console.error("[chef-home]", e);
+      setLoadError(e?.message ?? e?.error ?? "Impossible de charger le tableau de bord.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,6 +138,29 @@ export default function ChefHome() {
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFF" }}>
         <ActivityIndicator size="large" color={INDIGO2} />
         <Text style={{ marginTop: 12, color: INDIGO, fontSize: 15 }}>Chargement du tableau de bord…</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFF", padding: 32 }}>
+        <Feather name="alert-triangle" size={52} color="#DC2626" />
+        <Text style={{ marginTop: 16, fontSize: 18, fontWeight: "800", color: "#1F2937", textAlign: "center" }}>
+          Tableau de bord indisponible
+        </Text>
+        <Text style={{ marginTop: 8, fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20 }}>
+          {loadError}
+        </Text>
+        <Pressable
+          onPress={() => { setLoading(true); load(); }}
+          style={{ marginTop: 20, backgroundColor: INDIGO2, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14 }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Réessayer</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push("/agent/home" as never)} style={{ marginTop: 12 }}>
+          <Text style={{ color: INDIGO2, fontSize: 14, fontWeight: "600" }}>Retour à l'accueil</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
