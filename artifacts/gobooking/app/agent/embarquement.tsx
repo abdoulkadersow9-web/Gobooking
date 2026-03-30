@@ -85,7 +85,7 @@ interface BoardingStatus {
   };
 }
 
-type MainTab = "billets" | "en_route" | "depart";
+type MainTab = "billets" | "depart";
 
 export default function EmbarquementScreen() {
   const { user, token, logout } = useAuth();
@@ -959,17 +959,6 @@ export default function EmbarquementScreen() {
             <Text style={[styles.tabBtnText, activeTab === "billets" && styles.tabBtnTextActive]}>Billets</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, activeTab === "en_route" && styles.tabBtnActive]}
-            onPress={handleEnRouteTabPress}
-          >
-            <Feather name="radio" size={13} color={activeTab === "en_route" ? G_DARK : "rgba(255,255,255,0.6)"} />
-            <Text style={[styles.tabBtnText, activeTab === "en_route" && styles.tabBtnTextActive]}>
-              En Route {enRouteList.filter(p => p.status === "accepted").length > 0
-                ? `(${enRouteList.filter(p => p.status === "accepted").length})`
-                : ""}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={[styles.tabBtn, activeTab === "depart" && styles.tabBtnActive]}
             onPress={() => {
               setActiveTab("depart");
@@ -1319,157 +1308,6 @@ export default function EmbarquementScreen() {
         </ScrollView>
       )}
 
-      {/* ── En Route tab ── */}
-      {activeTab === "en_route" && (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
-          {/* Scan en-route QR */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Scanner QR passager en route</Text>
-            <Text style={{ fontSize: 12, color: "#6B7280", marginBottom: 12 }}>
-              Scannez le QR code affiché sur le téléphone du passager
-            </Text>
-            <TouchableOpacity style={[styles.scanBtn, { backgroundColor: "#0369A1" }]} onPress={openEnRouteCamera}>
-              <Ionicons name="qr-code-outline" size={24} color="#fff" />
-              <Text style={styles.scanBtnText}>Scanner QR en route</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Trip info */}
-          {activeTripId ? (
-            <View style={{ backgroundColor: G_LIGHT, borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Feather name="radio" size={14} color={G} />
-              <Text style={{ color: G_DARK, fontSize: 12, fontWeight: "600" }}>Trajet actif : {activeTripId}</Text>
-              <TouchableOpacity onPress={async () => { const tid = await fetchActiveTripId(); await loadEnRoute(tid); }} style={{ marginLeft: "auto" }}>
-                <Feather name="refresh-cw" size={14} color={G} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, padding: 14, alignItems: "center", gap: 6 }}>
-              <Feather name="alert-circle" size={22} color="#D97706" />
-              <Text style={{ color: "#92400E", fontWeight: "600", fontSize: 13 }}>Aucun trajet en cours trouvé</Text>
-              <Text style={{ color: "#92400E", fontSize: 12, textAlign: "center" }}>Démarrez un trajet dans votre dashboard ou vérifiez votre bus.</Text>
-              <TouchableOpacity style={{ marginTop: 6, backgroundColor: "#D97706", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 }}
-                onPress={async () => { const tid = await fetchActiveTripId(); await loadEnRoute(tid); }}>
-                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 12 }}>Actualiser</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Header + refresh */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={styles.sectionTitle}>
-              Passagers confirmés ({enRouteList.length})
-            </Text>
-            <TouchableOpacity onPress={() => loadEnRoute(activeTripId)} style={{ padding: 6 }}>
-              <Feather name="refresh-cw" size={16} color={G} />
-            </TouchableOpacity>
-          </View>
-
-          {enRouteLoading && (
-            <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color={G} />
-              <Text style={styles.loadingText}>Chargement…</Text>
-            </View>
-          )}
-
-          {!enRouteLoading && enRouteList.length === 0 && activeTripId && (
-            <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 28 }]}>
-              <Feather name="users" size={36} color="#D1FAE5" />
-              <Text style={[styles.notFoundText, { color: "#64748B" }]}>Aucun passager en route</Text>
-              <Text style={styles.notFoundSub}>Les demandes acceptées apparaîtront ici</Text>
-            </View>
-          )}
-
-          {enRouteList.map(passenger => {
-            const isEmbarque = passenger.status === "embarqué";
-            const isBusy     = boardingId === passenger.id;
-
-            return (
-              <View key={passenger.id} style={[
-                styles.resultCard,
-                isEmbarque && { borderWidth: 1.5, borderColor: "#6EE7B7" },
-              ]}>
-                {/* Name + status */}
-                <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                  <View style={styles.passengerAvatar}>
-                    <Ionicons name="person" size={22} color={isEmbarque ? G_DARK : G} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.passengerName}>{passenger.clientName}</Text>
-                    <Text style={styles.passengerPhone}>{passenger.clientPhone}</Text>
-                  </View>
-                  <View style={{
-                    backgroundColor: isEmbarque ? "#ECFDF5" : "#FEF3C7",
-                    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4,
-                  }}>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: isEmbarque ? G : "#D97706" }}>
-                      {isEmbarque ? "Embarqué ✓" : "Confirmé"}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Boarding info */}
-                <View style={{ flexDirection: "row", gap: 14, paddingLeft: 4, marginTop: 4 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                    <Ionicons name="location-outline" size={13} color="#6B7280" />
-                    <Text style={{ fontSize: 12, color: "#374151" }}>{passenger.boardingPoint}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                    <Ionicons name="people-outline" size={13} color="#6B7280" />
-                    <Text style={{ fontSize: 12, color: "#374151" }}>
-                      {passenger.seatsRequested} siège{passenger.seatsRequested > 1 ? "s" : ""}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Action buttons */}
-                {!isEmbarque && (
-                  <View style={{ flexDirection: "row", gap: 8, marginTop: 6 }}>
-                    <TouchableOpacity
-                      style={styles.callBtn}
-                      onPress={() => callPassenger(passenger.clientPhone)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="call-outline" size={15} color="#0369A1" />
-                      <Text style={styles.callBtnText}>Appeler</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.boardBtn, isBusy && { opacity: 0.6 }]}
-                      onPress={() => boardEnRoute(passenger.id)}
-                      disabled={isBusy}
-                      activeOpacity={0.8}
-                    >
-                      {isBusy ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-done" size={15} color="#fff" />
-                          <Text style={styles.boardBtnText}>Embarquer</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {isEmbarque && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: G_LIGHT, borderRadius: 8, padding: 8, marginTop: 4 }}>
-                    <Ionicons name="checkmark-circle" size={16} color={G} />
-                    <Text style={{ color: G_DARK, fontSize: 12, fontWeight: "500" }}>Passager embarqué avec succès</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-
-          <View style={styles.tips}>
-            <Text style={styles.tipsTitle}>Instructions en route</Text>
-            <Text style={styles.tip}>• Les passagers acceptés apparaissent automatiquement</Text>
-            <Text style={styles.tip}>• Scannez leur QR ou appuyez sur "Embarquer"</Text>
-            <Text style={styles.tip}>• Appelez le passager si besoin pour coordonner le point d'arrêt</Text>
-          </View>
-        </ScrollView>
-      )}
       {/* ── Trip Selector Modal ── */}
       {showTripSelector && (
         <View style={styles.modalBackdrop}>

@@ -1,0 +1,136 @@
+J’ai analysé les pages Agent Réservation et Agent Embarquement.
+
+Il y a un problème de structure et de logique d’affichage qui doit être corrigé immédiatement.
+
+---
+
+## 1. PROBLÈME – PAGE AGENT RÉSERVATION
+
+Actuellement :
+
+- toutes les réservations sont mélangées  
+- aucune distinction claire entre :
+  - réservations des bus déjà partis (en route)
+  - réservations des départs futurs  
+
+👉 Cela crée :
+- confusion  
+- erreurs possibles  
+- mauvaise expérience agent  
+
+---
+
+## 2. LOGIQUE À APPLIQUER (OBLIGATOIRE)
+
+Il faut séparer clairement :
+
+### A. RÉSERVATIONS – BUS EN ROUTE
+
+- bus déjà parti  
+- places restantes disponibles  
+- réservations en temps réel  
+
+👉 rôle agent :
+- confirmer les réservations immédiatement  
+- gérer les places restantes  
+
+---
+
+### B. RÉSERVATIONS – DÉPARTS FUTURS
+
+- bus pas encore parti  
+- réservations normales  
+
+👉 rôle agent :
+- valider / confirmer les réservations  
+
+---
+
+## 3. STRUCTURE UI À FAIRE
+
+Créer une interface moderne avec séparation claire :
+
+- onglet ou filtre :
+  - En route
+  - À venir
+
+OU
+
+- deux blocs visuels distincts :
+  - réservations en cours (priorité)
+  - réservations futures  
+
+👉 priorité visuelle sur "En route"
+
+---
+
+## 4. OBJECTIF
+
+- éviter toute confusion  
+- guider l’agent  
+- rendre la page claire et professionnelle  
+- améliorer la rapidité de travail  
+
+---
+
+## 5. PROBLÈME – PAGE AGENT EMBARQUEMENT
+
+Actuellement :
+
+- présence d’un onglet “En route”
+
+👉 ce n’est pas logique
+
+---
+
+## 6. CORRECTION À FAIRE
+
+❌ supprimer :
+- onglet “En route” dans embarquement  
+
+✅ car :
+- l’agent embarquement travaille uniquement au départ  
+- l’agent “en route” gère déjà cette partie  
+
+---
+
+## 7. RÉSULTAT ATTENDU
+
+Page embarquement :
+
+- simple  
+- claire  
+- focalisée uniquement sur :
+  - scan QR  
+  - validation embarquement  
+
+👉 aucune confusion avec “en route”
+
+---
+
+## 8. CONSIGNE IMPORTANTE
+
+- ne rien casser  
+- garder la logique existante  
+- améliorer uniquement :
+  - organisation  
+  - affichage  
+  - UX  
+
+---
+
+## 9. OBJECTIF FINAL
+
+Une application :
+
+- claire  
+- structurée  
+- logique  
+- professionnelle  
+- adaptée au terrain réel  
+
+👉 chaque agent doit comprendre immédiatement son rôle sans confusion  
+
+---
+
+Merci d’appliquer cela directement dans l’application réelle avec affichage visible et testable.
