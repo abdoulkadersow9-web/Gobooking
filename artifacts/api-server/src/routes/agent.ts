@@ -1895,30 +1895,40 @@ router.get("/trip/:tripId/boarding-status", async (req, res) => {
       status: string;
       boarded: boolean;
       amount: number;
+      bookingType: "guichet" | "en-ligne";
+      paxCount: number;
     }[] = [];
 
     for (const b of bookings) {
-      const pList = Array.isArray(b.passengers) ? (b.passengers as any[]) : [];
+      const pList    = Array.isArray(b.passengers)  ? (b.passengers  as any[]) : [];
       const seatNums = Array.isArray(b.seatNumbers) ? (b.seatNumbers as string[]) : [];
       const isBoarded = b.status === "boarded" || b.status === "validated";
 
+      /* Determine booking type from source / payment method */
+      const src = (b.bookingSource ?? "") as string;
+      const pay = (b.paymentMethod  ?? "") as string;
+      const isGuichet = src === "guichet" || src === "agent" || pay === "cash" || pay === "espèces";
+
       passengers.push({
-        bookingId: b.id,
-        bookingRef: b.bookingRef ?? "",
-        name: pList[0]?.name ?? "Passager",
-        phone: pList[0]?.phone ?? b.contactPhone ?? "—",
-        seats: seatNums,
-        status: b.status ?? "confirmed",
-        boarded: isBoarded,
-        amount: b.totalAmount ?? 0,
+        bookingId:   b.id,
+        bookingRef:  b.bookingRef ?? "",
+        name:        pList[0]?.name ?? "Passager",
+        phone:       (pList[0]?.phone ?? b.contactPhone ?? "—") as string,
+        seats:       seatNums,
+        status:      (b.status ?? "confirmed") as string,
+        boarded:     isBoarded,
+        amount:      b.totalAmount ?? 0,
+        bookingType: isGuichet ? "guichet" : "en-ligne",
+        paxCount:    pList.length > 0 ? pList.length : 1,
       });
     }
 
-    const boarded = passengers.filter(p => p.boarded);
-    const absent = passengers.filter(p => !p.boarded);
+    const boarded  = passengers.filter(p => p.boarded);
+    const absent   = passengers.filter(p => !p.boarded && p.status !== "pending");
+    const pending  = passengers.filter(p => p.status === "pending");
 
     /* Count seats; fallback to 1 per passenger when no seat numbers assigned */
-    const paxSeats = (p: typeof passengers[0]) => p.seats.length > 0 ? p.seats.length : 1;
+    const paxSeats = (p: typeof passengers[0]) => p.seats.length > 0 ? p.seats.length : p.paxCount;
 
     res.json({
       trip: {
@@ -1929,12 +1939,15 @@ router.get("/trip/:tripId/boarding-status", async (req, res) => {
       },
       passengers,
       stats: {
-        total: passengers.length,
-        boarded: boarded.length,
-        absent: absent.length,
-        totalSeats: passengers.reduce((acc, p) => acc + paxSeats(p), 0),
-        boardedSeats: boarded.reduce((acc, p) => acc + paxSeats(p), 0),
-        absentSeats: absent.reduce((acc, p) => acc + paxSeats(p), 0),
+        total:        boarded.length + absent.length,
+        boarded:      boarded.length,
+        absent:       absent.length,
+        pending:      pending.length,
+        totalSeats:   passengers.reduce((acc, p) => acc + paxSeats(p), 0),
+        boardedSeats: boarded.reduce((acc, p)  => acc + paxSeats(p), 0),
+        absentSeats:  absent.reduce((acc, p)   => acc + paxSeats(p), 0),
+        guichetCount: passengers.filter(p => p.bookingType === "guichet").length,
+        onlineCount:  passengers.filter(p => p.bookingType === "en-ligne").length,
       },
     });
   } catch (err) {

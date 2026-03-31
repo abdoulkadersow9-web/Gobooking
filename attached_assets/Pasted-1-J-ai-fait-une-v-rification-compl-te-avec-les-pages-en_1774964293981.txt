@@ -1,0 +1,132 @@
+1"}
+J’ai fait une vérification complète avec les pages en conditions réelles.
+
+Les interfaces sont améliorées, mais la logique métier réelle de GoBooking n’est pas encore respectée.
+
+Maintenant, on passe à une étape critique : synchronisation + logique temps réel + structuration stricte des rôles.
+
+---
+
+🔴 1. PAGE AGENT EMBARQUEMENT (PRIORITÉ MAX)
+
+Actuellement, la page n’est pas complète.
+
+À corriger :
+
+- Lorsqu’on sélectionne un départ → afficher automatiquement la LISTE DES PASSAGERS
+- Cette liste doit contenir :
+  • nom
+  • siège
+  • statut (embarqué / en attente / absent)
+  • type (réservation / guichet)
+
+- Le scan QR ou saisie :
+  → valide automatiquement le passager
+  → met à jour son statut en temps réel (embarqué)
+
+- Ajouter :
+  • compteur total passagers
+  • nombre embarqués
+  • nombre restants
+
+- Gestion des absents :
+  • identifier les absents après embarquement
+  • possibilité de libérer les places
+
+- IMPORTANT :
+Pendant l’embarquement, toute nouvelle réservation ou vente (guichet ou en ligne) doit apparaître AUTOMATIQUEMENT dans la liste des passagers.
+
+👉 C’est une synchronisation temps réel obligatoire.
+
+---
+
+🔴 2. SYNCHRONISATION TEMPS RÉEL (CRITIQUE)
+
+Toutes les pages doivent être connectées :
+
+- Réservation confirmée → apparaît immédiatement en embarquement
+- Vente guichet → apparaît immédiatement en embarquement
+- Validation embarquement → visible côté système
+
+Aucune page ne doit fonctionner isolément.
+
+---
+
+🔴 3. AGENT RÉSERVATION EN LIGNE
+
+Logique à corriger :
+
+- L’agent voit TOUTES les agences
+- Les réservations doivent être structurées par :
+  • agence
+  • trajet
+  • statut
+
+- Affichage clair :
+  • Abidjan → Adjamé
+  • Abidjan → Yamoussoukro
+  • Bouaké → etc.
+
+- Séparer clairement :
+  • en attente
+  • confirmées
+  • annulées
+  • en route
+
+👉 Actuellement ce n’est pas assez structuré.
+
+---
+
+🔴 4. CHEF D’AGENCE
+
+À corriger :
+
+- Voir TOUTES les caisses des agents (pas une seule)
+- Voir :
+  • toutes les opérations
+  • tous les départs
+  • tous les états
+
+- Nettoyer :
+  • icônes
+  • blocs
+  • organisation
+
+👉 Le chef d’agence doit superviser tout, clairement.
+
+---
+
+🔴 5. LOGIQUE GLOBALE
+
+Toutes les pages doivent respecter :
+
+- séparation stricte des rôles
+- aucune confusion entre guichet / réservation / embarquement
+- aucune duplication inutile
+- affichage clair et structuré
+
+---
+
+🎯 OBJECTIF FINAL
+
+Je veux une application :
+
+- temps réel
+- fluide
+- logique métier respectée à 100%
+- synchronisée entre tous les agents
+- claire pour chaque rôle
+- professionnelle
+
+---
+
+⚠️ MÉTHODE
+
+Corriger par priorité :
+
+1. Embarquement (complet avec liste + temps réel)
+2. Synchronisation globale
+3. Réservation en ligne (multi-agences)
+4. Chef d’agence
+
+Ne rien casser, mais tout connecter et structurer correctem
