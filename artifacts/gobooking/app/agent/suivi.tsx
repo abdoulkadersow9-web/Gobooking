@@ -908,8 +908,9 @@ export default function SuiviScreen() {
 
   /* Focus Alert Mode */
   const [alertFocusIdx,  setAlertFocusIdx]  = useState(0);
-  const [fleetExpanded,  setFleetExpanded]  = useState(false);
+  const [fleetExpanded,  setFleetExpanded]  = useState(true);
   const [showAllAlerts,  setShowAllAlerts]  = useState(false);
+  const [suiviTab,       setSuiviTab]       = useState<"alertes" | "flotte" | "voyages">("alertes");
   const soundRef = useRef<{ stop: () => void } | null>(null);
 
   /* ── Live simulation frames/signal per camera trip ── */
@@ -1282,6 +1283,26 @@ export default function SuiviScreen() {
   const busesEnRoute    = data?.buses?.filter(b => b.status === "en_route")?.length ?? 0;
   const tripsSansAlerte = (data?.buses?.length ?? 0) - [...new Set(mergedAlerts.map(a => a.busId))].length;
 
+  /* ── Alertes tab pre-computed vars ── */
+  const alertRank   = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
+  const alertSorted = [...mergedAlerts].sort((a, b) => alertRank(a) - alertRank(b));
+  const alertVis    = showAllAlerts ? alertSorted : alertSorted.slice(0, 5);
+  const alertExtra  = alertSorted.length - 5;
+
+  /* ── Voyages tab pre-computed vars ── */
+  const allTrips   = data?.trips ?? [];
+  const tripsActive= allTrips.filter(t => ["en_route","en_cours","embarquement"].includes(t.status ?? ""));
+  const tripsDone  = allTrips.filter(t => ["terminé","arrivé"].includes(t.status ?? ""));
+  const tripsOther = allTrips.filter(t => !tripsActive.includes(t) && !tripsDone.includes(t));
+  const TRIP_ST: Record<string, { label: string; color: string; bg: string }> = {
+    en_route:      { label: "En route",      color: "#2563EB", bg: "#EFF6FF" },
+    en_cours:      { label: "En cours",      color: "#2563EB", bg: "#EFF6FF" },
+    embarquement:  { label: "Embarquement",  color: "#D97706", bg: "#FFFBEB" },
+    "terminé":     { label: "Terminé",       color: "#059669", bg: "#ECFDF5" },
+    "arrivé":      { label: "Arrivé",        color: "#059669", bg: "#ECFDF5" },
+    planifié:      { label: "Planifié",      color: "#6B7280", bg: "#F3F4F6" },
+  };
+
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
@@ -1436,14 +1457,34 @@ export default function SuiviScreen() {
           contentContainerStyle={S.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OK} />}
         >
-          {/* ══ SECTION ALERTES ══════════════════════════════════════════ */}
-          {(() => {
-            const rank   = (a: AlertItem) => a.response ? 2 : a.responseRequested ? 1 : 0;
-            const sorted = [...mergedAlerts].sort((a, b) => rank(a) - rank(b));
-            const visible = showAllAlerts ? sorted : sorted.slice(0, 5);
-            const extra   = sorted.length - 5;
+          {/* ══ ONGLETS NAVIGATION ══════════════════════════════════════ */}
+          <View style={{ flexDirection: "row", backgroundColor: "#fff", borderRadius: 14, padding: 4, marginBottom: 14, borderWidth: 1, borderColor: "#E2E8F0", elevation: 2, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4 }}>
+            {([
+              { key: "alertes",  icon: "alert-circle-outline",  label: "Alertes",    badge: mergedAlerts.filter(a => !a.response).length },
+              { key: "flotte",   icon: "bus-outline",            label: "Flotte",     badge: data?.buses?.length ?? 0 },
+              { key: "voyages",  icon: "map-outline",            label: "Voyages",    badge: data?.trips?.filter(t => t.status === "en_route" || t.status === "en_cours").length ?? 0 },
+            ] as { key: "alertes" | "flotte" | "voyages"; icon: any; label: string; badge: number }[]).map(t => {
+              const active = suiviTab === t.key;
+              const showBadge = t.badge > 0;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  onPress={() => setSuiviTab(t.key)}
+                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 11, gap: 5, backgroundColor: active ? RED_D : "transparent" }}>
+                  <Ionicons name={t.icon} size={15} color={active ? "#fff" : "#94A3B8"} />
+                  <Text style={{ fontSize: 12, fontWeight: active ? "800" : "600", color: active ? "#fff" : "#64748B" }}>{t.label}</Text>
+                  {showBadge && (
+                    <View style={{ backgroundColor: active ? "rgba(255,255,255,0.3)" : RED_D, borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{t.badge}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-            return (
+          {/* ══ SECTION ALERTES ══════════════════════════════════════════ */}
+          {suiviTab === "alertes" && (
               <View style={S.section}>
                 {/* Titre section */}
                 <View style={S.sectionHeader}>
@@ -1473,7 +1514,7 @@ export default function SuiviScreen() {
                 )}
 
                 {/* Liste des alertes (max 5, puis voir plus) */}
-                {visible.map((alert) => {
+                {alertVis.map((alert) => {
                   const flowStep  = alert.response ? "validate" : alert.responseRequested ? "waiting" : "new";
                   const stepColor = flowStep === "validate" ? OK : flowStep === "waiting" ? WARN : CRIT;
                   const btnLabel  = flowStep === "validate" ? "VALIDER" : "TRAITER";
@@ -1556,24 +1597,23 @@ export default function SuiviScreen() {
                 })}
 
                 {/* Voir plus / voir moins */}
-                {!showAllAlerts && extra > 0 && (
+                {!showAllAlerts && alertExtra > 0 && (
                   <TouchableOpacity style={S.showMoreBtn} onPress={() => setShowAllAlerts(true)} activeOpacity={0.8}>
-                    <Text style={S.showMoreTxt}>Voir {extra} autre{extra > 1 ? "s" : ""} alerte{extra > 1 ? "s" : ""}</Text>
+                    <Text style={S.showMoreTxt}>Voir {alertExtra} autre{alertExtra > 1 ? "s" : ""} alerte{alertExtra > 1 ? "s" : ""}</Text>
                     <Ionicons name="chevron-down" size={13} color="#374151" />
                   </TouchableOpacity>
                 )}
-                {showAllAlerts && sorted.length > 5 && (
+                {showAllAlerts && alertSorted.length > 5 && (
                   <TouchableOpacity style={S.showMoreBtn} onPress={() => setShowAllAlerts(false)} activeOpacity={0.8}>
                     <Text style={S.showMoreTxt}>Réduire</Text>
                     <Ionicons name="chevron-up" size={13} color="#374151" />
                   </TouchableOpacity>
                 )}
               </View>
-            );
-          })()}
+          )}
 
           {/* ══ SECTION FLOTTE ═══════════════════════════════════════════ */}
-          <View style={S.section}>
+          {suiviTab === "flotte" && <View style={S.section}>
             {/* Toggle flotte */}
             <TouchableOpacity style={S.sectionHeader} onPress={() => setFleetExpanded(v => !v)} activeOpacity={0.8}>
               <Ionicons name="bus-outline" size={12} color="#374151" />
@@ -1634,7 +1674,124 @@ export default function SuiviScreen() {
             {fleetExpanded && sortedBuses.length === 0 && (
               <Text style={S.fleetEmpty}>Aucun bus en service</Text>
             )}
-          </View>
+          </View>}
+
+          {/* ══ SECTION VOYAGES ════════════════════════════════════════════ */}
+          {suiviTab === "voyages" && (
+            <View>
+              {allTrips.length === 0 ? (
+                <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 36, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
+                  <Ionicons name="bus-outline" size={40} color="#CBD5E1" />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", marginTop: 12 }}>Aucun voyage</Text>
+                  <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 4 }}>Aucun voyage enregistré pour votre agence.</Text>
+                </View>
+              ) : (
+                <>
+                  {tripsActive.length > 0 && (
+                    <>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#2563EB" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>En cours ({tripsActive.length})</Text>
+                      </View>
+                      {tripsActive.map(trip => {
+                        const st  = TRIP_ST[trip.status ?? ""] ?? { label: trip.status ?? "—", color: "#6B7280", bg: "#F3F4F6" };
+                        const cam = trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
+                        return (
+                          <View key={trip.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: st.color + "40", marginBottom: 10, elevation: 2 }}>
+                            <View style={{ backgroundColor: st.bg, padding: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Ionicons name="bus" size={14} color={st.color} />
+                                <Text style={{ fontWeight: "800", color: st.color, fontSize: 13 }}>{trip.busName ?? "Bus"}</Text>
+                              </View>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                {cam && (
+                                  <TouchableOpacity onPress={() => setCameraTrip(trip)}>
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEE2E2", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#DC2626" }} />
+                                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#DC2626" }}>CAM</Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                )}
+                                <View style={{ backgroundColor: st.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: st.color + "30" }}>
+                                  <Text style={{ fontSize: 10, fontWeight: "700", color: st.color }}>{st.label.toUpperCase()}</Text>
+                                </View>
+                              </View>
+                            </View>
+                            <View style={{ padding: 12, gap: 6 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                                <Ionicons name="navigate-outline" size={13} color="#94A3B8" />
+                                <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A" }}>{trip.from} → {trip.to}</Text>
+                              </View>
+                              <View style={{ flexDirection: "row", gap: 12 }}>
+                                {trip.departureTime && (
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                                    <Text style={{ fontSize: 12, color: "#64748B" }}>Départ: {trip.departureTime}</Text>
+                                  </View>
+                                )}
+                                {trip.passengerCount !== undefined && (
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                                    <Ionicons name="people-outline" size={12} color="#94A3B8" />
+                                    <Text style={{ fontSize: 12, color: "#64748B" }}>{trip.passengerCount} passagers</Text>
+                                  </View>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </>
+                  )}
+                  {tripsOther.length > 0 && (
+                    <>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: tripsActive.length > 0 ? 8 : 0 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D97706" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>Autres ({tripsOther.length})</Text>
+                      </View>
+                      {tripsOther.map(trip => {
+                        const st = TRIP_ST[trip.status ?? ""] ?? { label: trip.status ?? "—", color: "#6B7280", bg: "#F3F4F6" };
+                        return (
+                          <View key={trip.id} style={{ backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8 }}>
+                            <View style={{ backgroundColor: st.bg, padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                <Ionicons name="bus-outline" size={13} color={st.color} />
+                                <Text style={{ fontWeight: "700", color: st.color, fontSize: 12 }}>{trip.busName ?? "Bus"}</Text>
+                              </View>
+                              <Text style={{ fontSize: 10, color: st.color, fontWeight: "700" }}>{st.label.toUpperCase()}</Text>
+                            </View>
+                            <View style={{ padding: 10 }}>
+                              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>{trip.from} → {trip.to}</Text>
+                              {trip.departureTime && <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 3 }}>Départ: {trip.departureTime}</Text>}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </>
+                  )}
+                  {tripsDone.length > 0 && (
+                    <>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: 8 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#059669" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>Terminés ({tripsDone.length})</Text>
+                      </View>
+                      {tripsDone.map(trip => (
+                        <View key={trip.id} style={{ backgroundColor: "#ECFDF5", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#6EE7B7", marginBottom: 8, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <View>
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#065F46" }}>{trip.from} → {trip.to}</Text>
+                            <Text style={{ fontSize: 11, color: "#059669", marginTop: 2 }}>{trip.busName}</Text>
+                          </View>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                            <Ionicons name="checkmark-circle" size={14} color="#059669" />
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#059669" }}>Terminé</Text>
+                          </View>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+            </View>
+          )}
 
         </ScrollView>
       )}

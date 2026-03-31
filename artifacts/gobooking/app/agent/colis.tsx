@@ -47,23 +47,26 @@ const DELIVERY_TYPES = [
   { key: "livraison_domicile", label: "Livraison à domicile" },
 ];
 
-const STATUSES: Record<string, { label: string; color: string; bg: string }> = {
-  créé:          { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
-  cree:          { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
-  en_attente:    { label: "Créé",       color: "#6B7280", bg: "#F3F4F6" },
-  en_gare:       { label: "En gare",    color: "#D97706", bg: "#FEF3C7" },
-  arrive_gare_depart: { label: "En gare", color: "#D97706", bg: "#FEF3C7" },
-  "chargé_bus":  { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
-  en_transit:    { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
-  en_route:      { label: "En transit", color: "#2563EB", bg: "#DBEAFE" },
-  arrivé:        { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
-  arrive:        { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
-  en_livraison:  { label: "Arrivé",     color: G,         bg: "#D1FAE5" },
-  livré:         { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
-  livre:         { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
-  retiré:        { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
-  retire:        { label: "Retiré",     color: "#065F46", bg: "#ECFDF5" },
-  annulé:        { label: "Annulé",     color: "#DC2626", bg: "#FEE2E2" },
+const STATUSES: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+  en_attente_validation: { label: "À valider",     color: "#0E7490", bg: "#ECFEFF", icon: "time-outline"              },
+  créé:                  { label: "Créé",           color: "#6B7280", bg: "#F3F4F6", icon: "add-circle-outline"        },
+  cree:                  { label: "Créé",           color: "#6B7280", bg: "#F3F4F6", icon: "add-circle-outline"        },
+  en_attente:            { label: "Créé",           color: "#6B7280", bg: "#F3F4F6", icon: "add-circle-outline"        },
+  en_attente_ramassage:  { label: "À ramasser",     color: "#EA580C", bg: "#FFF7ED", icon: "bicycle-outline"           },
+  valide:                { label: "Validé",         color: "#D97706", bg: "#FEF3C7", icon: "checkmark-circle-outline"  },
+  en_gare:               { label: "En gare",        color: "#D97706", bg: "#FEF3C7", icon: "business-outline"          },
+  arrive_gare_depart:    { label: "En gare",        color: "#D97706", bg: "#FEF3C7", icon: "business-outline"          },
+  "chargé_bus":          { label: "En transit",     color: "#2563EB", bg: "#DBEAFE", icon: "bus-outline"               },
+  en_transit:            { label: "En transit",     color: "#2563EB", bg: "#DBEAFE", icon: "bus-outline"               },
+  en_route:              { label: "En transit",     color: "#2563EB", bg: "#DBEAFE", icon: "bus-outline"               },
+  arrivé:                { label: "Arrivé",         color: G,         bg: "#D1FAE5", icon: "location-outline"          },
+  arrive:                { label: "Arrivé",         color: G,         bg: "#D1FAE5", icon: "location-outline"          },
+  en_livraison:          { label: "En livraison",   color: "#065F46", bg: "#ECFDF5", icon: "bicycle-outline"           },
+  livré:                 { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5", icon: "checkmark-done-outline"    },
+  livre:                 { label: "Livré ✓",        color: "#065F46", bg: "#ECFDF5", icon: "checkmark-done-outline"    },
+  retiré:                { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5", icon: "checkmark-done-outline"    },
+  retire:                { label: "Retiré ✓",       color: "#065F46", bg: "#ECFDF5", icon: "checkmark-done-outline"    },
+  annulé:                { label: "Annulé",         color: "#DC2626", bg: "#FEE2E2", icon: "close-circle-outline"      },
 };
 
 type NextAction = { label: string; route: string; color: string };
@@ -71,7 +74,11 @@ type NextAction = { label: string; route: string; color: string };
 function getNextAction(parcel: Parcel): NextAction | null {
   const s = parcel.status;
   const isHomeDelivery = parcel.deliveryType === "livraison_domicile";
-  if (s === "créé" || s === "cree" || s === "en_attente")
+  if (s === "en_attente_validation")
+    return null; // validation handled separately via validate/refuse endpoints
+  if (s === "en_attente_ramassage")
+    return null; // ramassage handled separately via send-livreur
+  if (s === "créé" || s === "cree" || s === "en_attente" || s === "valide")
     return { label: "Enregistrer en gare", route: "en-gare",       color: "#D97706" };
   if (s === "en_gare" || s === "arrive_gare_depart")
     return { label: "Charger dans bus",    route: "charge-bus",    color: P };
@@ -90,19 +97,21 @@ function getNextAction(parcel: Parcel): NextAction | null {
 }
 
 function getStatusStep(status: string): number {
-  if (["créé","cree","en_attente"].includes(status)) return 1;
-  if (["en_gare","arrive_gare_depart"].includes(status)) return 2;
-  if (["chargé_bus","en_transit","en_route"].includes(status)) return 3;
-  if (["arrivé","arrive","en_livraison"].includes(status)) return 4;
-  if (["retiré","retire","livré","livre"].includes(status)) return 5;
+  if (["en_attente_validation"].includes(status)) return 1;
+  if (["créé","cree","en_attente","valide"].includes(status)) return 2;
+  if (["en_attente_ramassage","en_gare","arrive_gare_depart"].includes(status)) return 3;
+  if (["chargé_bus","en_transit","en_route"].includes(status)) return 4;
+  if (["arrivé","arrive","en_livraison"].includes(status)) return 5;
+  if (["retiré","retire","livré","livre"].includes(status)) return 6;
   return 0;
 }
 
-const STEP_COLORS  = ["#6B7280","#D97706","#2563EB","#059669","#065F46"];
-const STEP_LABELS  = ["Créé","En gare","Transit","Arrivé","Retiré"];
+const STEP_COLORS  = ["#0E7490","#6B7280","#D97706","#2563EB","#059669","#065F46"];
+const STEP_LABELS  = ["À valider","Créé","En gare","Transit","Arrivé","Livré"];
 
 function MiniProgress({ status }: { status: string }) {
   const step = getStatusStep(status);
+  const totalSteps = STEP_COLORS.length;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 4 }}>
       {STEP_COLORS.map((color, i) => {
@@ -111,14 +120,15 @@ function MiniProgress({ status }: { status: string }) {
         return (
           <React.Fragment key={i}>
             <View style={{
-              width: current ? 20 : 14, height: 6, borderRadius: 3,
+              flex: 1, height: 5, borderRadius: 3,
               backgroundColor: filled ? color : "#E5E7EB",
+              ...(current && { height: 7 }),
             }} />
           </React.Fragment>
         );
       })}
-      <Text style={{ fontSize: 10, color: STEP_COLORS[step - 1] ?? "#9CA3AF", fontWeight: "700", marginLeft: 4 }}>
-        {STEP_LABELS[step - 1] ?? "—"} · {step > 0 ? step : "?"}/5
+      <Text style={{ fontSize: 10, color: STEP_COLORS[step - 1] ?? "#9CA3AF", fontWeight: "700", marginLeft: 6 }}>
+        {step}/{totalSteps}
       </Text>
     </View>
   );
@@ -156,9 +166,10 @@ interface Parcel {
 type TabType = "creer" | "liste" | "retrait" | "valider";
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUSES[status] ?? { label: status, color: "#6B7280", bg: "#F3F4F6" };
+  const s = STATUSES[status] ?? { label: status, color: "#6B7280", bg: "#F3F4F6", icon: "ellipse-outline" };
   return (
-    <View style={{ backgroundColor: s.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+    <View style={{ backgroundColor: s.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, flexDirection: "row", alignItems: "center", gap: 4 }}>
+      <Ionicons name={s.icon as any} size={10} color={s.color} />
       <Text style={{ fontSize: 11, fontWeight: "700", color: s.color }}>{s.label}</Text>
     </View>
   );
@@ -167,7 +178,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function ColisScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
-  const [tab, setTab]           = useState<TabType>("retrait");
+  const [tab, setTab]           = useState<TabType>("valider");
 
   const isAgent = user?.role === "agent";
 
@@ -214,10 +225,10 @@ export default function ColisScreen() {
       {/* Tabs */}
       <View style={S.tabs}>
         {([
-          { key: "retrait",  icon: "qr-code-outline",          label: "Retrait"     },
-          { key: "valider",  icon: "checkmark-circle-outline",  label: "Progression" },
-          { key: "liste",    icon: "time-outline",              label: "Historique"  },
+          { key: "valider",  icon: "layers-outline",            label: "En cours"    },
+          { key: "retrait",  icon: "qr-code-outline",           label: "Retrait"     },
           { key: "creer",    icon: "add-circle-outline",        label: "Nouveau"     },
+          { key: "liste",    icon: "time-outline",              label: "Historique"  },
         ] as { key: TabType; icon: any; label: string }[]).map(t => (
           <TouchableOpacity key={t.key} style={[S.tabBtn, tab === t.key && S.tabBtnActive]} onPress={() => setTab(t.key)}>
             <Ionicons name={t.icon} size={20} color={tab === t.key ? "#fff" : "#C4B5FD"} />
@@ -234,295 +245,527 @@ export default function ColisScreen() {
   );
 }
 
-/* ═══════════════════════════════════════════
-   TAB — Valider colis à distance
-   ═══════════════════════════════════════════ */
-interface RemoteParcel {
-  id: string;
-  trackingRef: string;
-  senderName: string;
-  senderPhone: string;
-  receiverName: string;
-  receiverPhone: string;
-  fromCity: string;
-  toCity: string;
-  parcelType: string;
-  weight: number;
-  amount: number;
-  deliveryType: string;
-  photoUrl: string | null;
-  declaredValue: number;
-  status: string;
-  createdAt: string;
+/* ── helper: section header ───────────────────────────────── */
+function SectionHeader({ icon, label, count, color, urgent }: {
+  icon: any; label: string; count: number; color: string; urgent?: boolean;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, marginBottom: 2 }}>
+      <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: color + "18", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: color + "30" }}>
+        <Ionicons name={icon} size={15} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A", letterSpacing: -0.2 }}>{label}</Text>
+      </View>
+      {urgent && count > 0 && (
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginRight: 4 }} />
+      )}
+      <View style={{ backgroundColor: color + "20", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3 }}>
+        <Text style={{ fontSize: 12, fontWeight: "800", color }}>{count}</Text>
+      </View>
+    </View>
+  );
 }
 
 function ValiderTab({ token }: { token: string | null }) {
-  const [parcels, setParcels] = React.useState<RemoteParcel[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [allParcels, setAllParcels] = React.useState<Parcel[]>([]);
+  const [loading, setLoading]       = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [selected, setSelected] = React.useState<RemoteParcel | null>(null);
-  const [prixReel, setPrixReel] = React.useState("");
-  const [notes, setNotes] = React.useState("");
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [prixReel, setPrixReel]     = React.useState("");
+  const [notes, setNotes]           = React.useState("");
   const [refusReason, setRefusReason] = React.useState("");
   const [showRefusModal, setShowRefusModal] = React.useState(false);
-  const [acting, setActing] = React.useState(false);
-  const [result, setResult] = React.useState<{ ok: boolean; msg: string } | null>(null);
+  const [refusingParcel, setRefusingParcel] = React.useState<Parcel | null>(null);
+  const [acting, setActing]         = React.useState<string | null>(null);
+  const [result, setResult]         = React.useState<{ ok: boolean; msg: string } | null>(null);
+
+  const TEAL    = "#0E7490";
+
+  /* ── terminal statuses (not shown in "En cours") ── */
+  const TERMINAL = ["retiré","retire","livré","livre","annulé"];
+  const isActive = (p: Parcel) => !TERMINAL.includes(p.status);
 
   const load = React.useCallback(async () => {
     if (!token) { setLoading(false); return; }
     try {
-      const data = await apiFetch<RemoteParcel[]>("/agent/parcels/pending-validation", { token });
-      setParcels(Array.isArray(data) ? data : []);
-    } catch { setParcels([]); }
+      const data = await apiFetch<Parcel[]>("/agent/parcels", { token });
+      setAllParcels(Array.isArray(data) ? data : []);
+    } catch { setAllParcels([]); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
   React.useEffect(() => { load(); }, [load]);
 
-  const handleValidate = async () => {
-    if (!selected || !token) return;
-    setActing(true);
+  /* ── poll every 30s ── */
+  React.useEffect(() => {
+    const t = setInterval(() => { if (token) load(); }, 30000);
+    return () => clearInterval(t);
+  }, [load, token]);
+
+  /* ── action handlers ── */
+  const handleValidate = async (parcel: Parcel) => {
+    if (!token) return;
+    setActing(parcel.id);
     try {
       const body: any = {};
       if (prixReel.trim() && parseFloat(prixReel) > 0) body.prixReel = parseFloat(prixReel);
       if (notes.trim()) body.notes = notes.trim();
-      await apiFetch(`/agent/parcels/${selected.id}/validate`, { token, method: "POST", body });
-      setResult({ ok: true, msg: `Colis ${selected.trackingRef} validé. SMS envoyé au client.` });
-      setSelected(null);
-      setPrixReel("");
-      setNotes("");
+      await apiFetch(`/agent/parcels/${parcel.id}/validate`, { token, method: "POST", body });
+      setResult({ ok: true, msg: `Colis ${parcel.trackingRef} validé. SMS envoyé au client.` });
+      setSelectedId(null); setPrixReel(""); setNotes("");
       load();
     } catch (e: any) {
       setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
-    } finally { setActing(false); }
+    } finally { setActing(null); }
   };
 
   const handleRefuse = async () => {
-    if (!selected || !token) return;
-    setActing(true);
+    if (!refusingParcel || !token) return;
+    setActing(refusingParcel.id);
     try {
-      await apiFetch(`/agent/parcels/${selected.id}/refuse`, { token, method: "POST", body: { reason: refusReason } });
-      setResult({ ok: false, msg: `Colis ${selected.trackingRef} refusé. SMS envoyé au client.` });
-      setSelected(null);
-      setShowRefusModal(false);
-      setRefusReason("");
+      await apiFetch(`/agent/parcels/${refusingParcel.id}/refuse`, { token, method: "POST", body: { reason: refusReason } });
+      setResult({ ok: false, msg: `Colis ${refusingParcel.trackingRef} refusé.` });
+      setRefusingParcel(null); setShowRefusModal(false); setRefusReason("");
       load();
     } catch (e: any) {
       setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
-    } finally { setActing(false); }
+    } finally { setActing(null); }
   };
 
-  const handleSendLivreur = async (parcel: RemoteParcel) => {
+  const handleSendLivreur = async (parcel: Parcel) => {
     if (!token) return;
-    setActing(true);
+    setActing(parcel.id);
     try {
       await apiFetch(`/agent/parcels/${parcel.id}/send-livreur`, { token, method: "POST", body: {} });
-      setResult({ ok: true, msg: `Livreur envoyé pour le colis ${parcel.trackingRef}.` });
+      setResult({ ok: true, msg: `Livreur envoyé pour ${parcel.trackingRef}.` });
       load();
     } catch (e: any) {
       setResult({ ok: false, msg: e?.message ?? "Erreur réseau" });
-    } finally { setActing(false); }
+    } finally { setActing(null); }
   };
 
-  const TEAL = "#0E7490";
-  const TEAL_LT = "#ECFEFF";
+  const handleStatusAction = async (parcel: Parcel) => {
+    const next = getNextAction(parcel);
+    if (!next || !token) return;
+    setActing(parcel.id);
+    try {
+      await apiFetch(`/agent/parcels/${parcel.id}/${next.route}`, { token, method: "POST", body: {} });
+      await load();
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? "Mise à jour impossible." });
+    } finally { setActing(null); }
+  };
 
-  const pendingValidation = parcels.filter(p => p.status === "en_attente_validation");
-  const pendingRamassage  = parcels.filter(p => p.status === "en_attente_ramassage");
+  /* ── data computed ── */
+  const active         = allParcels.filter(isActive);
+  const toValidate     = active.filter(p => p.status === "en_attente_validation");
+  const toPickup       = active.filter(p => p.status === "en_attente_ramassage");
+  const atStation      = active.filter(p => ["créé","cree","en_attente","valide","en_gare","arrive_gare_depart"].includes(p.status));
+  const inTransit      = active.filter(p => ["chargé_bus","en_transit","en_route"].includes(p.status));
+  const arrived        = active.filter(p => ["arrivé","arrive","en_livraison"].includes(p.status));
+  const totalActive    = active.length;
 
   if (loading) {
-    return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <ActivityIndicator color={TEAL} size="large" />
-    </View>;
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", gap: 14, backgroundColor: "#F8FAFC" }}>
+        <ActivityIndicator color={TEAL} size="large" />
+        <Text style={{ fontSize: 13, color: "#94A3B8" }}>Chargement des colis en cours…</Text>
+      </View>
+    );
   }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: "#F8FAFC" }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
-      contentContainerStyle={{ padding: 14, gap: 12 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={TEAL} />}
+      contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}>
 
+      {/* ── Result banner ── */}
       {result && (
-        <View style={{ backgroundColor: result.ok ? "#ECFDF5" : "#FFF1F2", borderRadius: 12, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View style={{ backgroundColor: result.ok ? "#ECFDF5" : "#FFF1F2", borderRadius: 12, padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <Text style={{ color: result.ok ? "#065F46" : "#9F1239", fontSize: 14, fontWeight: "600", flex: 1 }}>{result.msg}</Text>
           <TouchableOpacity onPress={() => setResult(null)}><Ionicons name="close-circle" size={20} color="#94A3B8" /></TouchableOpacity>
         </View>
       )}
 
-      {/* À valider */}
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 2 }}>
-        <Ionicons name="time" size={18} color={TEAL} />
-        <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
-          À valider ({pendingValidation.length})
-        </Text>
-      </View>
-
-      {pendingValidation.length === 0 && (
-        <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 20, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
-          <Ionicons name="checkmark-circle-outline" size={48} color="#CBD5E1" />
-          <Text style={{ color: "#6B7280", fontSize: 14, marginTop: 8 }}>Aucun colis en attente de validation</Text>
+      {/* ── Summary bar ── */}
+      {totalActive > 0 ? (
+        <View style={{ backgroundColor: "#fff", borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: "#E2E8F0", flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: TEAL + "18", justifyContent: "center", alignItems: "center" }}>
+            <Ionicons name="cube" size={20} color={TEAL} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>{totalActive} colis actif{totalActive > 1 ? "s" : ""}</Text>
+            <Text style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
+              {toValidate.length > 0 ? `${toValidate.length} à valider · ` : ""}{arrived.length > 0 ? `${arrived.length} arrivé${arrived.length > 1 ? "s" : ""} · ` : ""}{inTransit.length} en transit
+            </Text>
+          </View>
+          {toValidate.length > 0 && (
+            <View style={{ backgroundColor: "#FEF2F2", borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#FECACA" }}>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: "#DC2626" }}>⚠ Action</Text>
+            </View>
+          )}
+        </View>
+      ) : (
+        <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 36, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: "#F0FDF4", justifyContent: "center", alignItems: "center", marginBottom: 12 }}>
+            <Ionicons name="cube-outline" size={32} color="#059669" />
+          </View>
+          <Text style={{ fontSize: 16, fontWeight: "800", color: "#374151" }}>Aucun colis actif</Text>
+          <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 4, textAlign: "center" }}>Tous les colis sont livrés ou annulés.</Text>
         </View>
       )}
 
-      {pendingValidation.map(parcel => (
-        <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 2, borderColor: selected?.id === parcel.id ? TEAL : "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
-          <View style={{ backgroundColor: TEAL_LT, padding: 12, borderBottomWidth: 1, borderColor: "#CFFAFE" }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Ionicons name="document-text" size={16} color={TEAL} />
-                <Text style={{ fontWeight: "800", color: TEAL, fontSize: 14 }}>{parcel.trackingRef}</Text>
-              </View>
-              <View style={{ backgroundColor: "#FEF9C3", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#854D0E" }}>Créé à distance</Text>
-              </View>
-            </View>
-          </View>
-          <View style={{ padding: 12, gap: 6 }}>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "600" }}>EXPÉDITEUR</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.senderName}</Text>
-                <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.senderPhone}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "600" }}>DESTINATAIRE</Text>
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.receiverName}</Text>
-                <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.receiverPhone}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.fromCity} → {parcel.toCity}</Text>
-              <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.weight} kg · {parcel.parcelType}</Text>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={{ backgroundColor: parcel.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0F9FF", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: parcel.deliveryType === "livraison_domicile" ? "#EA580C" : "#0284C7" }}>
-                  {parcel.deliveryType === "livraison_domicile" ? "Domicile" : "Gare"}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 13, fontWeight: "800", color: "#16A34A" }}>
-                {Number(parcel.amount).toLocaleString()} FCFA
-                {parcel.declaredValue > 0 && <Text style={{ fontSize: 11, color: "#6B7280" }}> (déclaré: {Number(parcel.declaredValue).toLocaleString()})</Text>}
-              </Text>
-            </View>
-            {parcel.photoUrl && (
-              <View style={{ borderRadius: 10, overflow: "hidden", marginTop: 4, borderWidth: 1, borderColor: "#E2E8F0" }}>
-                <Image source={{ uri: parcel.photoUrl }} style={{ width: "100%", height: 160 }} resizeMode="cover" />
-                <View style={{ backgroundColor: "#F0FDF4", padding: 6 }}>
-                  <Text style={{ fontSize: 11, color: "#15803D", textAlign: "center", fontWeight: "600" }}>Photo du colis fournie par le client</Text>
-                </View>
-              </View>
-            )}
-            {/* Validation panel */}
-            {selected?.id === parcel.id ? (
-              <View style={{ backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12, gap: 10, marginTop: 4, borderWidth: 1.5, borderColor: TEAL }}>
-                <TextInput
-                  value={prixReel}
-                  onChangeText={setPrixReel}
-                  placeholder="Ajuster le prix FCFA (optionnel)"
-                  keyboardType="numeric"
-                  style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
-                />
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Note pour le client (optionnel)"
-                  style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
-                />
-                <View style={{ flexDirection: "row", gap: 8 }}>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: "#059669", borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
-                    onPress={handleValidate} disabled={acting}>
-                    {acting ? <ActivityIndicator size="small" color="#fff" />
-                      : <><Ionicons name="checkmark-circle" size={16} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Valider</Text></>}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
-                    onPress={() => setShowRefusModal(true)} disabled={acting}>
-                    <Ionicons name="close-circle" size={16} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Refuser</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{ backgroundColor: "#F1F5F9", borderRadius: 12, padding: 13 }}
-                    onPress={() => setSelected(null)}>
-                    <Ionicons name="close" size={18} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={{ backgroundColor: TEAL, borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 4, flexDirection: "row", justifyContent: "center", gap: 8 }}
-                onPress={() => { setSelected(parcel); setPrixReel(""); setNotes(""); }}>
-                <Ionicons name="eye-outline" size={16} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Vérifier ce colis</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      ))}
-
-      {/* À ramasser (domicile) */}
-      {pendingRamassage.length > 0 && (
+      {/* ══ SECTION 1 : À VALIDER ══════════════════════════════════ */}
+      {(toValidate.length > 0 || true) && (
         <>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
-            <Ionicons name="bicycle" size={18} color="#EA580C" />
-            <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
-              Ramassage domicile ({pendingRamassage.length})
-            </Text>
-          </View>
-          {pendingRamassage.map(parcel => (
-            <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FED7AA" }}>
-              <View style={{ backgroundColor: "#FFF7ED", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={{ fontWeight: "800", color: "#EA580C", fontSize: 13 }}>{parcel.trackingRef}</Text>
-                <View style={{ backgroundColor: "#FEF3C7", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#B45309" }}>À ramasser</Text>
-                </View>
-              </View>
-              <View style={{ padding: 12, gap: 6 }}>
-                <Text style={{ fontSize: 13, color: "#0F172A", fontWeight: "600" }}>{parcel.senderName} — {parcel.senderPhone}</Text>
-                <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.fromCity} → {parcel.toCity}</Text>
-                <TouchableOpacity
-                  style={{ backgroundColor: "#EA580C", borderRadius: 12, paddingVertical: 13, alignItems: "center", marginTop: 4, flexDirection: "row", justifyContent: "center", gap: 8 }}
-                  onPress={() => handleSendLivreur(parcel)} disabled={acting}>
-                  {acting ? <ActivityIndicator size="small" color="#fff" />
-                    : <><Ionicons name="bicycle-outline" size={16} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>Envoyer livreur</Text></>}
-                </TouchableOpacity>
-              </View>
+          <SectionHeader icon="time" label="À valider — Colis en ligne" count={toValidate.length} color="#DC2626" urgent />
+          {toValidate.length === 0 ? (
+            <View style={{ backgroundColor: "#fff", borderRadius: 12, padding: 16, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 12 }}>
+              <Ionicons name="checkmark-circle-outline" size={28} color="#CBD5E1" />
+              <Text style={{ color: "#9CA3AF", fontSize: 13, marginTop: 6 }}>Aucun colis en attente de validation</Text>
             </View>
-          ))}
+          ) : (
+            <View style={{ gap: 10, marginBottom: 12 }}>
+              {toValidate.map(parcel => (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 2, borderColor: selectedId === parcel.id ? "#0E7490" : "#CFFAFE", elevation: 3, shadowColor: "#0E7490", shadowOpacity: 0.1, shadowRadius: 8 }}>
+                  {/* Header */}
+                  <View style={{ backgroundColor: "#ECFEFF", padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="document-text" size={16} color={TEAL} />
+                      <Text style={{ fontWeight: "800", color: TEAL, fontSize: 14 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={{ backgroundColor: "#FEF9C3", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#854D0E" }}>📱 Client en ligne</Text>
+                      </View>
+                      {parcel.createdAt && (
+                        <Text style={{ fontSize: 10, color: "#94A3B8" }}>
+                          {new Date(parcel.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    {/* Parties */}
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 10, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700", marginBottom: 3 }}>EXPÉDITEUR</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.senderName}</Text>
+                        <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.senderPhone}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 10, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700", marginBottom: 3 }}>DESTINATAIRE</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.receiverName}</Text>
+                        <Text style={{ fontSize: 12, color: "#475569" }}>{parcel.receiverPhone}</Text>
+                      </View>
+                    </View>
+                    {/* Route + meta */}
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, color: "#374151", fontWeight: "600" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        {parcel.weight && <Text style={{ fontSize: 11, color: "#64748B" }}>{parcel.weight} kg</Text>}
+                        <View style={{ backgroundColor: parcel.deliveryType === "livraison_domicile" ? "#FFF7ED" : "#F0F9FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: parcel.deliveryType === "livraison_domicile" ? "#EA580C" : "#0284C7" }}>
+                            {parcel.deliveryType === "livraison_domicile" ? "🏠 Domicile" : "🚉 Gare"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, color: "#6B7280" }}>{parcel.parcelType}</Text>
+                      <Text style={{ fontSize: 15, fontWeight: "900", color: "#16A34A" }}>{Number(parcel.amount).toLocaleString()} FCFA</Text>
+                    </View>
+                    {/* Photo */}
+                    {parcel.photoUrl && (
+                      <View style={{ borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0" }}>
+                        <Image source={{ uri: parcel.photoUrl }} style={{ width: "100%", height: 150 }} resizeMode="cover" />
+                        <View style={{ backgroundColor: "#F0FDF4", padding: 5 }}>
+                          <Text style={{ fontSize: 10, color: "#15803D", textAlign: "center", fontWeight: "600" }}>📸 Photo fournie par le client</Text>
+                        </View>
+                      </View>
+                    )}
+                    {/* Validation panel */}
+                    {selectedId === parcel.id ? (
+                      <View style={{ backgroundColor: "#F8FAFC", borderRadius: 12, padding: 12, gap: 10, borderWidth: 1.5, borderColor: TEAL }}>
+                        <TextInput
+                          value={prixReel}
+                          onChangeText={setPrixReel}
+                          placeholder="Ajuster le prix FCFA (optionnel)"
+                          keyboardType="numeric"
+                          style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
+                        />
+                        <TextInput
+                          value={notes}
+                          onChangeText={setNotes}
+                          placeholder="Note pour le client (optionnel)"
+                          style={{ backgroundColor: "#fff", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 }}
+                        />
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: "#059669", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                            onPress={() => handleValidate(parcel)} disabled={acting === parcel.id}>
+                            {acting === parcel.id
+                              ? <ActivityIndicator size="small" color="#fff" />
+                              : <><Ionicons name="checkmark-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Valider</Text></>}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 6 }}
+                            onPress={() => { setRefusingParcel(parcel); setShowRefusModal(true); }} disabled={acting === parcel.id}>
+                            <Ionicons name="close-circle" size={18} color="#fff" />
+                            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Refuser</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ backgroundColor: "#F1F5F9", borderRadius: 12, padding: 14 }}
+                            onPress={() => setSelectedId(null)}>
+                            <Ionicons name="close" size={18} color="#64748B" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={{ backgroundColor: TEAL, borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                        onPress={() => { setSelectedId(parcel.id); setPrixReel(""); setNotes(""); }}>
+                        <Ionicons name="eye-outline" size={18} color="#fff" />
+                        <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Vérifier et valider</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
         </>
       )}
 
-      {/* Refus modal */}
+      {/* ══ SECTION 2 : À RAMASSER ═════════════════════════════════ */}
+      {toPickup.length > 0 && (
+        <>
+          <SectionHeader icon="bicycle" label="Ramassage à domicile" count={toPickup.length} color="#EA580C" urgent />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {toPickup.map(parcel => (
+              <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FED7AA", elevation: 2 }}>
+                <View style={{ backgroundColor: "#FFF7ED", padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Ionicons name="bicycle" size={16} color="#EA580C" />
+                    <Text style={{ fontWeight: "800", color: "#EA580C", fontSize: 14 }}>{parcel.trackingRef}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                </View>
+                <View style={{ padding: 12, gap: 8 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <View>
+                      <Text style={{ fontSize: 11, color: "#94A3B8", fontWeight: "700" }}>EXPÉDITEUR</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>{parcel.senderName}</Text>
+                      <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.senderPhone}</Text>
+                    </View>
+                    <Text style={{ fontSize: 15, fontWeight: "900", color: "#EA580C" }}>{Number(parcel.amount).toLocaleString()} F</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{ backgroundColor: "#EA580C", borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                    onPress={() => handleSendLivreur(parcel)} disabled={acting === parcel.id}>
+                    {acting === parcel.id
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <><Ionicons name="bicycle-outline" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Envoyer le livreur</Text></>}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* ══ SECTION 3 : EN GARE ════════════════════════════════════ */}
+      {atStation.length > 0 && (
+        <>
+          <SectionHeader icon="business" label="En gare — Prêts à charger" count={atStation.length} color="#D97706" />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {atStation.map(parcel => {
+              const next = getNextAction(parcel);
+              return (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FDE68A", elevation: 2 }}>
+                  <View style={{ backgroundColor: "#FFFBEB", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="cube-outline" size={14} color="#D97706" />
+                      <Text style={{ fontWeight: "800", color: "#D97706", fontSize: 13 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{parcel.parcelType}</Text>
+                  </View>
+                  <View style={{ padding: 12, gap: 6 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} F</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.senderName} → {parcel.receiverName}</Text>
+                    <MiniProgress status={parcel.status} />
+                    {next && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: next.color, borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                        onPress={() => handleStatusAction(parcel)} disabled={acting === parcel.id}>
+                        {acting === parcel.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="arrow-forward-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>{next.label}</Text></>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* ══ SECTION 4 : EN TRANSIT ═════════════════════════════════ */}
+      {inTransit.length > 0 && (
+        <>
+          <SectionHeader icon="bus" label="En transit — Sur la route" count={inTransit.length} color="#2563EB" />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {inTransit.map(parcel => {
+              const next = getNextAction(parcel);
+              return (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#BFDBFE", elevation: 2 }}>
+                  <View style={{ backgroundColor: "#EFF6FF", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="bus-outline" size={14} color="#2563EB" />
+                      <Text style={{ fontWeight: "800", color: "#2563EB", fontSize: 13 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#2563EB" }} />
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#2563EB" }}>EN ROUTE</Text>
+                    </View>
+                  </View>
+                  <View style={{ padding: 12, gap: 6 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} F</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.senderName} → {parcel.receiverName}</Text>
+                    <MiniProgress status={parcel.status} />
+                    {next && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: next.color, borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                        onPress={() => handleStatusAction(parcel)} disabled={acting === parcel.id}>
+                        {acting === parcel.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="arrow-forward-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>{next.label}</Text></>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* ══ SECTION 5 : ARRIVÉS ════════════════════════════════════ */}
+      {arrived.length > 0 && (
+        <>
+          <SectionHeader icon="location" label="Arrivés — À remettre" count={arrived.length} color="#059669" urgent />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {arrived.map(parcel => {
+              const next = getNextAction(parcel);
+              const isHome = parcel.deliveryType === "livraison_domicile";
+              return (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 2, borderColor: "#6EE7B7", elevation: 3, shadowColor: "#059669", shadowOpacity: 0.12, shadowRadius: 8 }}>
+                  <View style={{ backgroundColor: "#ECFDF5", padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="location" size={16} color="#059669" />
+                      <Text style={{ fontWeight: "800", color: "#059669", fontSize: 14 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <View style={{ backgroundColor: isHome ? "#FFF7ED" : "#F0FDF4", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                      <Ionicons name={isHome ? "bicycle-outline" : "storefront-outline"} size={11} color={isHome ? "#EA580C" : "#065F46"} />
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: isHome ? "#EA580C" : "#065F46" }}>{isHome ? "Domicile" : "Retrait gare"}</Text>
+                    </View>
+                  </View>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>EXPÉDITEUR</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }}>{parcel.senderName}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#ECFDF5", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#059669", fontWeight: "700" }}>DESTINATAIRE</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }}>{parcel.receiverName}</Text>
+                        <Text style={{ fontSize: 11, color: "#64748B" }}>{parcel.receiverPhone}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <Text style={{ fontSize: 14, fontWeight: "900", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} FCFA</Text>
+                    </View>
+                    <MiniProgress status={parcel.status} />
+                    {next ? (
+                      <TouchableOpacity
+                        style={{ backgroundColor: next.color, borderRadius: 12, paddingVertical: 14, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8, shadowColor: next.color, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 }}
+                        onPress={() => handleStatusAction(parcel)} disabled={acting === parcel.id}>
+                        {acting === parcel.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="checkmark-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>{next.label}</Text></>}
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 8 }}>
+                        <Ionicons name="checkmark-done-circle" size={16} color="#9CA3AF" />
+                        <Text style={{ fontSize: 12, color: "#9CA3AF", fontWeight: "600" }}>Terminé</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* ── Refus modal ── */}
       <Modal visible={showRefusModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
           <View style={{ backgroundColor: "#fff", borderRadius: 24, padding: 24, gap: 14 }}>
-            <Text style={{ fontSize: 18, fontWeight: "800", color: "#0F172A" }}>Motif du refus</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#FEE2E2", justifyContent: "center", alignItems: "center" }}>
+                <Ionicons name="close-circle" size={22} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: "800", color: "#0F172A" }}>Motif du refus</Text>
+                {refusingParcel && <Text style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>{refusingParcel.trackingRef}</Text>}
+              </View>
+            </View>
             <TextInput
               value={refusReason}
               onChangeText={setRefusReason}
-              placeholder="Expliquer pourquoi le colis est refusé..."
+              placeholder="Expliquer pourquoi le colis est refusé…"
               multiline
-              style={{ backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#E2E8F0", padding: 12, minHeight: 80, fontSize: 14 }}
+              style={{ backgroundColor: "#F8FAFC", borderRadius: 12, borderWidth: 1.5, borderColor: "#FECACA", padding: 14, minHeight: 80, fontSize: 14 }}
             />
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, padding: 14, alignItems: "center" }}
-                onPress={handleRefuse} disabled={acting}>
-                {acting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmer le refus</Text>}
+                style={{ flex: 1, backgroundColor: "#DC2626", borderRadius: 12, padding: 15, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                onPress={handleRefuse} disabled={!!acting}>
+                {acting ? <ActivityIndicator color="#fff" /> : <><Ionicons name="close-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>Confirmer le refus</Text></>}
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, padding: 14, alignItems: "center" }}
-                onPress={() => setShowRefusModal(false)}>
+                style={{ flex: 1, backgroundColor: "#F1F5F9", borderRadius: 12, padding: 15, alignItems: "center" }}
+                onPress={() => { setShowRefusModal(false); setRefusingParcel(null); }}>
                 <Text style={{ color: "#475569", fontWeight: "700", fontSize: 15 }}>Annuler</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-      <View style={{ height: 40 }} />
     </ScrollView>
   );
 }
