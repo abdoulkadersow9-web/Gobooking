@@ -9,6 +9,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
+import { useOnSync, useSync } from "@/context/SyncContext";
 import { notifyEmbarquementValide } from "@/services/notificationService";
 import { apiFetch, BASE_URL } from "@/utils/api";
 import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
@@ -93,6 +94,7 @@ type MainTab = "billets" | "depart";
 export default function EmbarquementScreen() {
   const { user, token, logout } = useAuth();
   const networkStatus   = useNetworkStatus(BASE_URL);
+  const { triggerSync } = useSync();
 
   const isEmbarquementAgent = !user?.agentRole ||
     user.agentRole === "agent_embarquement" || user.agentRole === "embarquement" ||
@@ -171,6 +173,24 @@ export default function EmbarquementScreen() {
   const [boardingById, setBoardingById]         = useState<string | null>(null);
   const pollBoardingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /* ── Sync temps réel ─────────────────────────────── */
+  const [lastBoardingSync, setLastBoardingSync] = useState<Date | null>(null);
+  const [newPassengerIds, setNewPassengerIds]   = useState<Set<string>>(new Set());
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const newBadgeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  /* Refs pour accès synchrone dans les callbacks async / useOnSync */
+  const selectedTripRef = useRef<TodayTrip | null>(null);
+  const activeTabRef    = useRef<MainTab>("billets");
+  const loadBoardingRef = useRef<((id: string, silent?: boolean) => Promise<void>) | null>(null);
+
+  /* Sync croisé: déclenché AVANT le return conditionnel ── */
+  useOnSync(["ticket", "reservation"], () => {
+    if (activeTabRef.current === "depart" && selectedTripRef.current) {
+      loadBoardingRef.current?.(selectedTripRef.current.id, true);
+    }
+  });
+
   /* ── Absent seat release (guichet) ───────────────── */
   const [selectedAbsents, setSelectedAbsents]   = useState<Set<string>>(new Set());
   const [releasingSeats, setReleasingSeats]     = useState(false);
@@ -215,6 +235,7 @@ export default function EmbarquementScreen() {
   /* ── Select a trip → auto-switch to depart tab + load list ── */
   const selectTrip = async (trip: TodayTrip) => {
     setSelectedTrip(trip);
+    selectedTripRef.current = trip;
     setActiveTripIdForGps(trip.id);
     setShowTripSelector(false);
     setDepartureResult(null);
@@ -222,6 +243,9 @@ export default function EmbarquementScreen() {
     setSelectedAbsents(new Set());
     /* Switch automatically to the passenger list tab */
     setActiveTab("depart");
+    activeTabRef.current = "depart";
+    /* Reset known IDs so next poll can detect "new" passengers */
+    knownIdsRef.current = new Set();
     await loadBoardingStatus(trip.id, false);
     startBoardingPoll(trip.id);
   };
@@ -231,7 +255,35 @@ export default function EmbarquementScreen() {
     if (!silent) setBoardingLoading(true);
     try {
       const data = await apiFetch<BoardingStatus>(`/agent/trip/${tripId}/boarding-status`, { token: token ?? undefined });
+
+      /* Detect genuinely new passengers (not yet in knownIds) */
+      if (silent && knownIdsRef.current.size > 0) {
+        const incoming = (data.passengers ?? []).map(p => p.bookingId);
+        const fresh = incoming.filter(id => !knownIdsRef.current.has(id));
+        if (fresh.length > 0) {
+          setNewPassengerIds(prev => {
+            const next = new Set(prev);
+            fresh.forEach(id => next.add(id));
+            return next;
+          });
+          /* Auto-clear "NOUVEAU" badge after 5s */
+          fresh.forEach(id => {
+            if (newBadgeTimers.current.has(id)) clearTimeout(newBadgeTimers.current.get(id)!);
+            newBadgeTimers.current.set(id, setTimeout(() => {
+              setNewPassengerIds(prev => {
+                const n = new Set(prev);
+                n.delete(id);
+                return n;
+              });
+              newBadgeTimers.current.delete(id);
+            }, 5000));
+          });
+        }
+      }
+      /* Update known IDs */
+      knownIdsRef.current = new Set((data.passengers ?? []).map(p => p.bookingId));
       setBoardingStatus(data);
+      setLastBoardingSync(new Date());
     } catch {
       if (!silent) setBoardingStatus(null);
     } finally {
@@ -239,18 +291,37 @@ export default function EmbarquementScreen() {
     }
   };
 
-  /* ── Real-time polling: refresh passenger list every 15s ── */
+  /* ── Real-time polling: 8s when on Départ tab, paused otherwise ── */
   const startBoardingPoll = (tripId: string) => {
     if (pollBoardingRef.current) clearInterval(pollBoardingRef.current);
     pollBoardingRef.current = setInterval(() => {
       loadBoardingStatus(tripId, true);
-    }, 15000);
+    }, 8000);
   };
 
-  /* Clear boarding poll on unmount */
+  /* Pause/resume poll based on active tab */
   useEffect(() => {
+    if (!selectedTrip) return;
+    if (activeTab === "depart") {
+      startBoardingPoll(selectedTrip.id);
+    } else {
+      if (pollBoardingRef.current) { clearInterval(pollBoardingRef.current); pollBoardingRef.current = null; }
+    }
     return () => { if (pollBoardingRef.current) clearInterval(pollBoardingRef.current); };
+  }, [activeTab, selectedTrip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Clear boarding poll + badge timers on unmount */
+  useEffect(() => {
+    return () => {
+      if (pollBoardingRef.current) clearInterval(pollBoardingRef.current);
+      newBadgeTimers.current.forEach(t => clearTimeout(t));
+    };
   }, []);
+
+  /* Keep refs in sync with state */
+  selectedTripRef.current = selectedTrip;
+  activeTabRef.current    = activeTab;
+  loadBoardingRef.current = loadBoardingStatus;
 
   /* ── Board a passenger directly from the list ────── */
   const boardPassengerFromList = async (p: BoardingPassenger) => {
@@ -278,6 +349,7 @@ export default function EmbarquementScreen() {
               },
             } : prev);
             if (selectedTrip) loadBoardingStatus(selectedTrip.id, true);
+            triggerSync("boarding");
           } catch (e: any) {
             Alert.alert("Erreur", e?.message ?? "Impossible de valider l'embarquement");
           } finally {
@@ -1326,7 +1398,11 @@ export default function EmbarquementScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 10, paddingHorizontal: 7, paddingVertical: 3 }}>
                       <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: G }} />
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: G_DARK }}>LIVE 15s</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: G_DARK }}>
+                        {lastBoardingSync
+                          ? `màj ${lastBoardingSync.getHours().toString().padStart(2,"0")}:${lastBoardingSync.getMinutes().toString().padStart(2,"0")}:${lastBoardingSync.getSeconds().toString().padStart(2,"0")}`
+                          : "LIVE 8s"}
+                      </Text>
                     </View>
                     <TouchableOpacity onPress={() => loadBoardingStatus(selectedTrip.id, false)} style={{ padding: 6 }}>
                       <Feather name="refresh-cw" size={16} color={G} />
@@ -1583,8 +1659,10 @@ export default function EmbarquementScreen() {
                   <Text style={[styles.notFoundSub, { marginTop: 6 }]}>Aucun passager embarqué</Text>
                 </View>
               ) : (
-                boardingStatus.passengers.filter(p => p.boarded).map(p => (
-                  <View key={p.bookingId} style={[styles.resultCard, { borderColor: "#6EE7B7", borderWidth: 1.5 }]}>
+                boardingStatus.passengers.filter(p => p.boarded).map(p => {
+                  const isNew = newPassengerIds.has(p.bookingId);
+                  return (
+                  <View key={p.bookingId} style={[styles.resultCard, { borderColor: isNew ? "#34D399" : "#6EE7B7", borderWidth: isNew ? 2 : 1.5, backgroundColor: isNew ? "#F0FDF4" : "#fff" }]}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                       <View style={[styles.passengerAvatar, { backgroundColor: G_LIGHT }]}>
                         <Ionicons name="checkmark-circle" size={22} color={G} />
@@ -1600,6 +1678,11 @@ export default function EmbarquementScreen() {
                               {(p.bookingType ?? "en-ligne") === "guichet" ? "GUICHET" : "EN LIGNE"}
                             </Text>
                           </View>
+                          {isNew && (
+                            <View style={{ backgroundColor: "#059669", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
+                              <Text style={{ fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.5 }}>NOUVEAU</Text>
+                            </View>
+                          )}
                         </View>
                         <Text style={styles.passengerPhone}>{p.phone}</Text>
                         {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s) : {p.seats.join(", ")}</Text>}
@@ -1609,7 +1692,8 @@ export default function EmbarquementScreen() {
                       </View>
                     </View>
                   </View>
-                ))
+                  );
+                })
               )}
 
               {boardingStatus.stats.absent === 0 && boardingStatus.stats.boarded > 0 && !departureResult && (

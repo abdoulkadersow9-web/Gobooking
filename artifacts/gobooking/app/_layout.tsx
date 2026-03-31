@@ -22,6 +22,7 @@ import { queryClient } from "@/utils/queryClient";
 import { BookingProvider } from "@/context/BookingContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ParcelProvider } from "@/context/ParcelContext";
+import { SyncProvider } from "@/context/SyncContext";
 import { BASE_URL } from "@/utils/api";
 import { setupNotificationListeners } from "@/utils/notifications";
 import { useNetworkStatus } from "@/utils/offline";
@@ -244,15 +245,17 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <LanguageProvider>
             <AuthProvider>
-              <BookingProvider>
-                <ParcelProvider>
-                  <GestureHandlerRootView style={{ flex: 1 }}>
-                    <KeyboardProvider>
-                      <RootLayoutNav />
-                    </KeyboardProvider>
-                  </GestureHandlerRootView>
-                </ParcelProvider>
-              </BookingProvider>
+              <SyncProvider>
+                <BookingProvider>
+                  <ParcelProvider>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <KeyboardProvider>
+                        <RootLayoutNav />
+                      </KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </ParcelProvider>
+                </BookingProvider>
+              </SyncProvider>
             </AuthProvider>
           </LanguageProvider>
         </QueryClientProvider>

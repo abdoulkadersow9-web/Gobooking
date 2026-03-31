@@ -10,6 +10,7 @@ import { router } from "expo-router";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { useAuth } from "@/context/AuthContext";
+import { useSync } from "@/context/SyncContext";
 import AlertBanner from "@/components/AlertBanner";
 import { useRealtime, useTripLive } from "@/hooks/useRealtime";
 import { apiFetch, BASE_URL } from "@/utils/api";
@@ -233,6 +234,9 @@ function todayStr() {
 export default function TicketsScreen() {
   const { user, token, logout, logoutIfActiveToken } = useAuth();
   const networkStatus = useNetworkStatus(BASE_URL);
+
+  /* ── Sync cross-pages ── */
+  const { triggerSync } = useSync();
 
   /* ── Module 6 — Temps réel ── */
   const { preDepartureAlerts, validationAlerts, agentRole: realtimeRole } = useRealtime(token);
@@ -518,6 +522,7 @@ export default function TicketsScreen() {
         setConfirmed({ bookingRef: offlineRef, total: finalTotal,
           passengerName: passengerName.trim(), passengerPhone: passengerPhone.trim(),
           seatCount: count, trip: selectedTrip, paymentLabel: pmLabel, isSP });
+        triggerSync("ticket");
         return;
       }
       const res = await apiFetch<{ bookingRef?: string; id?: string }>("/agent/reservations", {
@@ -536,6 +541,7 @@ export default function TicketsScreen() {
         paymentLabel: pmLabel,
         isSP,
       });
+      triggerSync("ticket");
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de créer la réservation");
     } finally {
