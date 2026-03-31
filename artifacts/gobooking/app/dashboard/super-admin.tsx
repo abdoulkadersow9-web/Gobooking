@@ -625,23 +625,69 @@ export default function SuperAdminDashboard() {
 
         {/* ══ Aperçu ══════════════════════════════════════════════ */}
         {activeTab === "apercu" && (<>
-          <View style={S.revenueCard}>
-            <LinearGradient colors={[PURPLE, "#5B21B6"]} style={S.revenueGradient}>
-              <Text style={S.revenueLabel}>Revenu total de la plateforme</Text>
-              <Text style={S.revenueValue}>{(stats.totalRevenue / 1_000_000).toFixed(1)} M FCFA</Text>
-              <Text style={S.revenueSub}>Cumulé depuis le lancement</Text>
-            </LinearGradient>
-          </View>
+
+          {/* ── Hero revenu plateforme ── */}
+          <LinearGradient colors={[PURPLE, "#5B21B6"]} style={{ borderRadius: 20, padding: 22, gap: 4 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" }}>
+                <Feather name="activity" size={20} color="white" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.75)" }}>GoBooking · Côte d'Ivoire</Text>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "white" }}>Revenu total de la plateforme</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 34, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -1 }}>
+              {stats.totalRevenue >= 1_000_000
+                ? `${(stats.totalRevenue / 1_000_000).toFixed(2)} M FCFA`
+                : `${(stats.totalRevenue ?? 0).toLocaleString()} FCFA`}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+              {[
+                { label: "Compagnies", value: stats.totalCompanies, icon: "briefcase" },
+                { label: "Réservations", value: (stats.totalBookings ?? 0).toLocaleString(), icon: "bookmark" },
+                { label: "Utilisateurs", value: (stats.totalUsers ?? 0).toLocaleString(), icon: "users" },
+              ].map((s, i) => (
+                <View key={i} style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 10, padding: 10, gap: 3, alignItems: "center" }}>
+                  <Feather name={s.icon as never} size={13} color="rgba(255,255,255,0.85)" />
+                  <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "white" }}>{s.value}</Text>
+                  <Text style={{ fontSize: 9, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", textAlign: "center" }}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+          </LinearGradient>
+
+          {/* ── Bandeau flux trajets ── */}
+          {(() => {
+            const enRoute   = trips.filter(t => t.status === "en_route").length;
+            const boarding  = trips.filter(t => t.status === "boarding").length;
+            const scheduled = trips.filter(t => t.status === "scheduled").length;
+            const completed = trips.filter(t => t.status === "completed").length;
+            return (
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {[
+                  { label: "En route",    count: enRoute,   color: "#059669", bg: "#ECFDF5", border: "#6EE7B7", icon: "navigation" },
+                  { label: "Embarquement",count: boarding,  color: "#7C3AED", bg: "#F5F3FF", border: "#C4B5FD", icon: "users" },
+                  { label: "Programmés",  count: scheduled, color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", icon: "clock" },
+                  { label: "Terminés",    count: completed, color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", icon: "check-circle" },
+                ].map((s, i) => (
+                  <View key={i} style={{ flex: 1, backgroundColor: s.bg, borderRadius: 14, padding: 10, alignItems: "center", borderWidth: 1.5, borderColor: s.border, gap: 3 }}>
+                    <Feather name={s.icon as never} size={14} color={s.color} />
+                    <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: s.color, lineHeight: 24 }}>{s.count}</Text>
+                    <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: s.color, textAlign: "center", opacity: 0.85 }}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
+
+          {/* ── KPI grid ── */}
           <View style={S.statsGrid}>
             {[
-              { icon: "users",       label: "Utilisateurs",  value: (stats.totalUsers ?? 0).toLocaleString(),    color: PRIMARY,   bg: "#EEF2FF" },
-              { icon: "briefcase",   label: "Compagnies",    value: stats.totalCompanies,                 color: "#D97706", bg: "#FFFBEB" },
-              { icon: "user",        label: "Agents",        value: stats.totalAgents,                    color: "#059669", bg: "#ECFDF5" },
-              { icon: "navigation",  label: "Trajets",       value: (stats.totalTrips ?? 0).toLocaleString(),    color: "#0891B2", bg: "#ECFEFF" },
-              { icon: "package",     label: "Colis",         value: (stats.totalParcels ?? 0).toLocaleString(),  color: "#6D28D9", bg: "#F5F3FF" },
-              { icon: "bookmark",    label: "Réservations",  value: (stats.totalBookings ?? 0).toLocaleString(), color: "#DC2626", bg: "#FEF2F2" },
-              { icon: "map-pin",     label: "Villes",        value: stats.totalCities,                    color: "#0F766E", bg: "#F0FDFA" },
-              { icon: "credit-card", label: "Modes paiement",value: "4 actifs",                           color: "#9333EA", bg: "#FAF5FF" },
+              { icon: "user",        label: "Agents",       value: stats.totalAgents,                    color: "#059669", bg: "#ECFDF5" },
+              { icon: "navigation",  label: "Trajets",      value: (stats.totalTrips ?? 0).toLocaleString(),    color: "#0891B2", bg: "#ECFEFF" },
+              { icon: "package",     label: "Colis",        value: (stats.totalParcels ?? 0).toLocaleString(),  color: "#6D28D9", bg: "#F5F3FF" },
+              { icon: "map-pin",     label: "Villes",       value: stats.totalCities,                    color: "#0F766E", bg: "#F0FDFA" },
             ].map((c, i) => (
               <View key={i} style={[S.statCard, { borderLeftColor: c.color }]}>
                 <View style={[S.statIcon, { backgroundColor: c.bg }]}><Feather name={c.icon as never} size={15} color={c.color} /></View>
@@ -651,6 +697,65 @@ export default function SuperAdminDashboard() {
             ))}
           </View>
 
+          {/* ── Flux réservations ── */}
+          {(() => {
+            const bs = computedBookingStats;
+            const total = bs.total || 1;
+            return (
+              <View style={{ backgroundColor: "white", borderRadius: 16, padding: 16, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>Statuts réservations</Text>
+                {[
+                  { label: "Confirmées",  count: bs.confirmed, color: "#059669", bg: "#ECFDF5" },
+                  { label: "En attente",  count: bs.pending,   color: "#D97706", bg: "#FFFBEB" },
+                  { label: "Annulées",    count: bs.cancelled, color: "#DC2626", bg: "#FEF2F2" },
+                ].map((s, i) => {
+                  const pct = Math.round((s.count / total) * 100);
+                  return (
+                    <View key={i} style={{ gap: 4 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s.color }} />
+                          <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: "#374151" }}>{s.label}</Text>
+                        </View>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: s.color }}>{s.count.toLocaleString()} · {pct}%</Text>
+                      </View>
+                      <View style={{ height: 5, backgroundColor: "#F1F5F9", borderRadius: 3, overflow: "hidden" }}>
+                        <View style={{ height: "100%", width: `${pct}%` as never, backgroundColor: s.color, borderRadius: 3 }} />
+                      </View>
+                    </View>
+                  );
+                })}
+                <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: "#94A3B8", textAlign: "right" }}>Total : {bs.total.toLocaleString()} réservations</Text>
+              </View>
+            );
+          })()}
+
+          {/* ── Performance compagnies ── */}
+          {computedBookingStats.byCompany.length > 0 && (<>
+            <Text style={[S.sectionTitle, { marginTop: 4 }]}>Performance par compagnie</Text>
+            {computedBookingStats.byCompany.slice(0, 6).map((co, i) => {
+              const confPct = co.total > 0 ? Math.round(co.confirmed / co.total * 100) : 0;
+              return (
+                <View key={i} style={{ backgroundColor: "white", borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+                  <View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: "#F5F3FF", justifyContent: "center", alignItems: "center" }}>
+                    <Text style={{ fontSize: 16, fontFamily: "Inter_700Bold", color: PURPLE }}>{co.name.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#0F172A" }}>{co.name}</Text>
+                    <View style={{ height: 4, backgroundColor: "#F1F5F9", borderRadius: 2, overflow: "hidden", marginTop: 5 }}>
+                      <View style={{ height: "100%", width: `${confPct}%` as never, backgroundColor: confPct > 75 ? "#059669" : confPct > 50 ? "#D97706" : "#DC2626", borderRadius: 2 }} />
+                    </View>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: "#94A3B8", marginTop: 2 }}>{co.confirmed}/{co.total} confirmées · {co.cancelled} annulées</Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: confPct > 75 ? "#059669" : confPct > 50 ? "#D97706" : "#DC2626" }}>{confPct}%</Text>
+                    <Text style={{ fontSize: 9, fontFamily: "Inter_400Regular", color: "#94A3B8" }}>confirmé</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>)}
+
           {/* ── Graphiques activité plateforme ── */}
           <DashboardCharts
             dailyBookings={adminAnalytics.dailyBookings}
@@ -659,7 +764,7 @@ export default function SuperAdminDashboard() {
           />
 
           <Text style={[S.sectionTitle, { marginTop: 4 }]}>Derniers inscrits</Text>
-          {stats.recentUsers.map(u => {
+          {stats.recentUsers.slice(0, 5).map(u => {
             const rs = ROLE_STYLE[u.role] ?? ROLE_STYLE.user;
             return (
               <View key={u.id} style={S.listCard}>

@@ -775,15 +775,60 @@ export default function CompanyDashboard() {
 
         {/* ── Aperçu ── */}
         {activeTab === "apercu" && (<>
-          <Text style={S.sectionTitle}>Vue d'ensemble</Text>
+
+          {/* ── Bandeau Live Statuts Trajets ── */}
+          {(() => {
+            const enRoute   = trips.filter(t => t.status === "en_route").length;
+            const boarding  = trips.filter(t => t.status === "boarding").length;
+            const scheduled = trips.filter(t => t.status === "scheduled").length;
+            const completed = trips.filter(t => t.status === "completed").length;
+            return (
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 2 }}>
+                {[
+                  { label: "En route",    count: enRoute,   color: "#059669", bg: "#ECFDF5", border: "#6EE7B7", icon: "navigation" },
+                  { label: "Embarquement",count: boarding,  color: "#7C3AED", bg: "#F5F3FF", border: "#C4B5FD", icon: "users" },
+                  { label: "Programmés",  count: scheduled, color: "#1D4ED8", bg: "#EFF6FF", border: "#93C5FD", icon: "clock" },
+                  { label: "Terminés",    count: completed, color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0", icon: "check-circle" },
+                ].map((s, i) => (
+                  <View key={i} style={{ flex: 1, backgroundColor: s.bg, borderRadius: 14, padding: 10, alignItems: "center", borderWidth: 1.5, borderColor: s.border, gap: 3 }}>
+                    <Feather name={s.icon as never} size={14} color={s.color} />
+                    <Text style={{ fontSize: 20, fontFamily: "Inter_700Bold", color: s.color, lineHeight: 24 }}>{s.count}</Text>
+                    <Text style={{ fontSize: 9, fontFamily: "Inter_600SemiBold", color: s.color, textAlign: "center", opacity: 0.85 }}>{s.label}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
+
+          {/* ── Hero revenu ── */}
+          <LinearGradient colors={[PRIMARY, DARK]} style={{ borderRadius: 18, padding: 18, flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.18)", justifyContent: "center", alignItems: "center" }}>
+              <Feather name="trending-up" size={22} color="white" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.75)" }}>Revenus cumulés</Text>
+              <Text style={{ fontSize: 26, fontFamily: "Inter_700Bold", color: "white", letterSpacing: -0.5 }}>
+                {stats.totalRevenue >= 1_000_000
+                  ? `${(stats.totalRevenue / 1_000_000).toFixed(2)} M`
+                  : (stats.totalRevenue ?? 0).toLocaleString()} FCFA
+              </Text>
+            </View>
+            <View style={{ alignItems: "flex-end", gap: 4 }}>
+              <View style={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "white" }}>{stats.totalReservations?.toLocaleString() ?? 0} rés.</Text>
+              </View>
+              <View style={{ backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "white" }}>{stats.totalParcels ?? 0} colis</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
           <View style={S.statsGrid}>
             {[
               { icon: "truck",       label: "Bus actifs",    value: `${stats.activeBuses}/${stats.totalBuses}`, color: "#1D4ED8", bg: "#EFF6FF" },
               { icon: "users",       label: "Agents",        value: stats.totalAgents,                         color: "#7C3AED", bg: "#F5F3FF" },
-              { icon: "navigation",  label: "Trajets",       value: stats.totalTrips,                          color: PRIMARY,   bg: "#EEF2FF" },
+              { icon: "navigation",  label: "Trajets total", value: stats.totalTrips,                          color: PRIMARY,   bg: "#EEF2FF" },
               { icon: "bookmark",    label: "Réservations",  value: (stats.totalReservations ?? 0).toLocaleString(),  color: "#059669", bg: "#ECFDF5" },
-              { icon: "package",     label: "Colis",         value: stats.totalParcels,                        color: "#D97706", bg: "#FFFBEB" },
-              { icon: "trending-up", label: "Revenus",       value: `${(stats.totalRevenue / 1_000_000).toFixed(1)} M FCFA`, color: "#0891B2", bg: "#ECFEFF" },
             ].map((c, i) => (
               <View key={i} style={[S.statCard, { borderLeftColor: c.color }]}>
                 <View style={[S.statIcon, { backgroundColor: c.bg }]}><Feather name={c.icon as never} size={16} color={c.color} /></View>
@@ -839,24 +884,42 @@ export default function CompanyDashboard() {
             ))}
           </View>
 
-          {/* Seats overview per bus */}
-          <Text style={[S.sectionTitle, { marginTop: 8 }]}>Disponibilité par bus</Text>
-          {buses.filter(b => b.status === "active").slice(0, 4).map(bus => {
-            const pct = Math.round(Math.random() * 40 + 45);
-            const booked = Math.round(bus.capacity * pct / 100);
-            return (
-              <View key={bus.id} style={S.busAvailRow}>
-                <View style={S.busAvailLeft}>
-                  <Text style={S.busAvailName}>{bus.busName}</Text>
-                  <Text style={S.busAvailSub}>{booked}/{bus.capacity} réservés · {bus.capacity - booked} libres</Text>
+          {/* Taux de remplissage par bus (données réelles) */}
+          {buses.filter(b => b.status === "active").length > 0 && (<>
+            <Text style={[S.sectionTitle, { marginTop: 8 }]}>Remplissage des cars actifs</Text>
+            {buses.filter(b => b.status === "active").slice(0, 5).map(bus => {
+              const activeTrip = trips.find(t =>
+                t.busName === bus.busName &&
+                (t.status === "en_route" || t.status === "boarding" || t.status === "scheduled")
+              );
+              const tripRes = activeTrip
+                ? reservations.filter(r => r.tripId === activeTrip.id && r.status !== "cancelled")
+                : [];
+              const booked = tripRes.reduce((sum, r) => sum + (r.passengers?.length ?? 1), 0);
+              const pct = bus.capacity > 0 ? Math.min(100, Math.round(booked / bus.capacity * 100)) : 0;
+              const statusColor = activeTrip?.status === "en_route" ? "#059669" : activeTrip?.status === "boarding" ? "#7C3AED" : "#1D4ED8";
+              const statusLabel = activeTrip?.status === "en_route" ? "En route" : activeTrip?.status === "boarding" ? "Embarquement" : activeTrip?.status === "scheduled" ? "Programmé" : "Disponible";
+              return (
+                <View key={bus.id} style={S.busAvailRow}>
+                  <View style={S.busAvailLeft}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={S.busAvailName}>{bus.busName}</Text>
+                      <View style={{ backgroundColor: activeTrip ? "#ECFDF5" : "#F8FAFC", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: statusColor }}>{statusLabel}</Text>
+                      </View>
+                    </View>
+                    <Text style={S.busAvailSub}>
+                      {activeTrip ? `${activeTrip.from} → ${activeTrip.to} · ` : ""}{booked}/{bus.capacity} passagers
+                    </Text>
+                  </View>
+                  <View style={S.busAvailBar}>
+                    <View style={[S.busAvailFill, { width: `${pct}%` as never, backgroundColor: pct > 85 ? "#DC2626" : pct > 65 ? "#D97706" : "#059669" }]} />
+                  </View>
+                  <Text style={[S.busAvailPct, { color: pct > 85 ? "#DC2626" : pct > 65 ? "#D97706" : "#059669" }]}>{pct}%</Text>
                 </View>
-                <View style={S.busAvailBar}>
-                  <View style={[S.busAvailFill, { width: `${pct}%` as never, backgroundColor: pct > 80 ? "#DC2626" : pct > 60 ? "#D97706" : PRIMARY }]} />
-                </View>
-                <Text style={S.busAvailPct}>{pct}%</Text>
-              </View>
-            );
-          })}
+              );
+            })}
+          </>)}
         </>)}
 
         {/* ══ Portefeuille ═══════════════════════════════════════════ */}
