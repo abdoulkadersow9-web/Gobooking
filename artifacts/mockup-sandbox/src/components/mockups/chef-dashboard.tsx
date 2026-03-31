@@ -1,466 +1,365 @@
 /**
- * Chef d'Agence Dashboard — Maquette v3
- * Positionnement : supervision / validation / décision
- * PAS d'actions terrain. PAS d'accès page suivi.
+ * Chef d'Agence — Dashboard final
+ * Structure : Header / Urgences / Supervision / Accès
+ * Principe : 1 info = 1 seule fois, max 5 items/liste, 0 répétition
  */
 import React, { useState, useEffect } from "react";
 
+/* ── Tokens ────────────────────────────────────────────── */
 const C = {
+  bg:       "#F5F6FA",
+  white:    "#FFFFFF",
   indigo:   "#4F46E5",
   indigo2:  "#3730A3",
-  indigoBg: "#EEF2FF",
-  red:      "#DC2626",
-  redBg:    "#FEF2F2",
-  amber:    "#D97706",
-  amberBg:  "#FEF3C7",
-  green:    "#059669",
-  greenBg:  "#D1FAE5",
-  blue:     "#1D4ED8",
-  blueBg:   "#EFF6FF",
-  purple:   "#7C3AED",
-  purpleBg: "#F5F3FF",
-  gray:     "#6B7280",
-  grayBg:   "#F3F4F6",
   text:     "#111827",
   textSub:  "#6B7280",
   border:   "#E5E7EB",
-  white:    "#FFFFFF",
-  bg:       "#F4F6FB",
+  red:      "#DC2626",
+  redSoft:  "#FEF2F2",
+  amber:    "#D97706",
+  amberSoft:"#FFFBEB",
+  green:    "#059669",
+  greenSoft:"#ECFDF5",
+  purple:   "#7C3AED",
+  purpleSoft:"#F5F3FF",
+  blue:     "#1D4ED8",
+  blueSoft: "#EFF6FF",
 };
 
-const Icon = {
-  alert:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:16,height:16}}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
-  nav:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:15,height:15}}><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>,
-  users:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:15,height:15}}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
-  dollar:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:18,height:18}}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
-  package:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:18,height:18}}><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
-  zap:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:16,height:16}}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
-  checkSq:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:15,height:15}}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
-  clock:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:12,height:12}}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-  check:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:12,height:12}}><polyline points="20 6 9 17 4 12"/></svg>,
-  bar:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:14,height:14}}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
-  trend:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:12,height:12}}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
-  chevron:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:14,height:14}}><polyline points="9 18 15 12 9 6"/></svg>,
-  eye:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:14,height:14}}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
-  map:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:11,height:11}}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>,
-  printer:  () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:11,height:11}}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
-  plus:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} style={{width:20,height:20}}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
-};
-
-const MOCK = {
-  agence: { name: "Agence Plateau", city: "Abidjan" },
-  stats: { tripsToday: 6, agents: 8, passengersToday: 142, revToday: 851000 },
-  perf: { vsYesterday: +12.4, vsSemaine: +8.1 },
-  alerts: 2,
-  aValider: { caisses: 3, colis: 5 },
-  attention: {
-    bordereaux_no_fuel: 4,
-    bordereaux_no_fuel_items: [
-      { route: "Abidjan → Bouaké",       time: "05:30", recettes: "245k" },
-      { route: "Abidjan → Daloa",        time: "06:00", recettes: "189k" },
-      { route: "Abidjan → San Pedro",    time: "06:30", recettes: "312k" },
-    ],
+/* ── Mock data ─────────────────────────────────────────── */
+const D = {
+  name:    "Kouamé",
+  agence:  "Agence Plateau · Abidjan",
+  kpis:    { departs: 6, agents: 8, caisse: 3, colis: 5 },
+  rev:     { billets: 680, bagages: 47, colis_r: 124, net: 851 },
+  urgences:{
+    alertes:   2,
+    caisses:   3,
+    colis:     5,
+    noFuel:    4,   /* nombre, pas de liste — accès via page bordereaux */
   },
-  supervision: {
-    active: [
-      { from: "Abidjan", to: "Bouaké",       time: "07:30", bus: "GB-034", pax: 42, seats: 49, status: "boarding"  },
-      { from: "Abidjan", to: "Yamoussoukro", time: "08:00", bus: "GB-018", pax: 34, seats: 38, status: "en_route"  },
-    ],
-    scheduled: [
-      { from: "Abidjan", to: "San Pedro", time: "10:00", pax: 18, seats: 45 },
-      { from: "Abidjan", to: "Korhogo",   time: "11:30", pax: 31, seats: 49 },
-      { from: "Abidjan", to: "Daloa",     time: "14:00", pax: 12, seats: 38 },
-    ],
-    done: 1,
-  },
-  bordereaux: [
-    { route: "Abidjan → Korhogo",      date: "31/03", pax: 44, total: 394000, net: 329000, ok: true  },
-    { route: "Abidjan → Yamoussoukro", date: "31/03", pax: 38, total: 271000, net: 229000, ok: true  },
-    { route: "Abidjan → Bouaké",       date: "31/03", pax: 49, total: 245000, net: null,   ok: false },
-    { route: "Abidjan → Daloa",        date: "31/03", pax: 36, total: 189000, net: null,   ok: false },
+  actifs: [
+    { route: "Abidjan → Bouaké",       heure: "07:30", statut: "Embarquement", pax: 42, total: 49, couleur: "#7C3AED" },
+    { route: "Abidjan → Yamoussoukro", heure: "08:00", statut: "En route",     pax: 34, total: 38, couleur: "#059669" },
   ],
-  revenue: { billets: 680000, colis: 124000, bagages: 47000, net: 781000 },
+  programme: [
+    { route: "Abidjan → San Pedro", heure: "10:00", pax: 18, total: 45 },
+    { route: "Abidjan → Korhogo",   heure: "11:30", pax: 31, total: 49 },
+    { route: "Abidjan → Daloa",     heure: "14:00", pax: 12, total: 38 },
+  ],
+  termines: 1,
 };
 
-function fmt(n: number) { return n >= 1000 ? `${Math.round(n/1000)}k` : String(n); }
+/* ── SVG Icons ─────────────────────────────────────────── */
+const Ic = {
+  warn:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={16} height={16}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  dollar:  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={18} height={18}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+  pkg:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={18} height={18}><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
+  zap:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={18} height={18}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  nav:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={14} height={14}><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>,
+  clock:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={12} height={12}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  check:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={12} height={12}><polyline points="20 6 9 17 4 12"/></svg>,
+  bar:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={16} height={16}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+  file:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={16} height={16}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  users:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={16} height={16}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+  trend:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={16} height={16}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  chev:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={14} height={14}><polyline points="9 18 15 12 9 6"/></svg>,
+  map:     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={11} height={11}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  plus:    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} width={22} height={22}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+};
 
-function SecHead({ title, accent, right }: { title: string; accent: string; right?: React.ReactNode }) {
+/* ── Composants atomiques ──────────────────────────────── */
+function Label({ text }: { text: string }) {
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-      <div style={{ width:3, height:18, borderRadius:2, background:accent, flexShrink:0 }} />
-      <span style={{ fontSize:13, fontWeight:800, color:C.text, flex:1 }}>{title}</span>
-      {right}
+    <div style={{ fontSize:9, fontWeight:800, color:"#9CA3AF", letterSpacing:1.5, textTransform:"uppercase", marginBottom:10 }}>
+      {text}
     </div>
   );
 }
 
-function NavCard({
-  icon, label, value, sublabel, accent, bg, badge, onClick,
-}: {
-  icon: React.ReactNode; label: string; value: string | number;
-  sublabel?: string; accent: string; bg: string; badge?: number; onClick?: () => void;
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <div style={{ fontSize:16, fontWeight:900, color:C.text, marginBottom:14 }}>{title}</div>
+  );
+}
+
+function ActionCard({ icon, label, sub, accent, soft, count, onClick }: {
+  icon: React.ReactNode; label: string; sub: string;
+  accent: string; soft: string; count: number; onClick?: ()=>void;
 }) {
   return (
     <div
       onClick={onClick}
       style={{
-        background: C.white, borderRadius:14, padding:14,
-        display:"flex", alignItems:"center", gap:12,
-        border:`1.5px solid ${bg}`, cursor:"pointer",
-        transition:"transform 0.1s",
+        display:"flex", alignItems:"center", gap:14,
+        background:C.white, borderRadius:16, padding:"14px 16px",
+        border:`1.5px solid ${soft}`, cursor:"pointer",
+        transition:"box-shadow .15s",
       }}
     >
-      <div style={{ width:44, height:44, borderRadius:14, background:bg, display:"flex", alignItems:"center", justifyContent:"center", color:accent, flexShrink:0 }}>
+      <div style={{ width:44, height:44, borderRadius:13, background:soft, display:"flex", alignItems:"center", justifyContent:"center", color:accent, flexShrink:0 }}>
         {icon}
       </div>
       <div style={{ flex:1 }}>
-        <div style={{ fontSize:13, fontWeight:800, color:C.text }}>{label}</div>
-        {sublabel && <div style={{ fontSize:11, color:C.textSub, marginTop:2 }}>{sublabel}</div>}
+        <div style={{ fontSize:14, fontWeight:800, color:C.text }}>{label}</div>
+        <div style={{ fontSize:11, color:C.textSub, marginTop:3 }}>{sub}</div>
       </div>
-      {badge !== undefined && badge > 0 && (
-        <div style={{ background:accent, borderRadius:12, minWidth:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 8px" }}>
-          <span style={{ color:"#fff", fontWeight:900, fontSize:15 }}>{badge}</span>
-        </div>
-      )}
-      <div style={{ color:C.textSub }}><Icon.chevron /></div>
+      <div style={{ background:accent, borderRadius:12, minWidth:34, height:34, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 10px", flexShrink:0 }}>
+        <span style={{ color:"#fff", fontWeight:900, fontSize:16 }}>{count}</span>
+      </div>
+      <div style={{ color:C.textSub }}>{Ic.chev}</div>
     </div>
   );
 }
 
+/* ── Page principale ───────────────────────────────────── */
 export default function ChefDashboard() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => { const iv = setInterval(() => setTick(t=>t+1), 1000); return () => clearInterval(iv); }, []);
-  const now = new Date();
-  const timeStr = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")}`;
+  const [sec, setSec] = useState(0);
+  useEffect(()=>{ const iv=setInterval(()=>setSec(s=>s+1),1000); return ()=>clearInterval(iv); },[]);
+  const now=new Date(); const ts=`${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}:${String(now.getSeconds()).padStart(2,"0")}`;
 
   return (
-    <div style={{ background:C.bg, minHeight:"100vh", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", display:"flex", justifyContent:"center" }}>
-      <div style={{ width:"100%", maxWidth:420, position:"relative" }}>
+    <div style={{ background:C.bg, minHeight:"100vh", fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif", display:"flex", justifyContent:"center" }}>
+      <div style={{ width:"100%", maxWidth:420, paddingBottom:90 }}>
 
-        {/* ══════════════════════════════════
-            HEADER — gradient indigo
-        ══════════════════════════════════ */}
-        <div style={{ background:`linear-gradient(135deg,${C.indigo2} 0%,${C.indigo} 60%,#6366F1 100%)`, padding:"18px 18px 20px" }}>
-          <div style={{ display:"flex", alignItems:"flex-start", marginBottom:14 }}>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:20, fontWeight:900, color:"#fff" }}>Bonjour, Kouamé 👋</div>
+        {/* ══════════════════════════════════════
+            A. HEADER
+        ══════════════════════════════════════ */}
+        <div style={{ background:`linear-gradient(150deg,${C.indigo2},${C.indigo} 55%,#818CF8)`, padding:"20px 18px 22px" }}>
+
+          {/* Greeting row */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18 }}>
+            <div>
+              <div style={{ fontSize:22, fontWeight:900, color:"#fff", letterSpacing:-0.5 }}>Bonjour, {D.name} 👋</div>
               <div style={{ display:"flex", alignItems:"center", gap:5, marginTop:5 }}>
-                <span style={{ color:"#A5B4FC" }}><Icon.map /></span>
-                <span style={{ fontSize:12, color:"#A5B4FC" }}>{MOCK.agence.name} — {MOCK.agence.city}</span>
+                <span style={{ color:"#A5B4FC" }}>{Ic.map}</span>
+                <span style={{ fontSize:12, color:"#A5B4FC" }}>{D.agence}</span>
               </div>
             </div>
-            {/* Live badge */}
-            <div style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(0,0,0,0.2)", borderRadius:20, padding:"5px 11px" }}>
-              <div style={{ width:6, height:6, borderRadius:3, background:"#4ADE80", animation:"pulse 2s infinite" }} />
-              <span style={{ fontSize:10, color:"#A5B4FC", fontWeight:600 }}>{timeStr}</span>
+            {/* Live time */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(0,0,0,0.22)", borderRadius:20, padding:"6px 12px" }}>
+              <div style={{ width:7, height:7, borderRadius:"50%", background:"#4ADE80", animation:"blink 1.6s infinite" }} />
+              <span style={{ fontSize:11, color:"#C7D2FE", fontWeight:600 }}>{ts}</span>
             </div>
           </div>
 
-          {/* 4 KPIs */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:12 }}>
+          {/* KPIs — 4 tuiles */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:16 }}>
             {[
-              { icon:<Icon.nav/>,    val:MOCK.stats.tripsToday,      label:"Départs",   color:C.indigo,  bg:"rgba(238,242,255,0.9)" },
-              { icon:<Icon.users/>,  val:MOCK.stats.agents,           label:"Agents",    color:C.green,   bg:"rgba(209,250,229,0.9)" },
-              { icon:<Icon.checkSq/>,val:MOCK.aValider.caisses,       label:"À valider", color:C.amber,   bg:"rgba(254,243,199,0.9)" },
-              { icon:<Icon.package/>,val:MOCK.aValider.colis,         label:"Colis",     color:C.purple,  bg:"rgba(245,243,255,0.9)" },
-            ].map((k,i) => (
-              <div key={i} style={{ background:k.bg, borderRadius:12, padding:"10px 6px", textAlign:"center" }}>
-                <div style={{ color:k.color, marginBottom:3, display:"flex", justifyContent:"center" }}>{k.icon}</div>
-                <div style={{ fontSize:20, fontWeight:900, color:k.color, lineHeight:1 }}>{k.val}</div>
-                <div style={{ fontSize:8, color:"#6B7280", fontWeight:600, marginTop:2, lineHeight:1.2 }}>{k.label}</div>
+              { v:D.kpis.departs, l:"Départs",   c:"#818CF8", bg:"rgba(129,140,248,.18)" },
+              { v:D.kpis.agents,  l:"Agents",    c:"#6EE7B7", bg:"rgba(110,231,183,.18)" },
+              { v:D.kpis.caisse,  l:"À valider", c:"#FCD34D", bg:"rgba(252,211,77,.18)"  },
+              { v:D.kpis.colis,   l:"Colis",     c:"#C4B5FD", bg:"rgba(196,181,253,.18)" },
+            ].map((k,i)=>(
+              <div key={i} style={{ background:k.bg, borderRadius:13, padding:"11px 8px", textAlign:"center", backdropFilter:"blur(6px)" }}>
+                <div style={{ fontSize:26, fontWeight:900, color:k.c, lineHeight:1 }}>{k.v}</div>
+                <div style={{ fontSize:9, color:"rgba(255,255,255,0.65)", fontWeight:700, marginTop:4, letterSpacing:.3 }}>{k.l}</div>
               </div>
             ))}
           </div>
 
-          {/* Revenus + perf */}
-          <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:12, padding:"11px 14px", display:"flex", alignItems:"center" }}>
+          {/* Revenue strip */}
+          <div style={{ background:"rgba(255,255,255,0.1)", borderRadius:13, padding:"12px 16px", display:"flex", alignItems:"center", gap:0 }}>
             {[
-              { l:"Billets", v:MOCK.revenue.billets, c:"#93C5FD" },
-              { l:"Colis",   v:MOCK.revenue.colis,   c:"#C4B5FD" },
-              { l:"Bagages", v:MOCK.revenue.bagages,  c:"#6EE7B7" },
-            ].map((r,i) => (
+              { l:"Billets",  v:D.rev.billets,   c:"#93C5FD" },
+              { l:"Bagages",  v:D.rev.bagages,   c:"#6EE7B7" },
+              { l:"Colis",    v:D.rev.colis_r,   c:"#C4B5FD" },
+            ].map((r,i)=>(
               <React.Fragment key={i}>
                 <div style={{ flex:1, textAlign:"center" }}>
-                  <div style={{ fontSize:8, color:"rgba(255,255,255,0.55)", fontWeight:700, marginBottom:2, textTransform:"uppercase" }}>{r.l}</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:r.c }}>{fmt(r.v)}</div>
+                  <div style={{ fontSize:9, color:"rgba(255,255,255,0.5)", fontWeight:700, marginBottom:3, textTransform:"uppercase", letterSpacing:.5 }}>{r.l}</div>
+                  <div style={{ fontSize:14, fontWeight:800, color:r.c }}>{r.v}k</div>
                 </div>
-                <div style={{ width:1, height:24, background:"rgba(255,255,255,0.18)" }} />
+                <div style={{ width:1, height:26, background:"rgba(255,255,255,0.15)" }} />
               </React.Fragment>
             ))}
-            <div style={{ flex:1.4, textAlign:"center" }}>
-              <div style={{ fontSize:8, color:"rgba(255,255,255,0.55)", fontWeight:700, marginBottom:2, textTransform:"uppercase" }}>NET AUJOURD'HUI</div>
-              <div style={{ fontSize:15, fontWeight:900, color:"#4ADE80" }}>+{fmt(MOCK.revenue.net)}</div>
-            </div>
-            <div style={{ width:1, height:24, background:"rgba(255,255,255,0.18)" }} />
-            <div style={{ flex:1.2, textAlign:"center" }}>
-              <div style={{ fontSize:8, color:"rgba(255,255,255,0.55)", fontWeight:700, marginBottom:2, textTransform:"uppercase" }}>VS HIER</div>
-              <div style={{ fontSize:13, fontWeight:800, color:"#4ADE80" }}>+{MOCK.perf.vsYesterday}%</div>
+            <div style={{ flex:1.3, textAlign:"center" }}>
+              <div style={{ fontSize:9, color:"rgba(255,255,255,0.5)", fontWeight:700, marginBottom:3, textTransform:"uppercase", letterSpacing:.5 }}>NET / JOUR</div>
+              <div style={{ fontSize:16, fontWeight:900, color:"#4ADE80" }}>+{D.rev.net}k</div>
             </div>
           </div>
         </div>
 
-        {/* ══════════════════════════════════
-            SIGNALEMENT ALERTE
-        ══════════════════════════════════ */}
-        {MOCK.alerts > 0 && (
-          <div style={{ display:"flex", alignItems:"center", gap:12, background:C.redBg, borderBottom:`2px solid #FCA5A5`, padding:"11px 16px", cursor:"pointer" }}>
-            <div style={{ width:36, height:36, borderRadius:10, background:"#FECACA", display:"flex", alignItems:"center", justifyContent:"center", color:C.red, flexShrink:0 }}>
-              <Icon.alert />
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:"#991B1B" }}>{MOCK.alerts} signalement{MOCK.alerts>1?"s":""} en attente</div>
-              <div style={{ fontSize:11, color:C.red, marginTop:1 }}>Consulter les alertes signalées par vos agents</div>
-            </div>
-            <div style={{ background:C.red, borderRadius:9, padding:"3px 11px" }}>
-              <span style={{ color:"#fff", fontSize:11, fontWeight:800 }}>Consulter</span>
-            </div>
-          </div>
-        )}
+        {/* Corps */}
+        <div style={{ padding:"24px 16px 0" }}>
 
-        <div style={{ padding:"0 0 100px" }}>
+          {/* ══════════════════════════════════════
+              B. URGENCES — 1 seule section consolidée
+              Alertes + caisses + colis + carburant
+          ══════════════════════════════════════ */}
+          <SectionTitle title="Urgences & validations" />
 
-          {/* ══════════════════════════════════
-              1. À VALIDER (cœur du rôle chef)
-          ══════════════════════════════════ */}
-          <div style={{ padding:"20px 14px 0" }}>
-            <SecHead
-              title="À valider"
-              accent={C.amber}
-              right={<span style={{ fontSize:11, color:C.textSub }}>Votre rôle principal</span>}
-            />
-
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              <NavCard
-                icon={<Icon.dollar />}
-                label={`${MOCK.aValider.caisses} caisses en attente`}
-                sublabel="Validez ou rejetez les soumissions agents"
-                accent={C.amber} bg={C.amberBg} badge={MOCK.aValider.caisses}
-              />
-              <NavCard
-                icon={<Icon.package />}
-                label={`${MOCK.aValider.colis} colis à valider`}
-                sublabel="En gare · en transit · arrivés à destination"
-                accent={C.purple} bg={C.purpleBg} badge={MOCK.aValider.colis}
-              />
-            </div>
-          </div>
-
-          {/* ══════════════════════════════════
-              2. POINTS D'ATTENTION (synthèse)
-          ══════════════════════════════════ */}
-          <div style={{ padding:"20px 14px 0" }}>
-            <SecHead title="Points d'attention" accent={C.red} />
-
-            {/* Bordereaux sans carburant — vue synthétique */}
+          {/* Alerte signalement — si présente */}
+          {D.urgences.alertes > 0 && (
             <div style={{
-              background:C.white, borderRadius:14,
-              border:`1.5px solid #FEE2E2`, overflow:"hidden", marginBottom:8,
+              display:"flex", alignItems:"center", gap:12,
+              background:C.redSoft, border:`1.5px solid #FCA5A5`,
+              borderRadius:16, padding:"13px 16px", marginBottom:10, cursor:"pointer",
             }}>
-              {/* Résumé haut */}
-              <div style={{ display:"flex", alignItems:"center", gap:12, padding:"13px 14px" }}>
-                <div style={{ width:42, height:42, borderRadius:13, background:"#FEF2F2", display:"flex", alignItems:"center", justifyContent:"center", color:C.red, flexShrink:0 }}>
-                  <Icon.zap />
+              <div style={{ width:40, height:40, borderRadius:12, background:"#FECACA", display:"flex", alignItems:"center", justifyContent:"center", color:C.red, flexShrink:0 }}>
+                {Ic.warn}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:800, color:"#991B1B" }}>
+                  {D.urgences.alertes} alerte{D.urgences.alertes>1?"s":""} en attente
                 </div>
+                <div style={{ fontSize:11, color:C.red, marginTop:3 }}>
+                  Signalements agents à consulter
+                </div>
+              </div>
+              <div style={{ background:C.red, borderRadius:10, padding:"6px 13px", fontSize:11, fontWeight:800, color:"#fff", whiteSpace:"nowrap" }}>
+                Consulter
+              </div>
+            </div>
+          )}
+
+          {/* Caisses à valider */}
+          <div style={{ marginBottom:10 }}>
+            <ActionCard
+              icon={Ic.dollar} label={`${D.urgences.caisses} caisses à valider`}
+              sub="Soumissions agents en attente d'approbation"
+              accent={C.amber} soft={C.amberSoft} count={D.urgences.caisses}
+            />
+          </div>
+
+          {/* Colis à valider */}
+          <div style={{ marginBottom:10 }}>
+            <ActionCard
+              icon={Ic.pkg} label={`${D.urgences.colis} colis à valider`}
+              sub="En gare · en transit · arrivés"
+              accent={C.purple} soft={C.purpleSoft} count={D.urgences.colis}
+            />
+          </div>
+
+          {/* Carburant manquant — synthèse en 1 carte, pas de liste */}
+          {D.urgences.noFuel > 0 && (
+            <div style={{
+              display:"flex", alignItems:"center", gap:14,
+              background:C.white, borderRadius:16, padding:"14px 16px",
+              border:"1.5px solid #FEE2E2", cursor:"pointer", marginBottom:0,
+            }}>
+              <div style={{ width:44, height:44, borderRadius:13, background:C.redSoft, display:"flex", alignItems:"center", justifyContent:"center", color:C.red, flexShrink:0 }}>
+                {Ic.zap}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:14, fontWeight:800, color:C.text }}>
+                  {D.urgences.noFuel} départs sans carburant
+                </div>
+                <div style={{ fontSize:11, color:C.textSub, marginTop:3 }}>
+                  Résultat net non calculable — gérer via Bordereaux
+                </div>
+              </div>
+              <div style={{ background:C.red, borderRadius:10, padding:"6px 13px", fontSize:11, fontWeight:800, color:"#fff", whiteSpace:"nowrap" }}>
+                Gérer →
+              </div>
+            </div>
+          )}
+
+          {/* Séparateur */}
+          <div style={{ height:1, background:C.border, margin:"28px 0 24px" }} />
+
+          {/* ══════════════════════════════════════
+              C. SUPERVISION
+              Départs actifs + programme
+          ══════════════════════════════════════ */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <span style={{ fontSize:16, fontWeight:900, color:C.text }}>Supervision des départs</span>
+            <span style={{ fontSize:12, color:C.indigo, fontWeight:700, cursor:"pointer" }}>Voir tout →</span>
+          </div>
+
+          {/* Statut global pills */}
+          <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+            {[
+              { l:"En cours", n:D.actifs.length, c:C.green,  bg:C.greenSoft  },
+              { l:"Programme",n:D.programme.length, c:C.amber, bg:C.amberSoft },
+              { l:"Terminés", n:D.termines,       c:C.textSub,bg:C.border    },
+            ].map((p,i)=>(
+              <div key={i} style={{ flex:1, background:p.bg, borderRadius:11, padding:"9px 8px", textAlign:"center" }}>
+                <div style={{ fontSize:20, fontWeight:900, color:p.c }}>{p.n}</div>
+                <div style={{ fontSize:9, color:C.textSub, marginTop:2, fontWeight:600 }}>{p.l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Actifs (max 2) */}
+          {D.actifs.map((t,i)=>{
+            const pct=(t.pax/t.total)*100;
+            return (
+              <div key={i} style={{
+                background:C.white, borderRadius:16, padding:"13px 14px",
+                border:`2px solid ${t.couleur}22`, marginBottom:8,
+              }}>
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <div style={{ width:36, height:36, borderRadius:11, background:`${t.couleur}18`, display:"flex", alignItems:"center", justifyContent:"center", color:t.couleur, flexShrink:0 }}>
+                    {Ic.nav}
+                  </div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:800, color:C.text }}>{t.route}</div>
+                    <div style={{ fontSize:11, fontWeight:700, color:t.couleur, marginTop:2 }}>{t.statut} · {t.heure}</div>
+                  </div>
+                  <div style={{ fontSize:17, fontWeight:900, color:C.text }}>
+                    {t.pax}<span style={{ fontSize:11, color:C.textSub, fontWeight:400 }}>/{t.total}</span>
+                  </div>
+                </div>
+                <div style={{ height:3, background:"#F3F4F6", borderRadius:2, marginTop:10, overflow:"hidden" }}>
+                  <div style={{ height:3, width:`${pct}%`, background:pct>=90?C.red:t.couleur, borderRadius:2 }} />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Programme (max 3) — lignes compactes */}
+          <div style={{ background:C.white, borderRadius:14, overflow:"hidden", border:`1px solid ${C.border}` }}>
+            {D.programme.map((t,i)=>(
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderTop:i===0?"none":`1px solid ${C.border}` }}>
+                <span style={{ color:C.amber }}>{Ic.clock}</span>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:800, color:C.text }}>
-                    {MOCK.attention.bordereaux_no_fuel} bordereaux sans carburant
-                  </div>
-                  <div style={{ fontSize:11, color:C.textSub, marginTop:2 }}>
-                    Résultat net non calculable — carburant non saisi
-                  </div>
+                  <span style={{ fontSize:12, fontWeight:700, color:C.text }}>{t.route}</span>
+                  <span style={{ fontSize:11, color:C.textSub, marginLeft:6 }}>{t.heure}</span>
                 </div>
-                <div style={{ background:C.red, borderRadius:9, padding:"5px 12px", cursor:"pointer" }}>
-                  <span style={{ color:"#fff", fontSize:11, fontWeight:800 }}>Gérer →</span>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <div style={{ width:40, height:3, background:"#F3F4F6", borderRadius:2, overflow:"hidden" }}>
+                    <div style={{ width:`${(t.pax/t.total)*100}%`, height:3, background:C.indigo, borderRadius:2 }} />
+                  </div>
+                  <span style={{ fontSize:10, color:C.textSub, minWidth:32 }}>{t.pax}/{t.total}</span>
                 </div>
               </div>
-              {/* 3 premiers éléments en aperçu (lecture seule) */}
-              {MOCK.attention.bordereaux_no_fuel_items.map((b, i) => (
-                <div key={i} style={{
-                  display:"flex", alignItems:"center", gap:10,
-                  padding:"8px 14px", borderTop:"1px solid #FEE2E2",
-                  background: i % 2 === 0 ? "#FFF7F7" : "#FFF",
-                }}>
-                  <div style={{ width:6, height:6, borderRadius:3, background:C.red, flexShrink:0 }} />
-                  <div style={{ flex:1 }}>
-                    <span style={{ fontSize:12, fontWeight:600, color:C.text }}>{b.route}</span>
-                    <span style={{ fontSize:10, color:C.textSub, marginLeft:6 }}>{b.time}</span>
-                  </div>
-                  <span style={{ fontSize:11, fontWeight:700, color:C.red }}>{b.recettes} FCFA</span>
-                </div>
-              ))}
-              {MOCK.attention.bordereaux_no_fuel > 3 && (
-                <div style={{ padding:"8px 14px", borderTop:"1px solid #FEE2E2", textAlign:"center" }}>
-                  <span style={{ fontSize:11, color:C.red, fontWeight:700 }}>
-                    + {MOCK.attention.bordereaux_no_fuel - 3} autres — Voir tous →
-                  </span>
-                </div>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* ══════════════════════════════════
-              3. SUPERVISION DÉPARTS (lecture seule)
-          ══════════════════════════════════ */}
-          <div style={{ padding:"20px 14px 0" }}>
-            <SecHead
-              title="Supervision des départs"
-              accent={C.indigo}
-              right={<span style={{ fontSize:11, color:C.indigo, fontWeight:700, cursor:"pointer" }}>Détails →</span>}
-            />
+          {/* Séparateur */}
+          <div style={{ height:1, background:C.border, margin:"28px 0 24px" }} />
 
-            {/* En cours */}
-            {MOCK.supervision.active.map((t, i) => {
-              const isBoarding = t.status === "boarding";
-              const pct = (t.pax / t.seats) * 100;
-              return (
-                <div key={i} style={{
-                  background:C.white, borderRadius:14, padding:13, marginBottom:8,
-                  border:`2px solid ${isBoarding ? "#DDD6FE" : "#A7F3D0"}`,
-                }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                    <div style={{ width:34, height:34, borderRadius:10, background:isBoarding ? C.purpleBg : C.greenBg, display:"flex", alignItems:"center", justifyContent:"center", color:isBoarding ? C.purple : C.green, flexShrink:0 }}>
-                      {isBoarding ? <Icon.checkSq /> : <Icon.nav />}
-                    </div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:800, color:C.text }}>{t.from} → {t.to}</div>
-                      <div style={{ fontSize:10, fontWeight:700, color:isBoarding ? C.purple : C.green, marginTop:2, textTransform:"uppercase" }}>
-                        {isBoarding ? "Embarquement" : "En route"} · {t.time}
-                      </div>
-                    </div>
-                    <div style={{ textAlign:"right" }}>
-                      <div style={{ fontSize:16, fontWeight:900, color:C.text }}>{t.pax}<span style={{ fontSize:11, color:C.textSub, fontWeight:400 }}>/{t.seats}</span></div>
-                      <div style={{ fontSize:9, color:C.textSub }}>{t.bus}</div>
-                    </div>
-                  </div>
-                  <div style={{ height:3, background:"#F3F4F6", borderRadius:2, marginTop:9, overflow:"hidden" }}>
-                    <div style={{ height:3, width:`${Math.min(100,pct)}%`, background:pct>=90 ? C.red : isBoarding ? C.purple : C.green, borderRadius:2 }} />
-                  </div>
+          {/* ══════════════════════════════════════
+              D. ACCÈS RAPIDES — 2×2 grille
+          ══════════════════════════════════════ */}
+          <SectionTitle title="Accès rapides" />
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+            {[
+              { icon:Ic.bar,   label:"Rapports",    accent:C.indigo,  bg:"#EEF2FF" },
+              { icon:Ic.file,  label:"Bordereaux",  accent:C.blue,    bg:C.blueSoft },
+              { icon:Ic.users, label:"Mes agents",  accent:C.green,   bg:C.greenSoft},
+              { icon:Ic.trend, label:"Statistiques",accent:C.purple,  bg:C.purpleSoft},
+            ].map((a,i)=>(
+              <div key={i} style={{ background:C.white, borderRadius:14, padding:"15px 14px", display:"flex", alignItems:"center", gap:12, border:`1px solid ${C.border}`, cursor:"pointer" }}>
+                <div style={{ width:38, height:38, borderRadius:11, background:a.bg, display:"flex", alignItems:"center", justifyContent:"center", color:a.accent, flexShrink:0 }}>
+                  {a.icon}
                 </div>
-              );
-            })}
-
-            {/* Programme compact */}
-            <div style={{ fontSize:9, fontWeight:800, color:"#9CA3AF", letterSpacing:1.2, marginBottom:6 }}>PROGRAMME · {MOCK.supervision.scheduled.length} À VENIR</div>
-            <div style={{ background:C.white, borderRadius:12, border:`1px solid ${C.border}`, overflow:"hidden" }}>
-              {MOCK.supervision.scheduled.map((t, i) => (
-                <div key={i} style={{
-                  display:"flex", alignItems:"center", gap:10, padding:"9px 13px",
-                  borderTop: i === 0 ? "none" : `1px solid ${C.border}`,
-                }}>
-                  <div style={{ color:C.amber }}><Icon.clock /></div>
-                  <div style={{ flex:1 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:C.text }}>{t.from} → {t.to}</span>
-                    <span style={{ fontSize:10, color:C.textSub, marginLeft:6 }}>{t.time}</span>
-                  </div>
-                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                    <div style={{ height:4, width:40, background:C.grayBg, borderRadius:2, overflow:"hidden" }}>
-                      <div style={{ height:4, width:`${(t.pax/t.seats)*100}%`, background:C.indigo, borderRadius:2 }} />
-                    </div>
-                    <span style={{ fontSize:10, color:C.textSub }}>{t.pax}/{t.seats}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Terminés */}
-            <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:8, padding:"8px 13px", background:C.white, borderRadius:12, border:`1px solid ${C.border}` }}>
-              <div style={{ color:C.gray }}><Icon.check /></div>
-              <span style={{ fontSize:12, color:C.gray, fontWeight:600 }}>{MOCK.supervision.done} départ terminé aujourd'hui</span>
-              <span style={{ marginLeft:"auto", fontSize:11, color:C.indigo, fontWeight:700, cursor:"pointer" }}>Voir →</span>
-            </div>
-          </div>
-
-          {/* ══════════════════════════════════
-              4. BORDEREAUX — synthèse financière
-          ══════════════════════════════════ */}
-          <div style={{ padding:"20px 14px 0" }}>
-            <SecHead
-              title="Bordereaux du jour"
-              accent={C.blue}
-              right={<span style={{ fontSize:11, color:C.blue, fontWeight:700, cursor:"pointer" }}>Tout voir →</span>}
-            />
-
-            <div style={{ background:C.white, borderRadius:14, border:`1px solid ${C.border}`, overflow:"hidden" }}>
-              {/* En-tête colonnes */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 50px 80px 60px 24px", gap:8, padding:"7px 13px", background:"#F9FAFB", borderBottom:`1px solid ${C.border}` }}>
-                {["Trajet","Pax","Recettes","Net",""].map((h,i) => (
-                  <div key={i} style={{ fontSize:9, fontWeight:800, color:C.textSub, textTransform:"uppercase", letterSpacing:0.5 }}>{h}</div>
-                ))}
+                <span style={{ fontSize:13, fontWeight:700, color:C.text, flex:1 }}>{a.label}</span>
+                <span style={{ color:C.textSub }}>{Ic.chev}</span>
               </div>
-              {MOCK.bordereaux.map((b, i) => (
-                <div key={i} style={{
-                  display:"grid", gridTemplateColumns:"1fr 50px 80px 60px 24px", gap:8,
-                  padding:"10px 13px", borderTop: i===0?"none":`1px solid ${C.border}`,
-                  alignItems:"center",
-                }}>
-                  <div>
-                    <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{b.route}</div>
-                    <div style={{ fontSize:9, color:C.textSub }}>{b.date}</div>
-                  </div>
-                  <div style={{ fontSize:12, color:C.text, fontWeight:600 }}>{b.pax}</div>
-                  <div style={{ fontSize:12, fontWeight:700, color:C.text }}>{fmt(b.total)}</div>
-                  <div style={{ fontSize:12, fontWeight:800, color:b.ok ? C.green : "#D97706" }}>
-                    {b.ok && b.net !== null ? `+${fmt(b.net)}` : "—"}
-                  </div>
-                  <div>
-                    {b.ok
-                      ? <span style={{ fontSize:8, background:C.greenBg, color:C.green, borderRadius:20, padding:"2px 5px", fontWeight:700 }}>✓</span>
-                      : <span style={{ fontSize:8, background:C.amberBg, color:C.amber, borderRadius:20, padding:"2px 5px", fontWeight:700 }}>!</span>
-                    }
-                  </div>
-                </div>
-              ))}
-              {/* Total */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 50px 80px 60px 24px", gap:8, padding:"10px 13px", borderTop:`2px solid ${C.border}`, background:"#F9FAFB" }}>
-                <div style={{ fontSize:12, fontWeight:800, color:C.text }}>TOTAL</div>
-                <div style={{ fontSize:12, fontWeight:800, color:C.text }}>{MOCK.bordereaux.reduce((s,b)=>s+b.pax,0)}</div>
-                <div style={{ fontSize:12, fontWeight:900, color:C.indigo }}>{fmt(MOCK.bordereaux.reduce((s,b)=>s+b.total,0))}</div>
-                <div style={{ fontSize:12, fontWeight:900, color:C.green }}>+{fmt(MOCK.bordereaux.filter(b=>b.ok&&b.net).reduce((s,b)=>s+(b.net as number),0))}</div>
-                <div />
-              </div>
-            </div>
-
-            {/* Imprimer rapport global */}
-            <button style={{
-              width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-              background:C.white, border:`1px solid ${C.border}`, borderRadius:14,
-              padding:"12px", cursor:"pointer", marginTop:10,
-            }}>
-              <span style={{ color:C.indigo }}><Icon.printer /></span>
-              <span style={{ fontSize:13, fontWeight:700, color:C.indigo }}>Imprimer le rapport du jour</span>
-            </button>
+            ))}
           </div>
 
-          {/* ══════════════════════════════════
-              5. ACCÈS RAPIDES
-          ══════════════════════════════════ */}
-          <div style={{ padding:"20px 14px 0" }}>
-            <SecHead title="Accès rapides" accent={C.gray} />
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              {[
-                { icon:<Icon.bar />,    label:"Rapports",      color:C.indigo,  bg:C.indigoBg },
-                { icon:<Icon.eye />,    label:"Bordereaux",    color:C.blue,    bg:C.blueBg   },
-                { icon:<Icon.users />,  label:"Mes agents",    color:C.green,   bg:C.greenBg  },
-                { icon:<Icon.trend />,  label:"Statistiques",  color:C.purple,  bg:C.purpleBg },
-              ].map((a,i) => (
-                <div key={i} style={{ background:C.white, borderRadius:12, padding:"13px 14px", display:"flex", alignItems:"center", gap:10, border:`1px solid ${C.border}`, cursor:"pointer" }}>
-                  <div style={{ width:34, height:34, borderRadius:10, background:a.bg, display:"flex", alignItems:"center", justifyContent:"center", color:a.color }}>
-                    {a.icon}
-                  </div>
-                  <span style={{ fontSize:13, fontWeight:700, color:C.text }}>{a.label}</span>
-                  <div style={{ marginLeft:"auto", color:C.textSub }}><Icon.chevron /></div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* FAB */}
-        <div style={{ position:"fixed", bottom:24, right:24, width:52, height:52, borderRadius:26, background:C.indigo, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"0 4px 14px rgba(79,70,229,0.45)", color:"#fff" }}>
-          <Icon.plus />
+        <div style={{ position:"fixed", bottom:26, right:24, width:54, height:54, borderRadius:27, background:C.indigo, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", boxShadow:"0 6px 20px rgba(79,70,229,.45)", color:"#fff" }}>
+          {Ic.plus}
         </div>
       </div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}} *{-webkit-font-smoothing:antialiased} button:hover{opacity:0.9}`}</style>
+      <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}} *{-webkit-font-smoothing:antialiased;box-sizing:border-box}`}</style>
     </div>
   );
 }
