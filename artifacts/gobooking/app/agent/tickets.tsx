@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, ActivityIndicator, Alert, Platform,
@@ -240,9 +240,12 @@ export default function TicketsScreen() {
   /* ── Tab ── */
   const [activeTab, setActiveTab] = useState<"vente" | "depart" | "impression" | "caisse">("vente");
 
+  /* ── Polling ref ── */
+  const tripsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   /* ── Vente state ── */
   const [trips, setTrips]           = useState<Trip[]>([]);
-  const [loadingTrips, setLoadingTrips] = useState(false);
+  const [loadingTrips, setLoadingTrips] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [passengerName, setPassengerName] = useState("");
   const [passengerPhone, setPassengerPhone] = useState("");
@@ -454,6 +457,23 @@ export default function TicketsScreen() {
   };
 
   useEffect(() => { if (token) fetchTrips(); }, [token]);
+
+  /* ── Auto-refresh silencieux des trajets toutes les 45s ── */
+  const fetchTripsSilent = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await apiFetch<Trip[]>("/agent/trips", { token: token ?? undefined });
+      if (Array.isArray(res)) setTrips(res);
+    } catch {}
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    if (tripsPollRef.current) clearInterval(tripsPollRef.current);
+    tripsPollRef.current = setInterval(fetchTripsSilent, 45000);
+    return () => { if (tripsPollRef.current) clearInterval(tripsPollRef.current); };
+  }, [token, fetchTripsSilent]);
+
   useEffect(() => {
     if (activeTab === "depart" && fleetBuses.length === 0) fetchFleetBuses();
     if (activeTab === "impression") fetchImpTrips();

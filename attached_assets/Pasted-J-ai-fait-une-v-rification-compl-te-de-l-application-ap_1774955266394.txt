@@ -1,0 +1,92 @@
+J’ai fait une vérification complète de l’application après les dernières améliorations.
+
+👉 Les bases sont bonnes (design, splash, login), mais il reste des points critiques à corriger immédiatement pour atteindre un niveau professionnel.
+
+🔴 1. PERFORMANCE / FLUIDITÉ
+L’application reste lente et pas assez fluide.
+Je veux une application moderne, rapide et réactive, comme les applications top niveau.
+
+- Optimiser les temps de chargement
+- Supprimer les latences inutiles
+- Rendre toutes les transitions fluides
+- Toutes les modifications doivent être visibles immédiatement dans l’interface
+
+⚠️ Rien ne doit donner l’impression de lenteur ou de blocage.
+
+---
+
+🔴 2. PROBLÈME DE LOGIQUE MÉTIER (TRÈS IMPORTANT)
+
+Il y a une incohérence grave dans la logique des agents.
+
+👉 CAS EN ROUTE :
+- Dès qu’un car est marqué “en route”, l’agent guichet NE DOIT PLUS vendre de tickets
+- Le car devient automatiquement “disponible en ligne”
+
+👉 VENTES APRÈS DÉPART :
+- Seules les réservations en ligne sont autorisées
+- L’agent réservation valide (avec infos + bagages + photos si nécessaire)
+- L’agent en route voit ces réservations avec les points d’arrêt
+
+👉 AGENT EN ROUTE :
+- Peut vendre des tickets uniquement pour SON trajet
+- Peut ajouter des passagers aux arrêts
+- Est lié à un départ précis
+- Doit avoir une gestion claire de caisse en fin de trajet
+
+👉 CLIENT :
+- Peut voir les cars en cours via “cars à proximité”
+- Basé sur sa position + trajet choisi
+- Voir uniquement les cars actifs des compagnies disponibles sur GoBooking
+
+⚠️ Cette logique doit être respectée strictement dans toute l’application.
+
+---
+
+🔴 3. PAGES MÉLANGÉES / PROBLÈMES D’INTERFACE
+
+Il y a trop de confusion dans les pages :
+
+- Les rôles sont mélangés
+- Les informations ne correspondent pas aux bons agents
+- Des pages affichent des données incorrectes (ex : guichet voit des trajets en route)
+
+👉 À corriger :
+- Vérifier chaque page selon le rôle (agent guichet, agent route, réservation, etc.)
+- Nettoyer les écrans
+- S’assurer que chaque rôle voit uniquement ce qui le concerne
+
+---
+
+🔴 4. DOUBLONS ET RÉPÉTITIONS
+
+Il y a trop de répétitions inutiles :
+
+- Éléments dupliqués
+- Sections répétées
+- Logiques redondantes
+
+👉 Actions :
+- Supprimer tous les doublons
+- Simplifier les interfaces
+- Rendre les pages propres, lisibles et professionnelles
+
+---
+
+🎯 OBJECTIF FINAL
+
+Je veux une application :
+
+- Fluide
+- Rapide
+- Moderne
+- Structurée
+- Logique métier respectée à 100%
+- Sans bugs
+- Sans répétitions
+- Avec des interfaces propres et professionnelles
+
+⚠️ Important :
+Ne rien casser dans la logique existante, mais tout optimiser, nettoyer et structurer.
+
+Merci de faire une vérification complète de toute l’application et d’appliquer ces corrections immédiatemen

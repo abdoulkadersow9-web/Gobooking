@@ -1735,24 +1735,33 @@ router.get("/trips", async (req, res) => {
     /* Only return trips relevant for guichet: last 2 days (late departures)
        through next 30 days (advance bookings). Filter out arrived/cancelled. */
     const todayDate = new Date();
-    const twoDaysAgo = new Date(todayDate.getTime() - 2 * 86400000).toISOString().split("T")[0];
+    const twoDaysAgo     = new Date(todayDate.getTime() -  2 * 86400000).toISOString().split("T")[0];
     const thirtyDaysAhead = new Date(todayDate.getTime() + 30 * 86400000).toISOString().split("T")[0];
 
-    const allTrips = await db.select().from(tripsTable)
-        .where(and(eq(tripsTable.companyId, companyId)))
-        .orderBy(desc(tripsTable.date));
+    /* ── Filtrage en base (évite de rapatrier tous les trajets) ── */
+    const trips = await db.select().from(tripsTable)
+      .where(and(
+        eq(tripsTable.companyId, companyId),
+        gte(tripsTable.date, twoDaysAgo),
+        sql`${tripsTable.date} <= ${thirtyDaysAhead}`,
+        sql`${tripsTable.status} NOT IN ('arrived','cancelled','completed')`
+      ))
+      .orderBy(desc(tripsTable.date))
+      .limit(100);
 
-    const trips = allTrips.filter(t => {
-      const d = t.date ?? "";
-      if (d < twoDaysAgo || d > thirtyDaysAhead) return false;
-      if (["arrived", "cancelled", "completed"].includes(t.status ?? "")) return false;
-      return true;
-    });
+    /* ── Seat counts en une seule requête groupée (évite N+1) ── */
+    const tripIds = trips.map(t => t.id);
+    const seatCountMap: Record<string, number> = {};
+    if (tripIds.length > 0) {
+      const allSeats = await db.select({ tripId: seatsTable.tripId })
+        .from(seatsTable)
+        .where(and(inArray(seatsTable.tripId, tripIds), eq(seatsTable.status, "available")));
+      for (const row of allSeats) {
+        seatCountMap[row.tripId] = (seatCountMap[row.tripId] ?? 0) + 1;
+      }
+    }
 
-    const enriched = await Promise.all(trips.map(async (trip) => {
-      const availableCount = await db.select().from(seatsTable)
-        .where(and(eq(seatsTable.tripId, trip.id), eq(seatsTable.status, "available")));
-      // Build ordered city list (from → stops → to)
+    const enriched = trips.map((trip) => {
       let stopCities: string[] = [];
       try {
         const stopsRaw = (trip as any).stops;
@@ -1775,13 +1784,13 @@ router.get("/trips", async (req, res) => {
         busType: trip.busType,
         status: trip.status,
         totalSeats: trip.totalSeats,
-        availableSeats: availableCount.length,
+        availableSeats: seatCountMap[trip.id] ?? 0,
         guichetSeats: trip.guichetSeats ?? 0,
         onlineSeats: trip.onlineSeats ?? 0,
         stops: stopCities,
         allCities,
       };
-    }));
+    });
 
     res.json(enriched);
   } catch (err) {

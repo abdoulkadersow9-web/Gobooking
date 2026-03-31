@@ -572,7 +572,7 @@ export default function RouteScreen() {
     pollRef.current = setInterval(() => {
       loadPassengers(tripIdToLoad, true);
       loadMyDeparture();
-    }, 8000);
+    }, 30000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeTrip?.id, assignedTripId, loadPassengers, loadMyDeparture]);
 
