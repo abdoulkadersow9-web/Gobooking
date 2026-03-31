@@ -749,39 +749,43 @@ export default function TicketsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── STATUT EN DIRECT — bandeau toujours visible ── */}
+      {/* ── STATUT EN DIRECT — bandeau compact toujours visible ── */}
       {!loadingTrips && trips.length > 0 && (
         <View style={{
-          flexDirection: "row", alignItems: "center", gap: 8,
-          backgroundColor: "#1E293B", paddingHorizontal: 14, paddingVertical: 10,
+          flexDirection: "row", alignItems: "center",
+          backgroundColor: "#0F172A", paddingHorizontal: 14, paddingVertical: 8, gap: 10,
         }}>
-          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#34D399" }} />
-          <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8", letterSpacing: 0.5 }}>EN DIRECT</Text>
-          <View style={{ flex: 1, flexDirection: "row", gap: 6 }}>
-            {tripsEnRoute.length > 0 && (
-              <View style={{ backgroundColor: "#64748B", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="navigate-outline" size={10} color="#CBD5E1" />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
-                  {tripsEnRoute.length} PARTI{tripsEnRoute.length > 1 ? "S" : ""}
-                </Text>
-              </View>
-            )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#34D399" }} />
+            <Text style={{ fontSize: 10, fontWeight: "800", color: "#64748B", letterSpacing: 0.6 }}>LIVE</Text>
+          </View>
+          <View style={{ flex: 1, flexDirection: "row", gap: 5, flexWrap: "wrap" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1E3A5F", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 }}>
+              <Ionicons name="ticket-outline" size={10} color="#93C5FD" />
+              <Text style={{ fontSize: 10, fontWeight: "800", color: "#93C5FD" }}>
+                {tripsFuture.length} à vendre
+              </Text>
+            </View>
             {tripsBoarding.length > 0 && (
-              <View style={{ backgroundColor: "#D97706", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <Ionicons name="bus" size={10} color="#FEF3C7" />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
-                  {tripsBoarding.length} EMBARQUEMENT
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#78350F", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3 }}>
+                <Ionicons name="flash" size={10} color="#FDE68A" />
+                <Text style={{ fontSize: 10, fontWeight: "800", color: "#FDE68A" }}>
+                  {tripsBoarding.length} embarquement
                 </Text>
               </View>
             )}
-            {tripsFuture.length > 0 && (
-              <View style={{ backgroundColor: "#1650D0", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
-                  {tripsFuture.length} À VENIR
+            {tripsEnRoute.length > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#1E293B", borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1, borderColor: "#334155" }}>
+                <Ionicons name="navigate-outline" size={10} color="#64748B" />
+                <Text style={{ fontSize: 10, fontWeight: "800", color: "#64748B" }}>
+                  {tripsEnRoute.length} en route
                 </Text>
               </View>
             )}
           </View>
+          <TouchableOpacity onPress={fetchTripsSilent} hitSlop={8}>
+            <Ionicons name="refresh-outline" size={14} color="#475569" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -932,13 +936,18 @@ export default function TicketsScreen() {
                     </View>
                     <View style={{ gap: 10, marginBottom: 8 }}>
                       {tripsBoarding.map(trip => {
-                        const isSelected = selectedTrip?.id === trip.id;
-                        const hasSeats   = trip.guichetSeats !== undefined && trip.guichetSeats > 0;
-                        const hasOnline  = (trip.onlineSeats ?? 0) > 0;
+                        const isSelected   = selectedTrip?.id === trip.id;
+                        const guichetSeats = trip.guichetSeats ?? 0;
+                        const hasGuichet   = guichetSeats > 0;
                         return (
                           <View key={trip.id} style={[S.tripCard, isSelected && S.tripCardSel, {
                             borderLeftWidth: 4, borderLeftColor: "#D97706",
                           }]}>
+                            {/* "Dernière chance" banner at top */}
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, marginBottom: 10, borderWidth: 1, borderColor: "#FDE68A" }}>
+                              <Ionicons name="flash" size={11} color="#D97706" />
+                              <Text style={{ fontSize: 10, fontWeight: "800", color: "#92400E", letterSpacing: 0.4 }}>VENTE DERNIÈRE MINUTE — Embarquement en cours</Text>
+                            </View>
                             <TouchableOpacity activeOpacity={0.75} onPress={() => setSelectedTrip(isSelected ? null : trip)}>
                               <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                                 <View style={{ flex: 1, gap: 4 }}>
@@ -955,20 +964,19 @@ export default function TicketsScreen() {
                                   <Text style={S.tripCardFcfa}>FCFA</Text>
                                 </View>
                               </View>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
                                   <Ionicons name="bus" size={10} color="#D97706" />
                                   <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>Embarquement</Text>
                                 </View>
-                                {hasSeats ? (
+                                {hasGuichet ? (
                                   <View style={S.tripBadgeGreen}>
                                     <Ionicons name="ticket-outline" size={11} color={G_DARK} />
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.guichetSeats} guichet</Text>
+                                    <Text style={S.tripBadgeGreenTxt}>{guichetSeats} guichet restant{guichetSeats > 1 ? "s" : ""}</Text>
                                   </View>
-                                ) : null}
-                                {!hasSeats && !hasOnline && trip.availableSeats !== undefined && (
-                                  <View style={S.tripBadgeGreen}>
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.availableSeats} places dispo.</Text>
+                                ) : (
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: "700", color: "#C2410C" }}>Guichet complet</Text>
                                   </View>
                                 )}
                                 <View style={{ flex: 1 }} />
@@ -1019,11 +1027,13 @@ export default function TicketsScreen() {
 
                     <View style={{ gap: 10 }}>
                       {tripsFuture.map(trip => {
-                        const isSelected = selectedTrip?.id === trip.id;
-                        const hasSeats   = trip.guichetSeats !== undefined && trip.guichetSeats > 0;
-                        const hasOnline  = (trip.onlineSeats ?? 0) > 0;
+                        const isSelected       = selectedTrip?.id === trip.id;
+                        const guichetSeats     = trip.guichetSeats ?? 0;
+                        const hasGuichet       = guichetSeats > 0;
+                        const hasOnline        = (trip.onlineSeats ?? 0) > 0;
+                        const guichetComplet   = trip.guichetSeats !== undefined && guichetSeats === 0;
                         return (
-                          <View key={trip.id} style={[S.tripCard, isSelected && S.tripCardSel]}>
+                          <View key={trip.id} style={[S.tripCard, isSelected && S.tripCardSel, guichetComplet && { borderLeftWidth: 4, borderLeftColor: "#F97316" }]}>
                             <TouchableOpacity activeOpacity={0.75} onPress={() => setSelectedTrip(isSelected ? null : trip)}>
                               <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
                                 <View style={{ flex: 1, gap: 4 }}>
@@ -1040,11 +1050,16 @@ export default function TicketsScreen() {
                                   <Text style={S.tripCardFcfa}>FCFA</Text>
                                 </View>
                               </View>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 }}>
-                                {hasSeats ? (
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+                                {hasGuichet ? (
                                   <View style={S.tripBadgeGreen}>
                                     <Ionicons name="ticket-outline" size={11} color={G_DARK} />
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.guichetSeats} guichet</Text>
+                                    <Text style={S.tripBadgeGreenTxt}>{guichetSeats} guichet</Text>
+                                  </View>
+                                ) : guichetComplet ? (
+                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FFF7ED", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                                    <Ionicons name="alert-circle-outline" size={11} color="#F97316" />
+                                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#C2410C" }}>Guichet complet</Text>
                                   </View>
                                 ) : null}
                                 {hasOnline ? (
@@ -1053,11 +1068,6 @@ export default function TicketsScreen() {
                                     <Text style={S.tripBadgeBlueTxt}>{trip.onlineSeats} en ligne</Text>
                                   </View>
                                 ) : null}
-                                {!hasSeats && !hasOnline && trip.availableSeats !== undefined && (
-                                  <View style={S.tripBadgeGreen}>
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.availableSeats} places dispo.</Text>
-                                  </View>
-                                )}
                                 <View style={{ flex: 1 }} />
                                 <View style={[S.tripSelIcon, isSelected && S.tripSelIconActive]}>
                                   <Ionicons name={isSelected ? "checkmark" : "chevron-down"} size={14} color={isSelected ? "#fff" : "#9CA3AF"} />
@@ -1085,11 +1095,16 @@ export default function TicketsScreen() {
                 )}
 
                 {/* ── Aucun trajet dans aucune section ── */}
-                {tripsEnRoute.length === 0 && tripsFuture.length === 0 && (
-                  <View style={{ alignItems: "center", padding: 16, gap: 8 }}>
-                    <Text style={{ color: "#9CA3AF", fontSize: 14 }}>Aucun trajet disponible</Text>
-                    <TouchableOpacity onPress={fetchTrips}>
-                      <Text style={{ color: G, fontSize: 13, fontWeight: "600" }}>Actualiser</Text>
+                {tripsEnRoute.length === 0 && tripsBoarding.length === 0 && tripsFuture.length === 0 && (
+                  <View style={{ alignItems: "center", padding: 24, gap: 10 }}>
+                    <Ionicons name="bus-outline" size={36} color="#D1D5DB" />
+                    <Text style={{ color: "#6B7280", fontSize: 14, fontWeight: "600" }}>Aucun trajet disponible</Text>
+                    <Text style={{ color: "#9CA3AF", fontSize: 12, textAlign: "center" }}>
+                      Les trajets du jour apparaîtront ici dès leur création.
+                    </Text>
+                    <TouchableOpacity onPress={fetchTrips} style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      <Ionicons name="refresh-outline" size={15} color={G} />
+                      <Text style={{ color: G, fontSize: 13, fontWeight: "700" }}>Actualiser</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1183,21 +1198,19 @@ export default function TicketsScreen() {
               </View>
 
               {/* RECAP */}
-              {selectedTrip && (
-                <View style={[S.recap, isSP && { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" }]}>
-                  <Text style={[S.recapTitle, isSP && { color: "#5B21B6" }]}>Récapitulatif</Text>
-                  <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
-                  <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
-                  <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
-                  {isSP && <View style={S.recapRow}><Text style={S.recapKey}>Type</Text><Text style={{ fontSize: 13, fontWeight: "700", color: "#7C3AED" }}>SP — Sans Payer</Text></View>}
-                  <View style={[S.recapRow, { borderTopWidth: 1, borderColor: isSP ? "#DDD6FE" : "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
-                    <Text style={[S.recapKey, { fontWeight: "700", color: isSP ? "#5B21B6" : G_DARK }]}>TOTAL</Text>
-                    <Text style={[S.recapVal, { fontWeight: "800", fontSize: 18, color: isSP ? "#7C3AED" : G }]}>
-                      {isSP ? "0 FCFA (SP)" : `${(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA`}
-                    </Text>
-                  </View>
+              <View style={[S.recap, isSP && { backgroundColor: "#F5F3FF", borderColor: "#DDD6FE" }]}>
+                <Text style={[S.recapTitle, isSP && { color: "#5B21B6" }]}>Récapitulatif</Text>
+                <View style={S.recapRow}><Text style={S.recapKey}>Trajet</Text><Text style={S.recapVal}>{selectedTrip.from} → {selectedTrip.to}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Départ</Text><Text style={S.recapVal}>{selectedTrip.departureTime}</Text></View>
+                <View style={S.recapRow}><Text style={S.recapKey}>Passagers</Text><Text style={S.recapVal}>{passengerCount}</Text></View>
+                {isSP && <View style={S.recapRow}><Text style={S.recapKey}>Type</Text><Text style={{ fontSize: 13, fontWeight: "700", color: "#7C3AED" }}>SP — Sans Payer</Text></View>}
+                <View style={[S.recapRow, { borderTopWidth: 1, borderColor: isSP ? "#DDD6FE" : "#FDE68A", paddingTop: 8, marginTop: 4 }]}>
+                  <Text style={[S.recapKey, { fontWeight: "700", color: isSP ? "#5B21B6" : G_DARK }]}>TOTAL</Text>
+                  <Text style={[S.recapVal, { fontWeight: "800", fontSize: 18, color: isSP ? "#7C3AED" : G }]}>
+                    {isSP ? "0 FCFA (SP)" : `${(selectedTrip.price * (parseInt(passengerCount) || 1)).toLocaleString()} FCFA`}
+                  </Text>
                 </View>
-              )}
+              </View>
 
               <TouchableOpacity
                 style={[S.submitBtn, isSP && { backgroundColor: "#7C3AED", shadowColor: "#7C3AED" }, submitting && { opacity: 0.6 }]}
