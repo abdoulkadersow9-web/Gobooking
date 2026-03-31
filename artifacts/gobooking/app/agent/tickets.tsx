@@ -337,6 +337,15 @@ export default function TicketsScreen() {
     }
   }, [dFrom, dTo]);
 
+  /* ── Désélection automatique si le trajet passe en_route ── */
+  useEffect(() => {
+    if (!selectedTrip) return;
+    const updated = trips.find(t => t.id === selectedTrip.id);
+    if (updated && (updated.status === "en_route" || updated.status === "en_cours")) {
+      setSelectedTrip(null);
+    }
+  }, [trips]);
+
   /* ── Auto-calcul du prix depuis la grille tarifaire ── */
   useEffect(() => {
     if (!dFrom || !dTo || dFrom === dTo) { setDAutoPrice(null); return; }
@@ -688,16 +697,12 @@ export default function TicketsScreen() {
   const _yesterday = (() => { const d = new Date(_now); d.setDate(d.getDate()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
 
   const _isEnRoute = (t: Trip) => {
-    /* Only trips from today or yesterday can be "en route" (late buses).
-       Old trips from days ago are ignored even if status = en_route. */
+    /* Un trajet "en route" est celui dont le statut API est explicitement en_route/en_cours.
+       Les trajets dont l'heure est passée mais dont le statut n'est PAS encore "en_route"
+       restent dans la liste "À venir" — le guichet peut encore vendre jusqu'au départ officiel. */
     const isRecentDate = t.date === _today || t.date === _yesterday;
     if (!isRecentDate) return false;
-    if (t.status === "en_route" || t.status === "en_cours") return true;
-    if (t.date === _today) {
-      const [h, m] = (t.departureTime || "99:99").split(":").map(Number);
-      return !isNaN(h) && !isNaN(m) && (h * 60 + m) < _nowMins;
-    }
-    return false;
+    return t.status === "en_route" || t.status === "en_cours";
   };
   const _isBoarding = (t: Trip) => t.status === "boarding" && (t.date === _today || t.date === _yesterday);
 
@@ -734,10 +739,10 @@ export default function TicketsScreen() {
           <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8", letterSpacing: 0.5 }}>EN DIRECT</Text>
           <View style={{ flex: 1, flexDirection: "row", gap: 6 }}>
             {tripsEnRoute.length > 0 && (
-              <View style={{ backgroundColor: "#DC2626", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
-                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#FCA5A5" }} />
+              <View style={{ backgroundColor: "#64748B", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Ionicons name="navigate-outline" size={10} color="#CBD5E1" />
                 <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>
-                  {tripsEnRoute.length} EN ROUTE
+                  {tripsEnRoute.length} PARTI{tripsEnRoute.length > 1 ? "S" : ""}
                 </Text>
               </View>
             )}
@@ -812,95 +817,77 @@ export default function TicketsScreen() {
             ) : (
               <View style={{ gap: 4 }}>
 
-                {/* ══ Section A : Bus EN ROUTE (priorité haute) ══ */}
+                {/* ══ Section A : PARTIS — Vente guichet fermée ══ */}
                 {tripsEnRoute.length > 0 && (
                   <>
-                    {/* En-route section header */}
                     <View style={{
                       flexDirection: "row", alignItems: "center", gap: 8,
-                      backgroundColor: "#FEF2F2", borderRadius: 10,
+                      backgroundColor: "#F1F5F9", borderRadius: 10,
                       paddingHorizontal: 12, paddingVertical: 9,
-                      borderWidth: 1.5, borderColor: "#FECACA", marginBottom: 4,
+                      borderWidth: 1, borderColor: "#CBD5E1", marginBottom: 4,
                     }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#EF4444" }} />
-                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#DC2626", letterSpacing: 0.5, flex: 1 }}>
-                        BUS EN ROUTE — Vente en temps réel
+                      <Ionicons name="navigate" size={13} color="#64748B" />
+                      <Text style={{ fontSize: 12, fontWeight: "800", color: "#475569", letterSpacing: 0.5, flex: 1 }}>
+                        PARTIS — Vente guichet fermée
                       </Text>
-                      <View style={{ backgroundColor: "#DC2626", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                      <View style={{ backgroundColor: "#94A3B8", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                         <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{tripsEnRoute.length}</Text>
                       </View>
                     </View>
 
-                    <View style={{ gap: 10, marginBottom: 8 }}>
+                    <View style={{ gap: 8, marginBottom: 8 }}>
                       {tripsEnRoute.map(trip => {
-                        const isSelected = selectedTrip?.id === trip.id;
-                        const hasSeats   = trip.guichetSeats !== undefined && trip.guichetSeats > 0;
-                        const hasOnline  = (trip.onlineSeats ?? 0) > 0;
+                        const hasOnline = (trip.onlineSeats ?? 0) > 0;
                         return (
-                          <View key={trip.id} style={[S.tripCard, isSelected && S.tripCardSel, {
-                            borderLeftWidth: 4, borderLeftColor: "#EF4444",
+                          <View key={trip.id} style={[S.tripCard, {
+                            borderLeftWidth: 4, borderLeftColor: "#94A3B8",
+                            opacity: 0.82,
                           }]}>
-                            <TouchableOpacity activeOpacity={0.75} onPress={() => setSelectedTrip(isSelected ? null : trip)}>
-                              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                                <View style={{ flex: 1, gap: 4 }}>
-                                  <Text style={S.tripCardRoute} numberOfLines={1}>
-                                    {trip.from}{"  "}<Text style={{ color: "#9CA3AF", fontSize: 14 }}>→</Text>{"  "}{trip.to}
-                                  </Text>
-                                  <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                                    <Ionicons name="time-outline" size={13} color="#9CA3AF" />
-                                    <Text style={S.tripCardTime}>{trip.departureTime} · {trip.date}</Text>
-                                  </View>
-                                </View>
-                                <View style={{ alignItems: "flex-end", marginLeft: 12 }}>
-                                  <Text style={S.tripCardPrice}>{trip.price?.toLocaleString()}</Text>
-                                  <Text style={S.tripCardFcfa}>FCFA</Text>
+                            <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                              <View style={{ flex: 1, gap: 4 }}>
+                                <Text style={[S.tripCardRoute, { color: "#64748B" }]} numberOfLines={1}>
+                                  {trip.from}{"  "}<Text style={{ color: "#CBD5E1", fontSize: 14 }}>→</Text>{"  "}{trip.to}
+                                </Text>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                  <Ionicons name="time-outline" size={13} color="#94A3B8" />
+                                  <Text style={[S.tripCardTime, { color: "#94A3B8" }]}>{trip.departureTime} · {trip.date}</Text>
                                 </View>
                               </View>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 }}>
-                                {/* En route badge */}
-                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEE2E2", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" }} />
-                                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#DC2626" }}>En route</Text>
-                                </View>
-                                {hasSeats ? (
-                                  <View style={S.tripBadgeGreen}>
-                                    <Ionicons name="ticket-outline" size={11} color={G_DARK} />
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.guichetSeats} guichet</Text>
-                                  </View>
-                                ) : null}
-                                {hasOnline ? (
-                                  <View style={S.tripBadgeBlue}>
-                                    <Ionicons name="wifi-outline" size={11} color="#1D4ED8" />
-                                    <Text style={S.tripBadgeBlueTxt}>{trip.onlineSeats} en ligne</Text>
-                                  </View>
-                                ) : null}
-                                {!hasSeats && !hasOnline && trip.availableSeats !== undefined && (
-                                  <View style={S.tripBadgeGreen}>
-                                    <Text style={S.tripBadgeGreenTxt}>{trip.availableSeats} places dispo.</Text>
-                                  </View>
-                                )}
-                                <View style={{ flex: 1 }} />
-                                <View style={[S.tripSelIcon, isSelected && S.tripSelIconActive]}>
-                                  <Ionicons name={isSelected ? "checkmark" : "chevron-down"} size={14} color={isSelected ? "#fff" : "#9CA3AF"} />
-                                </View>
+                              <View style={{ alignItems: "flex-end", marginLeft: 12 }}>
+                                <Text style={[S.tripCardPrice, { color: "#94A3B8" }]}>{trip.price?.toLocaleString()}</Text>
+                                <Text style={[S.tripCardFcfa, { color: "#CBD5E1" }]}>FCFA</Text>
                               </View>
-                            </TouchableOpacity>
-                            {isSelected && (
-                              <>
-                                <View style={S.tripCardDivider} />
-                                <TouchableOpacity
-                                  activeOpacity={0.85}
-                                  onPress={() => router.push({ pathname: "/agent/seat-plan/[tripId]" as any, params: { tripId: trip.id, from: trip.from, to: trip.to, date: trip.date, time: trip.departureTime, busType: trip.busType ?? "" } })}
-                                  style={S.tripSeatPlanBtn}>
-                                  <Ionicons name="grid-outline" size={16} color="#fff" />
-                                  <Text style={S.tripSeatPlanBtnTxt}>Voir le plan de sièges</Text>
-                                  <Ionicons name="arrow-forward" size={15} color="#fff" />
-                                </TouchableOpacity>
-                              </>
-                            )}
+                            </View>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 }}>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#E2E8F0", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                <Ionicons name="navigate-outline" size={10} color="#64748B" />
+                                <Text style={{ fontSize: 10, fontWeight: "700", color: "#64748B" }}>En route</Text>
+                              </View>
+                              {hasOnline ? (
+                                <View style={S.tripBadgeBlue}>
+                                  <Ionicons name="wifi-outline" size={11} color="#1D4ED8" />
+                                  <Text style={S.tripBadgeBlueTxt}>{trip.onlineSeats} places en ligne</Text>
+                                </View>
+                              ) : null}
+                              <View style={{ flex: 1 }} />
+                              <Text style={{ fontSize: 10, color: "#94A3B8", fontStyle: "italic" }}>Guichet fermé</Text>
+                            </View>
                           </View>
                         );
                       })}
+                    </View>
+
+                    {/* Info banner */}
+                    <View style={{
+                      flexDirection: "row", alignItems: "center", gap: 8,
+                      backgroundColor: "#EFF6FF", borderRadius: 10,
+                      paddingHorizontal: 12, paddingVertical: 10,
+                      borderWidth: 1, borderColor: "#BFDBFE", marginBottom: 8,
+                    }}>
+                      <Ionicons name="information-circle-outline" size={16} color="#3B82F6" />
+                      <Text style={{ fontSize: 12, color: "#1D4ED8", flex: 1, lineHeight: 17 }}>
+                        Les cars partis ne sont plus accessibles à la vente guichet. Les passagers peuvent réserver en ligne uniquement.
+                      </Text>
                     </View>
                   </>
                 )}

@@ -225,13 +225,13 @@ export default function ChefHome() {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Actions rapides</Text>
           <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-            <Pressable style={[s.actionBtn, { backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
-              <Feather name="plus-circle" size={16} color="white" />
-              <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Nouveau départ</Text>
+            <Pressable style={[s.actionBtn, { flex: 1, backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
+              <Feather name="list" size={16} color="white" />
+              <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Gérer les départs</Text>
             </Pressable>
-            <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
-              <Feather name="list" size={16} color={INDIGO2} />
-              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Trajets</Text>
+            <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/caisse" as never)}>
+              <Feather name="bar-chart-2" size={16} color={INDIGO2} />
+              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Ma caisse</Text>
             </Pressable>
           </View>
           {/* Caisses agents */}

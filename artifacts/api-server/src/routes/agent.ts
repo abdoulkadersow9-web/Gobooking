@@ -692,6 +692,21 @@ router.post("/reservations", async (req, res) => {
     if (!trips.length) { res.status(404).json({ error: "Trajet introuvable" }); return; }
     const trip = trips[0];
 
+    // Bloquer la vente guichet si le trajet est déjà en route
+    if (trip.status === "en_route" || trip.status === "en_cours") {
+      res.status(400).json({
+        error: "Ce trajet est déjà en route. La vente guichet est clôturée. Seules les réservations en ligne sont désormais acceptées.",
+        code: "TRIP_EN_ROUTE",
+      });
+      return;
+    }
+
+    // Bloquer la vente si le trajet est terminé/arrivé/annulé
+    if (["arrived", "completed", "cancelled"].includes(trip.status ?? "")) {
+      res.status(400).json({ error: "Ce trajet est terminé ou annulé. Aucune vente possible.", code: "TRIP_CLOSED" });
+      return;
+    }
+
     // Récupérer la compagnie de l'agent pour l'isolation des données
     const agentCompanyRows = await db.select({ companyId: agentsTable.companyId })
       .from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
