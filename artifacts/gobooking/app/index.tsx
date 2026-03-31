@@ -220,9 +220,12 @@ export default function SplashScreen() {
         </>
       )}
 
-      {/* Web-only: static soft glow behind logo */}
+      {/* Web-only: animated soft glow behind logo */}
       {IS_WEB && (
-        <View style={S.webGlow} pointerEvents="none" />
+        <>
+          <View style={S.webGlow} pointerEvents="none" />
+          <View style={S.webGlow2} pointerEvents="none" />
+        </>
       )}
 
       {/* Logo */}
@@ -281,12 +284,21 @@ const S = StyleSheet.create({
   },
   webGlow: {
     position: "absolute",
-    width: 300, height: 300, borderRadius: 150,
-    backgroundColor: "rgba(26,62,216,0.28)",
-    top: "50%",
-    left: "50%",
-    marginTop: -150,
-    marginLeft: -150,
+    width: 360, height: 360, borderRadius: 180,
+    backgroundColor: "rgba(26,62,216,0.22)",
+    top: "50%" as any,
+    left: "50%" as any,
+    marginTop: -180,
+    marginLeft: -180,
+  },
+  webGlow2: {
+    position: "absolute",
+    width: 220, height: 220, borderRadius: 110,
+    backgroundColor: "rgba(91,141,239,0.14)",
+    top: "50%" as any,
+    left: "50%" as any,
+    marginTop: -110,
+    marginLeft: -110,
   },
   ringsWrap: {
     position: "absolute",
@@ -294,41 +306,49 @@ const S = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   logoWrap: {
-    width: 130,
-    height: 130,
-    borderRadius: 36,
+    width: 136,
+    height: 136,
+    borderRadius: 38,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    padding: 14,
-    shadowColor: "#3B6EEA",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: IS_WEB ? 0.65 : 1,
-    shadowRadius: 52,
+    padding: 15,
     elevation: 28,
     borderWidth: 0,
+    ...(IS_WEB
+      ? { boxShadow: "0 0 60px 20px rgba(59,110,234,0.55), 0 8px 32px rgba(0,0,0,0.4)" } as any
+      : {
+          shadowColor: "#3B6EEA",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 1,
+          shadowRadius: 52,
+        }),
   },
   logo: {
-    width: 100,
-    height: 100,
+    width: 104,
+    height: 104,
   },
   textBlock: {
     alignItems: "center",
     gap: 7,
   },
   appName: {
-    fontSize: 40,
+    fontSize: 42,
     fontWeight: "800",
     color: "#FFFFFF",
-    letterSpacing: -1,
-    textShadowColor: "rgba(91,141,239,0.7)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 24,
+    letterSpacing: -1.2,
+    ...(IS_WEB
+      ? { textShadow: "0 0 32px rgba(91,141,239,0.85)" } as any
+      : {
+          textShadowColor: "rgba(91,141,239,0.7)",
+          textShadowOffset: { width: 0, height: 0 },
+          textShadowRadius: 24,
+        }),
   },
   tagline: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.55)",
-    letterSpacing: 0.5,
+    color: "rgba(255,255,255,0.58)",
+    letterSpacing: 0.6,
     textAlign: "center",
     fontWeight: "500",
   },

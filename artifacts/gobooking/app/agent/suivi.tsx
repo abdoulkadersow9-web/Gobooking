@@ -1451,14 +1451,13 @@ export default function SuiviScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
-          style={{ flex: 1 }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={S.scrollContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OK} />}
-        >
-          {/* ══ ONGLETS NAVIGATION ══════════════════════════════════════ */}
-          <View style={{ flexDirection: "row", backgroundColor: "#fff", borderRadius: 14, padding: 4, marginBottom: 14, borderWidth: 1, borderColor: "#E2E8F0", elevation: 2, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4 }}>
+        <>
+          {/* ══ ONGLETS NAVIGATION — FIXE, ne défile pas ══════════════ */}
+          <View style={{
+            flexDirection: "row", backgroundColor: CARD2, padding: 4,
+            marginHorizontal: 14, marginTop: 8, marginBottom: 8,
+            borderRadius: 16, borderWidth: 1, borderColor: BDR,
+          }}>
             {([
               { key: "alertes",  icon: "alert-circle-outline",  label: "Alertes",    badge: mergedAlerts.filter(a => !a.response).length },
               { key: "flotte",   icon: "bus-outline",            label: "Flotte",     badge: data?.buses?.length ?? 0 },
@@ -1466,15 +1465,24 @@ export default function SuiviScreen() {
             ] as { key: "alertes" | "flotte" | "voyages"; icon: any; label: string; badge: number }[]).map(t => {
               const active = suiviTab === t.key;
               const showBadge = t.badge > 0;
+              const tabColor = t.key === "alertes" ? RED_D : t.key === "flotte" ? "#1D4ED8" : "#0D9488";
               return (
                 <TouchableOpacity
                   key={t.key}
                   onPress={() => setSuiviTab(t.key)}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 10, borderRadius: 11, gap: 5, backgroundColor: active ? RED_D : "transparent" }}>
-                  <Ionicons name={t.icon} size={15} color={active ? "#fff" : "#94A3B8"} />
-                  <Text style={{ fontSize: 12, fontWeight: active ? "800" : "600", color: active ? "#fff" : "#64748B" }}>{t.label}</Text>
+                  style={{
+                    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+                    paddingVertical: 12, borderRadius: 12, gap: 5,
+                    backgroundColor: active ? tabColor : "transparent",
+                  }}>
+                  <Ionicons name={t.icon} size={15} color={active ? "#fff" : "#475569"} />
+                  <Text style={{ fontSize: 12, fontWeight: active ? "800" : "600", color: active ? "#fff" : "#475569" }}>{t.label}</Text>
                   {showBadge && (
-                    <View style={{ backgroundColor: active ? "rgba(255,255,255,0.3)" : RED_D, borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 }}>
+                    <View style={{
+                      backgroundColor: active ? "rgba(255,255,255,0.25)" : `${tabColor}99`,
+                      borderRadius: 10, minWidth: 18, height: 18,
+                      justifyContent: "center", alignItems: "center", paddingHorizontal: 4,
+                    }}>
                       <Text style={{ fontSize: 10, fontWeight: "800", color: "#fff" }}>{t.badge}</Text>
                     </View>
                   )}
@@ -1482,6 +1490,12 @@ export default function SuiviScreen() {
               );
             })}
           </View>
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={S.scrollContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={OK} />}
+          >
 
           {/* ══ SECTION ALERTES ══════════════════════════════════════════ */}
           {suiviTab === "alertes" && (
@@ -1680,58 +1694,60 @@ export default function SuiviScreen() {
           {suiviTab === "voyages" && (
             <View>
               {allTrips.length === 0 ? (
-                <View style={{ backgroundColor: "#fff", borderRadius: 16, padding: 36, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
-                  <Ionicons name="bus-outline" size={40} color="#CBD5E1" />
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151", marginTop: 12 }}>Aucun voyage</Text>
-                  <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 4 }}>Aucun voyage enregistré pour votre agence.</Text>
+                <View style={{ backgroundColor: CARD, borderRadius: 16, padding: 36, alignItems: "center", borderWidth: 1, borderColor: BDR }}>
+                  <Ionicons name="bus-outline" size={40} color="#334155" />
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#94A3B8", marginTop: 12 }}>Aucun voyage</Text>
+                  <Text style={{ fontSize: 13, color: "#475569", marginTop: 4 }}>Aucun voyage enregistré pour votre agence.</Text>
                 </View>
               ) : (
                 <>
                   {tripsActive.length > 0 && (
                     <>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#2563EB" }} />
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>En cours ({tripsActive.length})</Text>
+                        <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: "#3B82F6" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#E2E8F0", letterSpacing: 0.3 }}>EN COURS ({tripsActive.length})</Text>
                       </View>
                       {tripsActive.map(trip => {
-                        const st  = TRIP_ST[trip.status ?? ""] ?? { label: trip.status ?? "—", color: "#6B7280", bg: "#F3F4F6" };
                         const cam = trip.cameraStatus === "connected" && !!trip.cameraStreamUrl;
+                        const tripStatusColor = trip.status === "en_route" || trip.status === "en_cours" ? "#3B82F6" : "#D97706";
                         return (
-                          <View key={trip.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: st.color + "40", marginBottom: 10, elevation: 2 }}>
-                            <View style={{ backgroundColor: st.bg, padding: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <View key={trip.id} style={{ backgroundColor: CARD, borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: `${tripStatusColor}35`, marginBottom: 10 }}>
+                            {/* En-tête coloré */}
+                            <View style={{ backgroundColor: `${tripStatusColor}18`, padding: 11, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                <Ionicons name="bus" size={14} color={st.color} />
-                                <Text style={{ fontWeight: "800", color: st.color, fontSize: 13 }}>{trip.busName ?? "Bus"}</Text>
+                                <Ionicons name="bus" size={14} color={tripStatusColor} />
+                                <Text style={{ fontWeight: "800", color: tripStatusColor, fontSize: 13 }}>{trip.busName ?? "Bus"}</Text>
                               </View>
                               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                                 {cam && (
                                   <TouchableOpacity onPress={() => setCameraTrip(trip)}>
-                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEE2E2", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(220,38,38,0.18)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(220,38,38,0.35)" }}>
                                       <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#DC2626" }} />
-                                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#DC2626" }}>CAM</Text>
+                                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#F87171" }}>LIVE</Text>
                                     </View>
                                   </TouchableOpacity>
                                 )}
-                                <View style={{ backgroundColor: st.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: st.color + "30" }}>
-                                  <Text style={{ fontSize: 10, fontWeight: "700", color: st.color }}>{st.label.toUpperCase()}</Text>
+                                <View style={{ backgroundColor: `${tripStatusColor}20`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: `${tripStatusColor}40` }}>
+                                  <Text style={{ fontSize: 10, fontWeight: "700", color: tripStatusColor }}>{(trip.status ?? "—").toUpperCase().replace("_", " ")}</Text>
                                 </View>
                               </View>
                             </View>
-                            <View style={{ padding: 12, gap: 6 }}>
+                            {/* Corps */}
+                            <View style={{ padding: 12, gap: 7 }}>
                               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                <Ionicons name="navigate-outline" size={13} color="#94A3B8" />
-                                <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A" }}>{trip.from} → {trip.to}</Text>
+                                <Ionicons name="navigate-outline" size={13} color="#64748B" />
+                                <Text style={{ fontSize: 14, fontWeight: "700", color: "#F1F5F9" }}>{trip.from} → {trip.to}</Text>
                               </View>
-                              <View style={{ flexDirection: "row", gap: 12 }}>
+                              <View style={{ flexDirection: "row", gap: 16 }}>
                                 {trip.departureTime && (
                                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                                    <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                                    <Ionicons name="time-outline" size={12} color="#475569" />
                                     <Text style={{ fontSize: 12, color: "#64748B" }}>Départ: {trip.departureTime}</Text>
                                   </View>
                                 )}
                                 {trip.passengerCount !== undefined && (
                                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                                    <Ionicons name="people-outline" size={12} color="#94A3B8" />
+                                    <Ionicons name="people-outline" size={12} color="#475569" />
                                     <Text style={{ fontSize: 12, color: "#64748B" }}>{trip.passengerCount} passagers</Text>
                                   </View>
                                 )}
@@ -1744,45 +1760,42 @@ export default function SuiviScreen() {
                   )}
                   {tripsOther.length > 0 && (
                     <>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: tripsActive.length > 0 ? 8 : 0 }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D97706" }} />
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>Autres ({tripsOther.length})</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: tripsActive.length > 0 ? 12 : 0 }}>
+                        <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: "#D97706" }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#E2E8F0", letterSpacing: 0.3 }}>PLANIFIÉS ({tripsOther.length})</Text>
                       </View>
-                      {tripsOther.map(trip => {
-                        const st = TRIP_ST[trip.status ?? ""] ?? { label: trip.status ?? "—", color: "#6B7280", bg: "#F3F4F6" };
-                        return (
-                          <View key={trip.id} style={{ backgroundColor: "#fff", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#E2E8F0", marginBottom: 8 }}>
-                            <View style={{ backgroundColor: st.bg, padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                                <Ionicons name="bus-outline" size={13} color={st.color} />
-                                <Text style={{ fontWeight: "700", color: st.color, fontSize: 12 }}>{trip.busName ?? "Bus"}</Text>
-                              </View>
-                              <Text style={{ fontSize: 10, color: st.color, fontWeight: "700" }}>{st.label.toUpperCase()}</Text>
+                      {tripsOther.map(trip => (
+                        <View key={trip.id} style={{ backgroundColor: CARD, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: BDR, marginBottom: 8 }}>
+                          <View style={{ backgroundColor: "rgba(217,119,6,0.12)", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                              <Ionicons name="bus-outline" size={13} color="#F59E0B" />
+                              <Text style={{ fontWeight: "700", color: "#F59E0B", fontSize: 12 }}>{trip.busName ?? "Bus"}</Text>
                             </View>
-                            <View style={{ padding: 10 }}>
-                              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>{trip.from} → {trip.to}</Text>
-                              {trip.departureTime && <Text style={{ fontSize: 11, color: "#9CA3AF", marginTop: 3 }}>Départ: {trip.departureTime}</Text>}
-                            </View>
+                            <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>{(trip.status ?? "—").toUpperCase().replace("_", " ")}</Text>
                           </View>
-                        );
-                      })}
+                          <View style={{ padding: 10 }}>
+                            <Text style={{ fontSize: 13, fontWeight: "600", color: "#CBD5E1" }}>{trip.from} → {trip.to}</Text>
+                            {trip.departureTime && <Text style={{ fontSize: 11, color: "#475569", marginTop: 3 }}>Départ: {trip.departureTime}</Text>}
+                          </View>
+                        </View>
+                      ))}
                     </>
                   )}
                   {tripsDone.length > 0 && (
                     <>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: 8 }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#059669" }} />
-                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#0F172A" }}>Terminés ({tripsDone.length})</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, marginTop: 12 }}>
+                        <View style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: OK }} />
+                        <Text style={{ fontSize: 13, fontWeight: "800", color: "#E2E8F0", letterSpacing: 0.3 }}>TERMINÉS ({tripsDone.length})</Text>
                       </View>
                       {tripsDone.map(trip => (
-                        <View key={trip.id} style={{ backgroundColor: "#ECFDF5", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#6EE7B7", marginBottom: 8, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <View key={trip.id} style={{ backgroundColor: "rgba(5,150,105,0.1)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(5,150,105,0.25)", marginBottom: 8, padding: 12, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                           <View>
-                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#065F46" }}>{trip.from} → {trip.to}</Text>
-                            <Text style={{ fontSize: 11, color: "#059669", marginTop: 2 }}>{trip.busName}</Text>
+                            <Text style={{ fontSize: 13, fontWeight: "700", color: "#6EE7B7" }}>{trip.from} → {trip.to}</Text>
+                            <Text style={{ fontSize: 11, color: "#34D399", marginTop: 2 }}>{trip.busName}</Text>
                           </View>
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                            <Ionicons name="checkmark-circle" size={14} color="#059669" />
-                            <Text style={{ fontSize: 11, fontWeight: "700", color: "#059669" }}>Terminé</Text>
+                            <Ionicons name="checkmark-circle" size={14} color={OK} />
+                            <Text style={{ fontSize: 11, fontWeight: "700", color: OK }}>Terminé</Text>
                           </View>
                         </View>
                       ))}
@@ -1793,7 +1806,8 @@ export default function SuiviScreen() {
             </View>
           )}
 
-        </ScrollView>
+          </ScrollView>
+        </>
       )}
 
       {/* ══ MODAL — Déclencher une alerte ════════════════════════════ */}

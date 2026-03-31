@@ -44,8 +44,8 @@ function Ripple({ delay, size, maxOp }: { delay: number; size: number; maxOp: nu
         width: size, height: size, borderRadius: size / 2,
         borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)",
         transform: [{ scale }], opacity: op,
-        pointerEvents: "none" as any,
-      }}
+        pointerEvents: "none",
+      } as any}
     />
   );
 }
