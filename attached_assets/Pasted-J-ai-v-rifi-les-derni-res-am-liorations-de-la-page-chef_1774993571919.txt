@@ -1,0 +1,110 @@
+J’ai vérifié les dernières améliorations de la page chef d’agence avec les captures.
+
+Il y a une amélioration nette sur la structure (alertes, actions urgentes, organisation), mais un problème important de logique métier persiste, et la page n’est toujours pas à un niveau professionnel.
+
+---
+
+🔴 1. SÉPARATION DES RÔLES NON RESPECTÉE
+
+Le chef d’agence ne doit pas avoir une logique de page “suivi”.
+
+Actuellement, certaines sections (notamment les bordereaux carburant) donnent l’impression d’une interface agent suivi.
+
+👉 Ce n’est pas correct.
+
+Le chef d’agence doit être en position de supervision, pas d’exécution opérationnelle.
+
+---
+
+🔴 2. ACCÈS AU SUIVI
+
+Le chef d’agence :
+
+- peut voir les alertes ✔
+- peut voir les problèmes ✔
+- peut voir les éléments à traiter ✔
+
+❌ mais ne doit pas :
+- accéder à la page suivi
+- manipuler les opérations comme un agent suivi
+
+👉 La page suivi est strictement réservée à l’agent suivi.
+
+---
+
+🔴 3. BLOC CARBURANT À CORRIGER
+
+Le bloc actuel affiche :
+
+- une liste détaillée
+- des actions directes sur chaque ligne
+
+👉 Cela ressemble à une interface d’agent opérationnel.
+
+Je veux :
+
+- une vue synthétique
+- un nombre limité d’éléments visibles
+- une hiérarchie claire
+- une action globale ou accès contrôlé
+
+Exemple :
+- “36 départs sans carburant”
+- aperçu de quelques départs
+- bouton “Voir détails” ou “Gérer”
+
+---
+
+🔴 4. POSITIONNEMENT DU CHEF D’AGENCE
+
+Le chef d’agence doit :
+
+- superviser
+- valider
+- contrôler
+- décider
+
+Il ne doit pas être transformé en agent terrain.
+
+---
+
+🔴 5. NIVEAU DE LA PAGE (IMPORTANT)
+
+Même avec les améliorations, la page n’est pas encore à un niveau professionnel.
+
+👉 Il faut continuer à améliorer :
+
+- la fluidité
+- la lisibilité
+- la hiérarchie visuelle
+- la clarté des actions
+- la cohérence globale
+
+👉 La page doit être encore plus développée pour atteindre un niveau professionnel réel.
+
+---
+
+🔴 6. OBJECTIF FINAL
+
+Je veux une séparation stricte :
+
+- Agent suivi → exécution opérationnelle
+- Chef d’agence → supervision et validation
+
+👉 Aucune confusion entre les deux rôles.
+
+---
+
+🎯 OBJECTIF GLOBAL
+
+Une page chef d’agence :
+
+- claire
+- fluide
+- moderne
+- professionnelle
+- orientée décision rapide
+
+---
+
+Merci de corriger ces points de logique et d’améliorer encore la qualité de la page avant de continuer les autres modules.
