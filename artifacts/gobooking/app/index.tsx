@@ -96,11 +96,12 @@ export default function SplashScreen() {
   const progress    = useRef(new Animated.Value(0)).current;
 
   /* ── Native-only entry animations ── */
-  const logoScale = useRef(new Animated.Value(IS_WEB ? 1 : 0.25)).current;
+  const logoScale = useRef(new Animated.Value(IS_WEB ? 1 : 0.5)).current;
   const logoOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
   const nameOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
-  const nameY     = useRef(new Animated.Value(IS_WEB ? 0 : 24)).current;
+  const nameY     = useRef(new Animated.Value(IS_WEB ? 0 : 18)).current;
   const tagOp     = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
+  const animStarted = useRef(false);
 
   /* ── Navigation guard ── */
   const navigatedRef = useRef(false);
@@ -128,7 +129,42 @@ export default function SplashScreen() {
     if (minDoneRef.current && authDoneRef.current) doNavigate();
   };
 
+  /* Called once image is loaded (native) or immediately (web) */
+  const startAnimation = () => {
+    if (animStarted.current) return;
+    animStarted.current = true;
+    Animated.parallel([
+      /* Logo: scale from 0.5 → 1, fade from 0 → 1 */
+      Animated.spring(logoScale, { toValue: 1, tension: 80, friction: 9, useNativeDriver: true }),
+      Animated.timing(logoOp,    { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      /* Name: slide up + fade in */
+      Animated.sequence([
+        Animated.delay(280),
+        Animated.parallel([
+          Animated.timing(nameOp, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.timing(nameY,  { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        ]),
+      ]),
+      /* Tagline */
+      Animated.sequence([
+        Animated.delay(480),
+        Animated.timing(tagOp, { toValue: 1, duration: 240, useNativeDriver: true }),
+      ]),
+      /* Progress bar */
+      Animated.sequence([
+        Animated.delay(600),
+        Animated.timing(progress, {
+          toValue: 0.88, duration: MIN_SPLASH - 800,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }),
+      ]),
+    ]).start();
+  };
+
   useEffect(() => {
+    let frameDelay: ReturnType<typeof setTimeout> | null = null;
+
     if (IS_WEB) {
       /* Web: everything visible immediately — just animate the progress bar */
       Animated.timing(progress, {
@@ -137,38 +173,15 @@ export default function SplashScreen() {
         useNativeDriver: false,
       }).start();
     } else {
-      /* Native: crisp entry sequence */
-      Animated.parallel([
-        /* Logo: spring in */
-        Animated.spring(logoScale, { toValue: 1, tension: 90, friction: 8, useNativeDriver: true }),
-        Animated.timing(logoOp,    { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        /* Name: slide up, delay 320ms */
-        Animated.sequence([
-          Animated.delay(320),
-          Animated.parallel([
-            Animated.timing(nameOp, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(nameY,  { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-          ]),
-        ]),
-        /* Tagline: delay 500ms */
-        Animated.sequence([
-          Animated.delay(500),
-          Animated.timing(tagOp, { toValue: 1, duration: 260, useNativeDriver: true }),
-        ]),
-        /* Progress bar: delay 640ms */
-        Animated.sequence([
-          Animated.delay(640),
-          Animated.timing(progress, {
-            toValue: 0.88, duration: MIN_SPLASH - 800,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: false,
-          }),
-        ]),
-      ]).start();
+      /* Native: start after a brief frame delay to ensure React has rendered */
+      frameDelay = setTimeout(startAnimation, 16);
     }
 
     const t = setTimeout(() => { minDoneRef.current = true; tryNavigate(); }, MIN_SPLASH);
-    return () => clearTimeout(t);
+    return () => {
+      if (frameDelay) clearTimeout(frameDelay);
+      clearTimeout(t);
+    };
   }, []);
 
   /* Auth done → complete the bar + navigate */

@@ -1,0 +1,214 @@
+J’ai vérifié les dernières améliorations.
+
+La synchronisation et l’expérience agent sont maintenant solides. C’est validé.
+
+Maintenant on passe à une étape critique : structurer toute la logique métier dans les dashboards (compagnie, chef d’agence, super admin) et corriger l’ouverture de l’application.
+
+---
+
+🔴 1. PROBLÈME SPLASH (OUVERTURE)
+
+Actuellement :
+
+- le logo ne s’affiche pas correctement
+- il disparaît ou bug
+- l’animation n’est pas fluide
+
+👉 Ce point doit être corrigé immédiatement.
+
+Je veux :
+
+- logo stable et bien centré
+- animation fluide (aucun glitch)
+- rendu premium comme les grandes applications (Uber, Facebook, etc.)
+- chargement propre sans bug
+
+---
+
+🔴 2. STRUCTURE MÉTIER À RESPECTER (TRÈS IMPORTANT)
+
+Organisation stricte :
+
+- Une COMPAGNIE possède plusieurs AGENCES
+- Chaque AGENCE possède ses AGENTS :
+  - agent guichet
+  - agent bagage
+  - agent embarquement
+  - agent colis
+  - agent en route
+- Exception : agent réservation → voit toutes les réservations de la compagnie
+
+👉 Cette hiérarchie doit être respectée partout dans l’application sans mélange.
+
+---
+
+🔴 3. REMONTÉE DES INFORMATIONS (LOGIQUE GLOBALE)
+
+Toutes les actions doivent remonter automatiquement :
+
+- ventes tickets
+- bagages
+- colis
+- embarquement
+- validations
+
+👉 Tout doit être visible :
+
+- au chef d’agence
+- à l’entreprise (compagnie)
+
+👉 Aucune donnée ne doit rester isolée.
+
+---
+
+🔴 4. LOGIQUE DES BORDEREAUX (FLUX COMPLET)
+
+Flux attendu :
+
+1. Les agents effectuent leurs opérations (vente, bagage, embarquement)
+2. Les données remontent automatiquement
+3. L’agent de validation valide le départ
+
+👉 Dès validation :
+
+- le bordereau initial est généré
+- il est envoyé automatiquement :
+  - au chef d’agence
+  - à l’entreprise
+
+👉 À ce niveau :
+
+- la compagnie voit déjà la performance du départ (recettes, activité)
+- même si toutes les dépenses ne sont pas encore ajoutées
+
+---
+
+🔴 5. AJOUT DU BORDEREAU CARBURANT (LOGIQUE AVANCÉE)
+
+Le bordereau carburant peut arriver plus tard (le même jour ou après).
+
+👉 Donc :
+
+- le chef d’agence doit voir une liste des départs déjà effectués
+- avec un indicateur clair :
+  - “bordereau carburant manquant”
+
+👉 Action chef d’agence :
+
+- il sélectionne un départ
+- il ajoute (scan ou saisie) le bordereau carburant
+- il valide
+
+👉 Résultat :
+
+- les données du départ sont mises à jour :
+  - recettes tickets
+  - bagages
+  - colis
+  - + carburant
+- un bordereau final COMPLET est généré
+
+👉 Et automatiquement :
+
+- les données mises à jour sont renvoyées à la compagnie
+
+---
+
+🔴 6. NIVEAU ENTREPRISE (COMPAGNIE)
+
+La compagnie doit voir :
+
+- tous les départs
+- les recettes (immédiates après validation)
+- les dépenses (après ajout carburant)
+- les résultats nets mis à jour
+
+👉 Important :
+
+- avant carburant → performance brute
+- après carburant → résultat réel net
+
+👉 Objectif :
+
+- calcul propre
+- prêt pour comptabilité
+- aucune manipulation manuelle
+
+---
+
+🔴 7. DASHBOARD PROFESSIONNEL
+
+Les dashboards doivent être :
+
+- propres
+- structurés
+- modernes
+- sans doublons
+- sans mélange
+
+👉 Avec :
+
+- statistiques par agence
+- performances journalières
+- filtres (jour / semaine / mois)
+- classement des agences
+
+👉 Et :
+
+- indicateurs visuels clairs :
+  - départ validé
+  - carburant ajouté
+  - départ clôturé
+
+---
+
+🔴 8. EXPÉRIENCE UTILISATEUR
+
+Tout doit être :
+
+- fluide
+- rapide
+- lisible
+- bien organisé
+- avec icônes claires
+
+👉 Supprimer :
+
+- répétitions
+- éléments inutiles
+- incohérences
+
+---
+
+🔴 9. OBJECTIF FINAL
+
+Je veux une application :
+
+- totalement connectée
+- avec une logique métier complète
+- exploitable par une vraie compagnie de transport
+- prête pour des tests réels
+
+---
+
+⚠️ IMPORTANT
+
+- ne rien casser
+- rester dans la logique existante
+- connecter toutes les données entre elles
+- aucune donnée ne doit être perdue ou mélangée
+
+---
+
+🎯 PRIORITÉ IMMÉDIATE
+
+1. corriger le splash (logo + fluidité)
+2. structurer dashboards (agence / compagnie / admin)
+3. implémenter la logique complète des bordereaux (avec carburant différé)
+4. connecter toutes les données agents → validation → chef d’agence → entreprise
+
+---
+
+Quand c’est prêt, on passe aux tests réels avec simulation complète.
+
+Merci d’avancer rapidement sur ces points.

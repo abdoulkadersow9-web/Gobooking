@@ -6462,6 +6462,91 @@ router.get("/chef/audit-log", async (req, res) => {
   }
 });
 
+/* ─── GET /agent/chef/bordereaux — départs avec statut carburant ─── */
+router.get("/chef/bordereaux", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const companyId = agent.companyId;
+
+    const d7ago = new Date(Date.now() - 7 * 86_400_000).toISOString().split("T")[0];
+    const today  = new Date().toISOString().split("T")[0];
+
+    const tripList = await db.select().from(tripsTable).where(and(
+      eq(tripsTable.companyId, companyId),
+      sql`${tripsTable.date} >= ${d7ago}`,
+      sql`${tripsTable.date} <= ${today}`,
+    )).orderBy(desc(tripsTable.date)).limit(60);
+
+    const enriched = await Promise.all(tripList.map(async (trip) => {
+      const bookings = await db.select({ totalAmount: bookingsTable.totalAmount, status: bookingsTable.status })
+        .from(bookingsTable).where(and(
+          eq(bookingsTable.tripId, trip.id),
+          inArray(bookingsTable.status, ["confirmed", "boarded", "validated", "payé"]),
+        ));
+      const ticketRevenue = bookings.reduce((s, b) => s + (b.totalAmount ?? 0), 0);
+
+      const bagages = await db.select({ price: bagageItemsTable.price })
+        .from(bagageItemsTable).where(eq(bagageItemsTable.tripId, trip.id));
+      const bagageRevenue = bagages.reduce((s, b) => s + (b.price ?? 0), 0);
+
+      const colis = await db.select({ amount: parcelsTable.amount })
+        .from(parcelsTable).where(eq(parcelsTable.tripId as any, trip.id));
+      const colisRevenue = colis.reduce((s, c) => s + (c.amount ?? 0), 0);
+
+      const expenses = await db.select().from(tripExpensesTable).where(eq(tripExpensesTable.tripId, trip.id));
+      const hasFuel        = expenses.some(e => e.type === "carburant");
+      const carburantAmount = expenses.filter(e => e.type === "carburant").reduce((s, e) => s + (e.amount ?? 0), 0);
+      const totalExpenses  = expenses.reduce((s, e) => s + (e.amount ?? 0), 0);
+      const totalRecettes  = ticketRevenue + bagageRevenue + colisRevenue;
+
+      return {
+        id: trip.id, from: trip.from, to: trip.to,
+        date: trip.date, departureTime: trip.departureTime,
+        busName: trip.busName, busType: trip.busType, status: trip.status,
+        passengersCount: bookings.length,
+        ticketRevenue, bagageRevenue, colisRevenue,
+        totalRecettes, totalExpenses, carburantAmount,
+        hasFuel, netRevenue: totalRecettes - totalExpenses,
+      };
+    }));
+
+    res.json({ bordereaux: enriched });
+  } catch (err) {
+    console.error("[chef/bordereaux]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+/* ─── POST /agent/chef/bordereaux/:tripId/fuel — ajouter carburant ─── */
+router.post("/chef/bordereaux/:tripId/fuel", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const { tripId } = req.params;
+    const { amount, description } = req.body;
+
+    const amt = parseInt(amount);
+    if (!amount || isNaN(amt) || amt <= 0) {
+      return res.status(400).json({ error: "Montant invalide" });
+    }
+
+    const id = Date.now().toString() + Math.random().toString(36).substr(2, 6);
+    await db.insert(tripExpensesTable).values({
+      id, companyId: agent.companyId, tripId,
+      type: "carburant", amount: amt,
+      description: description ?? "Carburant",
+    } as any);
+
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error("[chef/bordereaux/:id/fuel]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 /* ─── GET /agent/chef/agents — agents de l'agence ────────────── */
 router.get("/chef/agents", async (req, res) => {
   try {

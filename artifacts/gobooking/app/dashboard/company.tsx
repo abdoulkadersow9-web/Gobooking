@@ -207,7 +207,14 @@ const DEMO_ANALYTICS: Analytics = {
   parcelByStatus: { livre: 310, en_transit: 142, en_livraison: 88, en_attente: 58, pris_en_charge: 40 },
 };
 
-type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "factures" | "en_route" | "analytiques" | "abonnement";
+type Tab = "apercu" | "trajets" | "reservations" | "sieges" | "bus" | "colis" | "agents" | "portefeuille" | "factures" | "en_route" | "analytiques" | "abonnement" | "rentabilite";
+type TripRentab = {
+  tripId: string; from: string; to: string; date: string; departureTime: string;
+  busName: string; status: string; bookedSeats: number; totalSeats: number;
+  totalRecettes: number; recettesReservations: number; recettesColis: number;
+  totalDepenses: number; benefice: number;
+};
+type RentabData = { trips: TripRentab[]; summary: { totalRecettes: number; totalDepenses: number; totalBenefice: number; tripCount: number } };
 type BoardingRequest = { id: string; tripId: string; clientName: string; clientPhone: string; boardingPoint: string; seatsRequested: number; status: string; createdAt: string };
 
 /* ─── Reusable picker row ─────────────────────────────────── */
@@ -317,6 +324,9 @@ export default function CompanyDashboard() {
   const [tripFilter, setTripFilter] = useState<"all" | "scheduled" | "en_route" | "completed">("all");
   const [tripStatusLoading, setTripStatusLoading] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<Analytics>(DEMO_ANALYTICS);
+  const [rentabData, setRentabData] = useState<RentabData | null>(null);
+  const [rentabLoading, setRentabLoading] = useState(false);
+  const [rentabFilter, setRentabFilter] = useState<"7j" | "30j" | "tout">("30j");
 
   /* modal states */
   const [addBusModal, setAddBusModal] = useState(false);
@@ -406,6 +416,15 @@ export default function CompanyDashboard() {
       .finally(() => setBoardingLoading(false));
   };
 
+  const loadRentabilite = () => {
+    if (!token) return;
+    setRentabLoading(true);
+    apiFetch<RentabData>("/company/rentabilite", { token })
+      .then(data => setRentabData(data))
+      .catch(() => {})
+      .finally(() => setRentabLoading(false));
+  };
+
   const handleBoardingAction = (id: string, action: "accept" | "reject") => {
     if (!token) return;
     const endpoint = `/company/boarding-requests/${id}/${action}`;
@@ -453,6 +472,7 @@ export default function CompanyDashboard() {
     loadBoardingRequests();
     loadInvoices();
     loadSubscription();
+    loadRentabilite();
   }, [token]);
 
   const confirmReservation = async (reservationId: string) => {
@@ -722,7 +742,8 @@ export default function CompanyDashboard() {
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: "apercu",       label: "Aperçu",        icon: "bar-chart-2" },
-    { id: "analytiques",  label: "Analytiques",   icon: "trending-up" },
+    { id: "rentabilite",  label: "Rentabilité",   icon: "trending-up" },
+    { id: "analytiques",  label: "Analytiques",   icon: "activity" },
     { id: "portefeuille", label: "Portefeuille",  icon: "credit-card" },
     { id: "factures",     label: "Factures",      icon: "file-text" },
     { id: "abonnement",   label: "Abonnement",    icon: "star" },
@@ -1006,6 +1027,102 @@ export default function CompanyDashboard() {
               </View>
             );
           })}
+        </>)}
+
+        {/* ── Rentabilité ── */}
+        {activeTab === "rentabilite" && (<>
+          {/* Summary header */}
+          {rentabLoading && !rentabData ? (
+            <View style={{ alignItems: "center", padding: 40 }}>
+              <ActivityIndicator color={PRIMARY} size="large" />
+              <Text style={{ color: "#6B7280", marginTop: 12 }}>Chargement des données...</Text>
+            </View>
+          ) : rentabData ? (<>
+            {/* Global summary card */}
+            <View style={{ borderRadius: 18, overflow: "hidden", marginBottom: 4 }}>
+              <LinearGradient colors={[PRIMARY, DARK]} style={{ padding: 20, gap: 16 }}>
+                <Text style={{ color: "white", fontSize: 16, fontWeight: "800" }}>Bilan financier global</Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {[
+                    { label: "Recettes totales", value: rentabData.summary.totalRecettes, color: "#BBF7D0", sign: "" },
+                    { label: "Dépenses", value: rentabData.summary.totalDepenses, color: "#FCA5A5", sign: "-" },
+                    { label: "Bénéfice net", value: rentabData.summary.totalBenefice, color: rentabData.summary.totalBenefice >= 0 ? "#BBF7D0" : "#FCA5A5", sign: rentabData.summary.totalBenefice >= 0 ? "+" : "" },
+                  ].map((c, i) => (
+                    <View key={i} style={{ flex: 1 }}>
+                      <Text style={{ color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "600" }}>{c.label}</Text>
+                      <Text style={{ color: c.color, fontSize: 13, fontWeight: "800", marginTop: 2 }}>
+                        {c.sign}{Math.abs(c.value) >= 1_000_000
+                          ? `${(c.value / 1_000_000).toFixed(1)}M`
+                          : Math.abs(c.value) >= 1000 ? `${(c.value / 1000).toFixed(0)}k` : `${c.value}`} FCFA
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{rentabData.summary.tripCount} trajet{rentabData.summary.tripCount !== 1 ? "s" : ""} analysé{rentabData.summary.tripCount !== 1 ? "s" : ""}</Text>
+              </LinearGradient>
+            </View>
+
+            {/* Per-trip breakdown */}
+            <Text style={[S.sectionTitle, { marginTop: 8, marginBottom: 8 }]}>Détail par trajet</Text>
+            {rentabData.trips.map((t) => {
+              const pct = t.totalSeats > 0 ? Math.round((t.bookedSeats / t.totalSeats) * 100) : 0;
+              const isPositif = t.benefice >= 0;
+              const statusColors: Record<string, { bg: string; color: string }> = {
+                en_route: { bg: "#DCFCE7", color: "#059669" },
+                completed: { bg: "#F1F5F9", color: "#475569" },
+                arrived: { bg: "#F1F5F9", color: "#475569" },
+                boarding: { bg: "#EDE9FE", color: "#7C3AED" },
+                scheduled: { bg: "#EFF6FF", color: "#1D4ED8" },
+              };
+              const sc = statusColors[t.status ?? ""] ?? { bg: "#F3F4F6", color: "#6B7280" };
+              return (
+                <View key={t.tripId} style={[S.card, { marginBottom: 10, padding: 14, gap: 10 }]}>
+                  <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{t.from} → {t.to}</Text>
+                      <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>{t.date} · {t.departureTime} · {t.busName}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", gap: 4 }}>
+                      <View style={{ backgroundColor: sc.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: sc.color }}>{t.status?.toUpperCase()}</Text>
+                      </View>
+                      <Text style={{ fontSize: 11, color: "#6B7280" }}>{t.bookedSeats}/{t.totalSeats} sièges ({pct}%)</Text>
+                    </View>
+                  </View>
+                  {/* Revenue row */}
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    {[
+                      { label: "Billets", val: t.recettesReservations, color: "#1D4ED8", bg: "#EFF6FF" },
+                      { label: "Colis", val: t.recettesColis, color: "#059669", bg: "#ECFDF5" },
+                      { label: "Dépenses", val: -t.totalDepenses, color: "#DC2626", bg: "#FEF2F2" },
+                    ].map((r, i) => (
+                      <View key={i} style={{ flex: 1, backgroundColor: r.bg, borderRadius: 8, padding: 7, alignItems: "center" }}>
+                        <Text style={{ fontSize: 9, color: r.color, fontWeight: "600" }}>{r.label}</Text>
+                        <Text style={{ fontSize: 11, color: r.color, fontWeight: "800", marginTop: 1 }}>
+                          {r.val !== 0 ? `${(Math.abs(r.val) / 1000).toFixed(0)}k` : "0"}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                  {/* Benefice */}
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8, borderTopWidth: 1, borderColor: "#F3F4F6" }}>
+                    <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "600" }}>Recettes: {t.totalRecettes.toLocaleString()} FCFA</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "800", color: isPositif ? "#059669" : "#DC2626" }}>
+                      {isPositif ? "+" : ""}{t.benefice.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </>) : (
+            <View style={{ alignItems: "center", padding: 40, gap: 10 }}>
+              <Feather name="trending-up" size={36} color="#9CA3AF" />
+              <Text style={{ color: "#6B7280", textAlign: "center" }}>Aucune donnée de rentabilité disponible</Text>
+              <TouchableOpacity onPress={loadRentabilite} style={{ backgroundColor: PRIMARY, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}>
+                <Text style={{ color: "white", fontWeight: "700" }}>Actualiser</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </>)}
 
         {/* ── Trajets ── */}

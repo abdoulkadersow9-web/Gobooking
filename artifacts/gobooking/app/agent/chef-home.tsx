@@ -4,7 +4,10 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -12,6 +15,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -48,6 +52,13 @@ type OnlineBooking = {
   passengers: { name: string }[];
   trip: { from: string; to: string; departureTime: string; busName: string } | null;
 };
+type Bordereau = {
+  id: string; from: string; to: string; date: string; departureTime: string;
+  busName: string; busType: string; status: string; passengersCount: number;
+  ticketRevenue: number; bagageRevenue: number; colisRevenue: number;
+  totalRecettes: number; totalExpenses: number; carburantAmount: number;
+  hasFuel: boolean; netRevenue: number;
+};
 
 export default function ChefHome() {
   const { user, token, logoutIfActiveToken } = useAuth();
@@ -62,6 +73,11 @@ export default function ChefHome() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingBookings, setPendingBookings] = useState<OnlineBooking[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [bordereaux, setBordereaux] = useState<Bordereau[]>([]);
+  const [fuelModal, setFuelModal] = useState<{ visible: boolean; trip: Bordereau | null }>({ visible: false, trip: null });
+  const [fuelAmount, setFuelAmount] = useState("");
+  const [fuelDesc, setFuelDesc] = useState("");
+  const [fuelLoading, setFuelLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!authToken) { setLoading(false); return; }
@@ -115,6 +131,42 @@ export default function ChefHome() {
   /* Sync immédiate: re-fetch quand un ticket est vendu, un passager embarqué
      ou une réservation confirmée — même sans attendre le poll 30s */
   useOnSync(["boarding", "ticket", "reservation"], load);
+
+  /* ── Bordereaux ── */
+  const loadBordereaux = useCallback(async () => {
+    if (!authToken) return;
+    try {
+      const res = await apiFetch<{ bordereaux: Bordereau[] }>("/agent/chef/bordereaux", { token: authToken });
+      setBordereaux(res.bordereaux ?? []);
+    } catch { /* silencieux */ }
+  }, [authToken]);
+
+  useEffect(() => { loadBordereaux(); }, [loadBordereaux]);
+
+  const submitFuel = useCallback(async () => {
+    if (!fuelModal.trip) return;
+    const amt = parseInt(fuelAmount);
+    if (!fuelAmount || isNaN(amt) || amt <= 0) {
+      Alert.alert("Erreur", "Entrez un montant valide.");
+      return;
+    }
+    setFuelLoading(true);
+    try {
+      await apiFetch(`/agent/chef/bordereaux/${fuelModal.trip.id}/fuel`, {
+        token: authToken,
+        method: "POST",
+        body: { amount: amt, description: fuelDesc || "Carburant" },
+      });
+      setFuelModal({ visible: false, trip: null });
+      setFuelAmount("");
+      setFuelDesc("");
+      loadBordereaux();
+    } catch (e: any) {
+      Alert.alert("Erreur", e?.message ?? "Impossible d'enregistrer le carburant.");
+    } finally {
+      setFuelLoading(false);
+    }
+  }, [fuelModal, fuelAmount, fuelDesc, authToken, loadBordereaux]);
 
   /* ── Pulsation du point LIVE ── */
   const ND = Platform.OS !== "web";
@@ -523,7 +575,141 @@ export default function ChefHome() {
             })}
           </View>
         )}
+        {/* ── Bordereaux / Carburant ── */}
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Bordereaux de départ</Text>
+            <Text style={s.sectionCount}>{bordereaux.length} départ{bordereaux.length !== 1 ? "s" : ""}</Text>
+          </View>
+          {bordereaux.length === 0 ? (
+            <View style={s.emptyCard}>
+              <Feather name="file-text" size={28} color="#9CA3AF" />
+              <Text style={s.emptyText}>Aucun départ ces 7 derniers jours</Text>
+            </View>
+          ) : (
+            bordereaux.slice(0, 8).map((b) => (
+              <View key={b.id} style={[s.tripCard, !b.hasFuel && { borderColor: "#FDE68A", borderWidth: 2 }]}>
+                {/* Trip header */}
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.tripRoute}>{b.from} → {b.to}</Text>
+                    <Text style={s.tripMeta}>{b.date} · {b.departureTime} · {b.busName}</Text>
+                  </View>
+                  {b.hasFuel ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#DCFCE7", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}>
+                      <Feather name="check-circle" size={12} color="#059669" />
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#059669" }}>COMPLET</Text>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}>
+                      <Feather name="alert-circle" size={12} color="#D97706" />
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>CARBURANT MANQUANT</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Revenue breakdown */}
+                <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
+                  {[
+                    { label: "Billets", val: b.ticketRevenue, color: "#1D4ED8", bg: "#EFF6FF" },
+                    { label: "Bagages", val: b.bagageRevenue, color: "#7C3AED", bg: "#F5F3FF" },
+                    { label: "Colis", val: b.colisRevenue, color: "#059669", bg: "#ECFDF5" },
+                  ].map((r, i) => (
+                    <View key={i} style={{ flex: 1, backgroundColor: r.bg, borderRadius: 8, padding: 6, alignItems: "center" }}>
+                      <Text style={{ fontSize: 9, color: r.color, fontWeight: "600" }}>{r.label}</Text>
+                      <Text style={{ fontSize: 11, color: r.color, fontWeight: "800", marginTop: 1 }}>
+                        {r.val > 0 ? `${(r.val / 1000).toFixed(0)}k` : "0"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Totals */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <Text style={{ fontSize: 10, color: "#6B7280" }}>Recettes totales</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>
+                      {b.totalRecettes.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  {b.hasFuel ? (
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ fontSize: 10, color: "#6B7280" }}>Net (après carburant)</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "800", color: b.netRevenue >= 0 ? "#059669" : "#DC2626" }}>
+                        {b.netRevenue >= 0 ? "+" : ""}{b.netRevenue.toLocaleString()} FCFA
+                      </Text>
+                    </View>
+                  ) : (
+                    <Pressable
+                      onPress={() => { setFuelModal({ visible: true, trip: b }); setFuelAmount(""); setFuelDesc(""); }}
+                      style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: INDIGO2, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}
+                    >
+                      <Feather name="plus-circle" size={13} color="white" />
+                      <Text style={{ fontSize: 12, fontWeight: "700", color: "white" }}>Ajouter carburant</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      {/* ── Modal Carburant ── */}
+      <Modal visible={fuelModal.visible} transparent animationType="slide" onRequestClose={() => setFuelModal({ visible: false, trip: null })}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: "#111827" }}>Bordereau carburant</Text>
+              <Pressable onPress={() => setFuelModal({ visible: false, trip: null })}>
+                <Feather name="x" size={22} color="#6B7280" />
+              </Pressable>
+            </View>
+            {fuelModal.trip && (
+              <View style={{ backgroundColor: "#F3F4F6", borderRadius: 12, padding: 12 }}>
+                <Text style={{ fontWeight: "700", color: "#111827" }}>
+                  {fuelModal.trip.from} → {fuelModal.trip.to}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                  {fuelModal.trip.date} · {fuelModal.trip.departureTime} · {fuelModal.trip.busName}
+                </Text>
+                <Text style={{ fontSize: 13, color: "#1D4ED8", fontWeight: "700", marginTop: 4 }}>
+                  Recettes: {fuelModal.trip.totalRecettes.toLocaleString()} FCFA
+                </Text>
+              </View>
+            )}
+            <View style={{ gap: 10 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>Montant carburant (FCFA) *</Text>
+              <TextInput
+                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: "700", color: "#111827" }}
+                placeholder="Ex: 45000"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={fuelAmount}
+                onChangeText={setFuelAmount}
+              />
+              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>Description (optionnel)</Text>
+              <TextInput
+                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, padding: 14, fontSize: 14, color: "#111827" }}
+                placeholder="Ex: Plein + 50L gasoil"
+                placeholderTextColor="#9CA3AF"
+                value={fuelDesc}
+                onChangeText={setFuelDesc}
+              />
+            </View>
+            <Pressable
+              onPress={submitFuel}
+              disabled={fuelLoading}
+              style={{ backgroundColor: INDIGO2, borderRadius: 14, paddingVertical: 16, alignItems: "center", opacity: fuelLoading ? 0.6 : 1 }}
+            >
+              {fuelLoading
+                ? <ActivityIndicator color="white" />
+                : <Text style={{ color: "white", fontSize: 15, fontWeight: "800" }}>Valider le bordereau carburant</Text>
+              }
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ── FAB ── */}
       <Pressable style={s.fab} onPress={() => router.push("/agent/chef-trips" as never)}>
