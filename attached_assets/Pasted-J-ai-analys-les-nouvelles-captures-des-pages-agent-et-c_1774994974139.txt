@@ -1,0 +1,114 @@
+J’ai analysé les nouvelles captures des pages agent et chef d’agence.
+
+Il y a des améliorations visuelles, mais la structure globale reste incorrecte. La logique métier n’est pas respectée, et l’application est actuellement confuse et non professionnelle.
+
+Nous devons corriger en profondeur l’organisation, la logique et les accès.
+
+---
+
+🔴 1. CONFUSION ENTRE LES PAGES
+
+Actuellement :
+
+- la page alertes ressemble aux bordereaux
+- la page bordereaux ressemble aux alertes
+- certaines pages affichent les mêmes informations
+
+👉 Résultat : on ne comprend pas où on est ni ce qu’on fait.
+
+👉 Chaque page doit avoir une fonction claire, unique et identifiable.
+
+---
+
+🔴 2. RÔLES NON RESPECTÉS (CRITIQUE)
+
+Un agent ne doit voir que ses modules.
+
+Actuellement :
+- un agent peut accéder à des fonctions qui ne sont pas les siennes (ex : colis)
+- les accès ne sont pas filtrés par rôle
+
+👉 Il faut une séparation stricte :
+
+- Agent guichet → billets uniquement
+- Agent colis → colis uniquement
+- Agent embarquement → embarquement uniquement
+- Agent suivi → suivi uniquement
+
+👉 Aucun mélange.
+
+---
+
+🔴 3. STRUCTURE DES PAGES À REFAIRE
+
+Chaque page doit être organisée proprement :
+
+### Exemple page Agent :
+
+1. Header (nom + agence)
+2. KPI simples (optionnel)
+3. Module principal (selon rôle)
+4. Liste claire des actions
+5. Navigation propre
+
+👉 Pas de mélange de blocs.
+
+---
+
+🔴 4. NAVIGATION MANQUANTE
+
+Il manque des éléments essentiels :
+
+- Profil utilisateur
+- Déconnexion
+- Accès paramètres
+- Parcours clair entre pages
+
+👉 C’est obligatoire pour une application professionnelle.
+
+---
+
+🔴 5. LOGIQUE MÉTIER NON APPLIQUÉE
+
+Nous avons défini que :
+
+- l’agent peut programmer des départs
+- chaque rôle a ses actions
+
+👉 Mais cela n’apparaît pas correctement dans l’interface.
+
+👉 Il faut afficher clairement les actions liées à chaque rôle.
+
+---
+
+🔴 6. PROBLÈME DE LISIBILITÉ
+
+Aujourd’hui :
+
+- les blocs sont mélangés
+- les informations sont répétées
+- il n’y a pas de hiérarchie
+
+👉 Il faut :
+
+- organiser par priorité
+- espacer correctement
+- simplifier les écrans
+
+---
+
+🔴 7. OBJECTIF FINAL
+
+Je veux une application :
+
+- claire
+- structurée
+- logique
+- sans mélange
+- avec séparation stricte des rôles
+- avec navigation professionnelle
+- avec des pages compréhensibles en 3 secondes
+
+---
+
+Merci de corriger la structure complète des pages (agent + chef d’agence) en respectant strictement la logique métier définie, avant toute autre amélioration.

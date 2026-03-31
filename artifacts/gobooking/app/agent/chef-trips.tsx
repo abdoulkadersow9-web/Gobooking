@@ -545,17 +545,36 @@ export default function ChefTrips() {
           </Pressable>
         </View>
 
-        {/* Tabs */}
+        {/* Tabs avec icônes */}
         <View style={s.tabBar}>
           {([
-            ["trips","Départs"],
-            ["caisses", caissesStats.pending > 0 ? `Caisses (${caissesStats.pending})` : "Caisses"],
-            ["historique","Historique"],
-          ] as const).map(([key, label]) => (
+            ["trips",      "calendar",    "Départs"],
+            ["caisses",    "dollar-sign", caissesStats.pending > 0 ? `Caisses (${caissesStats.pending})` : "Caisses"],
+            ["historique", "clock",       "Historique"],
+          ] as const).map(([key, icon, label]) => (
             <Pressable key={key} style={[s.tab, activeTab === key && s.tabActive]} onPress={() => setActiveTab(key as any)}>
+              <Feather name={icon as any} size={13} color={activeTab === key ? "#fff" : "rgba(255,255,255,0.5)"} />
               <Text style={[s.tabText, activeTab === key && s.tabTextActive]}>{label}</Text>
             </Pressable>
           ))}
+        </View>
+        {/* Sous-titre contextuel par tab */}
+        <View style={{ paddingHorizontal:16, paddingBottom:8, paddingTop:4 }}>
+          {activeTab === "trips" && (
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
+              Programmer, modifier et suivre les départs
+            </Text>
+          )}
+          {activeTab === "caisses" && (
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
+              Valider ou rejeter les soumissions de caisse de vos agents
+            </Text>
+          )}
+          {activeTab === "historique" && (
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
+              Journal des modifications — lecture seule
+            </Text>
+          )}
         </View>
       </LinearGradient>
 
@@ -1929,9 +1948,9 @@ const s = StyleSheet.create({
   addBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "white", justifyContent: "center", alignItems: "center" },
 
   tabBar: { flexDirection: "row", gap: 4, paddingBottom: 0 },
-  tab: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: "transparent" },
+  tab: { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 3, borderBottomColor: "transparent", flexDirection: "row", alignItems: "center", gap: 5 },
   tabActive: { borderBottomColor: "white" },
-  tabText: { fontSize: 14, fontWeight: "600", color: "rgba(255,255,255,0.6)" },
+  tabText: { fontSize: 13, fontWeight: "600", color: "rgba(255,255,255,0.6)" },
   tabTextActive: { color: "white" },
 
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", marginBottom: 10 },

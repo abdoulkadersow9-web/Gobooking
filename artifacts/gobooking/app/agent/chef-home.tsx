@@ -91,7 +91,7 @@ function ActionCard({
    PAGE
 ════════════════════════════════════════════════════════════ */
 export default function ChefHome() {
-  const { user, token, logoutIfActiveToken } = useAuth();
+  const { user, token, logout, logoutIfActiveToken } = useAuth();
   const auth = token ?? "";
 
   const [dash, setDash]           = useState<DashData | null>(null);
@@ -206,10 +206,19 @@ export default function ChefHome() {
                 <Text style={s.hSub}>{agence ? `${agence.name} — ${agence.city}` : "Chef d'Agence"}</Text>
               </View>
             </View>
-            {/* Live pill */}
-            <View style={s.livePill}>
-              <Animated.View style={[s.liveDot, { opacity: pulse }]} />
-              <Text style={s.liveText}>{syncTime ?? "–"}</Text>
+            {/* Logout + Live pill */}
+            <View style={{ alignItems:"flex-end", gap:8 }}>
+              <Pressable
+                onPress={() => logout?.()}
+                style={{ width:36, height:36, borderRadius:18, backgroundColor:"rgba(255,255,255,0.12)", alignItems:"center", justifyContent:"center" }}
+                hitSlop={8}
+              >
+                <Feather name="log-out" size={17} color="rgba(255,255,255,0.85)" />
+              </Pressable>
+              <View style={s.livePill}>
+                <Animated.View style={[s.liveDot, { opacity: pulse }]} />
+                <Text style={s.liveText}>{syncTime ?? "–"}</Text>
+              </View>
             </View>
           </View>
 
@@ -464,7 +473,7 @@ const s = StyleSheet.create({
   divider:     { height:1, backgroundColor:C.border, marginVertical:26 },
 
   /* Alerte banner */
-  alertBanner: { flexDirection:"row", alignItems:"center", gap:12, backgroundColor:C.redSoft, border:undefined, borderWidth:1.5, borderColor:"#FCA5A5", borderRadius:16, paddingHorizontal:16, paddingVertical:13, marginBottom:10 },
+  alertBanner: { flexDirection:"row", alignItems:"center", gap:12, backgroundColor:C.redSoft, borderWidth:1.5, borderColor:"#FCA5A5", borderRadius:16, paddingHorizontal:16, paddingVertical:13, marginBottom:10 },
   alertIconBox:{ width:40, height:40, borderRadius:12, backgroundColor:"#FECACA", alignItems:"center", justifyContent:"center" },
   alertTitle:  { fontSize:14, fontWeight:"800", color:"#991B1B" },
   alertSub:    { fontSize:11, color:C.red, marginTop:3 },
