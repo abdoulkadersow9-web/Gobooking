@@ -1,5 +1,6 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Print from "expo-print";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -28,6 +29,199 @@ import { apiFetch } from "@/utils/api";
 const INDIGO  = "#3730A3";
 const INDIGO2 = "#4F46E5";
 const LIGHT   = "#EEF2FF";
+
+function buildBordereauHtml(b: any, agenceName?: string): string {
+  const fmtNum = (n: number) => n?.toLocaleString("fr-FR") ?? "0";
+  const statusColor = b.status === "parti" ? "#059669" : b.status === "annulé" ? "#DC2626" : "#D97706";
+  const statusLabel = b.status === "parti" ? "PARTI" : b.status === "annulé" ? "ANNULÉ" : (b.status ?? "PROGRAMMÉ").toUpperCase();
+  const now = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bordereau de départ</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; color: #111827; }
+    .page { max-width: 680px; margin: 0 auto; background: #fff; }
+    /* Header */
+    .header { background: linear-gradient(135deg, #3730A3 0%, #4F46E5 100%); padding: 28px 32px 22px; color: #fff; position: relative; }
+    .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .company { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+    .brand-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; letter-spacing: 2px; text-transform: uppercase; }
+    .doc-label { background: rgba(255,255,255,0.18); border-radius: 8px; padding: 6px 14px; text-align: right; }
+    .doc-label-title { font-size: 10px; opacity: 0.75; letter-spacing: 1px; text-transform: uppercase; }
+    .doc-label-num { font-size: 16px; font-weight: 800; }
+    .route-banner { margin-top: 18px; background: rgba(255,255,255,0.12); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+    .city { font-size: 26px; font-weight: 900; }
+    .arrow { font-size: 22px; opacity: 0.6; flex: 1; text-align: center; }
+    .status-pill { background: ${statusColor}; color: #fff; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
+    /* Meta row */
+    .meta-row { display: flex; gap: 0; border-bottom: 1px solid #E5E7EB; }
+    .meta-cell { flex: 1; padding: 14px 18px; border-right: 1px solid #E5E7EB; }
+    .meta-cell:last-child { border-right: none; }
+    .meta-label { font-size: 10px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .meta-value { font-size: 14px; font-weight: 700; color: #111827; }
+    /* Revenue section */
+    .section { padding: 20px 24px 0; }
+    .section-title { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #6B7280; border-bottom: 2px solid #E5E7EB; padding-bottom: 8px; margin-bottom: 16px; }
+    .revenue-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .rev-card { background: #F8FAFC; border-radius: 10px; padding: 14px; border-left: 4px solid; }
+    .rev-card.blue { border-color: #1D4ED8; }
+    .rev-card.purple { border-color: #7C3AED; }
+    .rev-card.green { border-color: #059669; }
+    .rev-card-label { font-size: 10px; color: #6B7280; margin-bottom: 6px; }
+    .rev-card-val { font-size: 18px; font-weight: 900; }
+    .rev-card.blue .rev-card-val { color: #1D4ED8; }
+    .rev-card.purple .rev-card-val { color: #7C3AED; }
+    .rev-card.green .rev-card-val { color: #059669; }
+    .rev-card-sub { font-size: 10px; color: #9CA3AF; margin-top: 2px; }
+    /* Total bar */
+    .total-bar { background: #111827; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; }
+    .total-label { color: rgba(255,255,255,0.65); font-size: 12px; }
+    .total-val { color: #fff; font-size: 22px; font-weight: 900; }
+    /* Fuel / expenses */
+    .expense-row { display: flex; gap: 12px; margin-bottom: 16px; }
+    .expense-cell { flex: 1; background: #FEF3C7; border-radius: 10px; padding: 12px 16px; border-left: 4px solid #D97706; }
+    .expense-cell.net-pos { background: #ECFDF5; border-color: #059669; }
+    .expense-cell.net-neg { background: #FEF2F2; border-color: #DC2626; }
+    .expense-label { font-size: 10px; color: #6B7280; margin-bottom: 4px; }
+    .expense-val { font-size: 16px; font-weight: 800; }
+    .expense-val.fuel { color: #D97706; }
+    .expense-val.pos { color: #059669; }
+    .expense-val.neg { color: #DC2626; }
+    /* No fuel warning */
+    .no-fuel { background: #FFFBEB; border: 2px dashed #FCD34D; border-radius: 10px; padding: 14px; text-align: center; color: #92400E; font-size: 13px; margin-bottom: 16px; }
+    /* Footer */
+    .footer { background: #F9FAFB; border-top: 1px solid #E5E7EB; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .footer-brand { font-size: 13px; font-weight: 800; color: #3730A3; }
+    .footer-date { font-size: 11px; color: #9CA3AF; }
+    .sig-row { display: flex; gap: 24px; padding: 16px 24px 24px; }
+    .sig-box { flex: 1; border-top: 1.5px solid #E5E7EB; padding-top: 8px; }
+    .sig-label { font-size: 10px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="company">${agenceName ? agenceName.toUpperCase() : "GOBOOKING"}</div>
+          <div class="brand-sub">Transport Interurbain • Côte d'Ivoire</div>
+        </div>
+        <div class="doc-label">
+          <div class="doc-label-title">Bordereau de départ</div>
+          <div class="doc-label-num">#${String(b.id ?? "").slice(-6).toUpperCase() || "------"}</div>
+        </div>
+      </div>
+      <div class="route-banner">
+        <div class="city">${b.from}</div>
+        <div class="arrow">→</div>
+        <div class="city">${b.to}</div>
+        <div class="status-pill">${statusLabel}</div>
+      </div>
+    </div>
+
+    <!-- Meta -->
+    <div class="meta-row">
+      <div class="meta-cell">
+        <div class="meta-label">Date</div>
+        <div class="meta-value">${b.date}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Heure de départ</div>
+        <div class="meta-value">${b.departureTime}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Bus</div>
+        <div class="meta-value">${b.busName}</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Passagers</div>
+        <div class="meta-value">${b.passengersCount ?? 0} pax</div>
+      </div>
+    </div>
+
+    <!-- Revenue section -->
+    <div class="section" style="padding-top:20px;">
+      <div class="section-title">Détail des recettes</div>
+      <div class="revenue-grid">
+        <div class="rev-card blue">
+          <div class="rev-card-label">Billets</div>
+          <div class="rev-card-val">${fmtNum(b.ticketRevenue)}</div>
+          <div class="rev-card-sub">FCFA</div>
+        </div>
+        <div class="rev-card purple">
+          <div class="rev-card-label">Bagages</div>
+          <div class="rev-card-val">${fmtNum(b.bagageRevenue)}</div>
+          <div class="rev-card-sub">FCFA</div>
+        </div>
+        <div class="rev-card green">
+          <div class="rev-card-label">Colis</div>
+          <div class="rev-card-val">${fmtNum(b.colisRevenue)}</div>
+          <div class="rev-card-sub">FCFA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total bar -->
+    <div class="section">
+      <div class="total-bar">
+        <div>
+          <div class="total-label">RECETTES TOTALES</div>
+        </div>
+        <div class="total-val">${fmtNum(b.totalRecettes)} FCFA</div>
+      </div>
+    </div>
+
+    <!-- Fuel / Net -->
+    <div class="section">
+      <div class="section-title">Dépenses &amp; Résultat net</div>
+      ${b.hasFuel ? `
+      <div class="expense-row">
+        <div class="expense-cell">
+          <div class="expense-label">⛽ Carburant${b.fuelDesc ? " — " + b.fuelDesc : ""}</div>
+          <div class="expense-val fuel">${fmtNum(b.carburantAmount)} FCFA</div>
+        </div>
+        <div class="expense-cell ${b.netRevenue >= 0 ? "net-pos" : "net-neg"}">
+          <div class="expense-label">Résultat net</div>
+          <div class="expense-val ${b.netRevenue >= 0 ? "pos" : "neg"}">${b.netRevenue >= 0 ? "+" : ""}${fmtNum(b.netRevenue)} FCFA</div>
+        </div>
+      </div>
+      ` : `
+      <div class="no-fuel">
+        ⚠️ Coût carburant non renseigné — résultat net non calculable
+      </div>
+      `}
+    </div>
+
+    <!-- Signatures -->
+    <div class="section" style="margin-top:8px;">
+      <div class="section-title">Signatures</div>
+    </div>
+    <div class="sig-row">
+      <div class="sig-box">
+        <div class="sig-label">Agent guichet</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Chef d'agence</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-label">Chauffeur</div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-brand">GoBooking — Transport Ivoirien</div>
+      <div class="footer-date">Édité le ${now}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
 
 type DashData = {
   agence: { id: string; name: string; city: string; address?: string; phone?: string } | null;
@@ -78,6 +272,24 @@ export default function ChefHome() {
   const [fuelAmount, setFuelAmount] = useState("");
   const [fuelDesc, setFuelDesc] = useState("");
   const [fuelLoading, setFuelLoading] = useState(false);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+
+  const printBordereau = async (b: Bordereau) => {
+    setPrintingId(b.id);
+    try {
+      const html = buildBordereauHtml(b, dash?.agence?.name);
+      if (Platform.OS === "web") {
+        const win = window.open("", "_blank");
+        if (win) { win.document.write(html); win.document.close(); win.print(); }
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (e) {
+      Alert.alert("Impression", "Impossible d'imprimer le bordereau.");
+    } finally {
+      setPrintingId(null);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!authToken) { setLoading(false); return; }
@@ -624,7 +836,7 @@ export default function ChefHome() {
                   ))}
                 </View>
 
-                {/* Totals */}
+                {/* Totals + actions */}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                   <View>
                     <Text style={{ fontSize: 10, color: "#6B7280" }}>Recettes totales</Text>
@@ -649,6 +861,19 @@ export default function ChefHome() {
                     </Pressable>
                   )}
                 </View>
+                {/* Print button */}
+                <Pressable
+                  onPress={() => printBordereau(b)}
+                  disabled={printingId === b.id}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, alignSelf: "stretch", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}
+                >
+                  {printingId === b.id
+                    ? <ActivityIndicator size="small" color={INDIGO} />
+                    : <Feather name="printer" size={14} color={INDIGO} />}
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: INDIGO }}>
+                    {printingId === b.id ? "Génération…" : "Imprimer le bordereau"}
+                  </Text>
+                </Pressable>
               </View>
             ))
           )}

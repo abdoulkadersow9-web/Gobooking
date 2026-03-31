@@ -707,23 +707,43 @@ export default function VenteScreen() {
                   </Text>
                 </View>
               )}
-              {/* Seat stats bar */}
+              {/* Revenue + Seat stats */}
+              {/* Revenue card */}
+              {d.totals.revenue > 0 && (
+                <View style={{ backgroundColor: "#0B3C5D", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(52,211,153,0.2)", alignItems: "center", justifyContent: "center" }}>
+                    <Ionicons name="cash-outline" size={20} color="#34D399" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: 1, textTransform: "uppercase" }}>Recettes encaissées</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "900", color: "#34D399", letterSpacing: 0.5 }}>
+                      {d.totals.revenue.toLocaleString()} FCFA
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>{d.totals.payéCount} payé{d.totals.payéCount !== 1 ? "s" : ""}</Text>
+                    {d.totals.réservéCount > 0 && <Text style={{ fontSize: 10, color: "#FCD34D" }}>{d.totals.réservéCount} réservé{d.totals.réservéCount !== 1 ? "s" : ""}</Text>}
+                    {d.totals.spCount > 0 && <Text style={{ fontSize: 10, color: "#A78BFA" }}>{d.totals.spCount} SP</Text>}
+                  </View>
+                </View>
+              )}
+              {/* Seat stats */}
               <View style={s.statsGrid}>
                 <View style={s.statBox}>
                   <Text style={s.statNum}>{d.seats.total}</Text>
-                  <Text style={s.statLbl}>Places totales</Text>
+                  <Text style={s.statLbl}>Total</Text>
                 </View>
                 <View style={[s.statBox, { backgroundColor: G_LIGHT }]}>
                   <Text style={[s.statNum, { color: G }]}>{d.seats.availGuichet}</Text>
-                  <Text style={[s.statLbl, { color: G }]}>Dispo guichet</Text>
+                  <Text style={[s.statLbl, { color: G }]}>Libres</Text>
+                </View>
+                <View style={[s.statBox, { backgroundColor: "#FEF3C7" }]}>
+                  <Text style={[s.statNum, { color: "#D97706" }]}>{d.seats.total - d.seats.availGuichet - d.seats.usedOnline - d.seats.usedSP > 0 ? d.seats.total - d.seats.availGuichet - d.seats.usedOnline - d.seats.usedSP : d.totals.passengersCount}</Text>
+                  <Text style={[s.statLbl, { color: "#D97706" }]}>Guichet</Text>
                 </View>
                 <View style={[s.statBox, { backgroundColor: "#EFF6FF" }]}>
                   <Text style={[s.statNum, { color: "#2563EB" }]}>{d.seats.usedOnline}</Text>
                   <Text style={[s.statLbl, { color: "#2563EB" }]}>En ligne</Text>
-                </View>
-                <View style={[s.statBox, { backgroundColor: "#EDE9FE" }]}>
-                  <Text style={[s.statNum, { color: "#7C3AED" }]}>{d.seats.usedSP}</Text>
-                  <Text style={[s.statLbl, { color: "#7C3AED" }]}>SP</Text>
                 </View>
               </View>
             </View>

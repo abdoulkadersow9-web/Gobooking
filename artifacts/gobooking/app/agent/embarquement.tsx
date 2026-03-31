@@ -1936,34 +1936,73 @@ type BoardedRowProps = {
   isNew: boolean;
 };
 const BoardedPassengerRow = React.memo(function BoardedPassengerRow({ p, isNew }: BoardedRowProps) {
+  const isGuichet = (p.bookingType ?? "en-ligne") === "guichet";
+  const initials = p.name.split(" ").slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? "").join("");
   return (
-    <View style={[styles.resultCard, { borderColor: isNew ? "#34D399" : "#6EE7B7", borderWidth: isNew ? 2 : 1.5, backgroundColor: isNew ? "#F0FDF4" : "#fff" }]}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <View style={[styles.passengerAvatar, { backgroundColor: G_LIGHT }]}>
-          <Ionicons name="checkmark-circle" size={22} color={G} />
+    <View style={{
+      backgroundColor: isNew ? "#F0FDF4" : "#FAFFFE",
+      borderRadius: 14,
+      borderWidth: isNew ? 2 : 1,
+      borderColor: isNew ? "#34D399" : "#D1FAE5",
+      marginBottom: 8,
+      overflow: "hidden",
+    }}>
+      {/* Top accent bar */}
+      <View style={{ height: 3, backgroundColor: isNew ? "#059669" : "#6EE7B7" }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 12 }}>
+        {/* Avatar circle */}
+        <View style={{
+          width: 44, height: 44, borderRadius: 22,
+          backgroundColor: isNew ? "#059669" : G_LIGHT,
+          alignItems: "center", justifyContent: "center",
+          borderWidth: 2, borderColor: isNew ? "#34D399" : "#A7F3D0",
+        }}>
+          {isNew
+            ? <Ionicons name="star" size={20} color="#fff" />
+            : <Text style={{ fontSize: 15, fontWeight: "900", color: G }}>{initials || "?"}</Text>
+          }
         </View>
-        <View style={{ flex: 1 }}>
+
+        {/* Info */}
+        <View style={{ flex: 1, gap: 3 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-            <Text style={styles.passengerName}>{p.name}</Text>
-            <View style={{
-              backgroundColor: (p.bookingType ?? "en-ligne") === "guichet" ? "#ECFDF5" : "#EFF6FF",
-              borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
-            }}>
-              <Text style={{ fontSize: 9, fontWeight: "800", color: (p.bookingType ?? "en-ligne") === "guichet" ? G_DARK : "#1E40AF" }}>
-                {(p.bookingType ?? "en-ligne") === "guichet" ? "GUICHET" : "EN LIGNE"}
-              </Text>
-            </View>
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{p.name}</Text>
             {isNew && (
-              <View style={{ backgroundColor: "#059669", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.5 }}>NOUVEAU</Text>
+              <View style={{ backgroundColor: "#059669", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.8 }}>NOUVEAU</Text>
               </View>
             )}
           </View>
-          <Text style={styles.passengerPhone}>{p.phone}</Text>
-          {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s) : {p.seats.join(", ")}</Text>}
+          <Text style={{ fontSize: 12, color: "#6B7280" }}>{p.phone}</Text>
+          <View style={{ flexDirection: "row", gap: 5, flexWrap: "wrap", marginTop: 2 }}>
+            {p.seats.length > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F0FDF4", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: "#BBF7D0" }}>
+                <Ionicons name="grid-outline" size={10} color={G} />
+                <Text style={{ fontSize: 10, fontWeight: "700", color: G_DARK }}>
+                  {p.seats.join(", ")}
+                </Text>
+              </View>
+            )}
+            <View style={{ backgroundColor: isGuichet ? "#ECFDF5" : "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: isGuichet ? "#BBF7D0" : "#BFDBFE" }}>
+              <Text style={{ fontSize: 9, fontWeight: "800", color: isGuichet ? G_DARK : "#1E40AF" }}>
+                {isGuichet ? "GUICHET" : "EN LIGNE"}
+              </Text>
+            </View>
+            {p.paxCount > 1 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#F3F4F6", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 }}>
+                <Ionicons name="people-outline" size={10} color="#6B7280" />
+                <Text style={{ fontSize: 9, fontWeight: "700", color: "#6B7280" }}>{p.paxCount} pax</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-          <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>À bord ✓</Text>
+
+        {/* Status badge */}
+        <View style={{ alignItems: "center", gap: 4 }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "#059669", alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="checkmark" size={20} color="#fff" />
+          </View>
+          <Text style={{ fontSize: 9, fontWeight: "800", color: G_DARK }}>À BORD</Text>
         </View>
       </View>
     </View>
@@ -1982,61 +2021,88 @@ type AbsentRowProps = {
 const AbsentPassengerRow = React.memo(function AbsentPassengerRow({
   p, isSelected, isBoarding, isBoardingDisabled, onToggle, onCall, onBoard,
 }: AbsentRowProps) {
+  const isGuichet = p.bookingType === "guichet";
+  const initials = p.name.split(" ").slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? "").join("");
   return (
-    <View
-      style={[
-        styles.resultCard,
-        { borderWidth: 1.5 },
-        isSelected ? { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" } : { borderColor: "#FCD34D" },
-      ]}
-    >
-      <TouchableOpacity activeOpacity={0.8} onPress={() => onToggle(p.bookingId)}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+    <View style={{
+      backgroundColor: isSelected ? "#EFF6FF" : "#FFFBEB",
+      borderRadius: 14,
+      borderWidth: isSelected ? 2 : 1.5,
+      borderColor: isSelected ? "#3B82F6" : "#FCD34D",
+      marginBottom: 8,
+      overflow: "hidden",
+    }}>
+      {/* Top accent bar */}
+      <View style={{ height: 3, backgroundColor: isSelected ? "#3B82F6" : "#F59E0B" }} />
+
+      <TouchableOpacity activeOpacity={0.8} onPress={() => onToggle(p.bookingId)} style={{ padding: 12 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          {/* Checkbox */}
           <View style={{
-            width: 24, height: 24, borderRadius: 6, borderWidth: 2,
-            borderColor: isSelected ? "#3B82F6" : "#D1D5DB",
-            backgroundColor: isSelected ? "#3B82F6" : "#fff",
+            width: 26, height: 26, borderRadius: 8, borderWidth: 2,
+            borderColor: isSelected ? "#3B82F6" : "#D97706",
+            backgroundColor: isSelected ? "#3B82F6" : "transparent",
             alignItems: "center", justifyContent: "center",
           }}>
-            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+            {isSelected && <Ionicons name="checkmark" size={15} color="#fff" />}
           </View>
-          <View style={[styles.passengerAvatar, { backgroundColor: isSelected ? "#DBEAFE" : "#FEF3C7" }]}>
-            <Ionicons name="person" size={20} color={isSelected ? "#1D4ED8" : "#D97706"} />
+
+          {/* Avatar */}
+          <View style={{
+            width: 44, height: 44, borderRadius: 22,
+            backgroundColor: isSelected ? "#DBEAFE" : "#FEF3C7",
+            alignItems: "center", justifyContent: "center",
+            borderWidth: 2, borderColor: isSelected ? "#93C5FD" : "#FDE68A",
+          }}>
+            <Text style={{ fontSize: 15, fontWeight: "900", color: isSelected ? "#1D4ED8" : "#D97706" }}>
+              {initials || "?"}
+            </Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-              <Text style={styles.passengerName}>{p.name}</Text>
-              <View style={{
-                backgroundColor: p.bookingType === "guichet" ? "#ECFDF5" : "#EFF6FF",
-                borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
-              }}>
-                <Text style={{ fontSize: 9, fontWeight: "800", color: p.bookingType === "guichet" ? G_DARK : "#1E40AF" }}>
-                  {p.bookingType === "guichet" ? "GUICHET" : "EN LIGNE"}
+
+          {/* Info */}
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{p.name}</Text>
+            <Text style={{ fontSize: 12, color: "#6B7280" }}>{p.phone}</Text>
+            <View style={{ flexDirection: "row", gap: 5, flexWrap: "wrap", marginTop: 2 }}>
+              {p.seats.length > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1, borderColor: "#FDE68A" }}>
+                  <Ionicons name="grid-outline" size={10} color="#D97706" />
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>{p.seats.join(", ")}</Text>
+                </View>
+              )}
+              <View style={{ backgroundColor: isGuichet ? "#ECFDF5" : "#EFF6FF", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3, borderWidth: 1, borderColor: isGuichet ? "#BBF7D0" : "#BFDBFE" }}>
+                <Text style={{ fontSize: 9, fontWeight: "800", color: isGuichet ? G_DARK : "#1E40AF" }}>
+                  {isGuichet ? "GUICHET" : "EN LIGNE"}
                 </Text>
               </View>
             </View>
-            <Text style={styles.passengerPhone}>{p.phone}</Text>
-            {p.seats.length > 0 && (
-              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège{p.seats.length > 1 ? "s" : ""} : {p.seats.join(", ")}</Text>
-            )}
           </View>
-          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-            <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>Absent</Text>
+
+          {/* Absent badge */}
+          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 5, borderWidth: 1, borderColor: "#FDE68A", alignItems: "center" }}>
+            <Ionicons name="alert-circle" size={14} color="#D97706" />
+            <Text style={{ fontSize: 9, fontWeight: "800", color: "#D97706", marginTop: 2 }}>ABSENT</Text>
           </View>
         </View>
       </TouchableOpacity>
 
-      <View style={{ flexDirection: "row", gap: 8, paddingTop: 8 }}>
-        <TouchableOpacity style={styles.callBtn} onPress={() => onCall(p.phone)}>
-          <Ionicons name="call-outline" size={15} color="#0369A1" />
-          <Text style={styles.callBtnText}>Appeler</Text>
+      {/* Action buttons */}
+      <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+        <TouchableOpacity
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#E0F2FE", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: "#BAE6FD", flex: 1 }}
+          onPress={() => onCall(p.phone)}
+        >
+          <Ionicons name="call-outline" size={14} color="#0369A1" />
+          <Text style={{ fontSize: 12, fontWeight: "700", color: "#0369A1" }}>Appeler</Text>
         </TouchableOpacity>
-        <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", alignSelf: "center" }}>Réf: {p.bookingRef}</Text>
+        <View style={{ flex: 1, justifyContent: "center" }}>
+          <Text style={{ fontSize: 10, color: "#9CA3AF", textAlign: "center" }}>Réf: {p.bookingRef}</Text>
+        </View>
         <TouchableOpacity
           style={{
             flexDirection: "row", alignItems: "center", gap: 5,
-            backgroundColor: G, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
-            opacity: isBoarding ? 0.6 : 1,
+            backgroundColor: G, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
+            opacity: isBoarding ? 0.6 : 1, flex: 1, justifyContent: "center",
           }}
           onPress={() => onBoard(p)}
           disabled={isBoardingDisabled}
@@ -2044,8 +2110,8 @@ const AbsentPassengerRow = React.memo(function AbsentPassengerRow({
           {isBoarding
             ? <ActivityIndicator size="small" color="#fff" />
             : <>
-                <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>Embarquer</Text>
+                <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
+                <Text style={{ fontSize: 12, fontWeight: "800", color: "#fff" }}>Embarquer</Text>
               </>
           }
         </TouchableOpacity>

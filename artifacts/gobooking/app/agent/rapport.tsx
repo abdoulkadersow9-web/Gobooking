@@ -141,22 +141,43 @@ export default function RapportScreen() {
 
           <View style={S.section}>
             <Text style={S.sectionTitle}>Type de rapport *</Text>
-            <View style={{ gap: 8 }}>
-              {REPORT_TYPES.map(rt => (
-                <TouchableOpacity
-                  key={rt.key}
-                  style={[S.typeOption, reportType === rt.key && { borderColor: rt.color, borderWidth: 2, backgroundColor: rt.color + "12" }]}
-                  onPress={() => setReportType(rt.key)}>
-                  <Ionicons name={rt.icon} size={20} color={reportType === rt.key ? rt.color : "#9CA3AF"} />
-                  <Text style={[S.typeLabel, { color: reportType === rt.key ? rt.color : "#374151" }]}>{rt.label}</Text>
-                  {reportType === rt.key && <Ionicons name="checkmark-circle" size={20} color={rt.color} />}
-                </TouchableOpacity>
-              ))}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {REPORT_TYPES.map(rt => {
+                const sel = reportType === rt.key;
+                return (
+                  <TouchableOpacity
+                    key={rt.key}
+                    style={[S.typeChip, sel && { borderColor: rt.color, borderWidth: 2, backgroundColor: rt.color + "12" }]}
+                    onPress={() => setReportType(rt.key)}>
+                    <View style={[S.typeChipIcon, { backgroundColor: sel ? rt.color + "22" : "#F1F5F9" }]}>
+                      <Ionicons name={rt.icon} size={18} color={sel ? rt.color : "#94A3B8"} />
+                    </View>
+                    <Text style={[S.typeChipLabel, { color: sel ? rt.color : "#374151" }]} numberOfLines={2}>{rt.label}</Text>
+                    {sel && (
+                      <View style={{ position: "absolute", top: 6, right: 6 }}>
+                        <Ionicons name="checkmark-circle" size={14} color={rt.color} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
           <View style={S.section}>
-            <Text style={S.sectionTitle}>Description * (min. 10 car.)</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <Text style={S.sectionTitle}>Description *</Text>
+              <View style={[
+                { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+                description.length >= 10
+                  ? { backgroundColor: "#DCFCE7" }
+                  : { backgroundColor: "#FEE2E2" }
+              ]}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: description.length >= 10 ? "#15803D" : "#DC2626" }}>
+                  {description.length} / 10 min
+                </Text>
+              </View>
+            </View>
             <TextInput
               value={description}
               onChangeText={setDescription}
@@ -166,7 +187,11 @@ export default function RapportScreen() {
               textAlignVertical="top"
               style={S.textarea}
             />
-            <Text style={{ fontSize: 11, color: "#94A3B8", marginTop: 4 }}>{description.length} caractère(s)</Text>
+            {description.length > 0 && description.length < 10 && (
+              <Text style={{ fontSize: 11, color: "#EF4444", marginTop: 4 }}>
+                Encore {10 - description.length} caractère(s) requis
+              </Text>
+            )}
           </View>
 
           <View style={S.section}>
@@ -260,8 +285,9 @@ const S = StyleSheet.create({
   section:       { backgroundColor: "#fff", borderRadius: 14, padding: 16, gap: 10, borderWidth: 1, borderColor: "#E2E8F0" },
   sectionTitle:  { fontSize: 14, fontWeight: "800", color: "#0F172A" },
 
-  typeOption:  { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FAFAFA" },
-  typeLabel:   { flex: 1, fontSize: 14, fontWeight: "600" },
+  typeChip:      { width: "47%", borderRadius: 12, padding: 12, borderWidth: 1, borderColor: "#E2E8F0", backgroundColor: "#FAFAFA", alignItems: "center", gap: 8, position: "relative" },
+  typeChipIcon:  { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
+  typeChipLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" as any },
 
   textarea: { backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", padding: 12, fontSize: 14, minHeight: 120, lineHeight: 22 },
   input:    { backgroundColor: "#F8FAFC", borderRadius: 10, borderWidth: 1, borderColor: "#CBD5E1", padding: 12, fontSize: 14 },

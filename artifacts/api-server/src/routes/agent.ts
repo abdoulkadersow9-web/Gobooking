@@ -122,6 +122,53 @@ async function requireAgent(authHeader: string | undefined) {
   return users[0];
 }
 
+/* ── GET /agent/home/badges — compteurs urgents pour home.tsx ── */
+router.get("/home/badges", async (req, res) => {
+  try {
+    const user = await requireAgent(req.headers.authorization);
+    if (!user) { res.status(403).json({ error: "Unauthorized" }); return; }
+
+    const [colisRow, reservRow, alertRow] = await Promise.all([
+      /* colis en attente de validation pour la compagnie de l'agent */
+      db.execute(sql`
+        SELECT COUNT(*)::int AS cnt
+        FROM parcels p
+        JOIN agents a ON a.user_id = ${user.id}
+        WHERE p.company_id = a.company_id
+          AND p.status IN ('en_attente_validation', 'created', 'cree', 'créé')
+      `),
+      /* réservations en attente pour les voyages de la compagnie */
+      db.execute(sql`
+        SELECT COUNT(*)::int AS cnt
+        FROM bookings b
+        JOIN trips t ON t.id = b.trip_id
+        JOIN agents a ON a.user_id = ${user.id}
+        WHERE t.company_id = a.company_id
+          AND b.status IN ('pending', 'reserved', 'reservé')
+      `),
+      /* alertes actives non résolues pour la compagnie de l'agent */
+      db.execute(sql`
+        SELECT COUNT(*)::int AS cnt
+        FROM agent_alerts aa
+        JOIN agents a ON a.user_id = ${user.id}
+        WHERE aa.company_id = a.company_id
+          AND aa.resolved_at IS NULL
+      `),
+    ]);
+
+    const extract = (row: any) => (row as any)?.rows?.[0]?.cnt ?? 0;
+
+    res.json({
+      colisAValider:         extract(colisRow),
+      reservationsEnAttente: extract(reservRow),
+      alertesActives:        extract(alertRow),
+    });
+  } catch (err) {
+    console.error("GET /agent/home/badges error:", err);
+    res.json({ colisAValider: 0, reservationsEnAttente: 0, alertesActives: 0 });
+  }
+});
+
 router.get("/info", async (req, res) => {
   try {
     const user = await requireAgent(req.headers.authorization);

@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Pressable,
@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, hasRole } from "@/context/AuthContext";
 import AlertBanner from "@/components/AlertBanner";
 import { useRealtime } from "@/hooks/useRealtime";
+import { apiFetch } from "@/utils/api";
 
 const GREEN   = "#166534";
 const AMBER   = "#D97706";
@@ -182,6 +183,30 @@ export default function AgentHome() {
   const [photoUri, setPhotoUri] = useState<string | null>(user?.photoUrl ?? null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  /* ── Badges live ── */
+  const [badges, setBadges] = useState<Record<string, number>>({});
+  const badgeInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchBadges = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await apiFetch<{ colisAValider?: number; reservationsEnAttente?: number; alertesActives?: number }>(
+        "/agent/home/badges", { token }
+      );
+      setBadges({
+        colis:       data.colisAValider         ?? 0,
+        reservation: data.reservationsEnAttente  ?? 0,
+        suivi:       data.alertesActives         ?? 0,
+      });
+    } catch { /* silencieux */ }
+  }, [token]);
+
+  useEffect(() => {
+    fetchBadges();
+    badgeInterval.current = setInterval(fetchBadges, 45_000);
+    return () => { if (badgeInterval.current) clearInterval(badgeInterval.current); };
+  }, [fetchBadges]);
+
   const BASE_URL = process.env.EXPO_PUBLIC_DOMAIN
     ? `https://${process.env.EXPO_PUBLIC_DOMAIN}/api`
     : "";
@@ -336,32 +361,50 @@ export default function AgentHome() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {visibleModules.map(mod => (
-          <Pressable
-            key={mod.id}
-            style={({ pressed }) => [S.card, pressed && S.cardPressed]}
-            onPress={() => router.push(mod.path as never)}
-          >
-            <LinearGradient
-              colors={mod.gradient}
-              style={S.cardGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+        {visibleModules.map(mod => {
+          const badgeCount = badges[mod.id] ?? 0;
+          return (
+            <Pressable
+              key={mod.id}
+              style={({ pressed }) => [S.card, pressed && S.cardPressed]}
+              onPress={() => router.push(mod.path as never)}
             >
-              <View style={[S.cardAccent, { backgroundColor: mod.color }]} />
-              <View style={[S.cardIconBox, { backgroundColor: mod.color + "18", borderColor: mod.border }]}>
-                <Feather name={mod.icon} size={26} color={mod.color} />
-              </View>
-              <View style={S.cardBody}>
-                <Text style={[S.cardLabel, { color: mod.color }]}>{mod.label}</Text>
-                <Text style={S.cardSub}>{mod.sub}</Text>
-              </View>
-              <View style={[S.cardArrow, { backgroundColor: mod.color + "18", borderWidth: 1, borderColor: mod.border }]}>
-                <Feather name="arrow-right" size={16} color={mod.color} />
-              </View>
-            </LinearGradient>
-          </Pressable>
-        ))}
+              <LinearGradient
+                colors={mod.gradient}
+                style={S.cardGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={[S.cardAccent, { backgroundColor: mod.color }]} />
+                <View style={{ position: "relative", flexShrink: 0 }}>
+                  <View style={[S.cardIconBox, { backgroundColor: mod.color + "18", borderColor: mod.border }]}>
+                    <Feather name={mod.icon} size={26} color={mod.color} />
+                  </View>
+                  {badgeCount > 0 && (
+                    <View style={[S.badge, { backgroundColor: "#EF4444" }]}>
+                      <Text style={S.badgeText}>{badgeCount > 99 ? "99+" : badgeCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={S.cardBody}>
+                  <Text style={[S.cardLabel, { color: mod.color }]}>{mod.label}</Text>
+                  <Text style={S.cardSub}>{mod.sub}</Text>
+                  {badgeCount > 0 && (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#EF4444" }} />
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#EF4444" }}>
+                        {badgeCount} en attente
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[S.cardArrow, { backgroundColor: mod.color + "18", borderWidth: 1, borderColor: mod.border }]}>
+                  <Feather name="arrow-right" size={16} color={mod.color} />
+                </View>
+              </LinearGradient>
+            </Pressable>
+          );
+        })}
 
         {/* Extra links */}
         <View style={S.extraRow}>
@@ -409,6 +452,9 @@ const S = StyleSheet.create({
   cardSub:     { fontSize: 12, color: "#475569", fontWeight: "600" },
 
   cardArrow:   { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center", flexShrink: 0 },
+
+  badge:     { position: "absolute", top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 4, borderWidth: 2, borderColor: "#fff", zIndex: 10 },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800", lineHeight: 12 },
 
   extraRow:    { flexDirection: "row", gap: 10, marginTop: 4 },
   extraBtn:    { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: "#fff", borderRadius: 16, paddingVertical: 14, borderWidth: 1.5, borderColor: "#E2E8F0", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
