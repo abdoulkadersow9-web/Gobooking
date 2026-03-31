@@ -1,0 +1,216 @@
+"}
+J’ai vérifié les dernières améliorations.
+
+Les modules rentabilité, carburant et synchronisation sont bien avancés. C’est validé.
+
+Maintenant on passe à la phase finale : cohérence globale, modernisation complète des interfaces et finalisation de toute la logique métier.
+
+---
+
+🔴 1. LOGIQUE COLIS (TRÈS IMPORTANT)
+
+Le module colis doit suivre une logique complète et visible.
+
+Quand un client crée un colis en ligne :
+
+- il saisit ses informations
+- il ajoute une photo du colis
+- il valide la demande
+
+👉 Résultat attendu :
+
+- le colis apparaît automatiquement dans la page Agent Colis
+- avec un statut clair
+
+---
+
+👉 STATUTS À STRUCTURER :
+
+- Colis créé
+- Colis validé (agent colis)
+- En attente de ramassage
+- Colis récupéré
+- En route
+- Arrivé
+- Livré
+
+👉 Tout doit être visible, structuré et sans mélange.
+
+---
+
+🔴 2. PAGE AGENT COLIS
+
+La page doit être :
+
+- moderne
+- claire
+- organisée par statuts
+- sans confusion
+
+👉 Je veux :
+
+- des sections propres (par statut)
+- des cartes lisibles
+- des icônes modernes
+- une interface 2026 (propre, fluide, professionnelle)
+
+---
+
+🔴 3. MODERNISATION GLOBALE DES PAGES
+
+Toutes les pages doivent être revues :
+
+- Agent colis
+- Agent guichet
+- Agent embarquement
+- Agent suivi
+
+👉 Actuellement :
+
+- trop de mélange
+- incohérences visuelles
+- répétitions
+
+👉 À faire :
+
+- harmoniser toutes les pages
+- supprimer les doublons
+- aligner avec la logique métier
+
+---
+
+🔴 4. PAGE AGENT SUIVI (CRITIQUE)
+
+Cette page est actuellement désorganisée.
+
+👉 À refaire :
+
+- structure claire
+- informations cohérentes
+- données bien regroupées
+- aucune confusion
+
+---
+
+🔴 5. EXPÉRIENCE UTILISATEUR (TRÈS IMPORTANT)
+
+Je veux une application qui donne envie de travailler.
+
+👉 Donc :
+
+- transitions fluides
+- animations légères
+- aucune latence
+- aucune coupure
+
+👉 Tout doit être :
+
+- rapide
+- propre
+- moderne
+
+---
+
+🔴 6. TOUS LES BOUTONS DOIVENT FONCTIONNER
+
+- aucun bouton inactif
+- aucune action vide
+- toutes les actions doivent répondre immédiatement
+
+---
+
+🔴 7. BORDEREAUX PROFESSIONNELS
+
+Les bordereaux doivent être propres et complets :
+
+- nom de la compagnie
+- trajet
+- chauffeur
+- agents impliqués
+- recettes
+- dépenses
+- statut du départ
+
+👉 Format propre, lisible, professionnel
+
+---
+
+🔴 8. CRÉATION DES AGENTS ET CLIENTS
+
+Lors de la création :
+
+👉 Agents :
+
+- nom
+- email
+- mot de passe
+- photo (ou avatar)
+
+👉 Clients :
+
+- même logique
+- possibilité photo ou avatar
+
+👉 Tout doit être simple et propre
+
+---
+
+🔴 9. COHÉRENCE GLOBALE
+
+Toutes les pages doivent :
+
+- refléter leur rôle exact
+- afficher les bonnes informations
+- être cohérentes entre elles
+
+👉 Rien ne doit être incohérent
+
+---
+
+🔴 10. PERFORMANCE (PRIORITÉ ABSOLUE)
+
+L’application doit être :
+
+- très rapide
+- fluide
+- sans bug
+- optimisée pour usage réel terrain
+
+👉 Aucun ralentissement acceptable
+
+---
+
+🔴 11. OBJECTIF FINAL
+
+Je veux une application :
+
+- moderne (niveau 2026)
+- professionnelle
+- fluide
+- cohérente
+- prête pour utilisation réelle
+
+---
+
+⚠️ IMPORTANT
+
+- ne rien casser
+- rester dans la logique existante
+- améliorer l’interface et l’expérience
+- rendre tout visible et fonctionnel
+
+---
+
+🎯 PRIORITÉ IMMÉDIATE
+
+1. finaliser module colis (statuts + visibilité + UI)
+2. moderniser toutes les pages agents
+3. corriger page agent suivi
+4. rendre toutes les interfaces cohérentes
+5. optimiser performance globale
+
+---
+
+Quand c’est terminé, on passe aux tests réels complets avec simulation.
+
+Merci d’avancer rapideme
