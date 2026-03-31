@@ -117,8 +117,8 @@ export default function SplashScreen() {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
     Animated.timing(containerOp, {
-      toValue: 0, duration: 260,
-      easing: Easing.in(Easing.quad),
+      toValue: 0, duration: 300,
+      easing: Easing.inOut(Easing.quad),
       useNativeDriver: ND,
     }).start(() => {
       const u = userRef.current;
@@ -319,16 +319,17 @@ const S = StyleSheet.create({
     fontSize: 38,
     fontWeight: "800",
     color: "#FFFFFF",
-    letterSpacing: -1.2,
-    textShadowColor: "rgba(91,141,239,0.6)",
+    letterSpacing: -0.8,
+    textShadowColor: "rgba(91,141,239,0.65)",
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadowRadius: 22,
   },
   tagline: {
-    fontSize: 13.5,
-    color: "rgba(255,255,255,0.45)",
-    letterSpacing: 0.5,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.62)",
+    letterSpacing: 0.6,
     textAlign: "center",
+    fontWeight: "500",
   },
   barWrap: {
     position: "absolute",
@@ -336,26 +337,26 @@ const S = StyleSheet.create({
     alignItems: "center",
   },
   barTrack: {
-    width: 120,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    width: 140,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.12)",
     overflow: "hidden",
   },
   barFill: {
     height: "100%",
-    borderRadius: 1,
+    borderRadius: 2,
     backgroundColor: "#5B8DEF",
     shadowColor: "#5B8DEF",
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 5,
+    shadowOpacity: 1,
+    shadowRadius: 8,
   },
   version: {
     position: "absolute",
     bottom: IS_WEB ? 38 : 62,
     fontSize: 11,
-    color: "rgba(255,255,255,0.18)",
-    letterSpacing: 0.7,
+    color: "rgba(255,255,255,0.28)",
+    letterSpacing: 0.8,
   },
 });

@@ -207,14 +207,18 @@ export default function LoginScreen() {
       >
         {/* ── Logo / titre ── */}
         <LinearGradient
-          colors={["#1650D0", "#1030B4", "#0A1C84"]}
+          colors={["#1A4BE0", "#0F2DB8", "#091A82"]}
+          start={{ x: 0.15, y: 0 }}
+          end={{ x: 0.85, y: 1 }}
           style={styles.headerGradient}
         >
-          <Image
-            source={require("../../assets/logo.png")}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
+          <View style={styles.logoCard}>
+            <Image
+              source={require("../../assets/logo.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </View>
           <Text style={styles.appName}>GoBooking</Text>
           <Text style={styles.tagline}>Voyagez partout en Côte d'Ivoire</Text>
         </LinearGradient>
@@ -379,13 +383,20 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={loading || demoLoading !== null}
           >
-            {loading
-              ? <ActivityIndicator color="white" />
-              : <>
-                  <Feather name="log-in" size={18} color="white" />
-                  <Text style={styles.loginButtonText}>Se connecter</Text>
-                </>
-            }
+            <LinearGradient
+              colors={["#2563EB", "#1650D0", "#0F3DBF"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.loginButtonGradient}
+            >
+              {loading
+                ? <ActivityIndicator color="white" />
+                : <>
+                    <Feather name="log-in" size={18} color="white" />
+                    <Text style={styles.loginButtonText}>Se connecter</Text>
+                  </>
+              }
+            </LinearGradient>
           </Pressable>
 
           {/* ── Inscription ── */}
@@ -408,25 +419,41 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
   },
   headerGradient: {
-    paddingTop: 50,
-    paddingBottom: 64,
+    paddingTop: 56,
+    paddingBottom: 68,
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+  },
+  logoCard: {
+    width: 100,
+    height: 100,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 16,
+    marginBottom: 6,
   },
   logoImage: {
-    width: 110,
-    height: 110,
-    marginBottom: 4,
+    width: 76,
+    height: 76,
   },
   appName: {
-    fontSize: 32,
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: "white",
+    letterSpacing: -0.6,
   },
   tagline: {
     fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.85)",
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.78)",
+    letterSpacing: 0.2,
   },
   formCard: {
     backgroundColor: Colors.light.card,
@@ -651,32 +678,36 @@ const styles = StyleSheet.create({
 
   /* ── Bouton ────────────────────────────────────────────────── */
   loginButton: {
+    borderRadius: 18,
+    marginTop: 10,
+    overflow: "hidden",
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  loginButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#1650D0",
-    borderRadius: 18,
     paddingVertical: 17,
-    marginTop: 10,
-    shadowColor: "#1650D0",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.42,
-    shadowRadius: 14,
-    elevation: 6,
+    paddingHorizontal: 24,
+    borderRadius: 18,
   },
   loginButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.88,
+    transform: [{ scale: 0.975 }],
   },
   loginButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.68,
   },
   loginButtonText: {
     color: "white",
     fontSize: 16,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 
   /* ── Footer ────────────────────────────────────────────────── */
