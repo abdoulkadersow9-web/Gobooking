@@ -300,7 +300,29 @@ export default function EmbarquementScreen() {
       }
       /* Update known IDs */
       knownIdsRef.current = new Set((data.passengers ?? []).map(p => p.bookingId));
-      setBoardingStatus(data);
+
+      if (!silent) {
+        /* Initial load: full replace */
+        setBoardingStatus(data);
+      } else {
+        /* Background refresh: MERGE to preserve scroll position and order.
+           - Existing passengers: only swap reference if something changed (boarded/status)
+           - New passengers: appended at the BOTTOM — never cause scroll jump
+           - Removed passengers: kept until next non-silent reload (no visual disruption) */
+        setBoardingStatus(prev => {
+          if (!prev) return data;
+          const newMap = new Map((data.passengers ?? []).map(p => [p.bookingId, p]));
+          const updated = prev.passengers.map(p => {
+            const fresh = newMap.get(p.bookingId);
+            if (!fresh) return p;
+            if (fresh.boarded === p.boarded && fresh.status === p.status) return p;
+            return fresh;
+          });
+          const existingIds = new Set(prev.passengers.map(p => p.bookingId));
+          const appended = (data.passengers ?? []).filter(p => !existingIds.has(p.bookingId));
+          return { ...data, passengers: [...updated, ...appended] };
+        });
+      }
       setLastBoardingSync(new Date());
     } catch {
       if (!silent) setBoardingStatus(null);
@@ -849,6 +871,18 @@ export default function EmbarquementScreen() {
   const callPassenger = (phone: string) => {
     Linking.openURL(`tel:${phone.replace(/\s/g, "")}`);
   };
+
+  /* ── Stable handler refs (so memo row components don't re-render on every poll) ── */
+  const _boardRef  = useRef(boardPassengerFromList);
+  _boardRef.current  = boardPassengerFromList;
+  const _callRef   = useRef(callPassenger);
+  _callRef.current   = callPassenger;
+  const _toggleRef = useRef(toggleAbsent);
+  _toggleRef.current = toggleAbsent;
+
+  const stableBoardHandler  = useCallback((p: BoardingPassenger) => _boardRef.current(p),  []);
+  const stableCallPassenger = useCallback((phone: string)        => _callRef.current(phone), []);
+  const stableToggleAbsent  = useCallback((id: string)           => _toggleRef.current(id), []);
 
   /* ── Camera scan overlay (shared for both modes) ──── */
   if (scanMode || enRouteScanMode) {
@@ -1414,7 +1448,13 @@ export default function EmbarquementScreen() {
 
       {/* ── Départ tab ── */}
       {activeTab === "depart" && (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        >
           {!selectedTrip ? (
             <View style={[styles.resultCard, { alignItems: "center", paddingVertical: 32 }]}>
               <Ionicons name="git-branch-outline" size={44} color="#D1FAE5" />
@@ -1572,96 +1612,18 @@ export default function EmbarquementScreen() {
                     </Text>
                   </View>
 
-                  {boardingStatus.passengers.filter(p => !p.boarded && p.status !== "pending").map(p => {
-                    const isSelected = selectedAbsents.has(p.bookingId);
-                    const isBoarding = boardingById === p.bookingId;
-                    return (
-                      <View
-                        key={p.bookingId}
-                        style={[
-                          styles.resultCard,
-                          { borderWidth: 1.5 },
-                          isSelected
-                            ? { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" }
-                            : { borderColor: "#FCD34D" },
-                        ]}
-                      >
-                        <TouchableOpacity activeOpacity={0.8} onPress={() => toggleAbsent(p.bookingId)}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                            {/* Checkbox */}
-                            <View style={{
-                              width: 24, height: 24, borderRadius: 6, borderWidth: 2,
-                              borderColor: isSelected ? "#3B82F6" : "#D1D5DB",
-                              backgroundColor: isSelected ? "#3B82F6" : "#fff",
-                              alignItems: "center", justifyContent: "center",
-                            }}>
-                              {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
-                            </View>
-
-                            <View style={[styles.passengerAvatar, { backgroundColor: isSelected ? "#DBEAFE" : "#FEF3C7" }]}>
-                              <Ionicons name="person" size={20} color={isSelected ? "#1D4ED8" : "#D97706"} />
-                            </View>
-
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-                                <Text style={styles.passengerName}>{p.name}</Text>
-                                <View style={{
-                                  backgroundColor: p.bookingType === "guichet" ? "#ECFDF5" : "#EFF6FF",
-                                  borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
-                                }}>
-                                  <Text style={{ fontSize: 9, fontWeight: "800", color: p.bookingType === "guichet" ? G_DARK : "#1E40AF" }}>
-                                    {p.bookingType === "guichet" ? "GUICHET" : "EN LIGNE"}
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text style={styles.passengerPhone}>{p.phone}</Text>
-                              {p.seats.length > 0 && (
-                                <Text style={{ fontSize: 11, color: "#9CA3AF" }}>
-                                  Siège{p.seats.length > 1 ? "s" : ""} : {p.seats.join(", ")}
-                                </Text>
-                              )}
-                            </View>
-
-                            <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                              <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>Absent</Text>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-
-                        {/* Action row */}
-                        <View style={{ flexDirection: "row", gap: 8, paddingTop: 8 }}>
-                          <TouchableOpacity
-                            style={styles.callBtn}
-                            onPress={() => callPassenger(p.phone)}
-                          >
-                            <Ionicons name="call-outline" size={15} color="#0369A1" />
-                            <Text style={styles.callBtnText}>Appeler</Text>
-                          </TouchableOpacity>
-                          <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", alignSelf: "center" }}>
-                            Réf: {p.bookingRef}
-                          </Text>
-                          {/* Direct board button */}
-                          <TouchableOpacity
-                            style={{
-                              flexDirection: "row", alignItems: "center", gap: 5,
-                              backgroundColor: G, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
-                              opacity: isBoarding ? 0.6 : 1,
-                            }}
-                            onPress={() => boardPassengerFromList(p)}
-                            disabled={!!boardingById}
-                          >
-                            {isBoarding
-                              ? <ActivityIndicator size="small" color="#fff" />
-                              : <>
-                                  <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
-                                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>Embarquer</Text>
-                                </>
-                            }
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                  })}
+                  {boardingStatus.passengers.filter(p => !p.boarded && p.status !== "pending").map(p => (
+                    <AbsentPassengerRow
+                      key={p.bookingId}
+                      p={p}
+                      isSelected={selectedAbsents.has(p.bookingId)}
+                      isBoarding={boardingById === p.bookingId}
+                      isBoardingDisabled={!!boardingById}
+                      onToggle={stableToggleAbsent}
+                      onCall={stableCallPassenger}
+                      onBoard={stableBoardHandler}
+                    />
+                  ))}
 
                   {/* Release to guichet button */}
                   {selectedAbsents.size > 0 && !departureResult && (
@@ -1711,41 +1673,13 @@ export default function EmbarquementScreen() {
                   <Text style={[styles.notFoundSub, { marginTop: 6 }]}>Aucun passager embarqué</Text>
                 </View>
               ) : (
-                boardingStatus.passengers.filter(p => p.boarded).map(p => {
-                  const isNew = newPassengerIds.has(p.bookingId);
-                  return (
-                  <View key={p.bookingId} style={[styles.resultCard, { borderColor: isNew ? "#34D399" : "#6EE7B7", borderWidth: isNew ? 2 : 1.5, backgroundColor: isNew ? "#F0FDF4" : "#fff" }]}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={[styles.passengerAvatar, { backgroundColor: G_LIGHT }]}>
-                        <Ionicons name="checkmark-circle" size={22} color={G} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
-                          <Text style={styles.passengerName}>{p.name}</Text>
-                          <View style={{
-                            backgroundColor: (p.bookingType ?? "en-ligne") === "guichet" ? "#ECFDF5" : "#EFF6FF",
-                            borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
-                          }}>
-                            <Text style={{ fontSize: 9, fontWeight: "800", color: (p.bookingType ?? "en-ligne") === "guichet" ? G_DARK : "#1E40AF" }}>
-                              {(p.bookingType ?? "en-ligne") === "guichet" ? "GUICHET" : "EN LIGNE"}
-                            </Text>
-                          </View>
-                          {isNew && (
-                            <View style={{ backgroundColor: "#059669", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
-                              <Text style={{ fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.5 }}>NOUVEAU</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.passengerPhone}>{p.phone}</Text>
-                        {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s) : {p.seats.join(", ")}</Text>}
-                      </View>
-                      <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>À bord ✓</Text>
-                      </View>
-                    </View>
-                  </View>
-                  );
-                })
+                boardingStatus.passengers.filter(p => p.boarded).map(p => (
+                  <BoardedPassengerRow
+                    key={p.bookingId}
+                    p={p}
+                    isNew={newPassengerIds.has(p.bookingId)}
+                  />
+                ))
               )}
 
               {boardingStatus.stats.absent === 0 && boardingStatus.stats.boarded > 0 && !departureResult && (
@@ -1989,4 +1923,133 @@ const styles = StyleSheet.create({
   statBox: { alignItems: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, borderColor: "#E5E7EB", paddingVertical: 8, backgroundColor: "#F9FAFB" },
   statNum: { fontSize: 22, fontWeight: "800", color: "#111827" },
   statLabel: { fontSize: 11, color: "#6B7280", marginTop: 2 },
+});
+
+/* ══════════════════════════════════════════════════════════════
+   Composants mémorisés — ne se re-rendent QUE si leurs props changent.
+   La merge strategy + React.memo combinées = aucune ligne ne
+   re-rend inutilement lors d'un poll silencieux.
+════════════════════════════════════════════════════════════════ */
+
+type BoardedRowProps = {
+  p: BoardingPassenger;
+  isNew: boolean;
+};
+const BoardedPassengerRow = React.memo(function BoardedPassengerRow({ p, isNew }: BoardedRowProps) {
+  return (
+    <View style={[styles.resultCard, { borderColor: isNew ? "#34D399" : "#6EE7B7", borderWidth: isNew ? 2 : 1.5, backgroundColor: isNew ? "#F0FDF4" : "#fff" }]}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <View style={[styles.passengerAvatar, { backgroundColor: G_LIGHT }]}>
+          <Ionicons name="checkmark-circle" size={22} color={G} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+            <Text style={styles.passengerName}>{p.name}</Text>
+            <View style={{
+              backgroundColor: (p.bookingType ?? "en-ligne") === "guichet" ? "#ECFDF5" : "#EFF6FF",
+              borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
+            }}>
+              <Text style={{ fontSize: 9, fontWeight: "800", color: (p.bookingType ?? "en-ligne") === "guichet" ? G_DARK : "#1E40AF" }}>
+                {(p.bookingType ?? "en-ligne") === "guichet" ? "GUICHET" : "EN LIGNE"}
+              </Text>
+            </View>
+            {isNew && (
+              <View style={{ backgroundColor: "#059669", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: "900", color: "#fff", letterSpacing: 0.5 }}>NOUVEAU</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.passengerPhone}>{p.phone}</Text>
+          {p.seats.length > 0 && <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège(s) : {p.seats.join(", ")}</Text>}
+        </View>
+        <View style={{ backgroundColor: G_LIGHT, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: G }}>À bord ✓</Text>
+        </View>
+      </View>
+    </View>
+  );
+});
+
+type AbsentRowProps = {
+  p: BoardingPassenger;
+  isSelected: boolean;
+  isBoarding: boolean;
+  isBoardingDisabled: boolean;
+  onToggle: (id: string) => void;
+  onCall: (phone: string) => void;
+  onBoard: (p: BoardingPassenger) => void;
+};
+const AbsentPassengerRow = React.memo(function AbsentPassengerRow({
+  p, isSelected, isBoarding, isBoardingDisabled, onToggle, onCall, onBoard,
+}: AbsentRowProps) {
+  return (
+    <View
+      style={[
+        styles.resultCard,
+        { borderWidth: 1.5 },
+        isSelected ? { borderColor: "#3B82F6", backgroundColor: "#EFF6FF" } : { borderColor: "#FCD34D" },
+      ]}
+    >
+      <TouchableOpacity activeOpacity={0.8} onPress={() => onToggle(p.bookingId)}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{
+            width: 24, height: 24, borderRadius: 6, borderWidth: 2,
+            borderColor: isSelected ? "#3B82F6" : "#D1D5DB",
+            backgroundColor: isSelected ? "#3B82F6" : "#fff",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+          <View style={[styles.passengerAvatar, { backgroundColor: isSelected ? "#DBEAFE" : "#FEF3C7" }]}>
+            <Ionicons name="person" size={20} color={isSelected ? "#1D4ED8" : "#D97706"} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+              <Text style={styles.passengerName}>{p.name}</Text>
+              <View style={{
+                backgroundColor: p.bookingType === "guichet" ? "#ECFDF5" : "#EFF6FF",
+                borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2,
+              }}>
+                <Text style={{ fontSize: 9, fontWeight: "800", color: p.bookingType === "guichet" ? G_DARK : "#1E40AF" }}>
+                  {p.bookingType === "guichet" ? "GUICHET" : "EN LIGNE"}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.passengerPhone}>{p.phone}</Text>
+            {p.seats.length > 0 && (
+              <Text style={{ fontSize: 11, color: "#9CA3AF" }}>Siège{p.seats.length > 1 ? "s" : ""} : {p.seats.join(", ")}</Text>
+            )}
+          </View>
+          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>Absent</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <View style={{ flexDirection: "row", gap: 8, paddingTop: 8 }}>
+        <TouchableOpacity style={styles.callBtn} onPress={() => onCall(p.phone)}>
+          <Ionicons name="call-outline" size={15} color="#0369A1" />
+          <Text style={styles.callBtnText}>Appeler</Text>
+        </TouchableOpacity>
+        <Text style={{ flex: 1, fontSize: 11, color: "#6B7280", alignSelf: "center" }}>Réf: {p.bookingRef}</Text>
+        <TouchableOpacity
+          style={{
+            flexDirection: "row", alignItems: "center", gap: 5,
+            backgroundColor: G, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+            opacity: isBoarding ? 0.6 : 1,
+          }}
+          onPress={() => onBoard(p)}
+          disabled={isBoardingDisabled}
+        >
+          {isBoarding
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <>
+                <Ionicons name="checkmark-circle-outline" size={15} color="#fff" />
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>Embarquer</Text>
+              </>
+          }
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 });
