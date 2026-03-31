@@ -234,68 +234,15 @@ export default function LoginScreen() {
               </View>
             ) : demoRoles.length === 0 ? (
               <Text style={styles.demoEmptyText}>Aucun rôle démo disponible</Text>
-            ) : Platform.OS === "web" ? (
-              /* ── Web : grille cliquable — tous les rôles visibles sans glissement ── */
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {demoRoles.map((acc) => {
-                  const key     = acc.agentRole ?? acc.userRole;
-                  const rs      = getRoleStyle(acc.userRole, acc.agentRole);
-                  const busy    = demoLoading === key;
-                  const anyBusy = demoLoading !== null || loading;
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[
-                        {
-                          flexBasis: "30%",
-                          flexGrow: 1,
-                          minWidth: 88,
-                          maxWidth: "32%",
-                          paddingVertical: 10,
-                          paddingHorizontal: 6,
-                          borderRadius: 10,
-                          borderWidth: 1.5,
-                          borderColor: rs.color + "40",
-                          backgroundColor: rs.bg,
-                          alignItems: "center",
-                          gap: 6,
-                          opacity: anyBusy && !busy ? 0.5 : 1,
-                        },
-                        busy && { borderColor: rs.color, borderWidth: 2 },
-                      ]}
-                      onPress={() => handleDemoLogin(acc)}
-                      activeOpacity={0.7}
-                      disabled={anyBusy}
-                    >
-                      <View style={{
-                        width: 34, height: 34, borderRadius: 17,
-                        backgroundColor: rs.color + "20",
-                        alignItems: "center", justifyContent: "center",
-                      }}>
-                        {busy
-                          ? <ActivityIndicator size="small" color={rs.color} />
-                          : <Feather name={rs.icon} size={16} color={rs.color} />
-                        }
-                      </View>
-                      <Text style={{
-                        fontSize: 10, fontWeight: "700", color: rs.color,
-                        textAlign: "center", lineHeight: 13,
-                      }} numberOfLines={2}>
-                        {rs.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
             ) : (
               <>
-                {/* ── Native : Carousel horizontal — 3 cartes visibles ── */}
+                {/* ── Carousel horizontal — défilement fluide ── */}
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   snapToInterval={PAGE_SIZE * VISIBLE}
                   decelerationRate="fast"
-                  contentContainerStyle={{ gap: CARD_GAP }}
+                  contentContainerStyle={{ gap: CARD_GAP, paddingVertical: 2 }}
                   scrollEventThrottle={16}
                   onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
                     const x    = e.nativeEvent.contentOffset.x;
@@ -350,7 +297,7 @@ export default function LoginScreen() {
                   </View>
                 )}
 
-                {/* ── Hint swipe (disparaît après le 1er scroll) ── */}
+                {/* ── Hint swipe ── */}
                 {carouselPage === 0 && demoRoles.length > VISIBLE && (
                   <View style={styles.swipeHint}>
                     <Feather name="chevrons-right" size={12} color="#B45309" />
