@@ -227,13 +227,13 @@ export default function LoginScreen() {
           {/* ══ Accès rapide — rôles dynamiques ══════════════════ */}
           <View style={styles.demoBox}>
             <View style={styles.demoHeader}>
-              <Feather name="zap" size={13} color="#B45309" />
+              <Feather name="zap" size={13} color="#2563EB" />
               <Text style={styles.demoTitle}>Accès rapide — choisir un rôle</Text>
             </View>
 
             {demoRolesLoading ? (
               <View style={styles.demoLoaderRow}>
-                <ActivityIndicator size="small" color="#B45309" />
+                <ActivityIndicator size="small" color="#2563EB" />
                 <Text style={styles.demoLoaderText}>Chargement des rôles…</Text>
               </View>
             ) : demoRoles.length === 0 ? (
@@ -304,7 +304,7 @@ export default function LoginScreen() {
                 {/* ── Hint swipe ── */}
                 {carouselPage === 0 && demoRoles.length > VISIBLE && (
                   <View style={styles.swipeHint}>
-                    <Feather name="chevrons-right" size={12} color="#B45309" />
+                    <Feather name="chevrons-right" size={12} color="#2563EB" />
                     <Text style={styles.swipeHintText}>Glisser pour voir plus</Text>
                   </View>
                 )}
@@ -472,11 +472,11 @@ const styles = StyleSheet.create({
 
   /* ── Démo box ──────────────────────────────────────────────── */
   demoBox: {
-    backgroundColor: "#FFFBEB",
-    borderRadius: 16,
+    backgroundColor: "#EEF3FF",
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#FDE68A",
+    borderColor: "#C7D9FC",
     marginBottom: 4,
   },
   demoHeader: {
@@ -488,9 +488,9 @@ const styles = StyleSheet.create({
   demoTitle: {
     fontSize: 12,
     fontFamily: "Inter_700Bold",
-    color: "#92400E",
+    color: "#1E3A8A",
     textTransform: "uppercase",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   demoLoaderRow: {
     flexDirection: "row",
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   demoLoaderText: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "#92400E",
+    color: "#1E3A8A",
   },
   demoEmptyText: {
     textAlign: "center",
@@ -517,10 +517,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 6,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1.5,
     gap: 7,
-    minHeight: 82,
+    minHeight: 86,
+    shadowColor: "#1650D0",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   demoBusy: {
     opacity: 0.65,
@@ -528,7 +533,7 @@ const styles = StyleSheet.create({
   demoIconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 11,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -551,11 +556,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#FDE68A",
+    backgroundColor: "#BFDBFE",
   },
   dotActive: {
-    width: 18,
-    backgroundColor: "#B45309",
+    width: 20,
+    backgroundColor: "#1650D0",
     borderRadius: 3,
   },
 
@@ -566,12 +571,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 4,
     marginTop: 6,
-    opacity: 0.7,
+    opacity: 0.75,
   },
   swipeHintText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
-    color: "#B45309",
+    color: "#2563EB",
   },
 
   /* ── Divider ───────────────────────────────────────────────── */
