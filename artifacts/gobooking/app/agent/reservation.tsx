@@ -99,7 +99,7 @@ export default function AgentReservation() {
   const [bookings, setBookings] = useState<OnlineBooking[]>([]);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter]     = useState<"all" | "pending" | "confirmed">("pending");
+  const [filter, setFilter]     = useState<"all" | "pending" | "confirmed" | "cancelled">("pending");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
@@ -152,6 +152,7 @@ export default function AgentReservation() {
   const displayed = bookings.filter(b => {
     if (filter === "pending")   return b.status === "pending";
     if (filter === "confirmed") return b.status === "confirmed" || b.status === "boarded";
+    if (filter === "cancelled") return b.status === "cancelled";
     return true;
   });
 
@@ -166,11 +167,17 @@ export default function AgentReservation() {
     else { acc.push({ tripKey: key, tripInfo: b.trip ?? null, bookings: [b] }); }
     return acc;
   }, []);
-  /* Sort: groups with pending bookings first */
+  /* Sort: en_route/boarding first, then pending, then rest */
+  const isEnRouteTrip = (t: OnlineBooking["trip"]) =>
+    t?.status === "en_route" || t?.status === "in_progress" || t?.status === "boarding";
+
   groupedByTrip.sort((a, b) => {
-    const aHasPending = a.bookings.some(x => x.status === "pending") ? 0 : 1;
-    const bHasPending = b.bookings.some(x => x.status === "pending") ? 0 : 1;
-    return aHasPending - bHasPending;
+    const aActive   = isEnRouteTrip(a.tripInfo) ? 0 : 1;
+    const bActive   = isEnRouteTrip(b.tripInfo) ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    const aPending = a.bookings.some(x => x.status === "pending") ? 0 : 1;
+    const bPending = b.bookings.some(x => x.status === "pending") ? 0 : 1;
+    return aPending - bPending;
   });
 
   /* ── Confirm ── */
@@ -233,13 +240,20 @@ export default function AgentReservation() {
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
         <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={S.headerTitle}>Réservations</Text>
+          <Text style={S.headerTitle}>Réservations en ligne</Text>
           <Text style={S.headerSub}>
             {lastSync
-              ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 15s`
+              ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")} · Auto 30s`
               : `Chargement… · ${user?.name}`}
           </Text>
         </View>
+        <TouchableOpacity
+          onPress={() => router.push("/agent/rapport" as never)}
+          hitSlop={8}
+          style={{ marginRight: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 10, padding: 7 }}
+        >
+          <Feather name="alert-triangle" size={15} color="#FCA5A5" />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => load()} style={S.refreshBtn}>
           <Feather name="refresh-cw" size={17} color="#fff" />
         </TouchableOpacity>
@@ -260,33 +274,39 @@ export default function AgentReservation() {
         </View>
         <View style={S.statDivider} />
         <View style={S.statItem}>
+          <Text style={[S.statNum, { color: "#DC2626" }]}>{bookings.filter(b => b.status === "cancelled").length}</Text>
+          <Text style={S.statLabel}>Annulées</Text>
+        </View>
+        <View style={S.statDivider} />
+        <View style={S.statItem}>
           <Text style={[S.statNum, { color: TEAL }]}>{bookings.length}</Text>
           <Text style={S.statLabel}>Total</Text>
         </View>
       </View>
 
       {/* Filter chips */}
-      <View style={S.filterRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={S.filterRow} style={{ flexGrow: 0 }}>
         {([
-          { key: "pending",   label: "En attente", badge: pendingCount > 0 ? String(pendingCount) : null, icon: "time-outline" as const },
-          { key: "confirmed", label: "Confirmées",  badge: null, icon: "checkmark-circle-outline" as const },
-          { key: "all",       label: "Toutes",      badge: String(bookings.length), icon: "list-outline" as const },
+          { key: "pending",   label: "En attente", badge: pendingCount > 0 ? String(pendingCount) : null, icon: "time-outline" as const, activeColor: "#D97706", activeBg: "#78350F" },
+          { key: "confirmed", label: "Confirmées",  badge: String(bookings.filter(b => b.status === "confirmed" || b.status === "boarded").length), icon: "checkmark-circle-outline" as const, activeColor: "#fff", activeBg: TEAL },
+          { key: "cancelled", label: "Annulées",    badge: String(bookings.filter(b => b.status === "cancelled").length), icon: "close-circle-outline" as const, activeColor: "#fff", activeBg: "#DC2626" },
+          { key: "all",       label: "Toutes",      badge: String(bookings.length), icon: "list-outline" as const, activeColor: "#fff", activeBg: "#374151" },
         ] as const).map(f => (
           <TouchableOpacity
             key={f.key}
-            style={[S.chip, filter === f.key && S.chipActive]}
+            style={[S.chip, filter === f.key && { backgroundColor: f.activeBg, borderColor: f.activeBg }]}
             onPress={() => setFilter(f.key)}
           >
-            <Ionicons name={f.icon} size={13} color={filter === f.key ? "#fff" : "#6B7280"} />
-            <Text style={[S.chipTxt, filter === f.key && S.chipTxtActive]} numberOfLines={1}>{f.label}</Text>
-            {f.badge !== null && (
-              <View style={{ backgroundColor: filter === f.key ? "rgba(255,255,255,0.3)" : "#E5E7EB", borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 }}>
-                <Text style={{ fontSize: 10, fontWeight: "800", color: filter === f.key ? "#fff" : "#374151" }}>{f.badge}</Text>
+            <Ionicons name={f.icon} size={13} color={filter === f.key ? f.activeColor : "#6B7280"} />
+            <Text style={[S.chipTxt, filter === f.key && { color: f.activeColor }]} numberOfLines={1}>{f.label}</Text>
+            {f.badge !== null && f.badge !== "0" && (
+              <View style={{ backgroundColor: filter === f.key ? "rgba(255,255,255,0.25)" : "#E5E7EB", borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 }}>
+                <Text style={{ fontSize: 10, fontWeight: "800", color: filter === f.key ? f.activeColor : "#374151" }}>{f.badge}</Text>
               </View>
             )}
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Main list */}
       {loading ? (
@@ -317,11 +337,29 @@ export default function AgentReservation() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={TEAL} />}
         >
-          {groupedByTrip.map(group => {
+          {groupedByTrip.map((group, groupIdx) => {
             const trip = group.tripInfo;
             const groupPending = group.bookings.filter(b => b.status === "pending").length;
+            const isActive = isEnRouteTrip(trip);
+            /* Section separator when switching from active → upcoming */
+            const prevGroup = groupIdx > 0 ? groupedByTrip[groupIdx - 1] : null;
+            const prevIsActive = prevGroup ? isEnRouteTrip(prevGroup.tripInfo) : null;
+            const showSectionSep = groupIdx === 0 || (prevIsActive !== null && prevIsActive !== isActive);
             return (
               <View key={group.tripKey} style={{ marginBottom: 8 }}>
+                {/* Section label */}
+                {showSectionSep && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6, marginTop: groupIdx > 0 ? 4 : 0 }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: isActive ? "#BBF7D0" : "#E5E7EB" }} />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: isActive ? "#DCFCE7" : "#F3F4F6", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Ionicons name={isActive ? "navigate-outline" : "calendar-outline"} size={11} color={isActive ? "#059669" : "#6B7280"} />
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: isActive ? "#065F46" : "#6B7280", letterSpacing: 0.3 }}>
+                        {isActive ? "CARS EN ROUTE / EMBARQUEMENT" : "CARS À VENIR"}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1, height: 1, backgroundColor: isActive ? "#BBF7D0" : "#E5E7EB" }} />
+                  </View>
+                )}
                 {/* Departure header */}
                 {(() => {
                   const tsb = tripStatusBadge(trip?.status);
@@ -441,18 +479,14 @@ export default function AgentReservation() {
                   </View>
                 )}
 
-                {/* ── Places disponibles ── */}
-                {b.trip && (b.trip.guichetSeats > 0 || b.trip.onlineSeats > 0) && (
-                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 10, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: "#16A34A", fontWeight: "700", marginBottom: 2 }}>Guichet</Text>
-                      <Text style={{ fontSize: 15, fontWeight: "900", color: "#166534" }}>{b.trip.guichetSeats}</Text>
-                      <Text style={{ fontSize: 10, color: "#4ADE80" }}>places dispo</Text>
-                    </View>
-                    <View style={{ flex: 1, backgroundColor: TEAL_L, borderRadius: 10, padding: 10, alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: TEAL, fontWeight: "700", marginBottom: 2 }}>En ligne</Text>
-                      <Text style={{ fontSize: 15, fontWeight: "900", color: "#164E63" }}>{b.trip.onlineSeats}</Text>
-                      <Text style={{ fontSize: 10, color: TEAL }}>places dispo</Text>
+                {/* Places en ligne restantes (info utile pour l'agent réservation) */}
+                {b.trip && b.trip.onlineSeats >= 0 && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: TEAL_L, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#A5F3FC" }}>
+                      <Ionicons name="globe-outline" size={12} color={TEAL} />
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: "#164E63" }}>
+                        {b.trip.onlineSeats > 0 ? `${b.trip.onlineSeats} place${b.trip.onlineSeats > 1 ? "s" : ""} en ligne` : "Complet en ligne"}
+                      </Text>
                     </View>
                   </View>
                 )}
@@ -465,23 +499,22 @@ export default function AgentReservation() {
                   <InfoRow icon="card-outline"   label="Paiement"   val={paymentLabel(b.paymentMethod)} />
                 </View>
 
-                {/* ── Baggage section ── */}
-                <View style={S.baggageBlock}>
-                  <View style={S.baggageHeaderRow}>
-                    <Feather name="briefcase" size={13} color={hasBaggage ? "#7C3AED" : "#9CA3AF"} />
-                    <Text style={[S.baggageHeaderTxt, { color: hasBaggage ? "#7C3AED" : "#9CA3AF" }]}>
-                      Bagage{hasBaggage ? ` (×${b.baggageCount})` : ""}
-                    </Text>
-                    {hasBaggage && b.bagageStatus && (
-                      <View style={[S.bagStatusPill, { backgroundColor: b.bagageStatus === "accepté" ? "#DCFCE7" : "#FEF3C7" }]}>
-                        <Text style={[S.bagStatusTxt, { color: b.bagageStatus === "accepté" ? "#16A34A" : "#D97706" }]}>
-                          {b.bagageStatus === "accepté" ? "Validé" : "En attente"}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {hasBaggage ? (
+                {/* ── Baggage section — uniquement si bagage présent ── */}
+                {hasBaggage && (
+                  <View style={S.baggageBlock}>
+                    <View style={S.baggageHeaderRow}>
+                      <Feather name="briefcase" size={13} color="#7C3AED" />
+                      <Text style={[S.baggageHeaderTxt, { color: "#7C3AED" }]}>
+                        Bagage / Colis (×{b.baggageCount})
+                      </Text>
+                      {b.bagageStatus && (
+                        <View style={[S.bagStatusPill, { backgroundColor: b.bagageStatus === "accepté" ? "#DCFCE7" : "#FEF3C7" }]}>
+                          <Text style={[S.bagStatusTxt, { color: b.bagageStatus === "accepté" ? "#16A34A" : "#D97706" }]}>
+                            {b.bagageStatus === "accepté" ? "Validé" : "En attente"}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={S.baggageDetails}>
                       <View style={S.baggageDetailRow}>
                         <Ionicons name={baggageTypeLabel(b.baggageType).icon as any} size={14} color="#6B7280" />
@@ -493,16 +526,20 @@ export default function AgentReservation() {
                           <Text style={S.baggageDetailTxt}>{b.baggageDescription}</Text>
                         </View>
                       ) : null}
+                      {b.bagagePrice > 0 && (
+                        <View style={S.baggageDetailRow}>
+                          <Ionicons name="cash-outline" size={14} color="#6B7280" />
+                          <Text style={S.baggageDetailTxt}>{b.bagagePrice.toLocaleString()} FCFA</Text>
+                        </View>
+                      )}
                       {isPending && (
                         <Text style={S.baggageValidationNote}>
-                          Le bagage sera automatiquement validé à la confirmation de la réservation.
+                          Bagage validé automatiquement à la confirmation de la réservation.
                         </Text>
                       )}
                     </View>
-                  ) : (
-                    <Text style={S.noBaggageTxt}>Aucun bagage déclaré</Text>
-                  )}
-                </View>
+                  </View>
+                )}
 
                 {/* Source badge */}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
@@ -546,16 +583,18 @@ export default function AgentReservation() {
                 )}
 
                 {!isPending && !isCancelled && (
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 6 }}>
-                    <Ionicons name="checkmark-done-circle" size={18} color="#16A34A" />
-                    <Text style={{ fontSize: 13, color: "#16A34A", fontWeight: "700" }}>Réservation traitée</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 6, backgroundColor: "#F0FDF4", borderRadius: 10, paddingVertical: 8 }}>
+                    <Ionicons name="checkmark-done-circle" size={16} color="#16A34A" />
+                    <Text style={{ fontSize: 12, color: "#166534", fontWeight: "700" }}>
+                      {b.status === "boarded" ? "Passager embarqué" : "Réservation confirmée"}
+                    </Text>
                   </View>
                 )}
 
                 {isCancelled && (
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 6 }}>
-                    <Ionicons name="close-circle" size={18} color="#DC2626" />
-                    <Text style={{ fontSize: 13, color: "#DC2626", fontWeight: "700" }}>Réservation annulée</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingTop: 8, paddingBottom: 8, backgroundColor: "#FEF2F2", borderRadius: 10 }}>
+                    <Ionicons name="close-circle" size={16} color="#DC2626" />
+                    <Text style={{ fontSize: 12, color: "#991B1B", fontWeight: "700" }}>Réservation annulée — Siège libéré</Text>
                   </View>
                 )}
               </View>
@@ -566,15 +605,6 @@ export default function AgentReservation() {
           })}
         </ScrollView>
       )}
-
-      {/* Rapport button */}
-      <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 14, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-        onPress={() => router.push("/agent/rapport" as never)}
-      >
-        <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
-      </TouchableOpacity>
 
       {/* Cancel modal */}
       <Modal visible={!!cancelModal} transparent animationType="slide" onRequestClose={() => setCancelModal(null)}>
