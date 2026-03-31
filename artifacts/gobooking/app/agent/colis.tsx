@@ -361,7 +361,9 @@ function ValiderTab({ token }: { token: string | null }) {
   const active         = allParcels.filter(isActive);
   const toValidate     = active.filter(p => p.status === "en_attente_validation");
   const toPickup       = active.filter(p => p.status === "en_attente_ramassage");
-  const atStation      = active.filter(p => ["créé","cree","en_attente","valide","en_gare","arrive_gare_depart"].includes(p.status));
+  const newlyCreated   = active.filter(p => ["créé","cree","en_attente"].includes(p.status));
+  const validated      = active.filter(p => ["valide"].includes(p.status));
+  const atStation      = active.filter(p => ["en_gare","arrive_gare_depart"].includes(p.status));
   const inTransit      = active.filter(p => ["chargé_bus","en_transit","en_route"].includes(p.status));
   const arrived        = active.filter(p => ["arrivé","arrive","en_livraison"].includes(p.status));
   const totalActive    = active.length;
@@ -399,7 +401,7 @@ function ValiderTab({ token }: { token: string | null }) {
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>{totalActive} colis actif{totalActive > 1 ? "s" : ""}</Text>
             <Text style={{ fontSize: 12, color: "#64748B", marginTop: 1 }}>
-              {toValidate.length > 0 ? `${toValidate.length} à valider · ` : ""}{arrived.length > 0 ? `${arrived.length} arrivé${arrived.length > 1 ? "s" : ""} · ` : ""}{inTransit.length} en transit
+              {toValidate.length > 0 ? `${toValidate.length} à valider · ` : ""}{newlyCreated.length > 0 ? `${newlyCreated.length} créé${newlyCreated.length > 1 ? "s" : ""} · ` : ""}{arrived.length > 0 ? `${arrived.length} arrivé${arrived.length > 1 ? "s" : ""} · ` : ""}{inTransit.length} en transit
             </Text>
           </View>
           {toValidate.length > 0 && (
@@ -416,6 +418,65 @@ function ValiderTab({ token }: { token: string | null }) {
           <Text style={{ fontSize: 16, fontWeight: "800", color: "#374151" }}>Aucun colis actif</Text>
           <Text style={{ fontSize: 13, color: "#9CA3AF", marginTop: 4, textAlign: "center" }}>Tous les colis sont livrés ou annulés.</Text>
         </View>
+      )}
+
+      {/* ══ SECTION 0 : CRÉÉS AU COMPTOIR ═════════════════════════ */}
+      {newlyCreated.length > 0 && (
+        <>
+          <SectionHeader icon="add-circle" label="Créés au comptoir" count={newlyCreated.length} color="#6B7280" />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {newlyCreated.map(parcel => {
+              const next = getNextAction(parcel);
+              return (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#E2E8F0", elevation: 2 }}>
+                  <View style={{ backgroundColor: "#F8FAFC", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="cube" size={14} color="#6B7280" />
+                      <Text style={{ fontWeight: "800", color: "#374151", fontSize: 13 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <View style={{ backgroundColor: "#F1F5F9", borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "700", color: "#64748B" }}>🏪 Comptoir</Text>
+                      </View>
+                      <Text style={{ fontSize: 10, color: "#9CA3AF" }}>{parcel.parcelType}</Text>
+                    </View>
+                  </View>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>EXPÉDITEUR</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.senderName}</Text>
+                        <Text style={{ fontSize: 11, color: "#64748B" }}>{parcel.senderPhone}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#059669", fontWeight: "700" }}>DESTINATAIRE</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.receiverName}</Text>
+                        <Text style={{ fontSize: 11, color: "#64748B" }}>{parcel.receiverPhone}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} FCFA</Text>
+                    </View>
+                    <MiniProgress status={parcel.status} />
+                    {next && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: next.color, borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                        onPress={() => handleStatusAction(parcel)} disabled={acting === parcel.id}>
+                        {acting === parcel.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="arrow-forward-circle" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>{next.label}</Text></>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
       )}
 
       {/* ══ SECTION 1 : À VALIDER ══════════════════════════════════ */}
@@ -580,7 +641,62 @@ function ValiderTab({ token }: { token: string | null }) {
         </>
       )}
 
-      {/* ══ SECTION 3 : EN GARE ════════════════════════════════════ */}
+      {/* ══ SECTION 3 : VALIDÉS ════════════════════════════════════ */}
+      {validated.length > 0 && (
+        <>
+          <SectionHeader icon="checkmark-circle" label="Validés — En attente de mise en gare" count={validated.length} color="#7C3AED" />
+          <View style={{ gap: 8, marginBottom: 12 }}>
+            {validated.map(parcel => {
+              const next = getNextAction(parcel);
+              return (
+                <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#DDD6FE", elevation: 2 }}>
+                  <View style={{ backgroundColor: "#F5F3FF", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                      <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+                      <Text style={{ fontWeight: "800", color: "#7C3AED", fontSize: 13 }}>{parcel.trackingRef}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <StatusBadge status={parcel.status} />
+                      <Text style={{ fontSize: 10, color: "#9CA3AF" }}>{parcel.parcelType}</Text>
+                    </View>
+                  </View>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>EXPÉDITEUR</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.senderName}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#059669", fontWeight: "700" }}>DESTINATAIRE</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.receiverName}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                        <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} FCFA</Text>
+                    </View>
+                    <MiniProgress status={parcel.status} />
+                    {next && (
+                      <TouchableOpacity
+                        style={{ backgroundColor: next.color, borderRadius: 12, paddingVertical: 13, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 8 }}
+                        onPress={() => handleStatusAction(parcel)} disabled={acting === parcel.id}>
+                        {acting === parcel.id
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="business" size={18} color="#fff" /><Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>{next.label}</Text></>}
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      )}
+
+      {/* ══ SECTION 4 : EN GARE ════════════════════════════════════ */}
       {atStation.length > 0 && (
         <>
           <SectionHeader icon="business" label="En gare — Prêts à charger" count={atStation.length} color="#D97706" />
@@ -591,20 +707,32 @@ function ValiderTab({ token }: { token: string | null }) {
                 <View key={parcel.id} style={{ backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", borderWidth: 1.5, borderColor: "#FDE68A", elevation: 2 }}>
                   <View style={{ backgroundColor: "#FFFBEB", padding: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                      <Ionicons name="cube-outline" size={14} color="#D97706" />
+                      <Ionicons name="business-outline" size={14} color="#D97706" />
                       <Text style={{ fontWeight: "800", color: "#D97706", fontSize: 13 }}>{parcel.trackingRef}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{parcel.parcelType}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <StatusBadge status={parcel.status} />
+                      <Text style={{ fontSize: 10, color: "#9CA3AF" }}>{parcel.parcelType}</Text>
+                    </View>
                   </View>
-                  <View style={{ padding: 12, gap: 6 }}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ padding: 12, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "700" }}>EXPÉDITEUR</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.senderName}</Text>
+                      </View>
+                      <View style={{ flex: 1, backgroundColor: "#FEF9C3", borderRadius: 8, padding: 8 }}>
+                        <Text style={{ fontSize: 10, color: "#92400E", fontWeight: "700" }}>DESTINATAIRE</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "700", color: "#0F172A" }} numberOfLines={1}>{parcel.receiverName}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                         <Ionicons name="navigate-outline" size={12} color="#94A3B8" />
                         <Text style={{ fontSize: 12, fontWeight: "600", color: "#374151" }}>{parcel.fromCity} → {parcel.toCity}</Text>
                       </View>
-                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} F</Text>
+                      <Text style={{ fontSize: 13, fontWeight: "800", color: "#059669" }}>{Number(parcel.amount).toLocaleString()} FCFA</Text>
                     </View>
-                    <Text style={{ fontSize: 12, color: "#64748B" }}>{parcel.senderName} → {parcel.receiverName}</Text>
                     <MiniProgress status={parcel.status} />
                     {next && (
                       <TouchableOpacity

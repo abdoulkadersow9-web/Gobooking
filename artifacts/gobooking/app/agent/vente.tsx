@@ -527,18 +527,21 @@ export default function VenteScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
         ) : (
-          <View style={s.headerIcon}><Ionicons name="ticket" size={22} color="#fff" /></View>
+          <View style={s.headerIcon}><Ionicons name="ticket" size={20} color="#fff" /></View>
         )}
         <View style={{ flex: 1 }}>
           <Text style={s.headerTitle}>
-            {view === "trips" ? "Espace Vente" : view === "detail" ? `${selectedTrip?.from} → ${selectedTrip?.to}` : "Nouvelle vente"}
+            {view === "trips" ? "Guichet — Espace Vente" : view === "detail" ? `${selectedTrip?.from} → ${selectedTrip?.to}` : "Nouvelle vente"}
           </Text>
           <Text style={s.headerSub}>
-            {view === "trips" ? "Sélectionnez un départ" :
-             view === "detail" ? `${selectedTrip?.departureTime} · ${selectedTrip?.date}` :
+            {view === "trips" ? `${trips.length} départ${trips.length !== 1 ? "s" : ""} disponible${trips.length !== 1 ? "s" : ""}` :
+             view === "detail" ? `${selectedTrip?.departureTime} · ${selectedTrip?.date} · ${selectedTrip?.busName ?? ""}` :
              "Enregistrement passager"}
           </Text>
         </View>
+        <TouchableOpacity onPress={() => { setReprintModal(true); setReprintTicket(null); }} style={[s.headerLogout, { marginRight: 6 }]} hitSlop={8}>
+          <Ionicons name="print-outline" size={16} color="#fff" />
+        </TouchableOpacity>
         <TouchableOpacity
           style={s.headerLogout} hitSlop={8}
           onPress={() => {
@@ -576,55 +579,82 @@ export default function VenteScreen() {
             </View>
 
             {loadingTrips ? (
-              <ActivityIndicator color={G} style={{ padding: 20 }} />
+              <View style={{ padding: 30, alignItems: "center", gap: 10 }}>
+                <ActivityIndicator color={G} size="large" />
+                <Text style={{ color: "#9CA3AF", fontSize: 13 }}>Chargement des départs…</Text>
+              </View>
             ) : trips.length === 0 ? (
               <View style={s.emptyBox}>
-                <Ionicons name="bus-outline" size={40} color="#D1FAE5" />
+                <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center", marginBottom: 8 }}>
+                  <Ionicons name="bus-outline" size={32} color={G} />
+                </View>
                 <Text style={s.emptyText}>Aucun départ disponible</Text>
-                <TouchableOpacity onPress={fetchTrips}>
-                  <Text style={{ color: G, fontSize: 13, marginTop: 4 }}>Actualiser</Text>
+                <Text style={{ color: "#9CA3AF", fontSize: 12, marginTop: 2, textAlign: "center" }}>Vérifiez les voyages planifiés dans votre agence.</Text>
+                <TouchableOpacity onPress={fetchTrips} style={{ marginTop: 10, backgroundColor: G_LIGHT, borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Ionicons name="refresh" size={14} color={G} />
+                  <Text style={{ color: G, fontSize: 13, fontWeight: "700" }}>Actualiser</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               trips.map(trip => {
-                const isTransit = trip.status === "en_route" || trip.status === "in_progress";
-                const isBoarding = trip.status === "boarding";
+                const isTransit  = trip.status === "en_route" || trip.status === "in_progress" || trip.status === "en_cours";
+                const isBoarding = trip.status === "boarding" || trip.status === "embarquement";
+                const seatsLow   = trip.availableSeats !== undefined && trip.availableSeats <= 5;
+                const statusColor = isBoarding ? "#D97706" : isTransit ? "#2563EB" : G;
+                const statusBg    = isBoarding ? "#FEF3C7" : isTransit ? "#EFF6FF" : G_LIGHT;
+                const statusLbl   = isBoarding ? "Embarquement" : isTransit ? "En transit" : "Planifié";
                 return (
                   <TouchableOpacity
                     key={trip.id}
-                    style={[s.tripCard, isBoarding && { borderColor: "#F59E0B", borderLeftWidth: 4 }]}
+                    style={[s.tripCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}
                     onPress={() => selectTrip(trip)}
                     activeOpacity={0.75}
                   >
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 }}>
-                        <Text style={s.tripRoute}>{trip.from} → {trip.to}</Text>
-                        {isBoarding && (
-                          <View style={{ backgroundColor: "#FEF3C7", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>Embarquement</Text>
-                          </View>
-                        )}
-                        {isTransit && (
-                          <View style={{ backgroundColor: G_LIGHT, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
-                            <Text style={{ fontSize: 10, fontWeight: "700", color: G }}>En transit</Text>
-                          </View>
-                        )}
+                    <View style={{ flex: 1, gap: 6 }}>
+                      {/* Route + Badges */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Text style={s.tripRoute}>{trip.from}</Text>
+                        <Ionicons name="arrow-forward" size={13} color="#94A3B8" />
+                        <Text style={s.tripRoute}>{trip.to}</Text>
+                        <View style={{ backgroundColor: statusBg, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: statusColor }}>{statusLbl}</Text>
+                        </View>
                         {trip.tripType && trip.tripType !== "standard" && (
-                          <View style={{ backgroundColor: "#EDE9FE", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <View style={{ backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
                             <Text style={{ fontSize: 10, fontWeight: "700", color: "#7C3AED" }}>{tripTypeLabel(trip.tripType)}</Text>
                           </View>
                         )}
                       </View>
-                      <Text style={s.tripMeta}>{trip.departureTime} · {trip.date}</Text>
+                      {/* Meta: heure + date + bus */}
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                          <Ionicons name="time-outline" size={12} color="#94A3B8" />
+                          <Text style={s.tripMeta}>{trip.departureTime} · {trip.date}</Text>
+                        </View>
+                        {trip.stops && trip.stops.length > 0 && (
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                            <Ionicons name="git-branch-outline" size={11} color="#94A3B8" />
+                            <Text style={{ fontSize: 11, color: "#9CA3AF" }}>{trip.stops.length} arrêt{trip.stops.length > 1 ? "s" : ""}</Text>
+                          </View>
+                        )}
+                      </View>
+                      {/* Places disponibles */}
                       {trip.availableSeats !== undefined && (
-                        <Text style={[s.tripMeta, { color: trip.availableSeats <= 5 ? "#EF4444" : G, fontWeight: "600" }]}>
-                          {trip.availableSeats} place{trip.availableSeats !== 1 ? "s" : ""} dispo.
-                        </Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Ionicons name="people-outline" size={12} color={seatsLow ? "#EF4444" : G} />
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: seatsLow ? "#EF4444" : G }}>
+                            {trip.availableSeats} place{trip.availableSeats !== 1 ? "s" : ""} libre{trip.availableSeats !== 1 ? "s" : ""}
+                          </Text>
+                          {seatsLow && <Text style={{ fontSize: 10, color: "#EF4444", fontWeight: "600" }}>⚠ Presque complet</Text>}
+                        </View>
                       )}
                     </View>
-                    <View style={{ alignItems: "flex-end", gap: 6 }}>
-                      <Text style={s.tripPrice}>{trip.price?.toLocaleString()} <Text style={{ fontSize: 11, fontWeight: "400" }}>FCFA</Text></Text>
-                      <Ionicons name="chevron-forward" size={18} color="#D1FAE5" />
+                    <View style={{ alignItems: "flex-end", gap: 8 }}>
+                      <Text style={s.tripPrice}>{trip.price?.toLocaleString()}</Text>
+                      <Text style={{ fontSize: 10, color: "#94A3B8", marginTop: -4 }}>FCFA</Text>
+                      <View style={{ backgroundColor: G_LIGHT, borderRadius: 8, width: 32, height: 32, justifyContent: "center", alignItems: "center" }}>
+                        <Ionicons name="chevron-forward" size={18} color={G_DARK} />
+                      </View>
                     </View>
                   </TouchableOpacity>
                 );
