@@ -13,17 +13,14 @@ import {
 
 import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
-const ND       = Platform.OS !== "web";
+/* ── Constants ────────────────────────────────── */
 const IS_WEB   = Platform.OS === "web";
-
-/* Durée minimale du splash — assez pour voir l'animation complète */
-const MIN_SPLASH = 2000;
+const ND       = !IS_WEB;           /* useNativeDriver: true only on native */
+const MIN_SPLASH = IS_WEB ? 1400 : 1800;
 
 /* ══════════════════════════════════════════
-   COMPOSANTS GRAPHIQUES
+   NATIVE-ONLY: Ripple ring animation
 ══════════════════════════════════════════ */
-
-/* ── Anneau d'expansion (ripple) ── */
 function Ripple({ delay, size, maxOp }: { delay: number; size: number; maxOp: number }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -31,27 +28,27 @@ function Ripple({ delay, size, maxOp }: { delay: number; size: number; maxOp: nu
       Animated.sequence([
         Animated.delay(delay),
         Animated.timing(anim, {
-          toValue: 1, duration: 2500,
+          toValue: 1, duration: 2200,
           easing: Easing.out(Easing.cubic),
-          useNativeDriver: ND,
+          useNativeDriver: true,
         }),
-        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: ND }),
+        Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, []);
-  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.1, 1.6] });
+  const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 1.5] });
   const op    = anim.interpolate({
-    inputRange: [0, 0.1, 0.6, 1],
-    outputRange: [0, maxOp, maxOp * 0.35, 0],
+    inputRange: [0, 0.08, 0.55, 1],
+    outputRange: [0, maxOp, maxOp * 0.3, 0],
   });
   return (
     <Animated.View
       style={{
         position: "absolute",
         width: size, height: size, borderRadius: size / 2,
-        borderWidth: 1.5, borderColor: "rgba(255,255,255,0.85)",
+        borderWidth: 1.5, borderColor: "rgba(255,255,255,0.9)",
         transform: [{ scale }], opacity: op,
         pointerEvents: "none" as any,
       }}
@@ -59,24 +56,16 @@ function Ripple({ delay, size, maxOp }: { delay: number; size: number; maxOp: nu
   );
 }
 
-/* ── Barre de progression ── */
-function ProgressBar({ progress }: { progress: Animated.Value }) {
-  const pct = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
-  return (
-    <View style={S.barTrack}>
-      <Animated.View style={[S.barFill, { width: pct }]} />
-    </View>
-  );
-}
-
-/* ── Pulsation du glow (loop) ── */
+/* ══════════════════════════════════════════
+   NATIVE-ONLY: Pulsing glow orb
+══════════════════════════════════════════ */
 function GlowOrb() {
-  const pulse = useRef(new Animated.Value(0.45)).current;
+  const pulse = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.65, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: ND }),
-        Animated.timing(pulse, { toValue: 0.45, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: ND }),
+        Animated.timing(pulse, { toValue: 0.68, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -86,27 +75,34 @@ function GlowOrb() {
 }
 
 /* ══════════════════════════════════════════
-   ÉCRAN PRINCIPAL
+   PROGRESS BAR
+══════════════════════════════════════════ */
+function ProgressBar({ width }: { width: Animated.AnimatedInterpolation<string | number> }) {
+  return (
+    <View style={S.barTrack}>
+      <Animated.View style={[S.barFill, { width }]} />
+    </View>
+  );
+}
+
+/* ══════════════════════════════════════════
+   MAIN SPLASH SCREEN
 ══════════════════════════════════════════ */
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
 
-  /*
-   * Sur web : tout démarre VISIBLE (opacity=1, translateY=0, scale=1)
-   * L'animation est du polish — elle ne cache pas le contenu.
-   * Sur native : séquence d'entrée dramatique depuis 0.
-   */
+  /* ── Shared animations ── */
   const containerOp = useRef(new Animated.Value(1)).current;
-  const logoScale   = useRef(new Animated.Value(IS_WEB ? 1   : 0.2)).current;
-  const logoOp      = useRef(new Animated.Value(IS_WEB ? 1   : 0  )).current;
-  const nameOp      = useRef(new Animated.Value(IS_WEB ? 1   : 0  )).current;
-  const nameY       = useRef(new Animated.Value(IS_WEB ? 0   : 30 )).current;
-  const tagOp       = useRef(new Animated.Value(IS_WEB ? 1   : 0  )).current;
-  const tagY        = useRef(new Animated.Value(IS_WEB ? 0   : 12 )).current;
   const progress    = useRef(new Animated.Value(0)).current;
-  const barOp       = useRef(new Animated.Value(IS_WEB ? 1   : 0  )).current;
 
-  /* Navigation guards */
+  /* ── Native-only entry animations ── */
+  const logoScale = useRef(new Animated.Value(IS_WEB ? 1 : 0.25)).current;
+  const logoOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
+  const nameOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
+  const nameY     = useRef(new Animated.Value(IS_WEB ? 0 : 24)).current;
+  const tagOp     = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
+
+  /* ── Navigation guard ── */
   const navigatedRef = useRef(false);
   const minDoneRef   = useRef(false);
   const authDoneRef  = useRef(false);
@@ -116,9 +112,10 @@ export default function SplashScreen() {
   const doNavigate = useRef(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
+    /* Fast, clean fade-out */
     Animated.timing(containerOp, {
-      toValue: 0, duration: 300,
-      easing: Easing.inOut(Easing.quad),
+      toValue: 0, duration: IS_WEB ? 180 : 260,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: ND,
     }).start(() => {
       const u = userRef.current;
@@ -127,61 +124,45 @@ export default function SplashScreen() {
     });
   }).current;
 
-  function tryNavigate() {
+  const tryNavigate = () => {
     if (minDoneRef.current && authDoneRef.current) doNavigate();
-  }
+  };
 
   useEffect(() => {
     if (IS_WEB) {
-      /* Web : logo déjà visible, on anime juste le bounce + progress bar */
-      Animated.sequence([
-        /* Léger bounce du logo (déjà à scale 1, petit effet de vie) */
-        Animated.spring(logoScale, {
-          toValue: 1.04, tension: 200, friction: 4, useNativeDriver: false,
-        }),
-        Animated.spring(logoScale, {
-          toValue: 1.0, tension: 150, friction: 6, useNativeDriver: false,
-        }),
-      ]).start();
-
-      /* Barre de progression — remplit sur MIN_SPLASH */
+      /* Web: everything visible immediately — just animate the progress bar */
       Animated.timing(progress, {
-        toValue: 0.88,
-        duration: MIN_SPLASH - 500,
+        toValue: 0.9, duration: MIN_SPLASH - 400,
         easing: Easing.out(Easing.quad),
         useNativeDriver: false,
       }).start();
     } else {
-      /* Native : animation complète d'entrée */
+      /* Native: crisp entry sequence */
       Animated.parallel([
-        Animated.parallel([
-          Animated.spring(logoScale, { toValue: 1, tension: 80, friction: 7, useNativeDriver: ND }),
-          Animated.timing(logoOp,   { toValue: 1, duration: 340, useNativeDriver: ND }),
-        ]),
+        /* Logo: spring in */
+        Animated.spring(logoScale, { toValue: 1, tension: 90, friction: 8, useNativeDriver: true }),
+        Animated.timing(logoOp,    { toValue: 1, duration: 320, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        /* Name: slide up, delay 320ms */
         Animated.sequence([
-          Animated.delay(350),
+          Animated.delay(320),
           Animated.parallel([
-            Animated.timing(nameOp, { toValue: 1, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
-            Animated.timing(nameY,  { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
+            Animated.timing(nameOp, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(nameY,  { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
           ]),
         ]),
+        /* Tagline: delay 500ms */
         Animated.sequence([
-          Animated.delay(560),
-          Animated.parallel([
-            Animated.timing(tagOp, { toValue: 1, duration: 300, useNativeDriver: ND }),
-            Animated.timing(tagY,  { toValue: 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
-          ]),
+          Animated.delay(500),
+          Animated.timing(tagOp, { toValue: 1, duration: 260, useNativeDriver: true }),
         ]),
+        /* Progress bar: delay 640ms */
         Animated.sequence([
-          Animated.delay(700),
-          Animated.parallel([
-            Animated.timing(barOp, { toValue: 1, duration: 200, useNativeDriver: ND }),
-            Animated.timing(progress, {
-              toValue: 0.85, duration: MIN_SPLASH - 900,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: false,
-            }),
-          ]),
+          Animated.delay(640),
+          Animated.timing(progress, {
+            toValue: 0.88, duration: MIN_SPLASH - 800,
+            easing: Easing.out(Easing.quad),
+            useNativeDriver: false,
+          }),
         ]),
       ]).start();
     }
@@ -190,75 +171,76 @@ export default function SplashScreen() {
     return () => clearTimeout(t);
   }, []);
 
-  /* Auth terminé → compléter la barre + naviguer */
+  /* Auth done → complete the bar + navigate */
   useEffect(() => {
     if (!isLoading) {
       authDoneRef.current = true;
       Animated.timing(progress, {
-        toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: false,
+        toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false,
       }).start();
       tryNavigate();
     }
   }, [isLoading, user]);
 
+  const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
+
   return (
     <Animated.View style={[S.container, { opacity: containerOp }]}>
-      {/* ── Fond dégradé ── */}
+      {/* Gradient background */}
       <LinearGradient
         colors={["#0C1B72", "#091250", "#050B28"]}
         locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
+        start={{ x: 0.25, y: 0 }}
+        end={{ x: 0.75, y: 1 }}
       />
 
-      {/* ── Orbe lumineux pulsant ── */}
-      <GlowOrb />
+      {/* Native-only decorative elements (skip on web for performance) */}
+      {!IS_WEB && (
+        <>
+          <GlowOrb />
+          <View style={S.ringsWrap} pointerEvents="none">
+            <Ripple delay={0}    size={220} maxOp={0.22} />
+            <Ripple delay={750}  size={350} maxOp={0.14} />
+            <Ripple delay={1500} size={480} maxOp={0.07} />
+          </View>
+        </>
+      )}
 
-      {/* ── Anneaux ripple ── */}
-      <View style={S.ringsWrap} pointerEvents="none">
-        <Ripple delay={0}    size={230} maxOp={0.20} />
-        <Ripple delay={800}  size={360} maxOp={0.13} />
-        <Ripple delay={1600} size={490} maxOp={0.07} />
-      </View>
+      {/* Web-only: static soft glow behind logo */}
+      {IS_WEB && (
+        <View style={S.webGlow} pointerEvents="none" />
+      )}
 
-      {/* ── Logo ── */}
+      {/* Logo */}
       <Animated.View
-        style={[
-          S.logoWrap,
-          { opacity: logoOp, transform: [{ scale: logoScale }] },
-        ]}
+        style={[S.logoWrap, { opacity: logoOp, transform: [{ scale: logoScale }] }]}
       >
         <Image
           source={require("../assets/logo.png")}
           style={S.logo}
           resizeMode="contain"
+          fadeDuration={0}
         />
       </Animated.View>
 
-      {/* ── Texte ── */}
+      {/* App name + tagline */}
       <View style={S.textBlock}>
-        <Animated.Text
-          style={[S.appName, { opacity: nameOp, transform: [{ translateY: nameY }] }]}
-        >
+        <Animated.Text style={[S.appName, { opacity: nameOp, transform: [{ translateY: nameY }] }]}>
           GoBooking
         </Animated.Text>
-        <Animated.Text
-          style={[S.tagline, { opacity: tagOp, transform: [{ translateY: tagY }] }]}
-        >
+        <Animated.Text style={[S.tagline, { opacity: tagOp }]}>
           Voyagez partout en Côte d'Ivoire
         </Animated.Text>
       </View>
 
-      {/* ── Barre de progression ── */}
-      <Animated.View style={[S.barWrap, { opacity: barOp }]}>
-        <ProgressBar progress={progress} />
-      </Animated.View>
+      {/* Progress bar */}
+      <View style={S.barWrap}>
+        <ProgressBar width={barWidth} />
+      </View>
 
-      {/* ── Version ── */}
-      <Animated.Text style={[S.version, { opacity: tagOp }]}>
-        v2.0 · Côte d'Ivoire
-      </Animated.Text>
+      {/* Version */}
+      <Text style={S.version}>v2.0 · Côte d'Ivoire</Text>
     </Animated.View>
   );
 }
@@ -272,77 +254,82 @@ const S = StyleSheet.create({
     backgroundColor: "#050B28",
     justifyContent: "center",
     alignItems: "center",
-    gap: 22,
+    gap: 24,
   },
   glowOrb: {
     position: "absolute",
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 260, height: 260, borderRadius: 130,
     backgroundColor: "#1A3ED8",
     shadowColor: "#3B82F6",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 90,
+    shadowRadius: 100,
     elevation: 0,
+  },
+  webGlow: {
+    position: "absolute",
+    width: 300, height: 300, borderRadius: 150,
+    backgroundColor: "rgba(26,62,216,0.28)",
+    top: "50%",
+    left: "50%",
+    marginTop: -150,
+    marginLeft: -150,
   },
   ringsWrap: {
     position: "absolute",
-    width: 500,
-    height: 500,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 500, height: 500,
+    alignItems: "center", justifyContent: "center",
   },
   logoWrap: {
-    width: 130,
-    height: 130,
-    borderRadius: 38,
+    width: 126,
+    height: 126,
+    borderRadius: 36,
     backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.22)",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.50,
-    shadowRadius: 34,
-    elevation: 22,
+    padding: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.55,
+    shadowRadius: 38,
+    elevation: 24,
+    borderWidth: IS_WEB ? 0 : 1.5,
+    borderColor: "rgba(255,255,255,0.18)",
   },
   logo: {
-    width: 98,
-    height: 98,
+    width: 96,
+    height: 96,
   },
   textBlock: {
     alignItems: "center",
-    gap: 8,
+    gap: 7,
   },
   appName: {
-    fontSize: 38,
+    fontSize: 40,
     fontWeight: "800",
     color: "#FFFFFF",
-    letterSpacing: -0.8,
-    textShadowColor: "rgba(91,141,239,0.65)",
+    letterSpacing: -1,
+    textShadowColor: "rgba(91,141,239,0.7)",
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 22,
+    textShadowRadius: 24,
   },
   tagline: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.62)",
-    letterSpacing: 0.6,
+    color: "rgba(255,255,255,0.55)",
+    letterSpacing: 0.5,
     textAlign: "center",
     fontWeight: "500",
   },
   barWrap: {
     position: "absolute",
-    bottom: IS_WEB ? 96 : 128,
+    bottom: IS_WEB ? 80 : 120,
     alignItems: "center",
   },
   barTrack: {
-    width: 140,
+    width: 148,
     height: 3,
     borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.10)",
     overflow: "hidden",
   },
   barFill: {
@@ -352,13 +339,13 @@ const S = StyleSheet.create({
     shadowColor: "#5B8DEF",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 8,
+    shadowRadius: 10,
   },
   version: {
     position: "absolute",
-    bottom: IS_WEB ? 38 : 62,
+    bottom: IS_WEB ? 28 : 52,
     fontSize: 11,
-    color: "rgba(255,255,255,0.28)",
+    color: "rgba(255,255,255,0.25)",
     letterSpacing: 0.8,
   },
 });

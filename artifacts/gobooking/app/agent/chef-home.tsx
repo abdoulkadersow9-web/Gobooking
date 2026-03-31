@@ -1,17 +1,16 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -40,6 +39,12 @@ type Trip = {
   estimated_arrival_time?: string; actual_departure_time?: string;
   intel?: any;
 };
+type OnlineBooking = {
+  id: string; bookingRef: string; status: string; totalAmount: number;
+  contactPhone: string; createdAt: string;
+  passengers: { name: string }[];
+  trip: { from: string; to: string; departureTime: string; busName: string } | null;
+};
 
 export default function ChefHome() {
   const { user, token, logoutIfActiveToken } = useAuth();
@@ -52,6 +57,8 @@ export default function ChefHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [pendingCaisses, setPendingCaisses] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingBookings, setPendingBookings] = useState<OnlineBooking[]>([]);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     if (!authToken) { setLoading(false); return; }
@@ -66,16 +73,20 @@ export default function ChefHome() {
     }
     setLoadError(null);
     try {
-      const [d, b, t, cs] = await Promise.all([
+      const [d, b, t, cs, ob] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
         apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
         apiFetch<{ sessions: any[]; stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
+        apiFetch<OnlineBooking[]>("/agent/online-bookings", { token: authToken }).catch(() => [] as OnlineBooking[]),
       ]);
       setDash(d);
       setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
       setPendingCaisses((cs as any).stats?.pending ?? 0);
+      const obArr = Array.isArray(ob) ? ob : [];
+      setPendingBookings(obArr.filter((x: OnlineBooking) => x.status === "pending").slice(0, 5));
+      setLastSync(new Date());
     } catch (e: any) {
       if (e?.httpStatus === 401) {
         logoutIfActiveToken(authToken);
@@ -199,7 +210,11 @@ export default function ChefHome() {
           {/* Live indicator */}
           <View style={s.liveBadge}>
             <View style={s.liveDot} />
-            <Text style={s.liveText}>Données en temps réel</Text>
+            <Text style={s.liveText}>
+              {lastSync
+                ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")} · Refresh 30s`
+                : "Chargement en cours…"}
+            </Text>
           </View>
         </LinearGradient>
 
@@ -219,6 +234,99 @@ export default function ChefHome() {
               <Text style={s.statLabel}>{item.label}</Text>
             </View>
           ))}
+        </View>
+
+        {/* ── Flux en temps réel ── */}
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Flux du jour</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#4ADE80" }} />
+              <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>
+                {lastSync ? `${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}` : "—"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Online pending reservations */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: pendingBookings.length > 0 ? "#FEF3C7" : "#F9FAFB",
+              borderRadius: 14, padding: 14, marginBottom: 10,
+              borderWidth: 1.5,
+              borderColor: pendingBookings.length > 0 ? "#FCD34D" : "#E5E7EB",
+              flexDirection: "row", alignItems: "center", gap: 12,
+            }}
+            onPress={() => router.push("/agent/reservation" as never)}
+          >
+            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: pendingBookings.length > 0 ? "#D97706" : "#9CA3AF", alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name="globe-outline" size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: "800", color: pendingBookings.length > 0 ? "#92400E" : "#374151" }}>
+                Réservations en ligne
+              </Text>
+              <Text style={{ fontSize: 12, color: pendingBookings.length > 0 ? "#B45309" : "#6B7280", marginTop: 2 }}>
+                {pendingBookings.length > 0
+                  ? `${pendingBookings.length} en attente de confirmation`
+                  : "Aucune réservation en attente"}
+              </Text>
+              {pendingBookings.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                  {pendingBookings.slice(0, 3).map(b => (
+                    <View key={b.id} style={{ backgroundColor: "rgba(217,119,6,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>
+                        {b.passengers[0]?.name ?? "?"} · {b.trip?.from ?? "?"} → {b.trip?.to ?? "?"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+            <View style={{ gap: 6, alignItems: "flex-end" }}>
+              {pendingBookings.length > 0 && (
+                <View style={{ backgroundColor: "#D97706", borderRadius: 14, minWidth: 28, height: 28, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}>
+                  <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14 }}>{pendingBookings.length}</Text>
+                </View>
+              )}
+              <Feather name="chevron-right" size={16} color="#9CA3AF" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Active boarding */}
+          {(() => {
+            const boardingTrips = tripsToday.filter(t => t.status === "boarding" || t.status === "en_route" || t.status === "in_progress");
+            if (boardingTrips.length === 0) return null;
+            return (
+              <View style={{ borderRadius: 14, overflow: "hidden", marginBottom: 10 }}>
+                {boardingTrips.map(t => (
+                  <View key={t.id} style={{
+                    backgroundColor: t.status === "boarding" ? "#EDE9FE" : "#DCFCE7",
+                    padding: 13, borderBottomWidth: 1,
+                    borderColor: t.status === "boarding" ? "#DDD6FE" : "#BBF7D0",
+                    flexDirection: "row", alignItems: "center", gap: 12,
+                  }}>
+                    <Ionicons
+                      name={t.status === "boarding" ? "checkmark-done-circle-outline" : "navigate-outline"}
+                      size={22}
+                      color={t.status === "boarding" ? "#7C3AED" : "#059669"}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: "800", fontSize: 13, color: t.status === "boarding" ? "#5B21B6" : "#065F46" }}>
+                        {t.from_city} → {t.to_city}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: t.status === "boarding" ? "#7C3AED" : "#059669", marginTop: 1 }}>
+                        {t.status === "boarding" ? "EMBARQUEMENT EN COURS" : "EN ROUTE"} · {t.departure_time} · {t.bus_name}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280" }}>
+                      {t.passenger_count}/{t.total_seats}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
         </View>
 
         {/* ── Actions rapides ── */}

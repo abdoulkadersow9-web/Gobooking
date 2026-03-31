@@ -1,0 +1,171 @@
+J’ai fait une vérification complète de l’application en conditions réelles.
+
+Les améliorations sont visibles, mais le niveau actuel n’est pas encore acceptable pour une application professionnelle.
+
+Maintenant je veux une exécution stricte, propre, complète, sans approximation.
+
+---
+
+🔴 PROBLÈME CRITIQUE : ÉCRAN D’OUVERTURE (SPLASH)
+
+L’ouverture de l’application n’est pas encore correcte.
+
+- le logo ne s’affiche pas proprement
+- il y a des bugs visuels
+- il y a des ralentissements anormaux
+- le rendu n’est pas fluide
+- l’expérience n’est pas professionnelle
+
+👉 L’ouverture doit être IMPACTANTE, FLUIDE, PROPRE.
+
+Je veux :
+
+- affichage immédiat du logo GoBooking (net, centré, propre)
+- animation fluide (pas de lag, pas de blocage)
+- aucune latence visuelle
+- transition propre vers le login
+- aucune cassure, aucun bug
+
+👉 Le splash screen doit donner une impression d’application haut niveau dès la première seconde.
+
+Actuellement ce n’est pas le cas.
+
+---
+
+🔴 PROBLÈME MAJEUR : PAS DE SYSTÈME TEMPS RÉEL
+
+L’application fonctionne encore comme des pages séparées.
+
+👉 Ce n’est pas acceptable.
+
+GoBooking doit fonctionner comme un système connecté :
+
+- réservation confirmée → visible immédiatement en embarquement
+- vente guichet → visible immédiatement en embarquement
+- embarquement validé → mise à jour globale
+- libération de siège → mise à jour instantanée
+
+👉 aucune page ne doit être isolée
+
+---
+
+🔴 PAGE AGENT EMBARQUEMENT (PRIORITÉ MAXIMALE)
+
+Actuellement incomplète.
+
+Je veux :
+
+1. Liste complète des passagers dès sélection du départ
+   - nom
+   - siège
+   - statut
+   - source (réservation / guichet)
+
+2. Scan et validation instantanée
+   - QR ou saisie → validation immédiate
+   - mise à jour visuelle directe
+
+3. Compteurs visibles
+   - total
+   - embarqués
+   - restants
+
+4. Gestion des absents
+   - identifier les absents
+   - libérer les sièges
+
+5. SYNCHRONISATION EN TEMPS RÉEL
+   - nouvelles réservations apparaissent automatiquement
+   - ventes guichet apparaissent automatiquement
+   - sans rechargement
+
+---
+
+🔴 PAGE AGENT RÉSERVATION EN LIGNE
+
+À corriger :
+
+- vision globale multi-agences
+- structuration par :
+  • agence
+  • trajet
+  • statut
+
+- séparation claire :
+  • en attente
+  • confirmées
+  • annulées
+  • en route
+
+👉 L’agent doit voir tout le système, clairement.
+
+---
+
+🔴 PAGE CHEF D’AGENCE
+
+Actuellement insuffisant.
+
+Je veux :
+
+- voir toutes les caisses des agents
+- voir tous les flux :
+  • ventes
+  • réservations
+  • embarquements
+  • départs
+
+- interface claire
+- suppression des incohérences
+
+👉 Le chef d’agence doit avoir une vision complète et exploitable.
+
+---
+
+🔴 QUALITÉ GÉNÉRALE
+
+Je ne veux plus :
+
+- bugs visuels
+- lenteurs
+- pages mélangées
+- incohérences
+- éléments manquants
+
+Je veux :
+
+- une application fluide
+- rapide
+- stable
+- logique
+- synchronisée
+- professionnelle
+
+---
+
+🔴 MÉTHODE OBLIGATOIRE
+
+1. corriger splash (ouverture) correctement
+2. corriger embarquement complètement
+3. implémenter synchronisation temps réel
+4. corriger réservation en ligne
+5. corriger chef d’agence
+
+👉 sans mélange
+👉 sans improvisation
+👉 sans ajout hors logique
+
+---
+
+🎯 OBJECTIF FINAL
+
+Une application :
+
+- moderne
+- fluide
+- fiable
+- synchronisée
+- prête pour production
+
+---
+
+Merci de reprendre avec un niveau d’exigence élevé et de corriger en priorité l’ouverture (splash) + embarquement + synchronisation globale.
