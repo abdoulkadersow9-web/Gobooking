@@ -253,6 +253,11 @@ type Bordereau = {
   totalRecettes: number; totalExpenses: number; carburantAmount: number;
   hasFuel: boolean; netRevenue: number;
 };
+type AgenceStats = {
+  colis:   { aValider: number; enGare: number; enTransit: number; arrives: number; total: number };
+  alertes: { active: number };
+  revenue: { today: { billets: number; colis: number; bagages: number; total: number; expenses: number; net: number } };
+};
 
 export default function ChefHome() {
   const { user, token, logoutIfActiveToken } = useAuth();
@@ -268,6 +273,7 @@ export default function ChefHome() {
   const [pendingBookings, setPendingBookings] = useState<OnlineBooking[]>([]);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [bordereaux, setBordereaux] = useState<Bordereau[]>([]);
+  const [agenceStats, setAgenceStats] = useState<AgenceStats | null>(null);
   const [fuelModal, setFuelModal] = useState<{ visible: boolean; trip: Bordereau | null }>({ visible: false, trip: null });
   const [fuelAmount, setFuelAmount] = useState("");
   const [fuelDesc, setFuelDesc] = useState("");
@@ -304,12 +310,13 @@ export default function ChefHome() {
     }
     setLoadError(null);
     try {
-      const [d, b, t, cs, ob] = await Promise.all([
+      const [d, b, t, cs, ob, as_] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
         apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
         apiFetch<{ sessions: any[]; stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
         apiFetch<OnlineBooking[]>("/agent/online-bookings", { token: authToken }).catch(() => [] as OnlineBooking[]),
+        apiFetch<AgenceStats>("/agent/chef/stats-agence", { token: authToken }).catch(() => null),
       ]);
       setDash(d);
       setBuses(b.buses ?? []);
@@ -317,6 +324,7 @@ export default function ChefHome() {
       setPendingCaisses((cs as any).stats?.pending ?? 0);
       const obArr = Array.isArray(ob) ? ob : [];
       setPendingBookings(obArr.filter((x: OnlineBooking) => x.status === "pending").slice(0, 5));
+      if (as_) setAgenceStats(as_);
       setLastSync(new Date());
     } catch (e: any) {
       if (e?.httpStatus === 401) {
@@ -520,6 +528,32 @@ export default function ChefHome() {
             </View>
           ))}
         </View>
+
+        {/* ── Bannière alertes actives ── */}
+        {agenceStats && agenceStats.alertes.active > 0 && (
+          <TouchableOpacity
+            style={{
+              marginHorizontal: 14, marginTop: 6, marginBottom: 2,
+              backgroundColor: "#FEF2F2", borderRadius: 14, padding: 14,
+              borderWidth: 1.5, borderColor: "#FECACA",
+              flexDirection: "row", alignItems: "center", gap: 12,
+            }}
+            onPress={() => router.push("/agent/suivi" as never)}
+          >
+            <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#DC2626", alignItems: "center", justifyContent: "center" }}>
+              <Feather name="alert-triangle" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: "800", color: "#991B1B" }}>
+                {agenceStats.alertes.active} alerte{agenceStats.alertes.active > 1 ? "s" : ""} active{agenceStats.alertes.active > 1 ? "s" : ""}
+              </Text>
+              <Text style={{ fontSize: 12, color: "#DC2626", marginTop: 1 }}>
+                Toucher pour accéder au centre de suivi
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#DC2626" />
+          </TouchableOpacity>
+        )}
 
         {/* ── Flux en temps réel ── */}
         <View style={s.section}>
@@ -787,6 +821,85 @@ export default function ChefHome() {
             })}
           </View>
         )}
+        {/* ── Revenus du jour ── */}
+        {agenceStats && (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Chiffre d'affaires du jour</Text>
+              <View style={{ backgroundColor: "#ECFDF5", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#065F46" }}>
+                  {agenceStats.revenue.today.total > 0
+                    ? `${(agenceStats.revenue.today.total / 1000).toFixed(0)}k FCFA`
+                    : "Aucune recette"}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+              {[
+                { label: "Billets",   val: agenceStats.revenue.today.billets,  color: "#1D4ED8", bg: "#EFF6FF",  icon: "credit-card" as const },
+                { label: "Colis",     val: agenceStats.revenue.today.colis,    color: "#7C3AED", bg: "#F5F3FF",  icon: "package" as const },
+                { label: "Bagages",   val: agenceStats.revenue.today.bagages,  color: "#059669", bg: "#ECFDF5",  icon: "briefcase" as const },
+              ].map((r, i) => (
+                <View key={i} style={{ flex: 1, backgroundColor: r.bg, borderRadius: 12, padding: 12, alignItems: "center" }}>
+                  <Feather name={r.icon} size={16} color={r.color} />
+                  <Text style={{ fontSize: 9, color: r.color, fontWeight: "600", marginTop: 4 }}>{r.label}</Text>
+                  <Text style={{ fontSize: 13, color: r.color, fontWeight: "800", marginTop: 1 }}>
+                    {r.val > 0 ? `${(r.val / 1000).toFixed(0)}k` : "0"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {/* Net après dépenses */}
+            <View style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+              backgroundColor: agenceStats.revenue.today.net >= 0 ? "#ECFDF5" : "#FEF2F2",
+              borderRadius: 12, padding: 12,
+            }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Feather name="trending-up" size={16} color={agenceStats.revenue.today.net >= 0 ? "#059669" : "#DC2626"} />
+                <Text style={{ fontSize: 13, fontWeight: "700", color: agenceStats.revenue.today.net >= 0 ? "#065F46" : "#991B1B" }}>
+                  Net du jour (après dépenses)
+                </Text>
+              </View>
+              <Text style={{ fontSize: 16, fontWeight: "800", color: agenceStats.revenue.today.net >= 0 ? "#059669" : "#DC2626" }}>
+                {agenceStats.revenue.today.net >= 0 ? "+" : ""}{agenceStats.revenue.today.net.toLocaleString()} FCFA
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* ── Colis de l'agence ── */}
+        {agenceStats && agenceStats.colis.total > 0 && (
+          <View style={s.section}>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Colis en cours</Text>
+              <Text style={s.sectionCount}>{agenceStats.colis.total} total</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+              {[
+                { label: "À valider", val: agenceStats.colis.aValider,  color: "#D97706", bg: "#FEF3C7", icon: "clock" as const,       urgent: agenceStats.colis.aValider > 0 },
+                { label: "En gare",   val: agenceStats.colis.enGare,    color: "#1D4ED8", bg: "#EFF6FF", icon: "map-pin" as const,     urgent: false },
+                { label: "En transit",val: agenceStats.colis.enTransit, color: "#7C3AED", bg: "#F5F3FF", icon: "navigation" as const,  urgent: false },
+                { label: "Arrivés",   val: agenceStats.colis.arrives,   color: "#059669", bg: "#ECFDF5", icon: "check-circle" as const,urgent: false },
+              ].map((c, i) => (
+                <View key={i} style={{ flex: 1, backgroundColor: c.bg, borderRadius: 12, padding: 10, alignItems: "center", borderWidth: c.urgent ? 1.5 : 0, borderColor: c.urgent ? "#D97706" : "transparent" }}>
+                  <Feather name={c.icon} size={14} color={c.color} />
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: c.color, marginTop: 4 }}>{c.val}</Text>
+                  <Text style={{ fontSize: 9, color: c.color, fontWeight: "600", textAlign: "center", marginTop: 1 }}>{c.label}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: "#F5F3FF", borderRadius: 10 }}
+              onPress={() => router.push("/agent/colis" as never)}
+            >
+              <Feather name="package" size={14} color="#7C3AED" />
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#7C3AED" }}>Gérer les colis</Text>
+              <Feather name="chevron-right" size={14} color="#7C3AED" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ── Bordereaux / Carburant ── */}
         <View style={s.section}>
           <View style={s.sectionHeader}>

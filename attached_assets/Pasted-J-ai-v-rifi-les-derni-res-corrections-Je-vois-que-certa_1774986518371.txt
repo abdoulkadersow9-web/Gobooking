@@ -1,0 +1,194 @@
+J’ai vérifié les dernières corrections.
+
+Je vois que certaines requêtes de données ont été corrigées et que certaines cartes remontent maintenant de vraies données. C’est bien, mais ce n’est pas encore suffisant.
+
+Le problème principal reste le même : la logique métier complète de l’application n’est toujours pas respectée partout, et plusieurs pages restent incohérentes, mélangées ou incomplètes.
+
+Je veux maintenant une correction stricte, globale et propre, sans approximation.
+
+---
+
+🔴 1. LES REQUÊTES TECHNIQUES CORRIGÉES NE SUFFISENT PAS
+
+Le fait que certaines données remontent maintenant correctement ne veut pas dire que l’application est correcte.
+
+Ce que je constate encore :
+
+- certaines logiques métier ne sont pas respectées
+- certaines informations apparaissent au mauvais endroit
+- certaines pages restent mélangées
+- certains rôles voient des éléments qu’ils ne doivent pas voir
+- certaines pages ne reflètent pas encore leur vraie fonction
+
+Je veux donc une correction métier complète, pas seulement une correction SQL ou requêtes.
+
+---
+
+🔴 2. SÉPARATION STRICTE DES RÔLES
+
+Chaque rôle doit voir uniquement ce qui correspond à sa logique.
+
+Exemples :
+
+- l’agent réservation voit les réservations selon la logique définie
+- l’agent colis voit les colis selon leurs statuts
+- l’agent embarquement voit les passagers et validations d’embarquement
+- le chef d’agence voit uniquement la supervision de son agence
+- la compagnie voit les données consolidées de ses agences
+- le super admin voit la vue globale
+
+👉 Je ne veux plus de mélange entre rôles.
+
+---
+
+🔴 3. LOGIQUE MÉTIER À RELIRE ET À APPLIQUER EXACTEMENT
+
+Je demande de relire toute la logique métier déjà définie et de l’appliquer visiblement dans l’application.
+
+Tout ce qui a été demandé doit ressortir dans les pages :
+
+- réservations
+- colis
+- bagages
+- embarquement
+- bordereaux
+- carburant
+- supervision agence
+- supervision compagnie
+- dashboard admin
+
+👉 Rien ne doit être oublié.
+👉 Rien ne doit être affiché au mauvais endroit.
+
+---
+
+🔴 4. PAGE AGENT COLIS
+
+Même si les données remontent mieux, la page doit respecter la logique métier complète.
+
+Je veux une structure claire par statuts :
+
+- colis créé
+- validé
+- en attente de ramassage
+- récupéré
+- en route
+- arrivé
+- livré
+
+Si le client crée un colis en ligne avec photo et informations, cela doit apparaître automatiquement dans la page Agent Colis de manière visible, moderne et bien organisée.
+
+---
+
+🔴 5. PAGE AGENT EMBARQUEMENT
+
+La page doit être totalement cohérente avec l’embarquement réel :
+
+- liste passagers claire
+- validation scan QR ou code
+- statut embarqué / absent / en attente
+- ajout automatique des nouveaux passagers si réservation confirmée avant départ
+- aucun mélange avec d’autres fonctions
+
+---
+
+🔴 6. PAGE AGENT SUIVI
+
+Cette page reste trop mélangée.
+
+Je demande de la reprendre sérieusement :
+
+- structure propre
+- icônes modernes
+- données cohérentes
+- aucune confusion
+- logique claire
+
+---
+
+🔴 7. DASHBOARDS AGENCE / COMPAGNIE / ADMIN
+
+Même si certaines requêtes sont corrigées, les dashboards ne montrent toujours pas correctement tout ce qui a été demandé.
+
+Je veux que toutes les logiques déjà créées côté agents remontent correctement :
+
+- vers chef d’agence
+- vers compagnie
+- vers super admin
+
+Avec de vrais blocs visibles, pas seulement des données en arrière-plan.
+
+Exemples attendus :
+
+- départs du jour
+- ventes
+- colis
+- bagages
+- alertes
+- bordereaux
+- carburant
+- rentabilité
+- performance par agence
+- suivi des agents
+
+---
+
+🔴 8. STABILITÉ ET AFFICHAGE
+
+Je constate encore des problèmes de stabilité :
+
+- affichage pas toujours propre
+- couleurs parfois mélangées
+- écran pas toujours stable
+- impression générale pas encore professionnelle
+
+Je veux :
+
+- une interface stable
+- harmonisée
+- moderne
+- rapide
+- sans incohérence visuelle
+
+---
+
+🔴 9. TOUS LES ÉLÉMENTS DOIVENT ÊTRE VISIBLES ET FONCTIONNELS
+
+Je ne veux pas seulement que ce soit “créé dans le code”.
+
+Je veux que ce soit :
+
+- visible
+- cliquable
+- bien placé
+- cohérent
+- utile pour le rôle concerné
+
+Tout bouton, bloc, onglet ou carte doit avoir une vraie fonction et répondre correctement.
+
+---
+
+🔴 10. PRIORITÉ MAINTENANT
+
+Avant d’ajouter autre chose, je veux :
+
+1. correction complète des logiques métier non respectées
+2. séparation stricte des rôles
+3. nettoyage des pages mélangées
+4. affichage réel et visible de toutes les données attendues
+5. harmonisation UI/UX sur toutes les pages
+
+---
+
+🎯 OBJECTIF FINAL
+
+Je veux une application :
+
+- cohérente
+- stable
+- fluide
+- moderne
+- fidèle à la logique métier définie
+- proprement structurée pour chaque rôle
+
+Merci de reprendre cela sérieusement et de corriger maintenant la logique complète, pas seulement les requêtes techniques.

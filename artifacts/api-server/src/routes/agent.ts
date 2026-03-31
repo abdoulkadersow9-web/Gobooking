@@ -6620,5 +6620,91 @@ router.get("/chef/agents", async (req, res) => {
   }
 });
 
+/* ─── GET /agent/chef/stats-agence — colis + alertes + revenue live ── */
+router.get("/chef/stats-agence", async (req, res) => {
+  try {
+    const ctx = await requireChefAgence(req.headers.authorization);
+    if (!ctx) return res.status(403).json({ error: "Accès refusé" });
+    const { agent } = ctx;
+    const companyId = agent.companyId;
+    const todayStr  = new Date().toISOString().slice(0, 10);
+
+    const [colisRows, alertesRow, billetsRow] = await Promise.all([
+      db.execute(sql`
+        SELECT status, COUNT(*) as cnt
+        FROM parcels
+        WHERE company_id = ${companyId}
+          AND status NOT IN ('retiré','livré','retired','delivered')
+        GROUP BY status
+      `),
+      db.execute(sql`
+        SELECT COUNT(*) as cnt FROM agent_alerts
+        WHERE company_id = ${companyId} AND status = 'active'
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(b.total_amount),0) as billets
+        FROM bookings b
+        JOIN trips t ON t.id = b.trip_id
+        WHERE t.company_id = ${companyId}
+          AND t.date = ${todayStr}
+          AND b.status IN ('confirmed','boarded','validated','payé')
+      `),
+    ]);
+
+    const colisMap: Record<string, number> = {};
+    for (const r of colisRows.rows as any[]) colisMap[r.status] = Number(r.cnt);
+
+    const aValider  = (colisMap["en_attente_validation"] ?? 0) + (colisMap["cree"] ?? 0) + (colisMap["créé"] ?? 0) + (colisMap["en_attente"] ?? 0);
+    const enGare    = (colisMap["en_gare"] ?? 0) + (colisMap["arrive_gare_depart"] ?? 0) + (colisMap["valide"] ?? 0);
+    const enTransit = (colisMap["en_transit"] ?? 0) + (colisMap["chargé_bus"] ?? 0) + (colisMap["en_route"] ?? 0);
+    const arrives   = (colisMap["arrivé"] ?? 0) + (colisMap["arrive"] ?? 0) + (colisMap["en_livraison"] ?? 0) + (colisMap["en_attente_ramassage"] ?? 0);
+    const total     = Object.values(colisMap).reduce((s, v) => s + v, 0);
+
+    const alertesActive = Number((alertesRow.rows[0] as any)?.cnt ?? 0);
+    const billetsToday  = Number((billetsRow.rows[0] as any)?.billets ?? 0);
+
+    const [colisRevRow, bagRevRow, expRow] = await Promise.all([
+      db.execute(sql`
+        SELECT COALESCE(SUM(p.amount),0) as total FROM parcels p
+        JOIN trips t ON t.id = p.trip_id
+        WHERE t.company_id = ${companyId} AND t.date = ${todayStr}
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(bi.price),0) as total FROM bagage_items bi
+        JOIN trips t ON t.id = bi.trip_id
+        WHERE t.company_id = ${companyId} AND t.date = ${todayStr}
+      `),
+      db.execute(sql`
+        SELECT COALESCE(SUM(te.amount),0) as total FROM trip_expenses te
+        JOIN trips t ON t.id = te.trip_id
+        WHERE t.company_id = ${companyId} AND t.date = ${todayStr}
+      `),
+    ]);
+
+    const colisRevToday = Number((colisRevRow.rows[0] as any)?.total ?? 0);
+    const bagRevToday   = Number((bagRevRow.rows[0] as any)?.total ?? 0);
+    const expensesToday = Number((expRow.rows[0] as any)?.total ?? 0);
+    const totalRevToday = billetsToday + colisRevToday + bagRevToday;
+
+    res.json({
+      colis:   { aValider, enGare, enTransit, arrives, total },
+      alertes: { active: alertesActive },
+      revenue: {
+        today: {
+          billets:  billetsToday,
+          colis:    colisRevToday,
+          bagages:  bagRevToday,
+          total:    totalRevToday,
+          expenses: expensesToday,
+          net:      totalRevToday - expensesToday,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("[chef/stats-agence]", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 export default router;
 
