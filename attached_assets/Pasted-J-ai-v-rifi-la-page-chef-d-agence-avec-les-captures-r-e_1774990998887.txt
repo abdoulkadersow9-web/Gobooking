@@ -1,0 +1,169 @@
+J’ai vérifié la page chef d’agence avec les captures réelles, et je confirme que cette page n’est toujours pas correcte.
+
+Depuis hier, on envoie des messages clairs pour corriger cette partie, mais la logique métier n’est toujours pas respectée visuellement dans l’application. La page reste mélangée, confuse, difficile à comprendre et non exploitable pour un vrai chef d’agence.
+
+Je veux une correction immédiate, sérieuse et structurée.
+
+---
+
+🔴 1. PROBLÈME PRINCIPAL : PAGE CHEF D’AGENCE MÉLANGÉE
+
+Actuellement, la page mélange trop d’informations différentes :
+
+- réservations en ligne
+- alertes
+- départs
+- flotte
+- caisses
+- bordereaux carburant
+- cartes répétées
+
+👉 Le résultat est confus.
+
+Un chef d’agence doit avoir une page de supervision claire, lisible, structurée, et non un écran mélangé où tout apparaît en désordre.
+
+---
+
+🔴 2. LOGIQUE MÉTIER NON RESPECTÉE
+
+Je vois encore des “Réservations en ligne” sur la page chef d’agence.
+
+👉 Ce n’est pas correct.
+
+Les réservations en ligne relèvent d’abord de l’agent réservation selon la logique définie.
+
+Le chef d’agence doit voir :
+
+- les indicateurs de supervision de son agence
+- l’état des départs
+- les validations en attente
+- les caisses des agents
+- les alertes utiles
+- les bordereaux à compléter
+- les performances de l’agence
+
+👉 Il ne doit pas avoir une page qui ressemble à un mélange de plusieurs rôles.
+
+---
+
+🔴 3. CE QUE DOIT VOIR LE CHEF D’AGENCE
+
+Je veux une page chef d’agence réorganisée en sections très claires :
+
+### A. Vue rapide agence
+- départs du jour
+- agents actifs
+- cars disponibles
+- alertes actives
+
+### B. Supervision des opérations
+- départs en cours
+- départs terminés
+- validations en attente
+- incidents / alertes
+
+### C. Caisses des agents
+- liste claire des caisses à valider
+- montant
+- agent concerné
+- statut validation
+
+### D. Bordereaux / carburant
+- liste des départs terminés sans carburant associé
+- bouton “Ajouter carburant”
+- bouton “Imprimer le bordereau”
+- état clair : carburant manquant / carburant ajouté / départ clôturé
+
+👉 Tout cela doit être séparé visuellement, avec une vraie hiérarchie.
+
+---
+
+🔴 4. PROBLÈME ACTUEL DES CARTES CARBURANT / BORDEREAUX
+
+Sur les captures, les cartes de bordereaux sont répétées et difficiles à lire.
+
+Problèmes visibles :
+- trop de répétition
+- structure peu lisible
+- manque de hiérarchie visuelle
+- informations trop serrées
+- impression de désordre
+
+👉 Je veux des cartes beaucoup plus propres, par exemple :
+
+- trajet
+- heure / véhicule / compagnie
+- billets
+- bagages
+- colis
+- recette totale
+- statut carburant
+- actions propres :
+  • Ajouter carburant
+  • Imprimer bordereau
+
+👉 Et surtout :
+- espacement propre
+- alignement propre
+- lecture immédiate
+- aucune impression de mélange
+
+---
+
+🔴 5. LA PAGE DOIT ÊTRE UTILISABLE EN CONDITIONS RÉELLES
+
+Actuellement, la page ne donne pas envie de travailler.
+
+Je veux une page :
+
+- claire
+- moderne
+- stable
+- rapide
+- exploitable sur le terrain
+
+Le chef d’agence doit comprendre immédiatement où cliquer, quoi valider, quoi surveiller, sans chercher.
+
+---
+
+🔴 6. IL FAUT ARRÊTER LES AJOUTS MAL INTÉGRÉS
+
+Je ne veux plus d’éléments ajoutés dans le code mais mal placés dans l’interface.
+
+👉 Toute amélioration doit être :
+
+- visible
+- logique
+- bien positionnée
+- cohérente avec le rôle
+
+Si ce n’est pas propre visuellement, ce n’est pas terminé.
+
+---
+
+🔴 7. ACTION DEMANDÉE MAINTENANT
+
+Je demande de reprendre entièrement la page chef d’agence avec cette méthode :
+
+1. nettoyer complètement la page actuelle
+2. supprimer les blocs mal placés
+3. retirer les éléments qui ne correspondent pas au rôle
+4. restructurer par sections claires
+5. rendre la page propre, moderne et exploitable
+6. vérifier visuellement avant de considérer la page comme terminée
+
+---
+
+🎯 OBJECTIF
+
+Je veux une vraie page chef d’agence de supervision, pas une page mélangée.
+
+Je veux une page :
+
+- logique
+- claire
+- hiérarchisée
+- professionnelle
+- utilisable immédiatement
+
+Merci de corriger cette page sérieusement et rapidement, avant de continuer autre chose.

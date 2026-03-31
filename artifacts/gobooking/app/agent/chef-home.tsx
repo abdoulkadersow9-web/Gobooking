@@ -28,10 +28,10 @@ import { apiFetch } from "@/utils/api";
 
 const INDIGO  = "#3730A3";
 const INDIGO2 = "#4F46E5";
-const LIGHT   = "#EEF2FF";
 
-function buildBordereauHtml(b: any, agenceName?: string): string {
-  const fmtNum = (n: number) => n?.toLocaleString("fr-FR") ?? "0";
+/* ─── Génération HTML du bordereau ─── */
+function buildBordereauHtml(b: Bordereau, agenceName?: string): string {
+  const fmt = (n: number) => n?.toLocaleString("fr-FR") ?? "0";
   const statusColor = b.status === "parti" ? "#059669" : b.status === "annulé" ? "#DC2626" : "#D97706";
   const statusLabel = b.status === "parti" ? "PARTI" : b.status === "annulé" ? "ANNULÉ" : (b.status ?? "PROGRAMMÉ").toUpperCase();
   const now = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
@@ -39,14 +39,12 @@ function buildBordereauHtml(b: any, agenceName?: string): string {
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bordereau de départ</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; color: #111827; }
     .page { max-width: 680px; margin: 0 auto; background: #fff; }
-    /* Header */
-    .header { background: linear-gradient(135deg, #3730A3 0%, #4F46E5 100%); padding: 28px 32px 22px; color: #fff; position: relative; }
+    .header { background: linear-gradient(135deg, #3730A3, #4F46E5); padding: 28px 32px 22px; color: #fff; }
     .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
     .company { font-size: 22px; font-weight: 900; letter-spacing: 1px; }
     .brand-sub { font-size: 11px; opacity: 0.7; margin-top: 2px; letter-spacing: 2px; text-transform: uppercase; }
@@ -56,45 +54,33 @@ function buildBordereauHtml(b: any, agenceName?: string): string {
     .route-banner { margin-top: 18px; background: rgba(255,255,255,0.12); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
     .city { font-size: 26px; font-weight: 900; }
     .arrow { font-size: 22px; opacity: 0.6; flex: 1; text-align: center; }
-    .status-pill { background: ${statusColor}; color: #fff; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 800; letter-spacing: 1px; white-space: nowrap; }
-    /* Meta row */
-    .meta-row { display: flex; gap: 0; border-bottom: 1px solid #E5E7EB; }
+    .status-pill { background: ${statusColor}; color: #fff; border-radius: 20px; padding: 4px 16px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .meta-row { display: flex; border-bottom: 1px solid #E5E7EB; }
     .meta-cell { flex: 1; padding: 14px 18px; border-right: 1px solid #E5E7EB; }
     .meta-cell:last-child { border-right: none; }
     .meta-label { font-size: 10px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .meta-value { font-size: 14px; font-weight: 700; color: #111827; }
-    /* Revenue section */
+    .meta-value { font-size: 14px; font-weight: 700; }
     .section { padding: 20px 24px 0; }
     .section-title { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #6B7280; border-bottom: 2px solid #E5E7EB; padding-bottom: 8px; margin-bottom: 16px; }
     .revenue-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
     .rev-card { background: #F8FAFC; border-radius: 10px; padding: 14px; border-left: 4px solid; }
-    .rev-card.blue { border-color: #1D4ED8; }
-    .rev-card.purple { border-color: #7C3AED; }
-    .rev-card.green { border-color: #059669; }
-    .rev-card-label { font-size: 10px; color: #6B7280; margin-bottom: 6px; }
-    .rev-card-val { font-size: 18px; font-weight: 900; }
-    .rev-card.blue .rev-card-val { color: #1D4ED8; }
-    .rev-card.purple .rev-card-val { color: #7C3AED; }
-    .rev-card.green .rev-card-val { color: #059669; }
-    .rev-card-sub { font-size: 10px; color: #9CA3AF; margin-top: 2px; }
-    /* Total bar */
-    .total-bar { background: #111827; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px; }
+    .rev-card.blue { border-color: #1D4ED8; } .rev-card.purple { border-color: #7C3AED; } .rev-card.green { border-color: #059669; }
+    .rev-label { font-size: 10px; color: #6B7280; margin-bottom: 6px; }
+    .rev-val { font-size: 18px; font-weight: 900; }
+    .rev-card.blue .rev-val { color: #1D4ED8; } .rev-card.purple .rev-val { color: #7C3AED; } .rev-card.green .rev-val { color: #059669; }
+    .total-bar { background: #111827; border-radius: 10px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .total-label { color: rgba(255,255,255,0.65); font-size: 12px; }
     .total-val { color: #fff; font-size: 22px; font-weight: 900; }
-    /* Fuel / expenses */
     .expense-row { display: flex; gap: 12px; margin-bottom: 16px; }
-    .expense-cell { flex: 1; background: #FEF3C7; border-radius: 10px; padding: 12px 16px; border-left: 4px solid #D97706; }
-    .expense-cell.net-pos { background: #ECFDF5; border-color: #059669; }
-    .expense-cell.net-neg { background: #FEF2F2; border-color: #DC2626; }
-    .expense-label { font-size: 10px; color: #6B7280; margin-bottom: 4px; }
-    .expense-val { font-size: 16px; font-weight: 800; }
-    .expense-val.fuel { color: #D97706; }
-    .expense-val.pos { color: #059669; }
-    .expense-val.neg { color: #DC2626; }
-    /* No fuel warning */
+    .expense-cell { flex: 1; border-radius: 10px; padding: 12px 16px; border-left: 4px solid; }
+    .fuel-cell { background: #FEF3C7; border-color: #D97706; }
+    .net-pos { background: #ECFDF5; border-color: #059669; }
+    .net-neg { background: #FEF2F2; border-color: #DC2626; }
+    .exp-label { font-size: 10px; color: #6B7280; margin-bottom: 4px; }
+    .exp-val { font-size: 16px; font-weight: 800; }
+    .fuel-val { color: #D97706; } .pos-val { color: #059669; } .neg-val { color: #DC2626; }
     .no-fuel { background: #FFFBEB; border: 2px dashed #FCD34D; border-radius: 10px; padding: 14px; text-align: center; color: #92400E; font-size: 13px; margin-bottom: 16px; }
-    /* Footer */
-    .footer { background: #F9FAFB; border-top: 1px solid #E5E7EB; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .footer { background: #F9FAFB; border-top: 1px solid #E5E7EB; padding: 16px 24px; display: flex; justify-content: space-between; }
     .footer-brand { font-size: 13px; font-weight: 800; color: #3730A3; }
     .footer-date { font-size: 11px; color: #9CA3AF; }
     .sig-row { display: flex; gap: 24px; padding: 16px 24px 24px; }
@@ -104,7 +90,6 @@ function buildBordereauHtml(b: any, agenceName?: string): string {
 </head>
 <body>
   <div class="page">
-    <!-- Header -->
     <div class="header">
       <div class="header-top">
         <div>
@@ -123,97 +108,37 @@ function buildBordereauHtml(b: any, agenceName?: string): string {
         <div class="status-pill">${statusLabel}</div>
       </div>
     </div>
-
-    <!-- Meta -->
     <div class="meta-row">
-      <div class="meta-cell">
-        <div class="meta-label">Date</div>
-        <div class="meta-value">${b.date}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Heure de départ</div>
-        <div class="meta-value">${b.departureTime}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Bus</div>
-        <div class="meta-value">${b.busName}</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Passagers</div>
-        <div class="meta-value">${b.passengersCount ?? 0} pax</div>
-      </div>
+      <div class="meta-cell"><div class="meta-label">Date</div><div class="meta-value">${b.date}</div></div>
+      <div class="meta-cell"><div class="meta-label">Départ</div><div class="meta-value">${b.departureTime}</div></div>
+      <div class="meta-cell"><div class="meta-label">Bus</div><div class="meta-value">${b.busName}</div></div>
+      <div class="meta-cell"><div class="meta-label">Passagers</div><div class="meta-value">${b.passengersCount ?? 0} pax</div></div>
     </div>
-
-    <!-- Revenue section -->
     <div class="section" style="padding-top:20px;">
       <div class="section-title">Détail des recettes</div>
       <div class="revenue-grid">
-        <div class="rev-card blue">
-          <div class="rev-card-label">Billets</div>
-          <div class="rev-card-val">${fmtNum(b.ticketRevenue)}</div>
-          <div class="rev-card-sub">FCFA</div>
-        </div>
-        <div class="rev-card purple">
-          <div class="rev-card-label">Bagages</div>
-          <div class="rev-card-val">${fmtNum(b.bagageRevenue)}</div>
-          <div class="rev-card-sub">FCFA</div>
-        </div>
-        <div class="rev-card green">
-          <div class="rev-card-label">Colis</div>
-          <div class="rev-card-val">${fmtNum(b.colisRevenue)}</div>
-          <div class="rev-card-sub">FCFA</div>
-        </div>
+        <div class="rev-card blue"><div class="rev-label">Billets</div><div class="rev-val">${fmt(b.ticketRevenue)}</div></div>
+        <div class="rev-card purple"><div class="rev-label">Bagages</div><div class="rev-val">${fmt(b.bagageRevenue)}</div></div>
+        <div class="rev-card green"><div class="rev-label">Colis</div><div class="rev-val">${fmt(b.colisRevenue)}</div></div>
       </div>
     </div>
-
-    <!-- Total bar -->
     <div class="section">
-      <div class="total-bar">
-        <div>
-          <div class="total-label">RECETTES TOTALES</div>
-        </div>
-        <div class="total-val">${fmtNum(b.totalRecettes)} FCFA</div>
-      </div>
+      <div class="total-bar"><div class="total-label">RECETTES TOTALES</div><div class="total-val">${fmt(b.totalRecettes)} FCFA</div></div>
     </div>
-
-    <!-- Fuel / Net -->
     <div class="section">
       <div class="section-title">Dépenses &amp; Résultat net</div>
       ${b.hasFuel ? `
       <div class="expense-row">
-        <div class="expense-cell">
-          <div class="expense-label">⛽ Carburant${b.fuelDesc ? " — " + b.fuelDesc : ""}</div>
-          <div class="expense-val fuel">${fmtNum(b.carburantAmount)} FCFA</div>
-        </div>
-        <div class="expense-cell ${b.netRevenue >= 0 ? "net-pos" : "net-neg"}">
-          <div class="expense-label">Résultat net</div>
-          <div class="expense-val ${b.netRevenue >= 0 ? "pos" : "neg"}">${b.netRevenue >= 0 ? "+" : ""}${fmtNum(b.netRevenue)} FCFA</div>
-        </div>
-      </div>
-      ` : `
-      <div class="no-fuel">
-        ⚠️ Coût carburant non renseigné — résultat net non calculable
-      </div>
-      `}
+        <div class="expense-cell fuel-cell"><div class="exp-label">⛽ Carburant${b.fuelDesc ? " — " + b.fuelDesc : ""}</div><div class="exp-val fuel-val">${fmt(b.carburantAmount)} FCFA</div></div>
+        <div class="expense-cell ${b.netRevenue >= 0 ? "net-pos" : "net-neg"}"><div class="exp-label">Résultat net</div><div class="exp-val ${b.netRevenue >= 0 ? "pos-val" : "neg-val"}">${b.netRevenue >= 0 ? "+" : ""}${fmt(b.netRevenue)} FCFA</div></div>
+      </div>` : `<div class="no-fuel">⚠️ Coût carburant non renseigné — résultat net non calculable</div>`}
     </div>
-
-    <!-- Signatures -->
-    <div class="section" style="margin-top:8px;">
-      <div class="section-title">Signatures</div>
-    </div>
+    <div class="section" style="margin-top:8px;"><div class="section-title">Signatures</div></div>
     <div class="sig-row">
-      <div class="sig-box">
-        <div class="sig-label">Agent guichet</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">Chef d'agence</div>
-      </div>
-      <div class="sig-box">
-        <div class="sig-label">Chauffeur</div>
-      </div>
+      <div class="sig-box"><div class="sig-label">Agent guichet</div></div>
+      <div class="sig-box"><div class="sig-label">Chef d'agence</div></div>
+      <div class="sig-box"><div class="sig-label">Chauffeur</div></div>
     </div>
-
-    <!-- Footer -->
     <div class="footer">
       <div class="footer-brand">GoBooking — Transport Ivoirien</div>
       <div class="footer-date">Édité le ${now}</div>
@@ -223,35 +148,24 @@ function buildBordereauHtml(b: any, agenceName?: string): string {
 </html>`;
 }
 
+/* ─── Types ─── */
 type DashData = {
   agence: { id: string; name: string; city: string; address?: string; phone?: string } | null;
   stats: { tripsToday: number; agentsActive: number; passengersToday: number; busesAvailable: number };
-};
-type Bus = {
-  id: string; bus_name: string; plate_number: string; bus_type: string; capacity: number;
-  availability_status: string; logistic_status: string; current_trip_id: string | null;
-  from_city?: string; to_city?: string; date?: string; departure_time?: string;
 };
 type Trip = {
   id: string; from_city: string; to_city: string; date: string;
   departure_time: string; arrival_time: string; status: string;
   bus_name: string; total_seats: number; passenger_count: number;
   capacity_status?: string; delay_minutes?: number;
-  estimated_arrival_time?: string; actual_departure_time?: string;
-  intel?: any;
-};
-type OnlineBooking = {
-  id: string; bookingRef: string; status: string; totalAmount: number;
-  contactPhone: string; createdAt: string;
-  passengers: { name: string }[];
-  trip: { from: string; to: string; departureTime: string; busName: string } | null;
+  estimated_arrival_time?: string;
 };
 type Bordereau = {
   id: string; from: string; to: string; date: string; departureTime: string;
   busName: string; busType: string; status: string; passengersCount: number;
   ticketRevenue: number; bagageRevenue: number; colisRevenue: number;
   totalRecettes: number; totalExpenses: number; carburantAmount: number;
-  hasFuel: boolean; netRevenue: number;
+  hasFuel: boolean; netRevenue: number; fuelDesc?: string;
 };
 type AgenceStats = {
   colis:   { aValider: number; enGare: number; enTransit: number; arrives: number; total: number };
@@ -259,27 +173,57 @@ type AgenceStats = {
   revenue: { today: { billets: number; colis: number; bagages: number; total: number; expenses: number; net: number } };
 };
 
+/* ─── Helpers ─── */
+function tripStatus(s: string): { label: string; color: string; bg: string } {
+  if (s === "scheduled")   return { label: "Programmé",    color: "#D97706", bg: "#FEF3C7" };
+  if (s === "boarding")    return { label: "Embarquement", color: "#7C3AED", bg: "#EDE9FE" };
+  if (s === "en_route")    return { label: "En route",     color: "#166534", bg: "#DCFCE7" };
+  if (s === "in_progress") return { label: "En route",     color: "#166534", bg: "#DCFCE7" };
+  if (s === "arrived")     return { label: "Arrivé",       color: "#0369A1", bg: "#E0F2FE" };
+  if (s === "completed")   return { label: "Terminé",      color: "#6B7280", bg: "#F3F4F6" };
+  if (s === "cancelled")   return { label: "Annulé",       color: "#DC2626", bg: "#FEE2E2" };
+  return { label: s, color: "#6B7280", bg: "#F3F4F6" };
+}
+
+/* ─── Composant Section ─── */
+function SectionHeader({ title, accent, count, extra }: {
+  title: string; accent: string; count?: string | number; extra?: React.ReactNode;
+}) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14, gap: 10 }}>
+      <View style={{ width: 4, height: 22, borderRadius: 2, backgroundColor: accent }} />
+      <Text style={{ fontSize: 15, fontWeight: "800", color: "#111827", flex: 1, letterSpacing: -0.3 }}>{title}</Text>
+      {count !== undefined && (
+        <View style={{ backgroundColor: accent + "20", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 12, fontWeight: "700", color: accent }}>{count}</Text>
+        </View>
+      )}
+      {extra}
+    </View>
+  );
+}
+
+/* ─── Page principale ─── */
 export default function ChefHome() {
   const { user, token, logoutIfActiveToken } = useAuth();
   const authToken = token ?? "";
 
-  const [dash, setDash] = useState<DashData | null>(null);
-  const [buses, setBuses] = useState<Bus[]>([]);
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dash, setDash]           = useState<DashData | null>(null);
+  const [trips, setTrips]         = useState<Trip[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingCaisses, setPendingCaisses] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [pendingBookings, setPendingBookings] = useState<OnlineBooking[]>([]);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [lastSync, setLastSync]   = useState<Date | null>(null);
   const [bordereaux, setBordereaux] = useState<Bordereau[]>([]);
   const [agenceStats, setAgenceStats] = useState<AgenceStats | null>(null);
   const [fuelModal, setFuelModal] = useState<{ visible: boolean; trip: Bordereau | null }>({ visible: false, trip: null });
   const [fuelAmount, setFuelAmount] = useState("");
-  const [fuelDesc, setFuelDesc] = useState("");
+  const [fuelDesc, setFuelDesc]   = useState("");
   const [fuelLoading, setFuelLoading] = useState(false);
   const [printingId, setPrintingId] = useState<string | null>(null);
 
+  /* ─── Impression bordereau ─── */
   const printBordereau = async (b: Bordereau) => {
     setPrintingId(b.id);
     try {
@@ -290,19 +234,16 @@ export default function ChefHome() {
       } else {
         await Print.printAsync({ html });
       }
-    } catch (e) {
+    } catch {
       Alert.alert("Impression", "Impossible d'imprimer le bordereau.");
     } finally {
       setPrintingId(null);
     }
   };
 
+  /* ─── Chargement données ─── */
   const load = useCallback(async () => {
     if (!authToken) { setLoading(false); return; }
-    /* Guard: only block if user is fully loaded AND has an explicitly wrong role.
-       If user is null/pending (agentRole undefined), let the API call through — the server
-       will reject it with 403 if unauthorized. This prevents a race condition where
-       load() fires before the user object is hydrated from SecureStore. */
     if (user?.agentRole && user.agentRole !== "chef_agence") {
       setLoading(false);
       setLoadError(`Rôle détecté : ${user.agentRole}. Ce tableau de bord est réservé au chef d'agence.`);
@@ -310,28 +251,19 @@ export default function ChefHome() {
     }
     setLoadError(null);
     try {
-      const [d, b, t, cs, ob, as_] = await Promise.all([
+      const [d, t, cs, as_] = await Promise.all([
         apiFetch<DashData>("/agent/chef/dashboard", { token: authToken }),
-        apiFetch<{ buses: Bus[] }>("/agent/chef/available-buses", { token: authToken }),
         apiFetch<{ trips: Trip[] }>("/agent/chef/trips", { token: authToken }),
         apiFetch<{ sessions: any[]; stats: { pending: number; validated: number; rejected: number } }>("/agent/chef/caisses", { token: authToken }),
-        apiFetch<OnlineBooking[]>("/agent/online-bookings", { token: authToken }).catch(() => [] as OnlineBooking[]),
         apiFetch<AgenceStats>("/agent/chef/stats-agence", { token: authToken }).catch(() => null),
       ]);
       setDash(d);
-      setBuses(b.buses ?? []);
       setTrips(t.trips ?? []);
       setPendingCaisses((cs as any).stats?.pending ?? 0);
-      const obArr = Array.isArray(ob) ? ob : [];
-      setPendingBookings(obArr.filter((x: OnlineBooking) => x.status === "pending").slice(0, 5));
       if (as_) setAgenceStats(as_);
       setLastSync(new Date());
     } catch (e: any) {
-      if (e?.httpStatus === 401) {
-        logoutIfActiveToken(authToken);
-        return;
-      }
-      console.error("[chef-home]", e);
+      if (e?.httpStatus === 401) { logoutIfActiveToken(authToken); return; }
       setLoadError(e?.message ?? e?.error ?? "Impossible de charger le tableau de bord.");
     } finally {
       setLoading(false);
@@ -339,20 +271,6 @@ export default function ChefHome() {
     }
   }, [authToken, user, logoutIfActiveToken]);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Polling 30s
-  const interval = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    interval.current = setInterval(load, 30000);
-    return () => { if (interval.current) clearInterval(interval.current); };
-  }, [load]);
-
-  /* Sync immédiate: re-fetch quand un ticket est vendu, un passager embarqué
-     ou une réservation confirmée — même sans attendre le poll 30s */
-  useOnSync(["boarding", "ticket", "reservation"], load);
-
-  /* ── Bordereaux ── */
   const loadBordereaux = useCallback(async () => {
     if (!authToken) return;
     try {
@@ -361,133 +279,103 @@ export default function ChefHome() {
     } catch { /* silencieux */ }
   }, [authToken]);
 
-  useEffect(() => { loadBordereaux(); }, [loadBordereaux]);
-
   const submitFuel = useCallback(async () => {
     if (!fuelModal.trip) return;
     const amt = parseInt(fuelAmount);
-    if (!fuelAmount || isNaN(amt) || amt <= 0) {
-      Alert.alert("Erreur", "Entrez un montant valide.");
-      return;
-    }
+    if (!fuelAmount || isNaN(amt) || amt <= 0) { Alert.alert("Erreur", "Entrez un montant valide."); return; }
     setFuelLoading(true);
     try {
       await apiFetch(`/agent/chef/bordereaux/${fuelModal.trip.id}/fuel`, {
-        token: authToken,
-        method: "POST",
+        token: authToken, method: "POST",
         body: { amount: amt, description: fuelDesc || "Carburant" },
       });
       setFuelModal({ visible: false, trip: null });
-      setFuelAmount("");
-      setFuelDesc("");
+      setFuelAmount(""); setFuelDesc("");
       loadBordereaux();
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible d'enregistrer le carburant.");
-    } finally {
-      setFuelLoading(false);
-    }
+    } finally { setFuelLoading(false); }
   }, [fuelModal, fuelAmount, fuelDesc, authToken, loadBordereaux]);
 
-  /* ── Pulsation du point LIVE ── */
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadBordereaux(); }, [loadBordereaux]);
+  useEffect(() => {
+    const iv = setInterval(load, 30000);
+    return () => clearInterval(iv);
+  }, [load]);
+  useOnSync(["boarding", "ticket", "reservation"], load);
+
+  /* ─── Animation LIVE ─── */
   const ND = Platform.OS !== "web";
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: ND }),
-        Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: ND }),
-      ])
-    );
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: ND }),
+      Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: ND }),
+    ]));
     loop.start();
     return () => loop.stop();
   }, [pulseAnim, ND]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
-  const firstName = user?.name?.split(" ")[0] ?? "Chef";
-  const agence    = dash?.agence;
-  const stats     = dash?.stats;
-
-  const todayStr  = new Date().toISOString().slice(0, 10);
+  /* ─── Données dérivées ─── */
+  const firstName  = user?.name?.split(" ")[0] ?? "Chef";
+  const agence     = dash?.agence;
+  const stats      = dash?.stats;
+  const todayStr   = new Date().toISOString().slice(0, 10);
   const tripsToday = trips.filter(t => t.date === todayStr && t.status !== "cancelled");
-  const upcoming   = trips.filter(t => t.date > todayStr  && t.status !== "cancelled").slice(0, 5);
+  const upcoming   = trips.filter(t => t.date > todayStr  && t.status !== "cancelled").slice(0, 4);
+  const activeTrips = tripsToday.filter(t => ["boarding", "en_route", "in_progress"].includes(t.status));
+  const waitingTrips = tripsToday.filter(t => t.status === "scheduled");
+  const doneTrips    = tripsToday.filter(t => ["arrived", "completed"].includes(t.status));
+  const missingFuel  = bordereaux.filter(b => !b.hasFuel);
+  const activeAlerts = agenceStats?.alertes.active ?? 0;
 
-  function busStatusLabel(b: Bus): { label: string; color: string; bg: string } {
-    if (b.availability_status === "disponible") return { label: "Disponible", color: "#166534", bg: "#DCFCE7" };
-    if (b.availability_status === "en_service") return { label: `En route → ${b.to_city ?? "?"}`, color: "#D97706", bg: "#FEF3C7" };
-    if (b.availability_status === "en_panne")   return { label: "En panne", color: "#DC2626", bg: "#FEE2E2" };
-    return { label: b.logistic_status ?? "En attente", color: "#6B7280", bg: "#F3F4F6" };
-  }
-
-  function tripStatusLabel(s: string) {
-    if (s === "scheduled")   return { label: "Programmé",   icon: "calendar",      color: "#D97706", bg: "#FEF3C7" };
-    if (s === "boarding")    return { label: "Embarquement", icon: "user-check",    color: "#7C3AED", bg: "#EDE9FE" };
-    if (s === "en_route")    return { label: "En route",     icon: "navigation",    color: "#166534", bg: "#DCFCE7" };
-    if (s === "in_progress") return { label: "En route",     icon: "navigation",    color: "#166534", bg: "#DCFCE7" };
-    if (s === "arrived")     return { label: "Arrivé",       icon: "check-circle",  color: "#0369A1", bg: "#E0F2FE" };
-    if (s === "completed")   return { label: "Terminé",      icon: "check-square",  color: "#6B7280", bg: "#F3F4F6" };
-    if (s === "cancelled")   return { label: "Annulé",       icon: "x-circle",      color: "#DC2626", bg: "#FEE2E2" };
-    return { label: s, icon: "circle", color: "#6B7280", bg: "#F3F4F6" };
-  }
-
-  function capacityBadge(c?: string): { label: string; color: string; bg: string } | null {
-    if (c === "overloaded")  return { label: "Surcharge !", color: "#DC2626", bg: "#FEE2E2" };
-    if (c === "full")        return { label: "Complet",     color: "#DC2626", bg: "#FEE2E2" };
-    if (c === "almost_full") return { label: "Presque plein", color: "#D97706", bg: "#FEF3C7" };
-    return null;
-  }
-
-  function isLocked(status: string) {
-    return ["en_route","in_progress","boarding","arrived","completed"].includes(status);
-  }
-
+  /* ─── États de chargement / erreur ─── */
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFF" }}>
         <ActivityIndicator size="large" color={INDIGO2} />
-        <Text style={{ marginTop: 12, color: INDIGO, fontSize: 15 }}>Chargement du tableau de bord…</Text>
+        <Text style={{ marginTop: 12, color: INDIGO, fontSize: 15 }}>Chargement…</Text>
       </SafeAreaView>
     );
   }
-
   if (loadError) {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#F8FAFF", padding: 32 }}>
         <Feather name="alert-triangle" size={52} color="#DC2626" />
-        <Text style={{ marginTop: 16, fontSize: 18, fontWeight: "800", color: "#1F2937", textAlign: "center" }}>
-          Tableau de bord indisponible
-        </Text>
-        <Text style={{ marginTop: 8, fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20 }}>
-          {loadError}
-        </Text>
-        <Pressable
-          onPress={() => { setLoading(true); load(); }}
-          style={{ marginTop: 20, backgroundColor: INDIGO2, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14 }}
-        >
+        <Text style={{ marginTop: 16, fontSize: 18, fontWeight: "800", color: "#1F2937", textAlign: "center" }}>Tableau de bord indisponible</Text>
+        <Text style={{ marginTop: 8, fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20 }}>{loadError}</Text>
+        <Pressable onPress={() => { setLoading(true); load(); }}
+          style={{ marginTop: 20, backgroundColor: INDIGO2, borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14 }}>
           <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Réessayer</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push("/agent/home" as never)} style={{ marginTop: 12 }}>
-          <Text style={{ color: INDIGO2, fontSize: 14, fontWeight: "600" }}>Retour à l'accueil</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
+  /* ═══════════════════════════════════════════════════════
+     RENDU PRINCIPAL
+  ═══════════════════════════════════════════════════════ */
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFF" }} edges={["top"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F4F6FB" }} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={INDIGO} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={INDIGO2} />}
-        contentContainerStyle={{ paddingBottom: 130 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        {/* ── Header ── */}
+
+        {/* ══════════════════════════════════
+            HEADER — Identité + Statut live
+        ══════════════════════════════════ */}
         <LinearGradient colors={[INDIGO, INDIGO2, "#6366F1"]} style={s.header}>
           <View style={s.headerRow}>
             <View style={{ flex: 1 }}>
-              <Text style={s.headerGreeting}>Bonjour, {firstName} 👋</Text>
-              <Text style={s.headerRole}>Chef d'Agence</Text>
+              <Text style={s.greeting}>Bonjour, {firstName} 👋</Text>
+              <Text style={s.role}>Chef d'Agence</Text>
               {agence && (
                 <View style={s.agenceBadge}>
                   <Feather name="map-pin" size={12} color="#A5B4FC" />
@@ -499,8 +387,6 @@ export default function ChefHome() {
               <Feather name="grid" size={20} color="white" />
             </Pressable>
           </View>
-
-          {/* Live indicator */}
           <View style={s.liveBadge}>
             <Animated.View style={[s.liveDot, { opacity: pulseAnim }]} />
             <Text style={s.liveText}>
@@ -511,539 +397,467 @@ export default function ChefHome() {
           </View>
         </LinearGradient>
 
-        {/* ── Stats ── */}
+        {/* ══════════════════════════════════
+            A. VUE RAPIDE — 4 indicateurs clés
+        ══════════════════════════════════ */}
         <View style={s.statsGrid}>
           {[
-            { label: "Départs aujourd'hui", value: stats?.tripsToday ?? 0,      icon: "navigation" as const,  color: INDIGO2, bg: LIGHT },
-            { label: "Agents actifs",        value: stats?.agentsActive ?? 0,    icon: "users" as const,       color: "#166534", bg: "#DCFCE7" },
-            { label: "Passagers aujourd'hui",value: stats?.passengersToday ?? 0, icon: "user" as const,        color: "#D97706", bg: "#FEF3C7" },
-            { label: "Cars disponibles",     value: stats?.busesAvailable ?? 0,  icon: "truck" as const,       color: "#0369A1", bg: "#E0F2FE" },
+            { label: "Départs aujourd'hui", value: stats?.tripsToday ?? 0,       color: INDIGO2,   bg: "#EEF2FF",  icon: "navigation" as const },
+            { label: "Agents actifs",        value: stats?.agentsActive ?? 0,     color: "#166534", bg: "#DCFCE7",  icon: "users" as const },
+            { label: "Passagers aujourd'hui",value: stats?.passengersToday ?? 0,  color: "#D97706", bg: "#FEF3C7",  icon: "user" as const },
+            { label: "Alertes actives",      value: activeAlerts,                  color: activeAlerts > 0 ? "#DC2626" : "#6B7280", bg: activeAlerts > 0 ? "#FEE2E2" : "#F3F4F6", icon: "alert-triangle" as const },
           ].map((item, i) => (
-            <View key={i} style={[s.statCard, { backgroundColor: item.bg }]}>
+            <Pressable
+              key={i}
+              style={[s.statCard, { backgroundColor: item.bg }]}
+              onPress={i === 3 && activeAlerts > 0 ? () => router.push("/agent/suivi" as never) : undefined}
+            >
               <View style={[s.statIcon, { backgroundColor: item.color + "20" }]}>
                 <Feather name={item.icon} size={18} color={item.color} />
               </View>
               <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
               <Text style={s.statLabel}>{item.label}</Text>
-            </View>
+              {i === 3 && activeAlerts > 0 && (
+                <Text style={{ fontSize: 9, color: "#DC2626", fontWeight: "700", marginTop: 2 }}>Voir alertes →</Text>
+              )}
+            </Pressable>
           ))}
         </View>
 
-        {/* ── Bannière alertes actives ── */}
-        {agenceStats && agenceStats.alertes.active > 0 && (
-          <TouchableOpacity
-            style={{
-              marginHorizontal: 14, marginTop: 6, marginBottom: 2,
-              backgroundColor: "#FEF2F2", borderRadius: 14, padding: 14,
-              borderWidth: 1.5, borderColor: "#FECACA",
-              flexDirection: "row", alignItems: "center", gap: 12,
-            }}
-            onPress={() => router.push("/agent/suivi" as never)}
-          >
-            <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: "#DC2626", alignItems: "center", justifyContent: "center" }}>
-              <Feather name="alert-triangle" size={18} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: "800", color: "#991B1B" }}>
-                {agenceStats.alertes.active} alerte{agenceStats.alertes.active > 1 ? "s" : ""} active{agenceStats.alertes.active > 1 ? "s" : ""}
-              </Text>
-              <Text style={{ fontSize: 12, color: "#DC2626", marginTop: 1 }}>
-                Toucher pour accéder au centre de suivi
+        {/* Revenus du jour — bande compacte */}
+        {agenceStats && (
+          <View style={s.revenueStrip}>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={s.revStripLabel}>Billets</Text>
+              <Text style={[s.revStripValue, { color: "#1D4ED8" }]}>
+                {agenceStats.revenue.today.billets > 0 ? `${Math.round(agenceStats.revenue.today.billets / 1000)}k` : "—"}
               </Text>
             </View>
-            <Feather name="chevron-right" size={16} color="#DC2626" />
-          </TouchableOpacity>
+            <View style={s.revDivider} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={s.revStripLabel}>Colis</Text>
+              <Text style={[s.revStripValue, { color: "#7C3AED" }]}>
+                {agenceStats.revenue.today.colis > 0 ? `${Math.round(agenceStats.revenue.today.colis / 1000)}k` : "—"}
+              </Text>
+            </View>
+            <View style={s.revDivider} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={s.revStripLabel}>Bagages</Text>
+              <Text style={[s.revStripValue, { color: "#059669" }]}>
+                {agenceStats.revenue.today.bagages > 0 ? `${Math.round(agenceStats.revenue.today.bagages / 1000)}k` : "—"}
+              </Text>
+            </View>
+            <View style={s.revDivider} />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={s.revStripLabel}>Net du jour</Text>
+              <Text style={[s.revStripValue, {
+                color: agenceStats.revenue.today.net >= 0 ? "#059669" : "#DC2626",
+                fontSize: 14,
+              }]}>
+                {agenceStats.revenue.today.net >= 0 ? "+" : ""}{Math.round(agenceStats.revenue.today.net / 1000)}k
+              </Text>
+            </View>
+          </View>
         )}
 
-        {/* ── Flux en temps réel ── */}
+        {/* ══════════════════════════════════
+            B. SUPERVISION DES OPÉRATIONS
+        ══════════════════════════════════ */}
         <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Flux du jour</Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#4ADE80" }} />
-              <Text style={{ fontSize: 11, color: "#6B7280", fontWeight: "600" }}>
-                {lastSync ? `${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}` : "—"}
-              </Text>
-            </View>
-          </View>
+          <SectionHeader title="Supervision des opérations" accent={INDIGO2}
+            count={`${tripsToday.length} départ${tripsToday.length !== 1 ? "s" : ""} aujourd'hui`}
+          />
 
-          {/* Online pending reservations */}
-          <TouchableOpacity
-            style={{
-              backgroundColor: pendingBookings.length > 0 ? "#FEF3C7" : "#F9FAFB",
-              borderRadius: 14, padding: 14, marginBottom: 10,
-              borderWidth: 1.5,
-              borderColor: pendingBookings.length > 0 ? "#FCD34D" : "#E5E7EB",
-              flexDirection: "row", alignItems: "center", gap: 12,
-            }}
-            onPress={() => router.push("/agent/reservation" as never)}
-          >
-            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: pendingBookings.length > 0 ? "#D97706" : "#9CA3AF", alignItems: "center", justifyContent: "center" }}>
-              <Ionicons name="globe-outline" size={20} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 14, fontWeight: "800", color: pendingBookings.length > 0 ? "#92400E" : "#374151" }}>
-                Réservations en ligne
-              </Text>
-              <Text style={{ fontSize: 12, color: pendingBookings.length > 0 ? "#B45309" : "#6B7280", marginTop: 2 }}>
-                {pendingBookings.length > 0
-                  ? `${pendingBookings.length} en attente de confirmation`
-                  : "Aucune réservation en attente"}
-              </Text>
-              {pendingBookings.length > 0 && (
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-                  {pendingBookings.slice(0, 3).map(b => (
-                    <View key={b.id} style={{ backgroundColor: "rgba(217,119,6,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#92400E" }}>
-                        {b.passengers[0]?.name ?? "?"} · {b.trip?.from ?? "?"} → {b.trip?.to ?? "?"}
-                      </Text>
+          {/* Départs EN COURS — mis en avant */}
+          {activeTrips.length > 0 && (
+            <View style={{ marginBottom: 12 }}>
+              {activeTrips.map(t => {
+                const st   = tripStatus(t.status);
+                const pct  = t.total_seats > 0 ? Math.round((t.passenger_count / t.total_seats) * 100) : 0;
+                const isBoarding = t.status === "boarding";
+                return (
+                  <View key={t.id} style={[s.tripCardActive, { borderColor: isBoarding ? "#DDD6FE" : "#BBF7D0" }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 10 }}>
+                      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: isBoarding ? "#EDE9FE" : "#DCFCE7", alignItems: "center", justifyContent: "center" }}>
+                        <Ionicons name={isBoarding ? "checkmark-done-circle-outline" : "navigate-outline"} size={20} color={isBoarding ? "#7C3AED" : "#059669"} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: "800", color: "#111827" }}>{t.from_city} → {t.to_city}</Text>
+                        <Text style={{ fontSize: 12, color: isBoarding ? "#7C3AED" : "#059669", fontWeight: "600", marginTop: 1 }}>
+                          {isBoarding ? "⏳ EMBARQUEMENT EN COURS" : "🚌 EN ROUTE"} · {t.departure_time}
+                        </Text>
+                      </View>
+                      <View style={[s.badge, { backgroundColor: st.bg }]}>
+                        <Text style={[s.badgeText, { color: st.color }]}>{st.label}</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
-              )}
-            </View>
-            <View style={{ gap: 6, alignItems: "flex-end" }}>
-              {pendingBookings.length > 0 && (
-                <View style={{ backgroundColor: "#D97706", borderRadius: 14, minWidth: 28, height: 28, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}>
-                  <Text style={{ color: "#fff", fontWeight: "900", fontSize: 14 }}>{pendingBookings.length}</Text>
-                </View>
-              )}
-              <Feather name="chevron-right" size={16} color="#9CA3AF" />
-            </View>
-          </TouchableOpacity>
-
-          {/* Active boarding */}
-          {(() => {
-            const boardingTrips = tripsToday.filter(t => t.status === "boarding" || t.status === "en_route" || t.status === "in_progress");
-            if (boardingTrips.length === 0) return null;
-            return (
-              <View style={{ borderRadius: 14, overflow: "hidden", marginBottom: 10 }}>
-                {boardingTrips.map(t => (
-                  <View key={t.id} style={{
-                    backgroundColor: t.status === "boarding" ? "#EDE9FE" : "#DCFCE7",
-                    padding: 13, borderBottomWidth: 1,
-                    borderColor: t.status === "boarding" ? "#DDD6FE" : "#BBF7D0",
-                    flexDirection: "row", alignItems: "center", gap: 12,
-                  }}>
-                    <Ionicons
-                      name={t.status === "boarding" ? "checkmark-done-circle-outline" : "navigate-outline"}
-                      size={22}
-                      color={t.status === "boarding" ? "#7C3AED" : "#059669"}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: "800", fontSize: 13, color: t.status === "boarding" ? "#5B21B6" : "#065F46" }}>
-                        {t.from_city} → {t.to_city}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: t.status === "boarding" ? "#7C3AED" : "#059669", marginTop: 1 }}>
-                        {t.status === "boarding" ? "EMBARQUEMENT EN COURS" : "EN ROUTE"} · {t.departure_time} · {t.bus_name}
-                      </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={{ flex: 1, height: 6, backgroundColor: "#F3F4F6", borderRadius: 3, overflow: "hidden" }}>
+                        <View style={{ height: 6, borderRadius: 3, width: `${Math.min(100, pct)}%`, backgroundColor: pct >= 90 ? "#DC2626" : isBoarding ? "#7C3AED" : "#059669" }} />
+                      </View>
+                      <Text style={{ fontSize: 12, color: "#6B7280", fontWeight: "600" }}>{t.passenger_count}/{t.total_seats}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280" }}>
-                      {t.passenger_count}/{t.total_seats}
-                    </Text>
+                    <Text style={{ fontSize: 10, color: "#9CA3AF", marginTop: 4 }}>{t.bus_name}</Text>
                   </View>
-                ))}
-              </View>
-            );
-          })()}
-        </View>
-
-        {/* ── Actions rapides ── */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Actions rapides</Text>
-          <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-            <Pressable style={[s.actionBtn, { flex: 1, backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
-              <Feather name="list" size={16} color="white" />
-              <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Gérer les départs</Text>
-            </Pressable>
-            <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/rapport" as never)}>
-              <Feather name="bar-chart-2" size={16} color={INDIGO2} />
-              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Rapports</Text>
-            </Pressable>
-          </View>
-          {/* Caisses agents */}
-          <Pressable
-            style={{ backgroundColor: "#065F46", borderRadius: 14, padding: 16, flexDirection: "row", alignItems: "center", gap: 12 }}
-            onPress={() => router.push({ pathname: "/agent/chef-trips", params: { tab: "caisses" } } as never)}
-          >
-            <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" }}>
-              <Feather name="dollar-sign" size={20} color="#fff" />
+                );
+              })}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: "#fff", fontSize: 15, fontWeight: "800" }}>Caisses des agents</Text>
-              <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 12, marginTop: 2 }}>
-                {pendingCaisses > 0
-                  ? `${pendingCaisses} caisse${pendingCaisses > 1 ? "s" : ""} en attente de validation`
-                  : "Valider ou rejeter les caisses soumises par vos agents"}
-              </Text>
-            </View>
-            {pendingCaisses > 0 && (
-              <View style={{ backgroundColor: "#FCD34D", borderRadius: 12, minWidth: 24, height: 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 6, marginRight: 4 }}>
-                <Text style={{ color: "#92400E", fontWeight: "800", fontSize: 13 }}>{pendingCaisses}</Text>
-              </View>
-            )}
-            <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.8)" />
-          </Pressable>
-        </View>
-
-        {/* ── Cars disponibles ── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Flotte de cars</Text>
-            <Text style={s.sectionCount}>{buses.length} car{buses.length !== 1 ? "s" : ""}</Text>
-          </View>
-          {buses.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Feather name="truck" size={28} color="#9CA3AF" />
-              <Text style={s.emptyText}>Aucun car disponible</Text>
-            </View>
-          ) : (
-            buses.map((bus) => {
-              const st = busStatusLabel(bus);
-              const isAvailable = bus.availability_status === "disponible";
-              return (
-                <View key={bus.id} style={[s.busCard, isAvailable && s.busCardAvail]}>
-                  <View style={s.busCardLeft}>
-                    <View style={[s.busIcon, { backgroundColor: isAvailable ? "#DCFCE7" : "#F3F4F6" }]}>
-                      <Feather name="truck" size={18} color={isAvailable ? "#166534" : "#9CA3AF"} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.busName}>{bus.bus_name}</Text>
-                      <Text style={s.busPlate}>{bus.plate_number} · {bus.bus_type} · {bus.capacity} sièges</Text>
-                      {bus.from_city && bus.to_city && (
-                        <Text style={s.busRoute}>{bus.from_city} → {bus.to_city} · {bus.date} {bus.departure_time}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <View style={[s.busBadge, { backgroundColor: st.bg }]}>
-                    <Text style={[s.busBadgeText, { color: st.color }]}>{st.label}</Text>
-                  </View>
-                </View>
-              );
-            })
           )}
-        </View>
 
-        {/* ── Départs d'aujourd'hui ── */}
-        <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Départs d'aujourd'hui</Text>
-            <Text style={s.sectionCount}>{tripsToday.length}</Text>
-          </View>
-          {tripsToday.length === 0 ? (
+          {/* Départs en attente */}
+          {waitingTrips.length > 0 && (
+            <>
+              <Text style={s.subLabel}>EN ATTENTE DE DÉPART ({waitingTrips.length})</Text>
+              {waitingTrips.map(t => {
+                const pct = t.total_seats > 0 ? Math.round((t.passenger_count / t.total_seats) * 100) : 0;
+                return (
+                  <View key={t.id} style={s.tripCard}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.tripRoute}>{t.from_city} → {t.to_city}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                          <Feather name="clock" size={11} color="#9CA3AF" />
+                          <Text style={s.tripMeta}>{t.departure_time}</Text>
+                          <Text style={{ fontSize: 11, color: "#9CA3AF" }}>·</Text>
+                          <Text style={s.tripMeta}>{t.bus_name}</Text>
+                        </View>
+                      </View>
+                      <View style={[s.badge, { backgroundColor: "#FEF3C7" }]}>
+                        <Text style={[s.badgeText, { color: "#D97706" }]}>Programmé</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <View style={{ flex: 1, height: 4, backgroundColor: "#F3F4F6", borderRadius: 2, overflow: "hidden" }}>
+                        <View style={{ height: 4, borderRadius: 2, width: `${Math.min(100, pct)}%`, backgroundColor: pct >= 90 ? "#D97706" : "#4ADE80" }} />
+                      </View>
+                      <Text style={{ fontSize: 11, color: "#6B7280" }}>{t.passenger_count}/{t.total_seats} pax</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          )}
+
+          {/* Départs terminés */}
+          {doneTrips.length > 0 && (
+            <>
+              <Text style={[s.subLabel, { marginTop: 12 }]}>TERMINÉS AUJOURD'HUI ({doneTrips.length})</Text>
+              {doneTrips.map(t => (
+                <View key={t.id} style={[s.tripCard, { backgroundColor: "#F9FAFB" }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Feather name="check-circle" size={16} color="#9CA3AF" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.tripRoute, { color: "#6B7280" }]}>{t.from_city} → {t.to_city}</Text>
+                      <Text style={[s.tripMeta, { marginTop: 2 }]}>{t.departure_time} · {t.bus_name} · {t.passenger_count} pax</Text>
+                    </View>
+                    <View style={[s.badge, { backgroundColor: "#F3F4F6" }]}>
+                      <Text style={[s.badgeText, { color: "#6B7280" }]}>Terminé</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* Aucun départ */}
+          {tripsToday.length === 0 && (
             <View style={s.emptyCard}>
               <Feather name="calendar" size={28} color="#9CA3AF" />
               <Text style={s.emptyText}>Aucun départ aujourd'hui</Text>
             </View>
-          ) : (
-            tripsToday.map((trip) => {
-              const st      = tripStatusLabel(trip.status);
-              const cap     = capacityBadge(trip.capacity_status);
-              const locked  = isLocked(trip.status);
-              const pct     = trip.total_seats > 0 ? (trip.passenger_count / trip.total_seats) * 100 : 0;
-              const delay   = Number(trip.delay_minutes) || 0;
-              const eta     = trip.estimated_arrival_time ?? trip.arrival_time;
-              const isLive  = ["en_route","in_progress","boarding"].includes(trip.status);
+          )}
 
-              return (
-                <Pressable key={trip.id} style={[s.tripCard, isLive && { borderColor: "#BBF7D0", borderWidth: 2 }]}
-                  onPress={() => router.push("/agent/chef-trips" as never)}>
-                  <View style={s.tripCardTop}>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
-                        {locked && <Feather name="lock" size={12} color="#9CA3AF" />}
-                      </View>
-                      <View style={{ flexDirection: "row", gap: 10, marginTop: 3, alignItems: "center" }}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                          <Feather name="clock" size={11} color="#6B7280" />
-                          <Text style={s.tripMeta}>{trip.departure_time}</Text>
-                        </View>
-                        {isLive && eta && (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                            <Feather name="map-pin" size={11} color="#166534" />
-                            <Text style={[s.tripMeta, { color: "#166534" }]}>ETA {eta}</Text>
-                          </View>
-                        )}
-                        {delay > 0 && (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#FEF3C7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
-                            <Feather name="alert-circle" size={10} color="#D97706" />
-                            <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>+{delay} min</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <View style={[s.tripBadge, { backgroundColor: st.bg }]}>
-                      <Text style={[s.tripBadgeText, { color: st.color }]}>{st.label}</Text>
-                    </View>
-                  </View>
-                  {/* Indicateur capacité */}
-                  {cap && (
-                    <View style={[s.capBadge, { backgroundColor: cap.bg }]}>
-                      <Feather name="alert-triangle" size={10} color={cap.color} />
-                      <Text style={[s.capText, { color: cap.color }]}>{cap.label}</Text>
-                    </View>
-                  )}
-                  <View style={s.fillBarBg}>
-                    <View style={[s.fillBar, { width: `${Math.min(100, pct)}%`, backgroundColor: pct >= 100 ? "#DC2626" : pct >= 90 ? "#DC2626" : pct >= 70 ? "#D97706" : "#166534" }]} />
-                  </View>
-                  <Text style={s.fillLabel}>{trip.passenger_count} / {trip.total_seats} passagers ({Math.round(pct)}%)</Text>
+          {/* Prochains départs */}
+          {upcoming.length > 0 && (
+            <>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 }}>
+                <Text style={[s.subLabel, { marginTop: 0 }]}>PROCHAINS DÉPARTS</Text>
+                <Pressable onPress={() => router.push("/agent/chef-trips" as never)}>
+                  <Text style={{ fontSize: 12, color: INDIGO2, fontWeight: "700" }}>Tout voir →</Text>
                 </Pressable>
-              );
-            })
+              </View>
+              {upcoming.map(t => (
+                <View key={t.id} style={[s.tripCard, { backgroundColor: "#F8FAFF" }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Feather name="calendar" size={14} color="#A5B4FC" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.tripRoute}>{t.from_city} → {t.to_city}</Text>
+                      <Text style={s.tripMeta}>{t.date} · {t.departure_time}</Text>
+                    </View>
+                    <View style={[s.badge, { backgroundColor: "#EEF2FF" }]}>
+                      <Text style={[s.badgeText, { color: INDIGO2 }]}>Programmé</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* Bouton accès gestion */}
+          <Pressable style={[s.sectionCTA, { backgroundColor: INDIGO2 }]} onPress={() => router.push("/agent/chef-trips" as never)}>
+            <Feather name="list" size={15} color="white" />
+            <Text style={{ color: "white", fontSize: 13, fontWeight: "700" }}>Gérer tous les départs</Text>
+          </Pressable>
+        </View>
+
+        {/* ══════════════════════════════════
+            C. CAISSES DES AGENTS
+        ══════════════════════════════════ */}
+        <View style={s.section}>
+          <SectionHeader title="Caisses des agents" accent="#D97706"
+            count={pendingCaisses > 0 ? `${pendingCaisses} à valider` : "À jour"}
+          />
+
+          <Pressable
+            style={[s.caisseCard, pendingCaisses > 0 && s.caisseCardUrgent]}
+            onPress={() => router.push({ pathname: "/agent/chef-trips", params: { tab: "caisses" } } as never)}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: pendingCaisses > 0 ? "#FEF3C7" : "#F3F4F6", alignItems: "center", justifyContent: "center" }}>
+                <Feather name="dollar-sign" size={22} color={pendingCaisses > 0 ? "#D97706" : "#9CA3AF"} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#111827" }}>
+                  {pendingCaisses > 0 ? `${pendingCaisses} caisse${pendingCaisses > 1 ? "s" : ""} en attente` : "Aucune caisse en attente"}
+                </Text>
+                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 3 }}>
+                  {pendingCaisses > 0 ? "Valider ou rejeter les soumissions des agents" : "Toutes les caisses ont été traitées"}
+                </Text>
+              </View>
+              {pendingCaisses > 0 && (
+                <View style={{ backgroundColor: "#D97706", borderRadius: 14, minWidth: 32, height: 32, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}>
+                  <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>{pendingCaisses}</Text>
+                </View>
+              )}
+              <Feather name="chevron-right" size={18} color="#9CA3AF" />
+            </View>
+          </Pressable>
+
+          {/* Colis à valider */}
+          {agenceStats && agenceStats.colis.aValider > 0 && (
+            <Pressable
+              style={[s.caisseCard, { borderColor: "#DDD6FE", marginTop: 8 }]}
+              onPress={() => router.push("/agent/colis" as never)}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: "#F5F3FF", alignItems: "center", justifyContent: "center" }}>
+                  <Feather name="package" size={22} color="#7C3AED" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#111827" }}>
+                    {agenceStats.colis.aValider} colis à valider
+                  </Text>
+                  <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 3 }}>
+                    En transit : {agenceStats.colis.enTransit} · En gare : {agenceStats.colis.enGare}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: "#7C3AED", borderRadius: 14, minWidth: 32, height: 32, alignItems: "center", justifyContent: "center", paddingHorizontal: 8 }}>
+                  <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>{agenceStats.colis.aValider}</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color="#9CA3AF" />
+              </View>
+            </Pressable>
           )}
         </View>
 
-        {/* ── Prochains départs ── */}
-        {upcoming.length > 0 && (
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Prochains départs</Text>
-              <Pressable onPress={() => router.push("/agent/chef-trips" as never)}>
-                <Text style={{ color: INDIGO2, fontSize: 13, fontWeight: "600" }}>Voir tout</Text>
-              </Pressable>
-            </View>
-            {upcoming.map((trip) => {
-              const st = tripStatusLabel(trip.status);
-              return (
-                <View key={trip.id} style={[s.tripCard, { backgroundColor: "#F8FAFF" }]}>
-                  <View style={s.tripCardTop}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.tripRoute}>{trip.from_city} → {trip.to_city}</Text>
-                      <Text style={s.tripMeta}>{trip.date} · {trip.departure_time}</Text>
-                    </View>
-                    <View style={[s.tripBadge, { backgroundColor: st.bg }]}>
-                      <Text style={[s.tripBadgeText, { color: st.color }]}>{st.label}</Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
-        {/* ── Revenus du jour ── */}
-        {agenceStats && (
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Chiffre d'affaires du jour</Text>
-              <View style={{ backgroundColor: "#ECFDF5", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#065F46" }}>
-                  {agenceStats.revenue.today.total > 0
-                    ? `${(agenceStats.revenue.today.total / 1000).toFixed(0)}k FCFA`
-                    : "Aucune recette"}
-                </Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-              {[
-                { label: "Billets",   val: agenceStats.revenue.today.billets,  color: "#1D4ED8", bg: "#EFF6FF",  icon: "credit-card" as const },
-                { label: "Colis",     val: agenceStats.revenue.today.colis,    color: "#7C3AED", bg: "#F5F3FF",  icon: "package" as const },
-                { label: "Bagages",   val: agenceStats.revenue.today.bagages,  color: "#059669", bg: "#ECFDF5",  icon: "briefcase" as const },
-              ].map((r, i) => (
-                <View key={i} style={{ flex: 1, backgroundColor: r.bg, borderRadius: 12, padding: 12, alignItems: "center" }}>
-                  <Feather name={r.icon} size={16} color={r.color} />
-                  <Text style={{ fontSize: 9, color: r.color, fontWeight: "600", marginTop: 4 }}>{r.label}</Text>
-                  <Text style={{ fontSize: 13, color: r.color, fontWeight: "800", marginTop: 1 }}>
-                    {r.val > 0 ? `${(r.val / 1000).toFixed(0)}k` : "0"}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            {/* Net après dépenses */}
-            <View style={{
-              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              backgroundColor: agenceStats.revenue.today.net >= 0 ? "#ECFDF5" : "#FEF2F2",
-              borderRadius: 12, padding: 12,
-            }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Feather name="trending-up" size={16} color={agenceStats.revenue.today.net >= 0 ? "#059669" : "#DC2626"} />
-                <Text style={{ fontSize: 13, fontWeight: "700", color: agenceStats.revenue.today.net >= 0 ? "#065F46" : "#991B1B" }}>
-                  Net du jour (après dépenses)
-                </Text>
-              </View>
-              <Text style={{ fontSize: 16, fontWeight: "800", color: agenceStats.revenue.today.net >= 0 ? "#059669" : "#DC2626" }}>
-                {agenceStats.revenue.today.net >= 0 ? "+" : ""}{agenceStats.revenue.today.net.toLocaleString()} FCFA
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Colis de l'agence ── */}
-        {agenceStats && agenceStats.colis.total > 0 && (
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Colis en cours</Text>
-              <Text style={s.sectionCount}>{agenceStats.colis.total} total</Text>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
-              {[
-                { label: "À valider", val: agenceStats.colis.aValider,  color: "#D97706", bg: "#FEF3C7", icon: "clock" as const,       urgent: agenceStats.colis.aValider > 0 },
-                { label: "En gare",   val: agenceStats.colis.enGare,    color: "#1D4ED8", bg: "#EFF6FF", icon: "map-pin" as const,     urgent: false },
-                { label: "En transit",val: agenceStats.colis.enTransit, color: "#7C3AED", bg: "#F5F3FF", icon: "navigation" as const,  urgent: false },
-                { label: "Arrivés",   val: agenceStats.colis.arrives,   color: "#059669", bg: "#ECFDF5", icon: "check-circle" as const,urgent: false },
-              ].map((c, i) => (
-                <View key={i} style={{ flex: 1, backgroundColor: c.bg, borderRadius: 12, padding: 10, alignItems: "center", borderWidth: c.urgent ? 1.5 : 0, borderColor: c.urgent ? "#D97706" : "transparent" }}>
-                  <Feather name={c.icon} size={14} color={c.color} />
-                  <Text style={{ fontSize: 18, fontWeight: "900", color: c.color, marginTop: 4 }}>{c.val}</Text>
-                  <Text style={{ fontSize: 9, color: c.color, fontWeight: "600", textAlign: "center", marginTop: 1 }}>{c.label}</Text>
-                </View>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, backgroundColor: "#F5F3FF", borderRadius: 10 }}
-              onPress={() => router.push("/agent/colis" as never)}
-            >
-              <Feather name="package" size={14} color="#7C3AED" />
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#7C3AED" }}>Gérer les colis</Text>
-              <Feather name="chevron-right" size={14} color="#7C3AED" />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── Bordereaux / Carburant ── */}
+        {/* ══════════════════════════════════
+            D. BORDEREAUX DE DÉPART
+        ══════════════════════════════════ */}
         <View style={s.section}>
-          <View style={s.sectionHeader}>
-            <Text style={s.sectionTitle}>Bordereaux de départ</Text>
-            <Text style={s.sectionCount}>{bordereaux.length} départ{bordereaux.length !== 1 ? "s" : ""}</Text>
-          </View>
+          <SectionHeader
+            title="Bordereaux de départ"
+            accent="#0369A1"
+            count={`${bordereaux.length} départ${bordereaux.length !== 1 ? "s" : ""}`}
+            extra={
+              missingFuel.length > 0
+                ? <View style={{ backgroundColor: "#FEF3C7", borderRadius: 12, paddingHorizontal: 8, paddingVertical: 3, flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Feather name="alert-circle" size={11} color="#D97706" />
+                    <Text style={{ fontSize: 11, color: "#D97706", fontWeight: "700" }}>{missingFuel.length} sans carburant</Text>
+                  </View>
+                : undefined
+            }
+          />
+
           {bordereaux.length === 0 ? (
             <View style={s.emptyCard}>
               <Feather name="file-text" size={28} color="#9CA3AF" />
               <Text style={s.emptyText}>Aucun départ ces 7 derniers jours</Text>
             </View>
           ) : (
-            bordereaux.slice(0, 8).map((b) => (
-              <View key={b.id} style={[s.tripCard, !b.hasFuel && { borderColor: "#FDE68A", borderWidth: 2 }]}>
-                {/* Trip header */}
-                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+            bordereaux.slice(0, 10).map((b) => (
+              <View key={b.id} style={[s.bordCard, !b.hasFuel && s.bordCardIncomplete]}>
+
+                {/* Ligne 1 : Route + statut carburant */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.tripRoute}>{b.from} → {b.to}</Text>
-                    <Text style={s.tripMeta}>{b.date} · {b.departureTime} · {b.busName}</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#111827", letterSpacing: -0.3 }}>
+                      {b.from} → {b.to}
+                    </Text>
                   </View>
                   {b.hasFuel ? (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#DCFCE7", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}>
-                      <Feather name="check-circle" size={12} color="#059669" />
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#059669" }}>COMPLET</Text>
+                    <View style={s.statusPillOk}>
+                      <Feather name="check-circle" size={11} color="#059669" />
+                      <Text style={[s.statusPillText, { color: "#059669" }]}>Clôturé</Text>
                     </View>
                   ) : (
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 }}>
-                      <Feather name="alert-circle" size={12} color="#D97706" />
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: "#D97706" }}>CARBURANT MANQUANT</Text>
+                    <View style={s.statusPillWarn}>
+                      <Feather name="alert-circle" size={11} color="#D97706" />
+                      <Text style={[s.statusPillText, { color: "#D97706" }]}>Carburant manquant</Text>
                     </View>
                   )}
                 </View>
 
-                {/* Revenue breakdown */}
-                <View style={{ flexDirection: "row", gap: 6, marginBottom: 8 }}>
-                  {[
-                    { label: "Billets", val: b.ticketRevenue, color: "#1D4ED8", bg: "#EFF6FF" },
-                    { label: "Bagages", val: b.bagageRevenue, color: "#7C3AED", bg: "#F5F3FF" },
-                    { label: "Colis", val: b.colisRevenue, color: "#059669", bg: "#ECFDF5" },
-                  ].map((r, i) => (
-                    <View key={i} style={{ flex: 1, backgroundColor: r.bg, borderRadius: 8, padding: 6, alignItems: "center" }}>
-                      <Text style={{ fontSize: 9, color: r.color, fontWeight: "600" }}>{r.label}</Text>
-                      <Text style={{ fontSize: 11, color: r.color, fontWeight: "800", marginTop: 1 }}>
-                        {r.val > 0 ? `${(r.val / 1000).toFixed(0)}k` : "0"}
-                      </Text>
-                    </View>
-                  ))}
+                {/* Ligne 2 : Métadonnées du trajet */}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                  <Feather name="calendar" size={11} color="#9CA3AF" />
+                  <Text style={s.tripMeta}>{b.date}</Text>
+                  <Text style={{ color: "#D1D5DB" }}>·</Text>
+                  <Feather name="clock" size={11} color="#9CA3AF" />
+                  <Text style={s.tripMeta}>{b.departureTime}</Text>
+                  <Text style={{ color: "#D1D5DB" }}>·</Text>
+                  <Feather name="truck" size={11} color="#9CA3AF" />
+                  <Text style={s.tripMeta}>{b.busName}</Text>
+                  <Text style={{ color: "#D1D5DB" }}>·</Text>
+                  <Feather name="users" size={11} color="#9CA3AF" />
+                  <Text style={s.tripMeta}>{b.passengersCount} pax</Text>
                 </View>
 
-                {/* Totals + actions */}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                {/* Ligne 3 : Recettes ventilées */}
+                <View style={s.revenueRow}>
+                  <View style={s.revTile}>
+                    <Text style={[s.revTileLabel, { color: "#1D4ED8" }]}>Billets</Text>
+                    <Text style={[s.revTileValue, { color: "#1D4ED8" }]}>
+                      {b.ticketRevenue > 0 ? `${Math.round(b.ticketRevenue / 1000)}k` : "—"}
+                    </Text>
+                  </View>
+                  <View style={s.revTile}>
+                    <Text style={[s.revTileLabel, { color: "#7C3AED" }]}>Bagages</Text>
+                    <Text style={[s.revTileValue, { color: "#7C3AED" }]}>
+                      {b.bagageRevenue > 0 ? `${Math.round(b.bagageRevenue / 1000)}k` : "—"}
+                    </Text>
+                  </View>
+                  <View style={s.revTile}>
+                    <Text style={[s.revTileLabel, { color: "#059669" }]}>Colis</Text>
+                    <Text style={[s.revTileValue, { color: "#059669" }]}>
+                      {b.colisRevenue > 0 ? `${Math.round(b.colisRevenue / 1000)}k` : "—"}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Ligne 4 : Total + Net ou carburant manquant */}
+                <View style={[s.totalRow, { borderTopColor: "#F1F5F9" }]}>
                   <View>
-                    <Text style={{ fontSize: 10, color: "#6B7280" }}>Recettes totales</Text>
-                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>
+                    <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "600" }}>RECETTE TOTALE</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "900", color: "#111827", marginTop: 1 }}>
                       {b.totalRecettes.toLocaleString()} FCFA
                     </Text>
                   </View>
                   {b.hasFuel ? (
                     <View style={{ alignItems: "flex-end" }}>
-                      <Text style={{ fontSize: 10, color: "#6B7280" }}>Net (après carburant)</Text>
-                      <Text style={{ fontSize: 14, fontWeight: "800", color: b.netRevenue >= 0 ? "#059669" : "#DC2626" }}>
+                      <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "600" }}>NET (après carburant)</Text>
+                      <Text style={{ fontSize: 16, fontWeight: "900", color: b.netRevenue >= 0 ? "#059669" : "#DC2626", marginTop: 1 }}>
                         {b.netRevenue >= 0 ? "+" : ""}{b.netRevenue.toLocaleString()} FCFA
                       </Text>
                     </View>
                   ) : (
-                    <Pressable
-                      onPress={() => { setFuelModal({ visible: true, trip: b }); setFuelAmount(""); setFuelDesc(""); }}
-                      style={{ flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: INDIGO2, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }}
-                    >
-                      <Feather name="plus-circle" size={13} color="white" />
-                      <Text style={{ fontSize: 12, fontWeight: "700", color: "white" }}>Ajouter carburant</Text>
-                    </Pressable>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ fontSize: 10, color: "#9CA3AF", fontWeight: "600" }}>CARBURANT</Text>
+                      <Text style={{ fontSize: 12, color: "#D97706", fontWeight: "700", marginTop: 1 }}>Non renseigné</Text>
+                    </View>
                   )}
                 </View>
-                {/* Print button */}
-                <Pressable
-                  onPress={() => printBordereau(b)}
-                  disabled={printingId === b.id}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, alignSelf: "stretch", backgroundColor: "#F1F5F9", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: "#E2E8F0", justifyContent: "center" }}
-                >
-                  {printingId === b.id
-                    ? <ActivityIndicator size="small" color={INDIGO} />
-                    : <Feather name="printer" size={14} color={INDIGO} />}
-                  <Text style={{ fontSize: 12, fontWeight: "700", color: INDIGO }}>
-                    {printingId === b.id ? "Génération…" : "Imprimer le bordereau"}
-                  </Text>
-                </Pressable>
+
+                {/* Ligne 5 : Actions */}
+                <View style={s.actionsRow}>
+                  {!b.hasFuel && (
+                    <Pressable
+                      style={s.btnPrimary}
+                      onPress={() => { setFuelModal({ visible: true, trip: b }); setFuelAmount(""); setFuelDesc(""); }}
+                    >
+                      <Feather name="plus-circle" size={14} color="white" />
+                      <Text style={s.btnPrimaryText}>Ajouter carburant</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    style={[s.btnSecondary, b.hasFuel && { flex: 1 }]}
+                    onPress={() => printBordereau(b)}
+                    disabled={printingId === b.id}
+                  >
+                    {printingId === b.id
+                      ? <ActivityIndicator size="small" color={INDIGO} />
+                      : <Feather name="printer" size={14} color={INDIGO} />}
+                    <Text style={s.btnSecondaryText}>
+                      {printingId === b.id ? "Génération…" : "Imprimer le bordereau"}
+                    </Text>
+                  </Pressable>
+                </View>
+
               </View>
             ))
           )}
         </View>
+
+        {/* Raccourci rapport */}
+        <View style={{ marginHorizontal: 16, marginTop: 8 }}>
+          <Pressable
+            style={[s.sectionCTA, { backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" }]}
+            onPress={() => router.push("/agent/rapport" as never)}
+          >
+            <Feather name="bar-chart-2" size={15} color={INDIGO2} />
+            <Text style={{ color: INDIGO2, fontSize: 13, fontWeight: "700" }}>Voir les rapports de l'agence</Text>
+          </Pressable>
+        </View>
+
       </ScrollView>
 
       {/* ── Modal Carburant ── */}
       <Modal visible={fuelModal.visible} transparent animationType="slide" onRequestClose={() => setFuelModal({ visible: false, trip: null })}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, justifyContent: "flex-end" }}>
-          <View style={{ backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, gap: 16 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: "#111827" }}>Bordereau carburant</Text>
-              <Pressable onPress={() => setFuelModal({ visible: false, trip: null })}>
-                <Feather name="x" size={22} color="#6B7280" />
+          <View style={s.modal}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: "#111827" }}>⛽ Coût carburant</Text>
+                {fuelModal.trip && (
+                  <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                    {fuelModal.trip.from} → {fuelModal.trip.to} · {fuelModal.trip.date}
+                  </Text>
+                )}
+              </View>
+              <Pressable onPress={() => setFuelModal({ visible: false, trip: null })} style={s.modalClose}>
+                <Feather name="x" size={18} color="#6B7280" />
               </Pressable>
             </View>
             {fuelModal.trip && (
-              <View style={{ backgroundColor: "#F3F4F6", borderRadius: 12, padding: 12 }}>
-                <Text style={{ fontWeight: "700", color: "#111827" }}>
-                  {fuelModal.trip.from} → {fuelModal.trip.to}
-                </Text>
-                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
-                  {fuelModal.trip.date} · {fuelModal.trip.departureTime} · {fuelModal.trip.busName}
-                </Text>
-                <Text style={{ fontSize: 13, color: "#1D4ED8", fontWeight: "700", marginTop: 4 }}>
-                  Recettes: {fuelModal.trip.totalRecettes.toLocaleString()} FCFA
-                </Text>
+              <View style={{ backgroundColor: "#F8FAFF", borderRadius: 12, padding: 12, marginBottom: 16, flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ fontSize: 13, color: "#374151", fontWeight: "600" }}>Recettes à couvrir</Text>
+                <Text style={{ fontSize: 13, color: INDIGO2, fontWeight: "800" }}>{fuelModal.trip.totalRecettes.toLocaleString()} FCFA</Text>
               </View>
             )}
-            <View style={{ gap: 10 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>Montant carburant (FCFA) *</Text>
-              <TextInput
-                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, padding: 14, fontSize: 16, fontWeight: "700", color: "#111827" }}
-                placeholder="Ex: 45000"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="numeric"
-                value={fuelAmount}
-                onChangeText={setFuelAmount}
-              />
-              <Text style={{ fontSize: 13, fontWeight: "600", color: "#374151" }}>Description (optionnel)</Text>
-              <TextInput
-                style={{ borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12, padding: 14, fontSize: 14, color: "#111827" }}
-                placeholder="Ex: Plein + 50L gasoil"
-                placeholderTextColor="#9CA3AF"
-                value={fuelDesc}
-                onChangeText={setFuelDesc}
-              />
-            </View>
+            <Text style={s.inputLabel}>Montant carburant (FCFA) *</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Ex: 45 000"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="numeric"
+              value={fuelAmount}
+              onChangeText={setFuelAmount}
+            />
+            <Text style={[s.inputLabel, { marginTop: 12 }]}>Description (optionnel)</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Ex: Plein gasoil Bouaké"
+              placeholderTextColor="#9CA3AF"
+              value={fuelDesc}
+              onChangeText={setFuelDesc}
+            />
             <Pressable
               onPress={submitFuel}
               disabled={fuelLoading}
-              style={{ backgroundColor: INDIGO2, borderRadius: 14, paddingVertical: 16, alignItems: "center", opacity: fuelLoading ? 0.6 : 1 }}
+              style={[s.modalBtn, fuelLoading && { opacity: 0.6 }]}
             >
               {fuelLoading
                 ? <ActivityIndicator color="white" />
-                : <Text style={{ color: "white", fontSize: 15, fontWeight: "800" }}>Valider le bordereau carburant</Text>
-              }
+                : <Text style={{ color: "white", fontSize: 15, fontWeight: "800" }}>Valider le bordereau carburant</Text>}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -1053,15 +867,17 @@ export default function ChefHome() {
       <Pressable style={s.fab} onPress={() => router.push("/agent/chef-trips" as never)}>
         <Feather name="plus" size={24} color="white" />
       </Pressable>
+
     </SafeAreaView>
   );
 }
 
+/* ─── Styles ─── */
 const s = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 },
   headerRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
-  headerGreeting: { fontSize: 22, fontWeight: "800", color: "white" },
-  headerRole: { fontSize: 13, color: "#A5B4FC", marginTop: 2, marginBottom: 6 },
+  greeting: { fontSize: 22, fontWeight: "800", color: "white" },
+  role: { fontSize: 13, color: "#A5B4FC", marginTop: 2, marginBottom: 6 },
   agenceBadge: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   agenceText: { color: "#C7D2FE", fontSize: 13 },
   homeBtn: { padding: 10, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 12 },
@@ -1070,71 +886,104 @@ const s = StyleSheet.create({
   liveText: { color: "#C7D2FE", fontSize: 12 },
 
   statsGrid: {
-    flexDirection: "row", flexWrap: "wrap", gap: 12,
+    flexDirection: "row", flexWrap: "wrap", gap: 10,
     paddingHorizontal: 16, marginTop: -16, paddingTop: 0,
   },
-  statCard: {
-    flex: 1, minWidth: "44%", borderRadius: 18, padding: 16,
-    shadowColor: "#3730A3", shadowOpacity: 0.10, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 }, elevation: 4,
-  },
+  statCard: { flex: 1, minWidth: "44%", borderRadius: 18, padding: 16, elevation: 2 },
   statIcon: { width: 38, height: 38, borderRadius: 12, justifyContent: "center", alignItems: "center", marginBottom: 10 },
   statValue: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
-  statLabel: { fontSize: 11, color: "#6B7280", marginTop: 3, fontWeight: "600" },
+  statLabel: { fontSize: 10, color: "#6B7280", marginTop: 3, fontWeight: "600" },
 
-  section: { marginHorizontal: 16, marginTop: 24 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#111827", letterSpacing: -0.3 },
-  sectionCount: { fontSize: 12, color: "#6B7280", backgroundColor: "#F3F4F6", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, fontWeight: "600" },
-
-  actionBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 7, paddingVertical: 14, borderRadius: 16,
+  revenueStrip: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "white", marginHorizontal: 16, marginTop: 12,
+    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 8,
+    borderWidth: 1, borderColor: "#F1F5F9",
   },
-  actionBtnText: { fontSize: 13, fontWeight: "700" },
+  revStripLabel: { fontSize: 10, color: "#9CA3AF", fontWeight: "600", marginBottom: 3 },
+  revStripValue: { fontSize: 15, fontWeight: "800" },
+  revDivider: { width: 1, height: 36, backgroundColor: "#F1F5F9" },
+
+  section: { marginHorizontal: 16, marginTop: 28 },
+  subLabel: { fontSize: 10, fontWeight: "800", color: "#9CA3AF", letterSpacing: 1, marginBottom: 8 },
+
+  tripCardActive: {
+    backgroundColor: "white", borderRadius: 16, padding: 14, marginBottom: 8,
+    borderWidth: 2, elevation: 1,
+  },
+  tripCard: {
+    backgroundColor: "white", borderRadius: 14, padding: 13, marginBottom: 8,
+    borderWidth: 1, borderColor: "#EEF2F8",
+  },
+  tripRoute: { fontSize: 14, fontWeight: "700", color: "#111827" },
+  tripMeta: { fontSize: 11, color: "#9CA3AF", fontWeight: "500" },
+  badge: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
+  badgeText: { fontSize: 10, fontWeight: "700" },
+
+  sectionCTA: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, paddingVertical: 13, borderRadius: 14, marginTop: 12,
+  },
+
+  caisseCard: {
+    backgroundColor: "white", borderRadius: 16, padding: 16,
+    borderWidth: 1.5, borderColor: "#F1F5F9",
+  },
+  caisseCardUrgent: {
+    borderColor: "#FCD34D", backgroundColor: "#FFFBEB",
+  },
+
+  /* Bordereaux */
+  bordCard: {
+    backgroundColor: "white", borderRadius: 16, padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: "#EEF2F8",
+  },
+  bordCardIncomplete: {
+    borderColor: "#FDE68A", borderWidth: 2,
+  },
+  statusPillOk: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#ECFDF5", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  statusPillWarn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#FEF3C7", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
+  statusPillText: { fontSize: 10, fontWeight: "700" },
+
+  revenueRow: { flexDirection: "row", gap: 6, marginBottom: 12 },
+  revTile: { flex: 1, backgroundColor: "#F8FAFF", borderRadius: 10, padding: 9, alignItems: "center" },
+  revTileLabel: { fontSize: 9, fontWeight: "700", marginBottom: 3 },
+  revTileValue: { fontSize: 13, fontWeight: "900" },
+
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, paddingTop: 12, marginBottom: 12 },
+
+  actionsRow: { flexDirection: "row", gap: 8 },
+  btnPrimary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: INDIGO2, borderRadius: 12, paddingVertical: 11 },
+  btnPrimaryText: { color: "white", fontSize: 12, fontWeight: "700" },
+  btnSecondary: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "#F1F5F9", borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: "#E2E8F0" },
+  btnSecondaryText: { color: INDIGO, fontSize: 12, fontWeight: "700" },
 
   emptyCard: {
-    backgroundColor: "white", borderRadius: 18, padding: 28,
-    alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#F3F4F6",
-    shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    backgroundColor: "white", borderRadius: 16, padding: 28,
+    alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#F1F5F9",
   },
   emptyText: { color: "#9CA3AF", fontSize: 14 },
 
-  busCard: {
-    backgroundColor: "white", borderRadius: 16, padding: 15, marginBottom: 10,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    borderWidth: 1, borderColor: "#EEF2F8",
-    shadowColor: "#3730A3", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2,
+  /* Modal */
+  modal: {
+    backgroundColor: "white", borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, gap: 4,
   },
-  busCardAvail: { borderColor: "#BBF7D0", backgroundColor: "#F0FDF4" },
-  busCardLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  busIcon: { width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center" },
-  busName: { fontSize: 14, fontWeight: "700", color: "#111827", letterSpacing: -0.2 },
-  busPlate: { fontSize: 12, color: "#6B7280", marginTop: 1, fontWeight: "500" },
-  busRoute: { fontSize: 11, color: "#9CA3AF", marginTop: 2 },
-  busBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  busBadgeText: { fontSize: 11, fontWeight: "700" },
-
-  tripCard: {
-    backgroundColor: "white", borderRadius: 16, padding: 15, marginBottom: 10,
-    borderWidth: 1, borderColor: "#EEF2F8",
-    shadowColor: "#3730A3", shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 2,
+  modalClose: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center" },
+  inputLabel: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
+  input: {
+    borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 12,
+    padding: 14, fontSize: 16, fontWeight: "700", color: "#111827",
   },
-  tripCardTop: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  tripRoute: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  tripMeta: { fontSize: 12, color: "#6B7280", marginTop: 3 },
-  tripBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  tripBadgeText: { fontSize: 11, fontWeight: "700" },
-  fillBarBg: { height: 5, backgroundColor: "#F3F4F6", borderRadius: 4, marginTop: 10, overflow: "hidden" },
-  fillBar: { height: 5, borderRadius: 4 },
-  fillLabel: { fontSize: 11, color: "#9CA3AF", marginTop: 4 },
-  capBadge: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginTop: 8 },
-  capText: { fontSize: 11, fontWeight: "700" },
+  modalBtn: {
+    backgroundColor: INDIGO2, borderRadius: 14, paddingVertical: 16,
+    alignItems: "center", marginTop: 16,
+  },
 
   fab: {
     position: "absolute", bottom: 28, right: 20,
     width: 58, height: 58, borderRadius: 29,
     backgroundColor: INDIGO2, justifyContent: "center", alignItems: "center",
-    shadowColor: INDIGO, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
+    elevation: 8,
   },
 });
