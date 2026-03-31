@@ -179,13 +179,30 @@ export default function EmbarquementScreen() {
   const knownIdsRef = useRef<Set<string>>(new Set());
   const newBadgeTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
+  /* ── Toast animé: nouveau(x) passager(s) ─────────── */
+  const [toastMsg, setToastMsg]     = useState<string | null>(null);
+  const toastAnim  = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ND = Platform.OS !== "web";
+
+  const showPassengerToast = useCallback((count: number) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    const label = count === 1 ? "1 nouveau passager détecté" : `${count} nouveaux passagers détectés`;
+    setToastMsg(label);
+    toastAnim.setValue(0);
+    Animated.spring(toastAnim, { toValue: 1, useNativeDriver: ND, tension: 80, friction: 7 }).start();
+    toastTimer.current = setTimeout(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 300, useNativeDriver: ND }).start(() => setToastMsg(null));
+    }, 4500);
+  }, [toastAnim, ND]);
+
   /* Refs pour accès synchrone dans les callbacks async / useOnSync */
   const selectedTripRef = useRef<TodayTrip | null>(null);
   const activeTabRef    = useRef<MainTab>("billets");
   const loadBoardingRef = useRef<((id: string, silent?: boolean) => Promise<void>) | null>(null);
 
   /* Sync croisé: déclenché AVANT le return conditionnel ── */
-  useOnSync(["ticket", "reservation"], () => {
+  useOnSync(["ticket", "reservation", "boarding"], () => {
     if (activeTabRef.current === "depart" && selectedTripRef.current) {
       loadBoardingRef.current?.(selectedTripRef.current.id, true);
     }
@@ -261,6 +278,7 @@ export default function EmbarquementScreen() {
         const incoming = (data.passengers ?? []).map(p => p.bookingId);
         const fresh = incoming.filter(id => !knownIdsRef.current.has(id));
         if (fresh.length > 0) {
+          showPassengerToast(fresh.length);
           setNewPassengerIds(prev => {
             const next = new Set(prev);
             fresh.forEach(id => next.add(id));
@@ -662,6 +680,10 @@ export default function EmbarquementScreen() {
           ref:      res.bookingRef,
         });
         if (activeTripId) loadEnRoute(activeTripId);
+        /* Signaler immédiatement aux autres écrans qu'un passager a embarqué */
+        triggerSync("boarding");
+        /* Recharger silencieusement la liste de présences */
+        if (selectedTripRef.current) loadBoardingRef.current?.(selectedTripRef.current.id, true);
       }
     } catch (e: any) {
       setScanBusy(false);
@@ -781,6 +803,8 @@ export default function EmbarquementScreen() {
       setValidated(true);
       setFound(prev => prev ? { ...prev, status: "confirmed" } : prev);
       if (activeTripId) loadEnRoute(activeTripId);
+      triggerSync("boarding");
+      if (selectedTripRef.current) loadBoardingRef.current?.(selectedTripRef.current.id, true);
     } catch (e: any) {
       Alert.alert("Erreur", e?.message ?? "Impossible de valider l'embarquement");
     } finally {
@@ -1075,6 +1099,34 @@ export default function EmbarquementScreen() {
 
       {/* Offline Banner */}
       <OfflineBanner status={networkStatus} />
+
+      {/* ── Toast: nouveaux passagers détectés ───────── */}
+      {toastMsg && (
+        <Animated.View
+          style={{
+            position: "absolute", top: 56, left: 16, right: 16, zIndex: 999,
+            opacity: toastAnim,
+            transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+          }}
+        >
+          <View style={{
+            flexDirection: "row", alignItems: "center", gap: 10,
+            backgroundColor: "#059669", borderRadius: 14,
+            paddingHorizontal: 18, paddingVertical: 13,
+            shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
+            elevation: 8,
+          }}>
+            <Ionicons name="person-add" size={18} color="#fff" />
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14, flex: 1 }}>{toastMsg}</Text>
+            <View style={{
+              backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 8,
+              paddingHorizontal: 8, paddingVertical: 3,
+            }}>
+              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "600" }}>LIVE</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Header */}
       <View style={styles.header}>

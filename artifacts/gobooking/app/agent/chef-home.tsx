@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -16,6 +18,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useOnSync } from "@/context/SyncContext";
 import { apiFetch } from "@/utils/api";
 
 const INDIGO  = "#3730A3";
@@ -108,6 +111,24 @@ export default function ChefHome() {
     interval.current = setInterval(load, 30000);
     return () => { if (interval.current) clearInterval(interval.current); };
   }, [load]);
+
+  /* Sync immédiate: re-fetch quand un ticket est vendu, un passager embarqué
+     ou une réservation confirmée — même sans attendre le poll 30s */
+  useOnSync(["boarding", "ticket", "reservation"], load);
+
+  /* ── Pulsation du point LIVE ── */
+  const ND = Platform.OS !== "web";
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: ND }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: ND }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulseAnim, ND]);
 
   const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
 
@@ -209,11 +230,11 @@ export default function ChefHome() {
 
           {/* Live indicator */}
           <View style={s.liveBadge}>
-            <View style={s.liveDot} />
+            <Animated.View style={[s.liveDot, { opacity: pulseAnim }]} />
             <Text style={s.liveText}>
               {lastSync
-                ? `Sync ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")} · Refresh 30s`
-                : "Chargement en cours…"}
+                ? `En direct · màj ${lastSync.getHours().toString().padStart(2,"0")}:${lastSync.getMinutes().toString().padStart(2,"0")}:${lastSync.getSeconds().toString().padStart(2,"0")}`
+                : "Connexion…"}
             </Text>
           </View>
         </LinearGradient>
