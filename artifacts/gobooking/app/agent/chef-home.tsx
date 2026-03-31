@@ -229,9 +229,9 @@ export default function ChefHome() {
               <Feather name="list" size={16} color="white" />
               <Text style={[s.actionBtnText, { color: "white" }]} numberOfLines={1} adjustsFontSizeToFit>Gérer les départs</Text>
             </Pressable>
-            <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/caisse" as never)}>
+            <Pressable style={[s.actionBtn, { backgroundColor: "white", borderWidth: 1.5, borderColor: INDIGO2 }]} onPress={() => router.push("/agent/rapport" as never)}>
               <Feather name="bar-chart-2" size={16} color={INDIGO2} />
-              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Ma caisse</Text>
+              <Text style={[s.actionBtnText, { color: INDIGO2 }]} numberOfLines={1} adjustsFontSizeToFit>Rapports</Text>
             </Pressable>
           </View>
           {/* Caisses agents */}

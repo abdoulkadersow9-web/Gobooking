@@ -977,6 +977,13 @@ export default function EmbarquementScreen() {
             </View>
           )}
           <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center", marginLeft: 2 }}
+            hitSlop={8}
+            onPress={() => router.push("/agent/rapport" as never)}
+          >
+            <Feather name="alert-triangle" size={16} color="#FCA5A5" />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={{ backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center", marginLeft: 6 }}
             hitSlop={8}
             onPress={() => {
@@ -1612,14 +1619,6 @@ export default function EmbarquementScreen() {
         </View>
       )}
 
-      {/* Rapport button */}
-      <TouchableOpacity
-        style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#BE123C", borderRadius: 14, paddingVertical: 14, margin: 16, marginTop: 0, shadowColor: "#BE123C", shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-        onPress={() => router.push("/agent/rapport" as never)}
-      >
-        <Feather name="alert-triangle" size={16} color="#fff" />
-        <Text style={{ fontSize: 14, fontWeight: "800", color: "#fff" }}>Faire un rapport</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }

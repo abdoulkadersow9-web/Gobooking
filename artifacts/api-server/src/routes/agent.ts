@@ -916,6 +916,7 @@ router.get("/online-bookings", async (req, res) => {
           date: trip.date,
           departureTime: trip.departureTime,
           busName: trip.busName,
+          status: trip.status,
           guichetSeats: trip.guichetSeats,
           onlineSeats: trip.onlineSeats,
           totalSeats: trip.totalSeats,

@@ -1,0 +1,136 @@
+J’ai vérifié les pages en détail avec les captures, et il faut maintenant corriger l’application page par page, proprement, sans mélanger les rôles, sans ajouter des éléments hors programme, et en respectant strictement la logique définie depuis le début.
+
+POINT TRÈS IMPORTANT :
+On ne mélange plus les pages.
+On corrige les pages pas à pas.
+On applique exactement mon programme.
+On n’ajoute pas des éléments qui ne sont pas dans ma logique.
+Chaque rôle doit gérer uniquement son rôle.
+Tout ce qui doit ressortir doit être visible directement dans l’interface.
+
+1. PROBLÈME GLOBAL
+Les pages ne sont pas encore correctes :
+- les logiques métier ne sont pas respectées
+- certaines pages sont mélangées
+- certains blocs obligatoires manquent
+- certains éléments apparaissent chez les mauvais rôles
+- l’ouverture de l’application bug encore
+- les logos / affichages au démarrage ne ressortent pas bien
+- les déconnexions sont bizarres
+- certaines pages ne sont pas fluides
+- les icônes et blocs ne sont pas encore harmonisés partout
+
+Je veux maintenant une correction stricte, structurée, propre et visible immédiatement.
+
+2. CHEF D’AGENCE
+Sur la capture, on voit “Ma caisse”.
+Ceci n’est pas correct.
+Le chef d’agence ne doit pas avoir de caisse.
+
+À corriger immédiatement :
+- supprimer toute logique de caisse sur la page Chef d’agence
+- afficher à la place les bons blocs de supervision
+- faire ressortir tous les bordereaux des agents
+- faire ressortir tous les départs présents
+- faire ressortir tous les états utiles au chef d’agence
+- le chef d’agence doit superviser, contrôler, voir les agents, voir les départs, voir les validations, voir les bordereaux, mais ne pas gérer une caisse personnelle
+
+3. AGENT GUICHET
+Il faut améliorer fortement la page Agent guichet.
+La page doit être fluide, propre, logique et complète.
+
+Rappels de logique à respecter :
+- quand le car est en route, l’agent guichet ne vend plus de ticket
+- dès qu’un car est en route, il doit être considéré comme disponible en ligne selon la logique GoBooking
+- l’agent guichet doit travailler uniquement sur les départs encore ouverts au guichet
+- tout ce qui concerne sa caisse, ses feuilles utiles, ses opérations et ses validations doit être clair et visible
+- aucun mélange avec les rôles de réservation, embarquement ou chef d’agence
+
+Il faut revoir :
+- la structure de la page
+- les blocs d’action
+- la visibilité de la caisse du guichet
+- les feuilles / états / bordereaux utiles
+- la fluidité générale
+- les doublons et répétitions
+
+4. AGENT RÉSERVATION
+La page Réservations n’est pas encore correcte.
+Les cars en route, les réservations et les statuts sont encore mélangés.
+
+La logique à respecter :
+- l’agent réservation gère les réservations
+- il doit voir clairement les réservations en attente, confirmées, annulées ou en route selon la logique définie
+- si bagages ou colis sont liés, tout doit ressortir clairement
+- les validations doivent être propres
+- les blocs doivent être visibles, lisibles, séparés et non mélangés
+- les cars en route doivent être visibles correctement selon la logique métier, pas en désordre
+
+Je veux une page réservation plus fluide, mieux structurée, avec des blocs clairs, sans confusion.
+
+5. AGENT EMBARQUEMENT
+La page Embarquement doit être améliorée.
+Elle ne doit pas être vide, étrange ou incomplète.
+Tout ce qui est utile à l’embarquement doit ressortir immédiatement.
+
+À faire :
+- rendre la page plus fluide
+- rendre la logique d’embarquement visible
+- afficher correctement les passagers, billets, QR code, statuts, retards, validations
+- afficher les éléments utiles pour contrôler l’embarquement
+- éviter les vides, bugs ou zones qui ne ressortent pas
+- harmoniser les blocs et les icônes avec le reste de l’application
+
+6. HOMOGÉNÉITÉ ENTRE LES PAGES
+Tout ce qui doit être présent dans une logique équivalente doit être visible partout où c’est nécessaire.
+Je ne veux pas de pages incomplètes ou incohérentes.
+
+Exemple :
+- si une liste de passagers est nécessaire pour un rôle, elle doit être visible là où elle doit être visible
+- si un bordereau est nécessaire, il doit ressortir chez le bon rôle
+- si un état de départ est nécessaire, il doit être visible au bon endroit
+- les rôles doivent être cohérents entre eux, sans répétitions inutiles, sans trous, sans mélange
+
+7. INTERFACE / DESIGN / ICÔNES
+Il faut aussi vérifier :
+- les icônes présentes sur les pages
+- les blocs d’actions
+- les couleurs
+- les tailles
+- les répétitions
+- les zones vides
+- les boutons rouges inutiles ou mal placés
+- les éléments qui cassent la fluidité visuelle
+
+Je veux une interface moderne, professionnelle, propre, lisible et cohérente sur toutes les pages.
+
+8. BUGS À L’OUVERTURE / LOGOS / DÉCONNEXION
+Il faut corriger immédiatement :
+- les bugs au démarrage
+- les pages qui s’ouvrent mal
+- les logos qui ne s’affichent pas correctement
+- les déconnexions anormales ou bizarres
+- tout ce qui donne une impression d’application non stable
+
+9. MÉTHODE DE TRAVAIL À RESPECTER
+Corriger strictement page par page.
+Ne pas mélanger les rôles.
+Ne pas ajouter des éléments hors programme.
+Respecter exactement la logique GoBooking définie depuis le départ.
+Tout ce que j’ai déjà demandé doit être appliqué visiblement dans le code et dans l’interface.
+Je veux des améliorations concrètes, visibles immédiatement, propres et sans régression.
+
+OBJECTIF FINAL :
+Je veux que chaque page soit :
+- fluide
+- logique
+- claire
+- moderne
+- stable
+- complète selon son rôle
+- sans mélange
+- sans doublons
+- sans bug
+- sans éléments hors programme
+
+Merci de reprendre les pages sérieusement, rôle par rôle, avec vérification complète de la logique, du design et des données affichées.

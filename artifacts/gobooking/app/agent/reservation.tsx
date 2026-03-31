@@ -49,6 +49,7 @@ interface OnlineBooking {
     date: string;
     departureTime: string;
     busName: string;
+    status?: string;
     guichetSeats: number;
     onlineSeats: number;
     totalSeats: number;
@@ -71,6 +72,16 @@ function paymentLabel(p: string) {
   if (p === "card")         return "Carte bancaire";
   if (p === "cash")         return "Espèces";
   return p;
+}
+
+function tripStatusBadge(s?: string) {
+  if (s === "en_route" || s === "in_progress") return { label: "En route", color: "#166534", bg: "#DCFCE7", icon: "navigate" as const };
+  if (s === "boarding")   return { label: "Embarquement", color: "#7C3AED", bg: "#EDE9FE", icon: "bus" as const };
+  if (s === "scheduled")  return { label: "Programmé",    color: "#D97706", bg: "#FEF3C7", icon: "time-outline" as const };
+  if (s === "arrived")    return { label: "Arrivé",        color: "#0369A1", bg: "#E0F2FE", icon: "checkmark-circle-outline" as const };
+  if (s === "completed")  return { label: "Terminé",       color: "#6B7280", bg: "#F3F4F6", icon: "checkmark-done" as const };
+  if (s === "cancelled")  return { label: "Annulé",        color: "#DC2626", bg: "#FEE2E2", icon: "close-circle-outline" as const };
+  return null;
 }
 
 function baggageTypeLabel(t: string | null) {
@@ -131,10 +142,10 @@ export default function AgentReservation() {
     }
   }, [token]);
 
-  /* Auto-polling every 15 seconds */
+  /* Auto-polling every 30 seconds */
   useEffect(() => {
     load();
-    pollRef.current = setInterval(() => { load(true); }, 15000);
+    pollRef.current = setInterval(() => { load(true); }, 30000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [load]);
 
@@ -312,32 +323,52 @@ export default function AgentReservation() {
             return (
               <View key={group.tripKey} style={{ marginBottom: 8 }}>
                 {/* Departure header */}
-                <View style={{
-                  flexDirection: "row", alignItems: "center", backgroundColor: groupPending > 0 ? "#FEF3C7" : "#F0F9FF",
-                  borderRadius: 12, padding: 12, marginBottom: 8, gap: 10,
-                  borderLeftWidth: 4, borderLeftColor: groupPending > 0 ? "#D97706" : TEAL,
-                }}>
-                  <Ionicons name="bus" size={18} color={groupPending > 0 ? "#D97706" : TEAL} />
-                  <View style={{ flex: 1 }}>
-                    {trip
-                      ? <>
-                          <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{trip.from} → {trip.to}</Text>
-                          <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
-                            {trip.date} · {trip.departureTime} · {trip.busName}
-                          </Text>
-                        </>
-                      : <Text style={{ fontSize: 14, fontWeight: "700", color: "#374151" }}>Trajet non précisé</Text>
-                    }
-                  </View>
-                  <View style={{ alignItems: "flex-end", gap: 2 }}>
-                    <View style={{ backgroundColor: groupPending > 0 ? "#D97706" : "#0E7490", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
-                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{group.bookings.length} rés.</Text>
+                {(() => {
+                  const tsb = tripStatusBadge(trip?.status);
+                  const isEnRoute = trip?.status === "en_route" || trip?.status === "in_progress";
+                  const headerBg = isEnRoute ? "#F0FDF4" : groupPending > 0 ? "#FEF3C7" : "#F0F9FF";
+                  const borderColor = isEnRoute ? "#059669" : groupPending > 0 ? "#D97706" : TEAL;
+                  return (
+                    <View style={{
+                      flexDirection: "row", alignItems: "center", backgroundColor: headerBg,
+                      borderRadius: 12, padding: 12, marginBottom: 8, gap: 10,
+                      borderLeftWidth: 4, borderLeftColor: borderColor,
+                    }}>
+                      <Ionicons name={isEnRoute ? "navigate" : "bus"} size={18} color={borderColor} />
+                      <View style={{ flex: 1 }}>
+                        {trip
+                          ? <>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <Text style={{ fontSize: 14, fontWeight: "800", color: "#111827" }}>{trip.from} → {trip.to}</Text>
+                                {tsb && (
+                                  <View style={{ backgroundColor: tsb.bg, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                    <Text style={{ fontSize: 10, fontWeight: "800", color: tsb.color }}>{tsb.label}</Text>
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 1 }}>
+                                {trip.date} · {trip.departureTime} · {trip.busName}
+                              </Text>
+                              {isEnRoute && (
+                                <Text style={{ fontSize: 10, color: "#059669", fontWeight: "700", marginTop: 2 }}>
+                                  Réservations en ligne disponibles — car en route
+                                </Text>
+                              )}
+                            </>
+                          : <Text style={{ fontSize: 14, fontWeight: "700", color: "#374151" }}>Trajet non précisé</Text>
+                        }
+                      </View>
+                      <View style={{ alignItems: "flex-end", gap: 2 }}>
+                        <View style={{ backgroundColor: groupPending > 0 ? "#D97706" : TEAL, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 }}>
+                          <Text style={{ fontSize: 11, fontWeight: "800", color: "#fff" }}>{group.bookings.length} rés.</Text>
+                        </View>
+                        {groupPending > 0 && (
+                          <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>{groupPending} en attente</Text>
+                        )}
+                      </View>
                     </View>
-                    {groupPending > 0 && (
-                      <Text style={{ fontSize: 10, color: "#D97706", fontWeight: "700" }}>{groupPending} en attente</Text>
-                    )}
-                  </View>
-                </View>
+                  );
+                })()}
 
                 {/* Bookings in this group */}
                 {group.bookings.map(b => {
