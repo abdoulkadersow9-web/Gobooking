@@ -159,7 +159,6 @@ export default function RouteScreen() {
   const [autoAlerts,   setAutoAlerts]   = useState<BusAlert[]>([]);
 
   /* ── Caméra embarquée — connexion réelle ── */
-  const [showCamConnect, setShowCamConnect] = useState(false);
 
 
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
@@ -670,7 +669,7 @@ export default function RouteScreen() {
                   <View style={S.camConnGrid}>
                     <TouchableOpacity
                       style={[S.camConnBtn, { flex: 1 }]}
-                      onPress={() => setShowCamConnect(true)}
+                      onPress={() => { setTab("camera"); setIsModalOpen(true); }}
                       activeOpacity={0.8}
                     >
                       <View style={[S.camConnIcon, { backgroundColor: "#EFF6FF" }]}>
@@ -838,8 +837,35 @@ export default function RouteScreen() {
             </View>
           </ScrollView>
 
-          {/* Contenu de la page */}
-          <ScrollView
+          {/* ══ CAMÉRA — plein écran (hors ScrollView pour flex:1) ══ */}
+          {tab === "camera" && (
+            <View style={{ flex: 1, backgroundColor: "#0A0F1C" }}>
+              <CameraConnectModal
+                trips={activeTrip ? [{
+                  id: activeTrip.id,
+                  from: activeTrip.from,
+                  to: activeTrip.to,
+                  departureTime: activeTrip.departureTime,
+                  busName: activeTrip.busName,
+                  cameraStatus: activeTrip.cameraStatus,
+                  cameraStreamUrl: activeTrip.cameraStreamUrl,
+                }] : []}
+                token={token}
+                onClose={() => setIsModalOpen(false)}
+                onConnected={(trip) => {
+                  setIsModalOpen(false);
+                  if (activeTrip) {
+                    const updated = { ...activeTrip, cameraStatus: "connected", cameraStreamUrl: trip.cameraStreamUrl ?? null };
+                    setActiveTrip(updated);
+                    setTrips(prev => prev.map(t => t.id === activeTrip.id ? updated : t));
+                  }
+                }}
+              />
+            </View>
+          )}
+
+          {/* Contenu de la page (tous les autres onglets) */}
+          {tab !== "camera" && <ScrollView
             contentContainerStyle={S.body}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -1565,35 +1591,8 @@ export default function RouteScreen() {
               </View>
             )}
 
-            {/* ══ CAMÉRA EMBARQUÉE ══ */}
-            {tab === "camera" && (
-              <View style={{ flex: 1 }}>
-                <CameraConnectModal
-                  trips={activeTrip ? [{
-                    id: activeTrip.id,
-                    from: activeTrip.from,
-                    to: activeTrip.to,
-                    departureTime: activeTrip.departureTime,
-                    busName: activeTrip.busName,
-                    cameraStatus: activeTrip.cameraStatus,
-                    cameraStreamUrl: activeTrip.cameraStreamUrl,
-                  }] : []}
-                  token={token}
-                  onClose={() => setIsModalOpen(false)}
-                  onConnected={(trip) => {
-                    setIsModalOpen(false);
-                    if (activeTrip) {
-                      const updated = { ...activeTrip, cameraStatus: "connected", cameraStreamUrl: trip.cameraStreamUrl ?? null };
-                      setActiveTrip(updated);
-                      setTrips(prev => prev.map(t => t.id === activeTrip.id ? updated : t));
-                    }
-                  }}
-                />
-              </View>
-            )}
-            )}
 
-          </ScrollView>
+          </ScrollView>}
         </SafeAreaView>
         </SafeAreaProvider>
       </Modal>
