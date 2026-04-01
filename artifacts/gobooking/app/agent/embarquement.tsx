@@ -16,6 +16,8 @@ import { saveOffline, useNetworkStatus, isAlreadyScanned, markAsScanned } from "
 import { validateQR, qrErrorMessage } from "@/utils/qr";
 import OfflineBanner from "@/components/OfflineBanner";
 import { useAgentGps } from "@/utils/useAgentGps";
+import CameraConnectModal from "@/components/CameraConnectModal";
+import type { CameraTrip } from "@/components/CameraConnectModal";
 
 const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -171,6 +173,8 @@ export default function EmbarquementScreen() {
   const [closingDeparture, setClosingDeparture] = useState(false);
   const [departureResult, setDepartureResult]   = useState<{ cancelledCount: number; freedSeats: number } | null>(null);
   const [boardingById, setBoardingById]         = useState<string | null>(null);
+  const [showCamConnect, setShowCamConnect]     = useState(false);
+  const [camConnectTrip, setCamConnectTrip]     = useState<CameraTrip | null>(null);
   const pollBoardingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── Sync temps réel ─────────────────────────────── */
@@ -1191,6 +1195,25 @@ export default function EmbarquementScreen() {
               </Text>
             </View>
           )}
+          {/* Camera connect button */}
+          <TouchableOpacity
+            style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center", marginLeft: 2 }}
+            hitSlop={8}
+            onPress={() => {
+              if (selectedTrip) {
+                setCamConnectTrip({
+                  id: selectedTrip.id,
+                  from: selectedTrip.from,
+                  to: selectedTrip.to,
+                  departureTime: selectedTrip.departureTime,
+                  busName: selectedTrip.busName,
+                });
+              }
+              setShowCamConnect(true);
+            }}
+          >
+            <Ionicons name="videocam-outline" size={16} color="#67E8F9" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 8, width: 36, height: 36, justifyContent: "center", alignItems: "center", marginLeft: 2 }}
             hitSlop={8}
@@ -1807,6 +1830,23 @@ export default function EmbarquementScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {/* Camera connect modal */}
+      {showCamConnect && (
+        <CameraConnectModal
+          trips={todayTrips.map(t => ({
+            id: t.id, from: t.from, to: t.to,
+            departureTime: t.departureTime, busName: t.busName,
+          }))}
+          token={token}
+          preselectedTrip={camConnectTrip}
+          onClose={() => { setShowCamConnect(false); setCamConnectTrip(null); }}
+          onConnected={(_trip) => {
+            setShowCamConnect(false);
+            setCamConnectTrip(null);
+          }}
+        />
       )}
 
     </SafeAreaView>

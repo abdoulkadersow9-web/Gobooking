@@ -3859,9 +3859,9 @@ router.get("/suivi/overview", async (req, res) => {
         seatCount:         demo.seats,
         busId:             busId,
         busName:           demo.name,
-        cameraStreamUrl:   demo.cam ? `rtsp://cam${idx + 1}.gobooking.ci/live` : null,
-        cameraStatus:      demo.cam ? "connected" : "disconnected",
-        cameraConnectedAt: demo.cam ? new Date(now.getTime() - (idx + 1) * 8 * 60000).toISOString() : null,
+        cameraStreamUrl:   null,
+        cameraStatus:      "disconnected",
+        cameraConnectedAt: null,
         cameraPosition:    "intérieur",
       });
     });

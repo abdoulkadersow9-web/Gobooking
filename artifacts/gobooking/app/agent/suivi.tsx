@@ -1,5 +1,4 @@
 import { Ionicons, Feather } from "@expo/vector-icons";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,7 +16,6 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -26,321 +24,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { BASE_URL } from "@/utils/api";
+import CameraConnectModal, { buildHlsHtml, buildMjpegHtml } from "@/components/CameraConnectModal";
 
-/* ══════════════════════════════════════════════════════════════════
-   CAMERA CONNECT MODAL — QR scan + URL manuelle + player direct
-   ══════════════════════════════════════════════════════════════════ */
-
-/* Build inline HTML for MJPEG streams (IP Webcam / DroidCam) */
-function buildMjpegHtml(streamUrl: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
-    img{width:100%;height:100%;object-fit:contain;background:#000}
-    #err{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#FF4444;font-family:sans-serif;font-size:13px;text-align:center;padding:12px}
-  </style>
-</head>
-<body>
-  <img id="v" src="${streamUrl.replace(/"/g, "&quot;")}" onerror="document.getElementById('err').style.display='block';this.style.display='none';" />
-  <div id="err">⚠️ Flux non disponible<br>Vérifiez l'URL et la connexion réseau</div>
-</body>
-</html>`;
-}
-
-/* Detect stream type from URL */
-function detectStreamType(url: string): "mjpeg" | "hls" | "direct" {
-  const u = url.toLowerCase();
-  if (u.includes(".m3u8")) return "hls";
-  if (u.includes("/video") || u.includes("/shot.jpg") || u.includes("mjpeg") || u.includes("/stream")) return "mjpeg";
-  return "mjpeg"; // default: try MJPEG (works for IP Webcam / DroidCam)
-}
-
-/* Normalise URL: add /video if it looks like a bare DroidCam/IPWebcam host */
-function normaliseStreamUrl(raw: string): string {
-  let url = raw.trim();
-  if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("rtsp://")) {
-    url = "http://" + url;
-  }
-  // IP Webcam bare host → append /video
-  if (/^https?:\/\/[\d.]+:\d+\/?$/.test(url)) {
-    url = url.replace(/\/$/, "") + "/video";
-  }
-  return url;
-}
-
-/* Extract stream URL from a QR code payload.
-   Supports:
-   - Raw URL: http://192.168.x.x:8080/video
-   - JSON: {"stream":"http://...","trip":"tripId","token":"..."}
-   Returns { streamUrl, tripId?, position? } */
-function parseQrPayload(raw: string): { streamUrl: string; tripId?: string; position?: string } | null {
-  const trimmed = raw.trim();
-  // Try JSON first
-  try {
-    const obj = JSON.parse(trimmed);
-    const url = obj.stream ?? obj.url ?? obj.streamUrl ?? obj.cam ?? "";
-    if (url) return { streamUrl: normaliseStreamUrl(url), tripId: obj.trip ?? obj.tripId, position: obj.position ?? obj.pos };
-  } catch { /* not JSON */ }
-  // Plain URL?
-  if (trimmed.startsWith("http") || trimmed.startsWith("rtsp") || /^\d{1,3}\.\d{1,3}/.test(trimmed)) {
-    return { streamUrl: normaliseStreamUrl(trimmed) };
-  }
-  return null;
-}
-
-interface ConnectModalProps {
-  trips: TripItem[];
-  token: string | null;
-  onClose: () => void;
-  onConnected: (trip: TripItem) => void;
-  preselectedTrip?: TripItem | null;
-}
-
-function CameraConnectModal({ trips, token, onClose, onConnected, preselectedTrip }: ConnectModalProps) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [mode,        setMode]        = useState<"qr" | "manual">("qr");
-  const [scanning,    setScanning]    = useState(true);
-  const [scanned,     setScanned]     = useState(false);
-  const [manualUrl,   setManualUrl]   = useState("");
-  const [selectedTrip, setSelectedTrip] = useState<TripItem | null>(preselectedTrip ?? (trips.length === 1 ? trips[0] : null));
-  const [connecting,  setConnecting]  = useState(false);
-  const [error,       setError]       = useState<string | null>(null);
-  const [testHtml,    setTestHtml]    = useState<string | null>(null); // live preview before confirming
-  const [testUrl,     setTestUrl]     = useState<string | null>(null);
-
-  const doConnect = async (streamUrl: string, tripId?: string) => {
-    setError(null);
-    const trip = tripId ? trips.find(t => t.id === tripId) ?? selectedTrip : selectedTrip;
-    if (!trip) { setError("Sélectionnez d'abord un trajet à associer."); return; }
-    setConnecting(true);
-    try {
-      const r = await fetch(`${BASE_URL}/agent/suivi/trips/${trip.id}/camera/connect`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ streamUrl, position: "intérieur" }),
-      });
-      if (!r.ok) throw new Error(`Erreur serveur: ${r.status}`);
-      onConnected({ ...trip, cameraStreamUrl: streamUrl, cameraStatus: "connected" });
-    } catch (e: any) {
-      setError(e?.message ?? "Connexion impossible");
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const handleQrScan = ({ data }: { data: string }) => {
-    if (scanned) return;
-    setScanned(true);
-    setScanning(false);
-    const parsed = parseQrPayload(data);
-    if (!parsed) {
-      setError("QR Code invalide — aucune URL de flux détectée.");
-      setScanned(false); setScanning(true);
-      return;
-    }
-    // Show live preview immediately
-    const type = detectStreamType(parsed.streamUrl);
-    setTestUrl(parsed.streamUrl);
-    setTestHtml(type === "hls" ? buildVideoHtml(parsed.streamUrl) : buildMjpegHtml(parsed.streamUrl));
-    if (parsed.tripId) {
-      const t = trips.find(tr => tr.id === parsed.tripId);
-      if (t) setSelectedTrip(t);
-    }
-  };
-
-  const handleManualTest = () => {
-    if (!manualUrl.trim()) return;
-    const url = normaliseStreamUrl(manualUrl);
-    const type = detectStreamType(url);
-    setTestUrl(url);
-    setTestHtml(type === "hls" ? buildVideoHtml(url) : buildMjpegHtml(url));
-  };
-
-  const confirmConnect = () => {
-    if (testUrl) doConnect(testUrl);
-  };
-
-  const retryQr = () => { setScanned(false); setScanning(true); setTestHtml(null); setTestUrl(null); setError(null); };
-
-  if (!permission?.granted && mode === "qr") {
-    return (
-      <View style={CM.root}>
-        <View style={CM.header}>
-          <Text style={CM.title}>Connexion Caméra</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12}><Ionicons name="close" size={24} color="#fff"/></TouchableOpacity>
-        </View>
-        <View style={CM.permBox}>
-          <Feather name="camera-off" size={48} color="#64748B"/>
-          <Text style={CM.permTitle}>Caméra requise</Text>
-          <Text style={CM.permSub}>Pour scanner le QR Code, GoBooking a besoin d'accéder à votre caméra.</Text>
-          <TouchableOpacity style={CM.permBtn} onPress={requestPermission}>
-            <Feather name="camera" size={16} color="#fff"/>
-            <Text style={CM.permBtnTxt}>Autoriser la caméra</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[CM.permBtn, {backgroundColor:"transparent",borderWidth:1,borderColor:"#334155",marginTop:8}]}
-            onPress={() => setMode("manual")}>
-            <Text style={[CM.permBtnTxt,{color:"#94A3B8"}]}>Saisir l'URL manuellement</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={CM.root}>
-      {/* Header */}
-      <View style={CM.header}>
-        <View style={CM.liveBadge}>
-          <View style={{width:6,height:6,borderRadius:3,backgroundColor:"#EF4444"}}/>
-          <Text style={CM.liveText}>CONNEXION CAMÉRA</Text>
-        </View>
-        <TouchableOpacity onPress={onClose} hitSlop={12}><Ionicons name="close" size={24} color="#fff"/></TouchableOpacity>
-      </View>
-
-      {/* Mode tabs */}
-      <View style={CM.tabs}>
-        {(["qr","manual"] as const).map(m => (
-          <TouchableOpacity key={m} style={[CM.tab, mode===m && CM.tabActive]}
-            onPress={() => { setMode(m); setTestHtml(null); setTestUrl(null); setError(null); retryQr(); }}>
-            <Feather name={m==="qr"?"maximize":"wifi"} size={14} color={mode===m?"#3B82F6":"#64748B"}/>
-            <Text style={[CM.tabTxt, mode===m && CM.tabTxtActive]}>
-              {m==="qr" ? "Scan QR Code" : "URL / Wi-Fi"}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Trip selector (if multiple trips available) */}
-      {trips.length > 1 && (
-        <View style={CM.tripSel}>
-          <Text style={CM.tripSelLabel}>Trajet à associer :</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {trips.map(t => (
-              <TouchableOpacity key={t.id}
-                style={[CM.tripChip, selectedTrip?.id===t.id && CM.tripChipActive]}
-                onPress={() => setSelectedTrip(t)}>
-                <Text style={[CM.tripChipTxt, selectedTrip?.id===t.id && CM.tripChipTxtActive]} numberOfLines={1}>
-                  {t.from}→{t.to} {t.departureTime}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-      {trips.length === 1 && (
-        <View style={CM.tripInfo}>
-          <Ionicons name="bus" size={13} color="#3B82F6"/>
-          <Text style={CM.tripInfoTxt}>{trips[0].from} → {trips[0].to} · {trips[0].departureTime}</Text>
-        </View>
-      )}
-
-      {/* Preview OR scanner */}
-      {testHtml ? (
-        /* ── Live preview ── */
-        <View style={CM.previewWrap}>
-          <View style={CM.previewHeader}>
-            <View style={{flexDirection:"row",alignItems:"center",gap:6}}>
-              <View style={{width:7,height:7,borderRadius:4,backgroundColor:"#EF4444"}}/>
-              <Text style={{color:"#E2E8F0",fontSize:12,fontWeight:"700"}}>APERÇU EN DIRECT</Text>
-            </View>
-            <Text style={{color:"#64748B",fontSize:11}} numberOfLines={1}>{testUrl}</Text>
-          </View>
-          <WebView
-            source={{ html: testHtml }}
-            style={{flex:1,backgroundColor:"#000"}}
-            allowsInlineMediaPlayback
-            mediaPlaybackRequiresUserAction={false}
-            javaScriptEnabled
-            scrollEnabled={false}
-          />
-          <View style={CM.previewActions}>
-            <TouchableOpacity style={CM.previewRetry} onPress={retryQr}>
-              <Feather name="refresh-cw" size={14} color="#94A3B8"/>
-              <Text style={{color:"#94A3B8",fontSize:13,fontWeight:"600"}}>
-                {mode==="qr" ? "Nouveau scan" : "Changer URL"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[CM.connectBtn, connecting && {opacity:0.6}]}
-              onPress={confirmConnect} disabled={connecting}>
-              {connecting
-                ? <ActivityIndicator size="small" color="#fff"/>
-                : <><Feather name="link" size={15} color="#fff"/>
-                    <Text style={CM.connectBtnTxt}>Connecter à ce trajet</Text></>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : mode === "qr" ? (
-        /* ── QR scanner ── */
-        <View style={CM.scanWrap}>
-          <CameraView
-            style={{flex:1}}
-            facing="back"
-            onBarcodeScanned={scanning ? handleQrScan : undefined}
-            barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-          />
-          <View style={CM.scanOverlay} pointerEvents="none">
-            <View style={CM.scanFrame}>
-              <View style={[CM.scanCorner,{top:0,left:0,borderTopWidth:3,borderLeftWidth:3}]}/>
-              <View style={[CM.scanCorner,{top:0,right:0,borderTopWidth:3,borderRightWidth:3}]}/>
-              <View style={[CM.scanCorner,{bottom:0,left:0,borderBottomWidth:3,borderLeftWidth:3}]}/>
-              <View style={[CM.scanCorner,{bottom:0,right:0,borderBottomWidth:3,borderRightWidth:3}]}/>
-            </View>
-          </View>
-          <View style={CM.scanHintBox} pointerEvents="none">
-            <Feather name="maximize" size={16} color="#3B82F6"/>
-            <Text style={CM.scanHint}>Alignez le QR Code de la caméra dans le cadre</Text>
-          </View>
-        </View>
-      ) : (
-        /* ── URL manuelle ── */
-        <View style={CM.manualWrap}>
-          <View style={CM.urlInfo}>
-            <Feather name="info" size={14} color="#3B82F6"/>
-            <Text style={CM.urlInfoTxt}>
-              Entrez l'URL du flux vidéo de votre caméra.{"\n"}
-              Exemples :{"\n"}
-              • IP Webcam (Android) : http://192.168.1.x:8080/video{"\n"}
-              • DroidCam : http://192.168.1.x:4747/video{"\n"}
-              • Caméra Wi-Fi : http://192.168.1.x/stream{"\n"}
-              • HLS : http://... .m3u8
-            </Text>
-          </View>
-          <View style={CM.urlRow}>
-            <TextInput
-              style={CM.urlInput}
-              value={manualUrl}
-              onChangeText={setManualUrl}
-              placeholder="http://192.168.1.x:8080/video"
-              placeholderTextColor="#475569"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={handleManualTest}
-            />
-            <TouchableOpacity style={CM.urlTestBtn} onPress={handleManualTest} disabled={!manualUrl.trim()}>
-              <Feather name="play" size={18} color={manualUrl.trim()?"#fff":"#475569"}/>
-            </TouchableOpacity>
-          </View>
-          <Text style={CM.urlHint}>Appuyez sur ▶ pour tester la connexion avant de confirmer.</Text>
-        </View>
-      )}
-
-      {/* Error */}
-      {error && (
-        <View style={CM.errBox}>
-          <Feather name="alert-circle" size={14} color="#EF4444"/>
-          <Text style={CM.errTxt}>{error}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
 
 /* ── 3-colour operational palette ─────────────────────────── */
 const OK      = "#10B981";   /* Vert  — tout va bien          */
@@ -379,43 +64,6 @@ const BUS_STATUS: Record<string, { label: string; color: string; bg: string; ico
   en_panne:    { label: "EN PANNE",    color: CRIT, bg: `${CRIT}18`, icon: "alert-circle-outline"    },
 };
 
-/* ── HLS video player HTML ─────────────────────────────────────── */
-function buildVideoHtml(streamUrl: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden}
-    video{width:100%;height:100%;object-fit:contain;background:#000}
-    #err{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#FF4444;font-family:sans-serif;font-size:13px;text-align:center;padding:12px}
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
-</head>
-<body>
-  <video id="v" autoplay muted playsinline controls></video>
-  <div id="err">⚠️ Flux non disponible<br>Vérifiez la connexion caméra</div>
-  <script>
-    var v = document.getElementById("v");
-    var err = document.getElementById("err");
-    var url = "${streamUrl.replace(/"/g, '\\"')}";
-    if (Hls.isSupported()) {
-      var hls = new Hls({ maxBufferLength:10, startFragPrefetch:true });
-      hls.loadSource(url);
-      hls.attachMedia(v);
-      hls.on(Hls.Events.ERROR, function(_,d){ if(d.fatal){ err.style.display="block"; v.style.display="none"; } });
-    } else if (v.canPlayType("application/vnd.apple.mpegurl")) {
-      v.src = url;
-      v.addEventListener("error", function(){ err.style.display="block"; v.style.display="none"; });
-    } else {
-      err.style.display="block";
-      err.innerHTML = "Lecteur non compatible sur cet appareil";
-    }
-  </script>
-</body>
-</html>`;
-}
 
 /* ── Types ─────────────────────────────────────────────────────── */
 interface BusItem {
@@ -446,13 +94,7 @@ interface Overview { buses: BusItem[]; trips: TripItem[]; alerts: AlertItem[] }
 /* ══════════════════════════════════════════════════════════════════
    CAMÉRA LIVE — Lecteur vidéo plein écran immersif
    ══════════════════════════════════════════════════════════════════ */
-function CameraPlayer({
-  trip, onClose, liveData,
-}: {
-  trip: TripItem;
-  onClose: () => void;
-  liveData?: { frames: number; signal: number };
-}) {
+function CameraPlayer({ trip, onClose }: { trip: TripItem; onClose: () => void; }) {
   const [loading,    setLoading]    = useState(true);
   const [zoomIdx,    setZoomIdx]    = useState(0);           // 0=1× 1=1.5× 2=2×
   const [showMeta,   setShowMeta]   = useState(true);        // metadata overlay auto-hides
@@ -462,11 +104,6 @@ function CameraPlayer({
   const metaAnim     = useRef(new Animated.Value(1)).current;
   const streamUrl    = trip.cameraStreamUrl!;
   const ZOOM_LEVELS  = [1, 1.5, 2];
-  const signal       = liveData?.signal ?? 92;
-  const frames       = liveData?.frames ?? 0;
-  const sigBars      = Math.ceil((signal / 100) * 4);
-  const sigColor     = signal >= 80 ? CAM_GR : signal >= 60 ? "#FCD34D" : "#EF4444";
-
   /* Blinking LIVE dot */
   useEffect(() => {
     const blink = Animated.loop(Animated.sequence([
@@ -509,16 +146,12 @@ function CameraPlayer({
         <Text style={CS.camTitle} numberOfLines={1}>
           {trip.from} → {trip.to}  ·  {trip.cameraPosition ?? "intérieur"}
         </Text>
-        {/* Signal bars inline */}
-        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, marginRight: 8 }}>
-          {[1,2,3,4].map(b => (
-            <View key={b} style={{
-              width: 4, height: 4 + b * 3,
-              borderRadius: 2,
-              backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.18)",
-            }} />
-          ))}
-          <Text style={{ color: sigColor, fontSize: 10, fontWeight: "800", marginLeft: 3 }}>{signal}%</Text>
+        {/* Live connection status */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5, marginRight: 8 }}>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: webErr ? "#EF4444" : "#4ADE80" }} />
+          <Text style={{ color: webErr ? "#EF4444" : "#4ADE80", fontSize: 10, fontWeight: "800" }}>
+            {webErr ? "COUPÉ" : "EN DIRECT"}
+          </Text>
         </View>
         <TouchableOpacity onPress={onClose} hitSlop={12} style={CS.closeBtn}>
           <Ionicons name="close" size={20} color="#fff" />
@@ -542,7 +175,7 @@ function CameraPlayer({
         )}
         <Animated.View style={{ flex: 1, transform: [{ scale: zoomAnim }] }}>
           <WebView
-            source={{ html: buildVideoHtml(streamUrl) }}
+            source={{ html: buildHlsHtml(streamUrl) }}
             style={CS.video}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
@@ -564,10 +197,6 @@ function CameraPlayer({
             <View style={CS.metaChip}>
               <Ionicons name="people" size={10} color="#94A3B8" />
               <Text style={CS.metaChipTxt}>{trip.passengerCount ?? "—"} pax</Text>
-            </View>
-            <View style={CS.metaChip}>
-              <Ionicons name="film-outline" size={10} color="#94A3B8" />
-              <Text style={CS.metaChipTxt}>▲{frames} img</Text>
             </View>
             {zoomIdx > 0 && (
               <View style={[CS.metaChip, { backgroundColor: "rgba(251,191,36,0.25)", borderColor: "#FCD34D" }]}>
@@ -594,16 +223,8 @@ function CameraPlayer({
       {/* ── Footer info ── */}
       <View style={CS.footer}>
         <View style={CS.footerItem}>
-          <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2 }}>
-            {[1,2,3,4].map(b => (
-              <View key={b} style={{
-                width: 3, height: 3 + b * 2,
-                borderRadius: 1,
-                backgroundColor: b <= sigBars ? sigColor : "rgba(255,255,255,0.15)",
-              }} />
-            ))}
-          </View>
-          <Text style={[CS.footerTxt, { color: sigColor }]}>Signal {signal}%</Text>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: webErr ? "#EF4444" : "#4ADE80" }} />
+          <Text style={[CS.footerTxt, { color: webErr ? "#EF4444" : "#4ADE80" }]}>{webErr ? "Flux coupé" : "Flux actif"}</Text>
         </View>
         <View style={CS.footerItem}>
           <Animated.View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CAM_GR, opacity: liveDotAnim }} />
@@ -615,111 +236,8 @@ function CameraPlayer({
         </View>
         <View style={CS.footerItem}>
           <Ionicons name="film-outline" size={13} color="#64748B" />
-          <Text style={CS.footerTxt}>{frames} img</Text>
+          
         </View>
-      </View>
-    </View>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   LIVE CAM VIEW — Simulation vidéo animée style monitoring
-   ══════════════════════════════════════════════════════════════════ */
-function LiveCamView({
-  signal, route, busId,
-}: {
-  signal: number; route: string; busId: string;
-}) {
-  const scanAnim = useRef(new Animated.Value(0)).current;
-  const [ts,     setTs]     = useState(() => new Date().toLocaleTimeString("fr-FR"));
-  const [coords, setCoords] = useState(() => ({
-    lat: (5.35 + Math.random() * 0.08).toFixed(4),
-    lon: (3.95 + Math.random() * 0.06).toFixed(4),
-  }));
-  const [speed, setSpeed] = useState(() => 65 + Math.floor(Math.random() * 30));
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanAnim, { toValue: 1, duration: 3500, useNativeDriver: true, easing: Easing.linear }),
-        Animated.timing(scanAnim, { toValue: 0, duration: 0, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-
-    const tInterval = setInterval(() => setTs(new Date().toLocaleTimeString("fr-FR")), 1000);
-
-    const dataInterval = setInterval(() => {
-      setCoords(c => ({
-        lat: (parseFloat(c.lat) + (Math.random() - 0.5) * 0.001).toFixed(4),
-        lon: (parseFloat(c.lon) + (Math.random() - 0.5) * 0.0008).toFixed(4),
-      }));
-      setSpeed(s => Math.max(40, Math.min(110, s + Math.floor((Math.random() - 0.45) * 7))));
-    }, 2500);
-
-    return () => { loop.stop(); clearInterval(tInterval); clearInterval(dataInterval); };
-  }, [busId]);
-
-  const CARD_H = 118;
-  const sigBars = Math.max(1, Math.ceil((signal / 100) * 4));
-  const sigOk   = signal >= 65;
-
-  return (
-    <View style={{ height: CARD_H, backgroundColor: "#060810", overflow: "hidden" }}>
-
-      {/* Subtle moving scan line — white, barely visible */}
-      <Animated.View style={{
-        position: "absolute", left: 0, right: 0, height: 1,
-        backgroundColor: "rgba(255,255,255,0.1)",
-        transform: [{ translateY: scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0, CARD_H] }) }],
-      }} />
-
-      {/* Corner brackets — thin white */}
-      <View style={{ position:"absolute", top:7, left:8, width:9, height:9,
-        borderTopWidth:1, borderLeftWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
-      <View style={{ position:"absolute", top:7, right:8, width:9, height:9,
-        borderTopWidth:1, borderRightWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
-      <View style={{ position:"absolute", bottom:22, left:8, width:9, height:9,
-        borderBottomWidth:1, borderLeftWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
-      <View style={{ position:"absolute", bottom:22, right:8, width:9, height:9,
-        borderBottomWidth:1, borderRightWidth:1, borderColor:"rgba(255,255,255,0.4)" }} />
-
-      {/* GPS — top left */}
-      <Text style={{ position:"absolute", top:9, left:20,
-        color:"rgba(255,255,255,0.45)", fontSize:7, letterSpacing:0.5 }}>
-        {coords.lat}°N · {coords.lon}°W
-      </Text>
-
-      {/* Speed — top right */}
-      <Text style={{ position:"absolute", top:9, right:20,
-        color:"rgba(255,255,255,0.75)", fontSize:8, fontWeight:"700" }}>
-        {speed} km/h
-      </Text>
-
-      {/* Signal — middle right */}
-      <View style={{ position:"absolute", right:20, top:0, bottom:22,
-        justifyContent:"center" }}>
-        <View style={{ flexDirection:"row", alignItems:"flex-end", gap:1.5 }}>
-          {[1,2,3,4].map(b => (
-            <View key={b} style={{ width:2.5, height:3 + b * 2.5, borderRadius:1,
-              backgroundColor: b <= sigBars
-                ? (sigOk ? "rgba(255,255,255,0.65)" : "rgba(239,68,68,0.8)")
-                : "rgba(255,255,255,0.1)" }} />
-          ))}
-        </View>
-      </View>
-
-      {/* Bottom strip — route + timestamp */}
-      <View style={{ position:"absolute", bottom:0, left:0, right:0, height:22,
-        backgroundColor:"rgba(0,0,0,0.6)",
-        flexDirection:"row", alignItems:"center",
-        paddingHorizontal:12, justifyContent:"space-between" }}>
-        <Text style={{ color:"rgba(255,255,255,0.4)", fontSize:7.5, fontWeight:"600" }} numberOfLines={1}>
-          {route}
-        </Text>
-        <Text style={{ color:"rgba(255,255,255,0.3)", fontSize:7, letterSpacing:0.5 }}>
-          {ts}
-        </Text>
       </View>
     </View>
   );
@@ -1137,7 +655,6 @@ function BusDetailModal({
                 </Text>
                 <TouchableOpacity onPress={onOpenCamera} activeOpacity={0.85}
                   style={{ borderRadius: 10, overflow: "hidden" }}>
-                  <LiveCamView signal={90} route={`${trip.from} → ${trip.to}`} busId={bus.id} />
                   <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
                     justifyContent: "center", alignItems: "center",
                     backgroundColor: "rgba(0,0,0,0.25)" }}>
@@ -1233,9 +750,6 @@ export default function SuiviScreen() {
   const [suiviTab,       setSuiviTab]       = useState<"alertes" | "flotte" | "voyages">("alertes");
   const soundRef = useRef<{ stop: () => void } | null>(null);
 
-  /* ── Live simulation frames/signal per camera trip ── */
-  type LiveCamData = { frames: number; signal: number };
-  const [liveFrames, setLiveFrames] = useState<Record<string, LiveCamData>>({});
   const [syncSec,    setSyncSec]    = useState(0);
   const [liveTime,   setLiveTime]   = useState(() => new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
 
@@ -1260,13 +774,7 @@ export default function SuiviScreen() {
       const bScore = (bAlerts > 0 ? 100 : 0) + bAlerts * 10 + (bCamOk ? 3 : 0);
       return bScore - aScore;
     });
-  }, [data, mergedAlerts]);
-
-  /* ── Signal warning: any camera with signal < 75% ── */
-  const signalWarnTrips = useMemo(
-    () => activeCamTrips.filter(t => (liveFrames[t.id]?.signal ?? 100) < 75),
-    [activeCamTrips, liveFrames]
-  );
+  }, [data, mergedAlerts]);  const signalWarnTrips: any[] = [];
 
   useEffect(() => {
     if (hasAlerts) {
@@ -1347,31 +855,7 @@ export default function SuiviScreen() {
     return () => clearInterval(iv);
   }, []);
 
-  /* ── Simulated frame counter for connected camera trips (1s for fluidity) ── */
-  useEffect(() => {
-    if (!hasCameras || activeCamTrips.length === 0) {
-      setLiveFrames({});
-      return;
-    }
-    const iv = setInterval(() => {
-      setLiveFrames(prev => {
-        const next: Record<string, LiveCamData> = { ...prev };
-        activeCamTrips.forEach(trip => {
-          const cur = next[trip.id] ?? { frames: 0, signal: 93 };
-          /* 25fps ± small jitter — natural stream rhythm */
-          const fps    = 23 + Math.floor(Math.random() * 5);
-          /* signal: mostly stable 87-99%, occasional dip to 65-80% */
-          const rand   = Math.random();
-          const signal = rand < 0.08 ? 65 + Math.floor(Math.random() * 14)   // 8% dip
-                       : rand < 0.25 ? 87 + Math.floor(Math.random() * 10)   // 17% high
-                       :               90 + Math.floor(Math.random() * 9);    // 75% nominal
-          next[trip.id] = { frames: cur.frames + fps, signal };
-        });
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [hasCameras, activeCamTrips]);
+
 
   /* ── Sound alert: plays when active alerts + not muted (web only) ── */
   useEffect(() => {
@@ -1590,7 +1074,7 @@ export default function SuiviScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: CAM_BG }}>
         <StatusBar barStyle="light-content" backgroundColor={CAM_BG} />
-        <CameraPlayer trip={cameraTrip} onClose={() => setCameraTrip(null)} liveData={liveFrames[cameraTrip.id]} />
+        <CameraPlayer trip={cameraTrip} onClose={() => setCameraTrip(null)} />
       </SafeAreaView>
     );
   }
@@ -1865,8 +1349,7 @@ export default function SuiviScreen() {
                     (alert.busName && t.busName === alert.busName)
                   );
                   const aCamOk  = !!(aTrip?.cameraStatus === "connected" && aTrip?.cameraStreamUrl);
-                  const aLive   = aTrip ? liveFrames[aTrip.id] : undefined;
-                  const timeAgo = Math.round((Date.now() - new Date(alert.createdAt).getTime()) / 60000);
+                                    const timeAgo = Math.round((Date.now() - new Date(alert.createdAt).getTime()) / 60000);
 
                   return (
                     <View key={alert.id} style={[S.alertCard, { borderColor: `${stepColor}35` }]}>
@@ -1908,11 +1391,7 @@ export default function SuiviScreen() {
                             <Ionicons name="expand-outline" size={11} color="#374151" />
                           </View>
                           <View style={S.alertCamFeed}>
-                            <LiveCamView
-                              signal={aLive?.signal ?? 80}
-                              route={`${aTrip.from} → ${aTrip.to}`}
-                              busId={alert.busId ?? aTrip.busId ?? ""}
-                            />
+                            
                           </View>
                         </TouchableOpacity>
                       )}
@@ -2267,61 +1746,6 @@ const CP = StyleSheet.create({
   txt:        { fontSize: 12, fontWeight: "600", color: "#94A3B8", flex: 1 },
 });
 
-/* ── Camera Connect Modal Styles ─────────────────────────────────── */
-const CM = StyleSheet.create({
-  root:           { flex: 1, backgroundColor: "#0A0F1C" },
-  header:         { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" },
-  title:          { color: "#F1F5F9", fontSize: 16, fontWeight: "800" },
-  liveBadge:      { flexDirection: "row", alignItems: "center", gap: 6 },
-  liveText:       { color: "#F1F5F9", fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
-  permBox:        { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
-  permTitle:      { color: "#F1F5F9", fontSize: 18, fontWeight: "800", marginTop: 8 },
-  permSub:        { color: "#64748B", fontSize: 14, textAlign: "center", lineHeight: 20 },
-  permBtn:        { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#3B82F6", borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
-  permBtnTxt:     { color: "#fff", fontWeight: "700", fontSize: 14 },
-  tabs:           { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
-  tab:            { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" },
-  tabActive:      { backgroundColor: "rgba(59,130,246,0.15)", borderColor: "rgba(59,130,246,0.4)" },
-  tabTxt:         { color: "#64748B", fontSize: 13, fontWeight: "600" },
-  tabTxtActive:   { color: "#3B82F6" },
-  tripSel:        { paddingHorizontal: 16, marginBottom: 10 },
-  tripSelLabel:   { color: "#94A3B8", fontSize: 12, fontWeight: "600", marginBottom: 6 },
-  tripChip:       { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
-  tripChipActive: { backgroundColor: "rgba(59,130,246,0.18)", borderColor: "rgba(59,130,246,0.45)" },
-  tripChipTxt:    { color: "#94A3B8", fontSize: 12, fontWeight: "600", maxWidth: 160 },
-  tripChipTxtActive: { color: "#60A5FA" },
-  tripInfo:       { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, marginBottom: 8, backgroundColor: "rgba(59,130,246,0.08)", paddingVertical: 8, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(59,130,246,0.15)" },
-  tripInfoTxt:    { color: "#94A3B8", fontSize: 12 },
-  scanBox:        { flex: 1, overflow: "hidden", margin: 16, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  scanInner:      { flex: 1 },
-  previewWrap:    { flex: 1, margin: 16, borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  previewHeader:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", paddingHorizontal: 12, paddingVertical: 8 },
-  previewActions: { flexDirection: "row", gap: 8, padding: 12 },
-  previewRetry:   { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, paddingVertical: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)" },
-  connectBtn:     { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#059669", borderRadius: 10, paddingVertical: 12 },
-  connectBtnTxt:  { color: "#fff", fontWeight: "800", fontSize: 14 },
-  manualBox:      { flex: 1, padding: 16, gap: 12 },
-  manualTitle:    { color: "#E2E8F0", fontSize: 15, fontWeight: "700", marginBottom: 2 },
-  manualFormats:  { backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.07)" },
-  manualFmtTitle: { color: "#94A3B8", fontSize: 12, fontWeight: "700", marginBottom: 6 },
-  manualFmtTxt:   { color: "#64748B", fontSize: 12, lineHeight: 18 },
-  urlRow:         { flexDirection: "row", gap: 8, alignItems: "center" },
-  urlInput:       { flex: 1, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: "#F1F5F9", fontSize: 13, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
-  urlTestBtn:     { width: 44, height: 44, borderRadius: 10, backgroundColor: "#3B82F6", justifyContent: "center", alignItems: "center" },
-  urlHint:        { color: "#475569", fontSize: 11, textAlign: "center" },
-  posRow:         { flexDirection: "row", gap: 8 },
-  posChip:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
-  posChipActive:  { backgroundColor: "rgba(14,116,144,0.2)", borderColor: "rgba(14,116,144,0.45)" },
-  posChipTxt:     { color: "#64748B", fontSize: 12, fontWeight: "600" },
-  posChipTxtActive: { color: "#22D3EE" },
-  noTrip:         { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
-  noTripTxt:      { color: "#64748B", fontSize: 16, fontWeight: "700", textAlign: "center" },
-  noTripSub:      { color: "#475569", fontSize: 13, textAlign: "center" },
-  errorBanner:    { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(220,38,38,0.12)", margin: 16, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "rgba(220,38,38,0.3)" },
-  errorTxt:       { color: "#F87171", fontSize: 12, flex: 1 },
-  loadingOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(10,15,28,0.75)", zIndex: 20, gap: 10 },
-  loadingTxt:     { color: "#94A3B8", fontSize: 13 },
-});
 
 /* ── Main Styles ─────────────────────────────────────────────────── */
 const S = StyleSheet.create({
