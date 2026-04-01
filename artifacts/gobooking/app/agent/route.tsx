@@ -158,8 +158,207 @@ export default function RouteScreen() {
   const [alertActing,  setAlertActing]  = useState<string | null>(null);
   const [autoAlerts,   setAutoAlerts]   = useState<BusAlert[]>([]);
 
-  /* ── Caméra embarquée — connexion réelle ── */
+  /* ── Stop data + refs ── */
+  interface StopWithPassengers {
+    id: string; name: string; city: string; order: number;
+    passengers: { bookingRef: string; userName: string | null; fromStopId: string | null }[];
+  }
+  const [stopData, setStopData]         = useState<StopWithPassengers[]>([]);
+  const [stopLoading, setStopLoading]   = useState(false);
+  const [lastSync, setLastSync]         = useState<Date | null>(null);
+  const pollRef         = useRef<ReturnType<typeof setInterval> | null>(null);
+  const speedZeroRef    = useRef<number | null>(null);
+  const anomalyInjected = useRef<Set<string>>(new Set());
 
+  /* ── Scan ticket state ── */
+  const [scanPerm, requestScanPerm]   = useCameraPermissions();
+  const [scanMode, setScanMode]       = useState<"camera" | "manual">("camera");
+  const [scanInput, setScanInput]     = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult]   = useState<ScanRouteResult | null>(null);
+  const scannedRouteRef               = useRef(false);
+  const scanPulse                     = useRef(new Animated.Value(1)).current;
+
+  const assignedTripId = user?.tripId ?? null;
+  const assignedBusId  = user?.busId  ?? null;
+
+  const gps = useAgentGps(activeTrip?.id ?? null, token);
+
+  /* ── Data loaders ── */
+  const loadTrips = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const raw = await apiFetch<any[]>("/trips/live", { token });
+      const allTrips: LiveTrip[] = raw.map(t => ({
+        id: t.id, from: t.from ?? t.fromCity ?? "—", to: t.to ?? t.toCity ?? "—",
+        departureTime: t.departureTime ?? "—", arrivalTime: t.arrivalTime ?? t.estimatedArrival,
+        busName: t.busName ?? "Bus", status: "en_route" as const,
+        passengers: t.totalSeats ? (t.totalSeats - (t.availableSeats ?? 0)) : undefined,
+        totalSeats: t.totalSeats, lat: t.lat, lon: t.lon, speed: t.speed,
+        cameraStatus: t.cameraStatus ?? "disconnected",
+        cameraStreamUrl: t.cameraStreamUrl ?? null,
+      }));
+      setTrips(allTrips);
+      if (!activeTrip) {
+        const matched = assignedTripId ? allTrips.find(t => t.id === assignedTripId) : allTrips[0];
+        if (matched) setActiveTrip(matched);
+      }
+    } catch {
+      const demo: LiveTrip[] = [
+        { id: "trip-sim-001", from: "Abidjan", to: "Bouaké", departureTime: "07:00",
+          arrivalTime: "11:00", busName: "Daloa Express 07", status: "en_route",
+          passengers: 14, totalSeats: 63, lat: 6.4120, lon: -5.0340, speed: 82,
+          cameraStatus: "disconnected", cameraStreamUrl: null },
+      ];
+      setTrips(demo);
+      if (!activeTrip) setActiveTrip(demo[0]);
+    } finally { setLoading(false); }
+  }, [token, activeTrip, assignedTripId]);
+
+  const loadPassengers = useCallback(async (tripId: string, silent = false) => {
+    if (!token) return;
+    if (!silent) setPassLoading(true);
+    try {
+      const data = await apiFetch<Passenger[]>(`/agent/trip/${tripId}/passengers`, { token });
+      setPassengers(data.length > 0 ? data : DEMO_PASSENGERS);
+      setLastSync(new Date());
+    } catch {
+      if (!silent) setPassengers(DEMO_PASSENGERS);
+    } finally { if (!silent) setPassLoading(false); }
+  }, [token]);
+
+  const loadStopData = useCallback(async (tripId: string) => {
+    if (!token) return;
+    setStopLoading(true);
+    try {
+      const data = await apiFetch<{ stops: StopWithPassengers[] }>(`/company/trips/${tripId}/stop-passengers`, { token });
+      const stops = data.stops ?? [];
+      setStopData(stops.length > 0 ? stops : (DEMO_STOPS_FALLBACK as any));
+    } catch {
+      setStopData(DEMO_STOPS_FALLBACK as any);
+    } finally { setStopLoading(false); }
+  }, [token]);
+
+  const loadMyDeparture = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${BASE_URL}/agent/route/my-departure`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setMyDeparture(json.departure ?? null);
+        const apiAlerts: BusAlert[] = json.alerts ?? [];
+        setBusAlerts(apiAlerts.length > 0 ? apiAlerts : DEMO_ALERTS_FALLBACK);
+      }
+    } catch {}
+  }, [token]);
+
+  const respondToAlert = async (alertId: string, response: "panne" | "controle" | "pause") => {
+    if (alertId.startsWith("auto-") || alertId.startsWith("sim-")) {
+      setAlertActing(alertId);
+      await new Promise(r => setTimeout(r, 700));
+      setAutoAlerts(prev => prev.filter(a => a.id !== alertId));
+      setBusAlerts(prev  => prev.filter(a => a.id !== alertId));
+      anomalyInjected.current.delete("arret_prolonge");
+      anomalyInjected.current.delete("vitesse_anormale");
+      speedZeroRef.current = null;
+      Alert.alert("Anomalie résolue", "L'alerte a été clôturée. Le suivi continue.");
+      setAlertActing(null);
+      return;
+    }
+    setAlertActing(alertId);
+    try {
+      const res = await fetch(`${BASE_URL}/agent/route/alerts/${alertId}/respond`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ response }),
+      });
+      if (res.ok) {
+        Alert.alert("Réponse envoyée", "L'Agent Suivi a été notifié.");
+        await loadMyDeparture();
+      }
+    } catch { Alert.alert("Erreur", "Problème réseau."); }
+    setAlertActing(null);
+  };
+
+  const handleManualBooking = async () => {
+    if (!manualName.trim()) { Alert.alert("Erreur", "Entrez le nom du passager."); return; }
+    if (!manualPhone.trim()) { Alert.alert("Erreur", "Entrez le numéro de téléphone."); return; }
+    const seats = parseInt(manualSeats, 10);
+    if (isNaN(seats) || seats < 1 || seats > 10) { Alert.alert("Erreur", "Nombre de places invalide (1-10)."); return; }
+    const payload = {
+      passengerName: manualName.trim(), passengerPhone: manualPhone.trim(),
+      boardingPoint: manualPoint.trim() || undefined, seatCount: seats,
+    };
+    setManualSaving(true);
+    try {
+      const res = await apiFetch<{ bookingRef: string; totalAmount: number }>("/agent/route/manual-booking", {
+        token: token ?? undefined, method: "POST", body: payload,
+      });
+      setManualSuccess({ bookingRef: res.bookingRef, total: res.totalAmount });
+      setManualName(""); setManualPhone(""); setManualPoint(""); setManualSeats("1");
+      if (activeTrip) loadPassengers(activeTrip.id);
+    } catch (e: any) {
+      Alert.alert("Erreur création ticket", e?.message ?? "Impossible de créer la réservation. Vérifiez votre connexion.");
+    } finally { setManualSaving(false); }
+  };
+
+  /* ── Scan handlers ── */
+  const triggerScanPulse = () => {
+    Animated.sequence([
+      Animated.timing(scanPulse, { toValue: 1.08, duration: 120, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(scanPulse, { toValue: 0.96, duration: 80,  easing: Easing.in(Easing.ease),  useNativeDriver: true }),
+      Animated.timing(scanPulse, { toValue: 1,    duration: 120, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleScanCode = async (code: string) => {
+    if (!code.trim() || scanLoading) return;
+    setScanLoading(true);
+    try {
+      const already = await isAlreadyScanned(code);
+      if (already) {
+        setScanResult({ status: "already_used", message: "Ce billet a déjà été scanné sur cet appareil." });
+        triggerScanPulse(); return;
+      }
+      if (!networkStatus.isOnline) {
+        setScanResult({ status: "offline", message: "Connexion requise pour valider un ticket en temps réel." });
+        triggerScanPulse(); return;
+      }
+      const res = await apiFetch<{
+        valid: boolean; message?: string; passenger?: string;
+        route?: string; departure_time?: string; seats?: string;
+      }>("/agent/validate-qr", {
+        method: "POST", token: token ?? undefined,
+        body: JSON.stringify({ qrCode: code }),
+      });
+      if (res.valid) {
+        await markAsScanned(code);
+        setScanResult({ status: "valid", passenger: res.passenger, route: res.route, departure_time: res.departure_time, seats: res.seats });
+        triggerScanPulse();
+        if (activeTrip) loadPassengers(activeTrip.id, true);
+      } else {
+        const msg = res.message ?? "";
+        const status: ScanStatus = msg.includes("déjà utilisé") ? "already_used" : "invalid";
+        setScanResult({ status, message: msg });
+        triggerScanPulse();
+      }
+    } catch {
+      setScanResult({ status: "offline", message: "Erreur réseau — vérifiez votre connexion." });
+      triggerScanPulse();
+    } finally {
+      setScanLoading(false);
+      scannedRouteRef.current = false;
+    }
+  };
+
+  const resetScan = () => {
+    setScanResult(null);
+    setScanInput("");
+    scannedRouteRef.current = false;
+  };
 
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
