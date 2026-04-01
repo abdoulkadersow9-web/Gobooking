@@ -1,13 +1,30 @@
 /**
- * Réservations en ligne — Agent de vente
+ * Réservations en ligne — Dashboard opérationnel par agence
  *
- * Hiérarchie stricte par réservation :
- *   1. TRAJET (header de groupe, le plus visible)
- *   2. IDENTIFICATION (ref + statut)
- *   3. CLIENT (nom + téléphone)
- *   4. RÉSERVATION (passagers, sièges, montant, paiement)
- *   5. BAGAGE / COLIS (section séparée, seulement si présent)
- *   6. ACTIONS (Confirmer = principal · Annuler = secondaire)
+ * Architecture :
+ *   ┌─ HEADER AGENCE ──────────────────────────────────┐
+ *   │  Nom agence + ville + stats temps réel            │
+ *   └──────────────────────────────────────────────────┘
+ *   ┌─ FILTRE DÉPART ───────────────────────────────────┐
+ *   │  Tous · Programmés · En route · Terminés          │
+ *   └──────────────────────────────────────────────────┘
+ *   ┌─ FILTRE STATUT ───────────────────────────────────┐
+ *   │  En attente · Confirmées · Annulées · Toutes      │
+ *   └──────────────────────────────────────────────────┘
+ *   ┌─ GROUPE TRAJET ────────────────────────────────────┐
+ *   │  Abidjan → Bouaké  07:00  [En route]  3 rés.      │
+ *   │  ┌─ CARTE RÉSERVATION ──────────────────────────┐  │
+ *   │  │  MOBRES001                     En attente    │  │
+ *   │  │  ─────────────────────────────────────────── │  │
+ *   │  │  👤 Koné Mamadou          ☎ +225 07 xx xx   │  │
+ *   │  │  ─────────────────────────────────────────── │  │
+ *   │  │  2 pers. │ A3,A4 │ 12 000 F │ Mobile Money  │  │
+ *   │  │  ─────────────────────────────────────────── │  │
+ *   │  │  📦 Colis ×1   En attente   3 500 F          │  │
+ *   │  │  ─────────────────────────────────────────── │  │
+ *   │  │  [   ✓ CONFIRMER    ]  ·  Annuler            │  │
+ *   │  └──────────────────────────────────────────────┘  │
+ *   └──────────────────────────────────────────────────┘
  */
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,10 +54,12 @@ import { apiFetch } from "@/utils/api";
 const C = {
   teal:       "#0E7490",
   tealDark:   "#164E63",
+  tealMid:    "#0891B2",
   tealSoft:   "#ECFEFF",
   tealBorder: "#A5F3FC",
   green:      "#059669",
   greenSoft:  "#ECFDF5",
+  greenDark:  "#065F46",
   amber:      "#D97706",
   amberSoft:  "#FFFBEB",
   amberBorder:"#FDE68A",
@@ -48,14 +67,18 @@ const C = {
   redSoft:    "#FEF2F2",
   purple:     "#7C3AED",
   purpleSoft: "#F5F3FF",
+  indigo:     "#4F46E5",
+  indigoSoft: "#EEF2FF",
   text:       "#111827",
   textSub:    "#6B7280",
   border:     "#E5E7EB",
-  bg:         "#F5F6FA",
+  bg:         "#F1F5F9",
   white:      "#FFFFFF",
 };
 
 /* ── Types ─────────────────────────────────────────────────── */
+interface AgenceInfo { id: string; name: string; city: string }
+
 interface OnlineBooking {
   id: string;
   bookingRef: string;
@@ -86,8 +109,11 @@ interface OnlineBooking {
   } | null;
 }
 
+type DepartFilter = "all" | "scheduled" | "active" | "done";
+type StatusFilter = "pending" | "confirmed" | "cancelled" | "all";
+
 /* ── Helpers ───────────────────────────────────────────────── */
-function bookingStatusStyle(s: string): { label: string; color: string; bg: string } {
+function bookingStatusStyle(s: string) {
   if (s === "pending")   return { label: "En attente",  color: C.amber,  bg: C.amberSoft };
   if (s === "confirmed") return { label: "Confirmé",    color: C.green,  bg: C.greenSoft };
   if (s === "cancelled") return { label: "Annulé",      color: C.red,    bg: C.redSoft  };
@@ -97,30 +123,37 @@ function bookingStatusStyle(s: string): { label: string; color: string; bg: stri
 
 function tripStatusStyle(s?: string): { label: string; color: string; bg: string; icon: string } | null {
   if (!s) return null;
-  if (s === "en_route" || s === "in_progress") return { label: "En route",      color: C.green,  bg: C.greenSoft,  icon: "navigation" };
-  if (s === "boarding")                        return { label: "Embarquement",   color: C.purple, bg: C.purpleSoft, icon: "user-check" };
-  if (s === "scheduled")                       return { label: "Programmé",      color: C.amber,  bg: C.amberSoft,  icon: "clock"      };
-  if (s === "arrived" || s === "completed")    return { label: "Arrivé",         color: C.teal,   bg: C.tealSoft,   icon: "check-circle" };
-  if (s === "cancelled")                       return { label: "Annulé",         color: C.red,    bg: C.redSoft,    icon: "x-circle"   };
+  if (s === "en_route" || s === "in_progress") return { label: "En route",    color: C.green,  bg: C.greenSoft,  icon: "navigation" };
+  if (s === "boarding")                        return { label: "Embarquement",color: C.purple, bg: C.purpleSoft, icon: "user-check" };
+  if (s === "scheduled")                       return { label: "Programmé",   color: C.amber,  bg: C.amberSoft,  icon: "clock"      };
+  if (s === "arrived" || s === "completed")    return { label: "Arrivé",      color: C.teal,   bg: C.tealSoft,   icon: "check-circle" };
+  if (s === "cancelled")                       return { label: "Annulé",      color: C.red,    bg: C.redSoft,    icon: "x-circle"   };
   return null;
 }
 
-function paymentLabel(p: string): string {
+function paymentLabel(p: string) {
   if (p === "mobile_money") return "Mobile Money";
-  if (p === "card")         return "Carte bancaire";
+  if (p === "card")         return "Carte";
   if (p === "cash")         return "Espèces";
   return p ?? "—";
 }
 
-function baggageLabel(t: string | null): string {
-  if (t === "léger") return "Léger (sac, cartable)";
-  if (t === "lourd") return "Lourd (valise, carton)";
-  if (t === "colis") return "Colis / envoi groupé";
-  return t ?? "Non précisé";
+function baggageLabel(t: string | null) {
+  if (t === "léger") return "Léger";
+  if (t === "lourd") return "Lourd";
+  if (t === "colis") return "Colis";
+  return t ?? "Bagage";
 }
 
-const isEnRouteTrip = (t: OnlineBooking["trip"]) =>
-  t?.status === "en_route" || t?.status === "in_progress" || t?.status === "boarding";
+function isTripActive(s?: string) {
+  return s === "en_route" || s === "in_progress" || s === "boarding";
+}
+function isTripDone(s?: string) {
+  return s === "arrived" || s === "completed" || s === "cancelled";
+}
+function isTripScheduled(s?: string) {
+  return s === "scheduled" || !s;
+}
 
 /* ════════════════════════════════════════════════════════════
    PAGE PRINCIPALE
@@ -128,38 +161,49 @@ const isEnRouteTrip = (t: OnlineBooking["trip"]) =>
 export default function AgentReservation() {
   const { user, token, logoutIfActiveToken } = useAuth();
 
+  const [agence,     setAgence]     = useState<AgenceInfo | null>(null);
   const [bookings,   setBookings]   = useState<OnlineBooking[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter,     setFilter]     = useState<"pending" | "confirmed" | "cancelled" | "all">("pending");
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState<string | null>(null);
-  const [cancelModal, setCancelModal] = useState<OnlineBooking | null>(null);
+
+  const [departFilter, setDepartFilter] = useState<DepartFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+
+  const [confirming,   setConfirming]   = useState<string | null>(null);
+  const [cancelling,   setCancelling]   = useState<string | null>(null);
+  const [cancelModal,  setCancelModal]  = useState<OnlineBooking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+  const [lastSync,     setLastSync]     = useState<Date | null>(null);
+
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  /* ── Pulse animation quand des réservations sont en attente ── */
+  /* ── Pulse quand des réservations sont en attente ── */
   useEffect(() => {
     const pending = bookings.filter(b => b.status === "pending").length;
     if (pending > 0) {
       Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.12, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 800, useNativeDriver: true }),
       ])).start();
-    } else {
-      pulseAnim.stopAnimation();
-      pulseAnim.setValue(1);
-    }
+    } else { pulseAnim.stopAnimation(); pulseAnim.setValue(1); }
   }, [bookings.length]);
 
   /* ── Chargement ── */
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const data = await apiFetch<OnlineBooking[]>("/agent/online-bookings", { token: token ?? undefined });
-      setBookings(Array.isArray(data) ? data : []);
+      const resp = await apiFetch<{ agence: AgenceInfo | null; bookings: OnlineBooking[] }>(
+        "/agent/online-bookings", { token: token ?? undefined }
+      );
+      const data = resp as any;
+      /* Support both old array format and new object format */
+      if (Array.isArray(data)) {
+        setBookings(data);
+      } else {
+        setAgence(data?.agence ?? null);
+        setBookings(Array.isArray(data?.bookings) ? data.bookings : []);
+      }
       setLastSync(new Date());
     } catch (e: any) {
       if (e?.httpStatus === 401) { logoutIfActiveToken(token ?? ""); return; }
@@ -173,29 +217,25 @@ export default function AgentReservation() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [load]);
 
-  /* ── Confirmer ── */
+  /* ── Actions ── */
   const confirmBooking = async (b: OnlineBooking) => {
     const bagInfo = b.baggageCount > 0 ? `\nBagage : ${baggageLabel(b.baggageType)} (×${b.baggageCount})` : "";
-    Alert.alert(
-      "Confirmer la réservation",
-      `${b.bookingRef} — ${b.passengers[0]?.name ?? "client"}\n\nTrajet : ${b.trip?.from} → ${b.trip?.to}\nDate : ${b.trip?.date} à ${b.trip?.departureTime}\nMontant : ${(b.totalAmount ?? 0).toLocaleString()} FCFA${bagInfo}`,
+    Alert.alert("Confirmer", `${b.bookingRef} — ${b.passengers[0]?.name ?? "client"}\nTrajet : ${b.trip?.from} → ${b.trip?.to}\nDate : ${b.trip?.date} à ${b.trip?.departureTime}\nMontant : ${(b.totalAmount ?? 0).toLocaleString()} FCFA${bagInfo}`,
       [
         { text: "Annuler", style: "cancel" },
         { text: "Confirmer ✓", onPress: async () => {
           setConfirming(b.id);
           try {
             await apiFetch(`/agent/online-bookings/${b.id}/confirm`, { token: token ?? undefined, method: "POST", body: {} });
-            Alert.alert("✅ Confirmée", `${b.bookingRef} confirmée${b.baggageCount > 0 ? " avec le bagage" : ""} !`);
+            Alert.alert("✅ Confirmée", `${b.bookingRef} confirmée !`);
             await load(true);
-          } catch (e: any) {
-            Alert.alert("Erreur", e?.message ?? "Impossible de confirmer");
-          } finally { setConfirming(null); }
+          } catch (e: any) { Alert.alert("Erreur", e?.message ?? "Impossible de confirmer"); }
+          finally { setConfirming(null); }
         }},
       ]
     );
   };
 
-  /* ── Annuler ── */
   const cancelBooking = async () => {
     if (!cancelModal) return;
     setCancelling(cancelModal.id);
@@ -207,21 +247,27 @@ export default function AgentReservation() {
       setCancelModal(null); setCancelReason("");
       Alert.alert("Annulée", `${cancelModal.bookingRef} annulée. Siège libéré.`);
       await load(true);
-    } catch (e: any) {
-      Alert.alert("Erreur", e?.message ?? "Impossible d'annuler");
-    } finally { setCancelling(null); }
+    } catch (e: any) { Alert.alert("Erreur", e?.message ?? "Impossible d'annuler"); }
+    finally { setCancelling(null); }
   };
 
-  /* ── Compteurs ── */
+  /* ── Compteurs bruts ── */
   const pendingCount   = bookings.filter(b => b.status === "pending").length;
   const confirmedCount = bookings.filter(b => b.status === "confirmed" || b.status === "boarded").length;
   const cancelledCount = bookings.filter(b => b.status === "cancelled").length;
+  const activeTrips    = [...new Set(bookings.filter(b => isTripActive(b.trip?.status)).map(b => b.trip?.id))].length;
 
-  /* ── Filtrage ── */
+  /* ── Double filtrage : départ × statut ── */
   const displayed = bookings.filter(b => {
-    if (filter === "pending")   return b.status === "pending";
-    if (filter === "confirmed") return b.status === "confirmed" || b.status === "boarded";
-    if (filter === "cancelled") return b.status === "cancelled";
+    /* Filtre départ */
+    if (departFilter === "scheduled" && !isTripScheduled(b.trip?.status)) return false;
+    if (departFilter === "active"    && !isTripActive(b.trip?.status))    return false;
+    if (departFilter === "done"      && !isTripDone(b.trip?.status))      return false;
+
+    /* Filtre statut réservation */
+    if (statusFilter === "pending")   return b.status === "pending";
+    if (statusFilter === "confirmed") return b.status === "confirmed" || b.status === "boarded";
+    if (statusFilter === "cancelled") return b.status === "cancelled";
     return true;
   });
 
@@ -234,14 +280,18 @@ export default function AgentReservation() {
     else { acc.push({ tripKey: key, tripInfo: b.trip ?? null, bookings: [b] }); }
     return acc;
   }, []);
+
+  /* Tri : en route d'abord, puis programmés, puis terminés */
   groupedByTrip.sort((a, b) => {
-    const diff = (isEnRouteTrip(a.tripInfo) ? 0 : 1) - (isEnRouteTrip(b.tripInfo) ? 0 : 1);
+    const order = (t: OnlineBooking["trip"]) =>
+      isTripActive(t?.status) ? 0 : isTripScheduled(t?.status) ? 1 : 2;
+    const diff = order(a.tripInfo) - order(b.tripInfo);
     if (diff !== 0) return diff;
+    /* À statut égal, les groupes avec réservations en attente en premier */
     return (a.bookings.some(x => x.status === "pending") ? 0 : 1) -
            (b.bookings.some(x => x.status === "pending") ? 0 : 1);
   });
 
-  /* ── Sync time ── */
   const syncTime = lastSync
     ? `${String(lastSync.getHours()).padStart(2,"0")}:${String(lastSync.getMinutes()).padStart(2,"0")}:${String(lastSync.getSeconds()).padStart(2,"0")}`
     : null;
@@ -253,15 +303,16 @@ export default function AgentReservation() {
     <SafeAreaView style={s.root} edges={["top"]}>
       <StatusBar barStyle="light-content" backgroundColor={C.tealDark} />
 
-      {/* ── HEADER ── */}
-      <LinearGradient colors={[C.tealDark, C.teal, "#0891B2"]} style={s.header}>
+      {/* ── HEADER GRADIENT ── */}
+      <LinearGradient colors={[C.tealDark, C.teal, C.tealMid]} style={s.header}>
         <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace("/agent/home" as never)} hitSlop={8}>
           <Feather name="arrow-left" size={22} color="#fff" />
         </Pressable>
         <View style={{ flex:1, marginLeft:14 }}>
           <Text style={s.hTitle}>Réservations en ligne</Text>
-          <Text style={s.hSub}>
-            {syncTime ? `Sync ${syncTime} · Auto 30s` : `Chargement · ${user?.name}`}
+          <Text style={s.hSub} numberOfLines={1}>
+            {agence ? `${agence.name} · ${agence.city}` : user?.name ?? "…"}
+            {syncTime ? `  ·  ${syncTime}` : ""}
           </Text>
         </View>
         <Pressable onPress={() => load()} style={s.refreshBtn}>
@@ -269,156 +320,208 @@ export default function AgentReservation() {
         </Pressable>
       </LinearGradient>
 
-      {/* ── BANDEAU STATISTIQUES ── */}
-      <View style={s.statsRow}>
-        <View style={s.statCell}>
-          <Animated.Text style={[s.statNum, { color: C.amber, transform: [{ scale: pulseAnim }] }]}>
-            {pendingCount}
-          </Animated.Text>
-          <Text style={s.statLabel}>En attente</Text>
+      {/* ── BANNIÈRE AGENCE ── */}
+      <View style={s.agenceBanner}>
+        {/* Icône agence */}
+        <View style={s.agenceIcon}>
+          <Feather name="map-pin" size={16} color={C.teal} />
         </View>
-        <View style={s.statSep} />
-        <View style={s.statCell}>
-          <Text style={[s.statNum, { color: C.green }]}>{confirmedCount}</Text>
-          <Text style={s.statLabel}>Confirmées</Text>
+        <View style={{ flex:1 }}>
+          <Text style={s.agenceName} numberOfLines={1}>
+            {agence?.name ?? "Mon Agence"}
+          </Text>
+          <Text style={s.agenceCity}>{agence?.city ?? "Chargement…"}</Text>
         </View>
-        <View style={s.statSep} />
-        <View style={s.statCell}>
-          <Text style={[s.statNum, { color: C.red }]}>{cancelledCount}</Text>
-          <Text style={s.statLabel}>Annulées</Text>
-        </View>
-        <View style={s.statSep} />
-        <View style={s.statCell}>
-          <Text style={[s.statNum, { color: C.teal }]}>{bookings.length}</Text>
-          <Text style={s.statLabel}>Total</Text>
+        {/* Mini stats en temps réel */}
+        <View style={s.agenceStats}>
+          <Animated.View style={[s.agenceStatChip, { backgroundColor: C.amberSoft, transform:[{scale: pulseAnim}] }]}>
+            <Text style={[s.agenceStatNum, { color: C.amber }]}>{pendingCount}</Text>
+            <Text style={[s.agenceStatLabel, { color: C.amber }]}>attente</Text>
+          </Animated.View>
+          <View style={[s.agenceStatChip, { backgroundColor: C.greenSoft }]}>
+            <Text style={[s.agenceStatNum, { color: C.green }]}>{confirmedCount}</Text>
+            <Text style={[s.agenceStatLabel, { color: C.green }]}>confirmées</Text>
+          </View>
+          {activeTrips > 0 && (
+            <View style={[s.agenceStatChip, { backgroundColor: "#F0FDF4" }]}>
+              <Feather name="navigation" size={10} color={C.green} />
+              <Text style={[s.agenceStatNum, { color: C.greenDark }]}>{activeTrips}</Text>
+              <Text style={[s.agenceStatLabel, { color: C.greenDark }]}>en route</Text>
+            </View>
+          )}
         </View>
       </View>
 
-      {/* ── FILTRES ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow:0 }} contentContainerStyle={s.filterRow}>
-        {([
-          { key:"pending",   label:"En attente",  count:pendingCount,   activeColor:"#fff", activeBg: C.amber  },
-          { key:"confirmed", label:"Confirmées",   count:confirmedCount, activeColor:"#fff", activeBg: C.green  },
-          { key:"cancelled", label:"Annulées",     count:cancelledCount, activeColor:"#fff", activeBg: C.red    },
-          { key:"all",       label:"Toutes",       count:bookings.length,activeColor:"#fff", activeBg: "#374151"},
-        ] as const).map(f => (
-          <Pressable
-            key={f.key}
-            style={[s.filterChip, filter === f.key && { backgroundColor: f.activeBg, borderColor: f.activeBg }]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text style={[s.filterTxt, filter === f.key && { color: f.activeColor }]}>{f.label}</Text>
-            {f.count > 0 && (
-              <View style={[s.filterBadge, filter === f.key && { backgroundColor:"rgba(255,255,255,0.25)" }]}>
-                <Text style={[s.filterBadgeTxt, filter === f.key && { color: f.activeColor }]}>{f.count}</Text>
-              </View>
-            )}
-          </Pressable>
-        ))}
-      </ScrollView>
+      {/* ── FILTRE DÉPART ── */}
+      <View style={s.filterSection}>
+        <Text style={s.filterSectionLabel}>DÉPART</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+          {([
+            { key:"all",       label:"Tous",        icon:"list"       as const },
+            { key:"active",    label:"En route",    icon:"navigation" as const },
+            { key:"scheduled", label:"À venir",     icon:"clock"      as const },
+            { key:"done",      label:"Terminés",    icon:"check-circle" as const },
+          ] as const).map(f => {
+            const isActive = departFilter === f.key;
+            const color = f.key === "active" ? C.green : f.key === "done" ? C.textSub : C.teal;
+            return (
+              <Pressable
+                key={f.key}
+                style={[s.chip, isActive && { backgroundColor: color, borderColor: color }]}
+                onPress={() => setDepartFilter(f.key)}
+              >
+                <Feather name={f.icon} size={11} color={isActive ? "#fff" : color} />
+                <Text style={[s.chipTxt, isActive && { color:"#fff" }]}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-      {/* ── LISTE PRINCIPALE ── */}
+      {/* ── FILTRE STATUT RÉSERVATION ── */}
+      <View style={s.filterSection}>
+        <Text style={s.filterSectionLabel}>RÉSERVATION</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
+          {([
+            { key:"pending",   label:"En attente",  count:pendingCount,   color:C.amber },
+            { key:"confirmed", label:"Confirmées",  count:confirmedCount, color:C.green },
+            { key:"cancelled", label:"Annulées",    count:cancelledCount, color:C.red   },
+            { key:"all",       label:"Toutes",      count:bookings.length, color:C.teal },
+          ] as const).map(f => {
+            const isActive = statusFilter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                style={[s.chip, isActive && { backgroundColor: f.color, borderColor: f.color }]}
+                onPress={() => setStatusFilter(f.key)}
+              >
+                <Text style={[s.chipTxt, isActive && { color:"#fff" }]}>{f.label}</Text>
+                {f.count > 0 && (
+                  <View style={[s.chipBadge, isActive && { backgroundColor:"rgba(255,255,255,0.28)" }]}>
+                    <Text style={[s.chipBadgeTxt, isActive && { color:"#fff" }]}>{f.count}</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ── LISTE ── */}
       {loading ? (
         <View style={s.centerBox}>
           <ActivityIndicator size="large" color={C.teal} />
-          <Text style={{ color:C.textSub, marginTop:10 }}>Chargement…</Text>
+          <Text style={{ color:C.textSub, marginTop:10, fontSize:13 }}>Chargement des réservations…</Text>
         </View>
       ) : displayed.length === 0 ? (
         <View style={s.centerBox}>
-          <Feather name="calendar" size={48} color="#CBD5E1" />
-          <Text style={s.emptyTitle}>
-            {filter === "pending" ? "Aucune réservation en attente" : "Aucune réservation"}
-          </Text>
+          <View style={{ width:64, height:64, borderRadius:32, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center", marginBottom:6 }}>
+            <Feather name="inbox" size={28} color={C.teal} />
+          </View>
+          <Text style={s.emptyTitle}>Aucune réservation</Text>
           <Text style={s.emptySub}>
-            {filter === "pending"
-              ? "Les nouvelles réservations en ligne apparaîtront ici"
-              : "Modifiez le filtre pour voir d'autres réservations"}
+            {statusFilter === "pending"
+              ? "Aucune réservation en attente pour ce filtre"
+              : "Modifiez les filtres pour voir d'autres réservations"}
           </Text>
           <Pressable onPress={() => load()} style={s.emptyBtn}>
-            <Text style={{ color:"#fff", fontWeight:"700" }}>Actualiser</Text>
+            <Feather name="refresh-cw" size={14} color="#fff" />
+            <Text style={{ color:"#fff", fontWeight:"700", fontSize:13 }}>Actualiser</Text>
           </Pressable>
         </View>
       ) : (
         <ScrollView
           style={{ flex:1 }}
-          contentContainerStyle={{ padding:14, paddingBottom:48 }}
+          contentContainerStyle={{ padding:12, paddingBottom:48 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(true); }} tintColor={C.teal} />}
         >
+          {/* Résumé du filtre actif */}
+          <View style={{ flexDirection:"row", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+            <Text style={{ fontSize:12, color:C.textSub, fontWeight:"600" }}>
+              {displayed.length} réservation{displayed.length > 1 ? "s" : ""} · {groupedByTrip.length} départ{groupedByTrip.length > 1 ? "s" : ""}
+            </Text>
+            <Text style={{ fontSize:11, color:C.textSub }}>
+              {syncTime ? `Mis à jour ${syncTime}` : ""}
+            </Text>
+          </View>
+
           {groupedByTrip.map((group) => {
-            const trip        = group.tripInfo;
-            const isActive    = isEnRouteTrip(trip);
+            const trip         = group.tripInfo;
+            const isActive     = isTripActive(trip?.status);
+            const isDone       = isTripDone(trip?.status);
             const groupPending = group.bookings.filter(b => b.status === "pending").length;
-            const ts          = tripStatusStyle(trip?.status);
+            const ts           = tripStatusStyle(trip?.status);
+
+            const accentColor = isActive ? C.green : isDone ? C.textSub : groupPending > 0 ? C.amber : C.teal;
 
             return (
-              <View key={group.tripKey} style={{ marginBottom:16 }}>
+              <View key={group.tripKey} style={{ marginBottom:14 }}>
 
-                {/* ════ BLOC 1 : TRAJET (en-tête de groupe) ════
-                    Le plus visible — route large + statut + compteur
-                ═══════════════════════════════════════════════ */}
-                <View style={[s.tripHeader, { borderLeftColor: isActive ? C.green : groupPending > 0 ? C.amber : C.teal }]}>
-                  {/* Route */}
+                {/* ════ HEADER TRAJET (Bloc départ) ════ */}
+                <View style={[s.tripHeader, { borderLeftColor: accentColor }]}>
                   <View style={{ flex:1 }}>
                     {trip ? (
                       <>
-                        <Text style={s.tripRoute}>
-                          {trip.from}
-                          <Text style={{ color:C.textSub }}> → </Text>
-                          {trip.to}
-                        </Text>
-                        <View style={{ flexDirection:"row", alignItems:"center", flexWrap:"wrap", gap:12, marginTop:5 }}>
-                          <View style={{ flexDirection:"row", alignItems:"center", gap:4 }}>
-                            <Feather name="calendar" size={11} color={C.textSub} />
-                            <Text style={s.tripMeta}>{trip.date}</Text>
+                        {/* Route en grande taille */}
+                        <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginBottom:5 }}>
+                          <Text style={s.tripFrom}>{trip.from}</Text>
+                          <Feather name="arrow-right" size={14} color={accentColor} />
+                          <Text style={s.tripTo}>{trip.to}</Text>
+                        </View>
+                        {/* Métadonnées */}
+                        <View style={{ flexDirection:"row", alignItems:"center", flexWrap:"wrap", gap:10 }}>
+                          <View style={s.tripMetaItem}>
+                            <Feather name="calendar" size={10} color={C.textSub} />
+                            <Text style={s.tripMetaTxt}>{trip.date}</Text>
                           </View>
-                          <View style={{ flexDirection:"row", alignItems:"center", gap:4 }}>
-                            <Feather name="clock" size={11} color={C.textSub} />
-                            <Text style={s.tripMeta}>{trip.departureTime}</Text>
+                          <View style={s.tripMetaItem}>
+                            <Feather name="clock" size={10} color={C.textSub} />
+                            <Text style={s.tripMetaTxt}>{trip.departureTime}</Text>
                           </View>
-                          <View style={{ flexDirection:"row", alignItems:"center", gap:4 }}>
-                            <Feather name="truck" size={11} color={C.textSub} />
-                            <Text style={s.tripMeta}>{trip.busName}</Text>
+                          <View style={s.tripMetaItem}>
+                            <Feather name="truck" size={10} color={C.textSub} />
+                            <Text style={s.tripMetaTxt}>{trip.busName}</Text>
                           </View>
                         </View>
                       </>
                     ) : (
-                      <Text style={[s.tripRoute, { color:C.textSub }]}>Trajet non précisé</Text>
+                      <Text style={[s.tripFrom, { color:C.textSub }]}>Trajet non précisé</Text>
                     )}
                   </View>
 
-                  {/* Statut + compteur */}
-                  <View style={{ alignItems:"flex-end", gap:6 }}>
+                  {/* Côté droit : statut + compteur */}
+                  <View style={{ alignItems:"flex-end", gap:5 }}>
                     {ts && (
                       <View style={[s.tripStatusPill, { backgroundColor: ts.bg }]}>
-                        <Feather name={ts.icon as any} size={10} color={ts.color} />
+                        <Feather name={ts.icon as any} size={9} color={ts.color} />
                         <Text style={[s.tripStatusTxt, { color: ts.color }]}>{ts.label}</Text>
                       </View>
                     )}
-                    <View style={[s.countPill, { backgroundColor: groupPending > 0 ? C.amber : C.teal }]}>
-                      <Text style={s.countPillTxt}>
-                        {group.bookings.length} rés.{groupPending > 0 ? ` · ${groupPending} att.` : ""}
+                    <View style={[s.countPill, { backgroundColor: groupPending > 0 ? C.amber : accentColor }]}>
+                      <Text style={s.countTxt}>
+                        {group.bookings.length} rés.{groupPending > 0 ? `  ·  ${groupPending} att.` : ""}
                       </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* ════ CARTES RÉSERVATION ════ */}
+                {/* ════ CARTES RÉSERVATIONS ════ */}
                 {group.bookings.map(b => {
-                  const bst        = bookingStatusStyle(b.status);
-                  const paxCount   = b.passengers?.length ?? 1;
-                  const seatNums   = b.seatNumbers?.length > 0 ? b.seatNumbers.join(", ") : "À assigner";
-                  const isPending  = b.status === "pending";
+                  const bst         = bookingStatusStyle(b.status);
+                  const paxCount    = b.passengers?.length ?? 1;
+                  const seatNums    = b.seatNumbers?.length > 0 ? b.seatNumbers.join(", ") : "À assigner";
+                  const isPending   = b.status === "pending";
                   const isCancelled = b.status === "cancelled";
-                  const isConfirming = confirming === b.id;
-                  const hasBaggage = b.baggageCount > 0;
-                  const initial    = (b.passengers?.[0]?.name ?? "?").charAt(0).toUpperCase();
+                  const isConf      = confirming === b.id;
+                  const hasBaggage  = b.baggageCount > 0;
+                  const initial     = (b.passengers?.[0]?.name ?? "?").charAt(0).toUpperCase();
 
                   return (
-                    <View key={b.id} style={[s.card, isPending && s.cardPending]}>
+                    <View key={b.id} style={[s.card, isPending && s.cardPending, { marginLeft:8 }]}>
 
-                      {/* ── Ligne 1 : Référence + statut ── */}
+                      {/* ── Ligne référence + statut ── */}
                       <View style={s.cardTopRow}>
                         <Text style={s.cardRef}>{b.bookingRef}</Text>
                         <View style={[s.statusBadge, { backgroundColor: bst.bg }]}>
@@ -426,73 +529,69 @@ export default function AgentReservation() {
                         </View>
                       </View>
 
-                      <View style={s.cardDivider} />
+                      <View style={s.divider} />
 
-                      {/* ── BLOC 2 : CLIENT ── */}
+                      {/* ── CLIENT ── */}
                       <View style={s.clientRow}>
                         <View style={s.clientAvatar}>
-                          <Text style={s.clientAvatarTxt}>{initial}</Text>
+                          <Text style={s.clientInitial}>{initial}</Text>
                         </View>
                         <View style={{ flex:1 }}>
                           <Text style={s.clientName} numberOfLines={1}>
                             {b.passengers?.[0]?.name ?? "Client inconnu"}
                           </Text>
-                          {b.contactPhone ? (
-                            <Pressable onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g,"")}`)} hitSlop={4}>
-                              <Text style={s.clientPhone}>{b.contactPhone}</Text>
-                            </Pressable>
-                          ) : (
-                            <Text style={s.clientNoPhone}>Pas de téléphone</Text>
-                          )}
+                          {b.contactPhone
+                            ? <Pressable onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g,"")}`)}>
+                                <Text style={s.clientPhone}>{b.contactPhone}</Text>
+                              </Pressable>
+                            : <Text style={s.clientNoPhone}>Pas de téléphone</Text>
+                          }
                         </View>
                         {b.contactPhone && (
-                          <Pressable
-                            style={s.callBtn}
-                            onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g,"")}`)}
-                            hitSlop={4}
-                          >
-                            <Feather name="phone" size={16} color={C.teal} />
+                          <Pressable style={s.callBtn}
+                            onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\s/g,"")}`)}>
+                            <Feather name="phone" size={15} color={C.teal} />
                           </Pressable>
                         )}
                       </View>
 
-                      <View style={s.cardDivider} />
+                      <View style={s.divider} />
 
-                      {/* ── BLOC 3 : RÉSERVATION ── */}
+                      {/* ── RÉSERVATION (grille 4 colonnes) ── */}
                       <View style={s.resvGrid}>
                         <View style={s.resvCell}>
                           <Text style={s.resvLabel}>Passagers</Text>
-                          <Text style={s.resvVal}>{paxCount} pers.</Text>
+                          <Text style={s.resvVal}>{paxCount}</Text>
                         </View>
-                        <View style={s.resvCellSep} />
+                        <View style={s.resvSep} />
                         <View style={s.resvCell}>
                           <Text style={s.resvLabel}>Sièges</Text>
                           <Text style={s.resvVal} numberOfLines={1}>{seatNums}</Text>
                         </View>
-                        <View style={s.resvCellSep} />
+                        <View style={s.resvSep} />
                         <View style={s.resvCell}>
                           <Text style={s.resvLabel}>Montant</Text>
-                          <Text style={[s.resvVal, { color: C.teal }]}>
+                          <Text style={[s.resvVal, { color:C.teal }]}>
                             {(b.totalAmount ?? 0).toLocaleString()} F
                           </Text>
                         </View>
-                        <View style={s.resvCellSep} />
+                        <View style={s.resvSep} />
                         <View style={s.resvCell}>
                           <Text style={s.resvLabel}>Paiement</Text>
                           <Text style={s.resvVal} numberOfLines={1}>{paymentLabel(b.paymentMethod)}</Text>
                         </View>
                       </View>
 
-                      {/* ── BLOC 4 : BAGAGE / COLIS (seulement si présent) ── */}
+                      {/* ── BAGAGE / COLIS ── */}
                       {hasBaggage && (
                         <>
-                          <View style={s.cardDivider} />
+                          <View style={s.divider} />
                           <View style={s.bagRow}>
-                            <View style={[s.bagIcon, { backgroundColor: C.purpleSoft }]}>
-                              <Feather name="package" size={14} color={C.purple} />
+                            <View style={s.bagIcon}>
+                              <Feather name="package" size={13} color={C.purple} />
                             </View>
                             <View style={{ flex:1 }}>
-                              <View style={{ flexDirection:"row", alignItems:"center", gap:8 }}>
+                              <View style={{ flexDirection:"row", alignItems:"center", gap:6 }}>
                                 <Text style={s.bagTitle}>
                                   {baggageLabel(b.baggageType)} × {b.baggageCount}
                                 </Text>
@@ -513,7 +612,7 @@ export default function AgentReservation() {
                               )}
                             </View>
                             {b.bagagePrice > 0 && (
-                              <Text style={[s.resvVal, { color: C.purple }]}>
+                              <Text style={[s.resvVal, { color:C.purple }]}>
                                 {b.bagagePrice.toLocaleString()} F
                               </Text>
                             )}
@@ -521,59 +620,52 @@ export default function AgentReservation() {
                         </>
                       )}
 
-                      {/* ── BLOC 5 : ACTIONS ── */}
+                      {/* ── ACTIONS ── */}
                       {isPending && (
                         <>
-                          <View style={s.cardDivider} />
+                          <View style={s.divider} />
                           <View style={s.actionsBlock}>
-                            {/* Bouton principal : CONFIRMER */}
                             <Pressable
-                              style={[s.confirmBtn, isConfirming && { opacity:0.65 }]}
+                              style={[s.confirmBtn, isConf && { opacity:0.65 }]}
                               onPress={() => confirmBooking(b)}
-                              disabled={isConfirming || cancelling === b.id}
+                              disabled={isConf || cancelling === b.id}
                             >
-                              {isConfirming
+                              {isConf
                                 ? <ActivityIndicator color="#fff" size="small" />
                                 : <>
-                                    <Feather name="check-circle" size={17} color="#fff" />
+                                    <Feather name="check-circle" size={16} color="#fff" />
                                     <Text style={s.confirmTxt}>
                                       Confirmer{hasBaggage ? " + bagage" : ""}
                                     </Text>
                                   </>
                               }
                             </Pressable>
-                            {/* Bouton secondaire : ANNULER */}
                             <Pressable
                               style={s.cancelBtn}
                               onPress={() => { setCancelModal(b); setCancelReason(""); }}
-                              disabled={isConfirming || cancelling === b.id}
+                              disabled={isConf || cancelling === b.id}
                             >
-                              <Text style={s.cancelTxt}>Annuler la réservation</Text>
+                              <Text style={s.cancelTxt}>Annuler</Text>
                             </Pressable>
                           </View>
                         </>
                       )}
 
-                      {/* Statut final (confirmé / annulé) */}
+                      {/* Statut final (confirmé / embarqué / annulé) */}
                       {!isPending && (
-                        <View style={[s.finalStatus, {
-                          backgroundColor: isCancelled ? C.redSoft : bst.bg,
-                        }]}>
+                        <View style={[s.finalStatus, { backgroundColor: isCancelled ? C.redSoft : bst.bg }]}>
                           <Feather
                             name={isCancelled ? "x-circle" : "check-circle"}
-                            size={14}
+                            size={13}
                             color={isCancelled ? C.red : bst.color}
                           />
                           <Text style={[s.finalStatusTxt, { color: isCancelled ? C.red : bst.color }]}>
-                            {isCancelled
-                              ? "Réservation annulée — siège libéré"
-                              : b.status === "boarded"
-                                ? "Passager embarqué"
-                                : "Réservation confirmée"}
+                            {isCancelled ? "Annulée — siège libéré"
+                              : b.status === "boarded" ? "Passager embarqué"
+                              : "Réservation confirmée"}
                           </Text>
                         </View>
                       )}
-
                     </View>
                   );
                 })}
@@ -587,10 +679,12 @@ export default function AgentReservation() {
       <Modal visible={!!cancelModal} transparent animationType="slide" onRequestClose={() => setCancelModal(null)}>
         <View style={s.modalOverlay}>
           <View style={s.modalCard}>
-            <View style={s.modalHeader}>
+            <View style={{ flexDirection:"row", alignItems:"flex-start", justifyContent:"space-between", marginBottom:14 }}>
               <View>
                 <Text style={s.modalTitle}>Annuler la réservation</Text>
-                <Text style={s.modalSub}>{cancelModal?.bookingRef} · {cancelModal?.passengers?.[0]?.name ?? "Client"}</Text>
+                <Text style={{ fontSize:12, color:C.textSub, marginTop:3 }}>
+                  {cancelModal?.bookingRef} · {cancelModal?.passengers?.[0]?.name ?? "Client"}
+                </Text>
               </View>
               <Pressable onPress={() => setCancelModal(null)} hitSlop={8}>
                 <Feather name="x" size={20} color={C.textSub} />
@@ -605,24 +699,22 @@ export default function AgentReservation() {
               multiline
               numberOfLines={2}
             />
-            <View style={{ gap:10 }}>
-              <Pressable
-                style={[s.modalCancelBtn, cancelling === cancelModal?.id && { opacity:0.65 }]}
-                onPress={cancelBooking}
-                disabled={!!cancelling}
-              >
-                {cancelling === cancelModal?.id
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <>
-                      <Feather name="x-circle" size={16} color="#fff" />
-                      <Text style={s.modalCancelTxt}>Confirmer l'annulation</Text>
-                    </>
-                }
-              </Pressable>
-              <Pressable style={s.modalKeepBtn} onPress={() => setCancelModal(null)}>
-                <Text style={s.modalKeepTxt}>Garder la réservation</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              style={[s.confirmBtn, { backgroundColor: C.red }, cancelling === cancelModal?.id && { opacity:0.65 }]}
+              onPress={cancelBooking}
+              disabled={!!cancelling}
+            >
+              {cancelling === cancelModal?.id
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Feather name="x-circle" size={16} color="#fff" />
+                    <Text style={s.confirmTxt}>Confirmer l'annulation</Text>
+                  </>
+              }
+            </Pressable>
+            <Pressable style={s.cancelBtn} onPress={() => setCancelModal(null)}>
+              <Text style={[s.cancelTxt, { color:C.textSub }]}>Garder la réservation</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -634,98 +726,95 @@ export default function AgentReservation() {
 const s = StyleSheet.create({
   root: { flex:1, backgroundColor: C.bg },
 
-  /* Header */
+  /* Header gradient */
   header:     { flexDirection:"row", alignItems:"center", paddingHorizontal:16, paddingVertical:14 },
   hTitle:     { fontSize:17, fontWeight:"800", color:"#fff" },
   hSub:       { fontSize:11, color:"rgba(255,255,255,0.65)", marginTop:2 },
   refreshBtn: { width:36, height:36, borderRadius:18, backgroundColor:"rgba(255,255,255,0.12)", alignItems:"center", justifyContent:"center" },
 
-  /* Stats */
-  statsRow:  { flexDirection:"row", backgroundColor:C.white, borderBottomWidth:1, borderBottomColor:C.border },
-  statCell:  { flex:1, alignItems:"center", paddingVertical:12 },
-  statNum:   { fontSize:22, fontWeight:"900", lineHeight:24 },
-  statLabel: { fontSize:9, color:C.textSub, fontWeight:"600", marginTop:3, textTransform:"uppercase" },
-  statSep:   { width:1, backgroundColor:C.border, marginVertical:10 },
+  /* Bannière agence */
+  agenceBanner:    { flexDirection:"row", alignItems:"center", gap:12, backgroundColor:C.white, paddingHorizontal:14, paddingVertical:12, borderBottomWidth:1, borderBottomColor:C.border },
+  agenceIcon:      { width:38, height:38, borderRadius:10, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center", borderWidth:1, borderColor:C.tealBorder },
+  agenceName:      { fontSize:14, fontWeight:"800", color:C.text },
+  agenceCity:      { fontSize:11, color:C.textSub, marginTop:1 },
+  agenceStats:     { flexDirection:"row", gap:6 },
+  agenceStatChip:  { alignItems:"center", borderRadius:10, paddingHorizontal:8, paddingVertical:5, flexDirection:"row", gap:3 },
+  agenceStatNum:   { fontSize:15, fontWeight:"900" },
+  agenceStatLabel: { fontSize:9, fontWeight:"700", textTransform:"uppercase" },
 
   /* Filtres */
-  filterRow:  { flexDirection:"row", gap:8, padding:12, paddingBottom:8 },
-  filterChip: { flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:14, paddingVertical:8, borderRadius:20, borderWidth:1.5, borderColor:C.border, backgroundColor:C.white },
-  filterTxt:  { fontSize:13, fontWeight:"700", color:C.text },
-  filterBadge:{ backgroundColor:C.border, borderRadius:10, paddingHorizontal:6, paddingVertical:1 },
-  filterBadgeTxt:{ fontSize:10, fontWeight:"800", color:C.text },
+  filterSection:     { backgroundColor:C.white, borderBottomWidth:1, borderBottomColor:C.border, paddingTop:8, paddingBottom:4 },
+  filterSectionLabel:{ fontSize:9, fontWeight:"800", color:C.textSub, letterSpacing:1, paddingHorizontal:14, marginBottom:4, textTransform:"uppercase" },
+  filterRow:         { flexDirection:"row", gap:6, paddingHorizontal:12, paddingBottom:8 },
+  chip:              { flexDirection:"row", alignItems:"center", gap:5, paddingHorizontal:12, paddingVertical:7, borderRadius:20, borderWidth:1.5, borderColor:C.border, backgroundColor:C.white },
+  chipTxt:           { fontSize:12, fontWeight:"700", color:C.text },
+  chipBadge:         { backgroundColor:C.border, borderRadius:10, paddingHorizontal:5, paddingVertical:1 },
+  chipBadgeTxt:      { fontSize:10, fontWeight:"800", color:C.text },
 
-  /* États vides / chargement */
-  centerBox:  { flex:1, justifyContent:"center", alignItems:"center", gap:12, paddingHorizontal:40 },
+  /* États vides */
+  centerBox:  { flex:1, justifyContent:"center", alignItems:"center", gap:10, paddingHorizontal:40 },
   emptyTitle: { fontSize:16, fontWeight:"800", color:C.text, textAlign:"center" },
   emptySub:   { fontSize:13, color:C.textSub, textAlign:"center", lineHeight:19 },
-  emptyBtn:   { paddingHorizontal:24, paddingVertical:11, backgroundColor:C.teal, borderRadius:12 },
+  emptyBtn:   { flexDirection:"row", alignItems:"center", gap:6, paddingHorizontal:20, paddingVertical:11, backgroundColor:C.teal, borderRadius:12 },
 
-  /* ── TRIP HEADER (Bloc 1 TRAJET) ── */
-  tripHeader: {
-    backgroundColor:C.white, borderRadius:14, padding:14, marginBottom:8,
-    borderLeftWidth:5, borderWidth:1, borderColor:C.border,
-    flexDirection:"row", alignItems:"center", gap:12,
-  },
-  tripRoute:       { fontSize:17, fontWeight:"900", color:C.text },
-  tripMeta:        { fontSize:11, color:C.textSub, fontWeight:"500" },
-  tripStatusPill:  { flexDirection:"row", alignItems:"center", gap:4, borderRadius:8, paddingHorizontal:8, paddingVertical:3 },
-  tripStatusTxt:   { fontSize:10, fontWeight:"800" },
-  countPill:       { borderRadius:10, paddingHorizontal:9, paddingVertical:3 },
-  countPillTxt:    { fontSize:10, fontWeight:"800", color:"#fff" },
+  /* Header trajet */
+  tripHeader:     { backgroundColor:C.white, borderRadius:14, padding:13, marginBottom:6, borderLeftWidth:5, borderWidth:1, borderColor:C.border, flexDirection:"row", alignItems:"center", gap:12 },
+  tripFrom:       { fontSize:16, fontWeight:"900", color:C.text },
+  tripTo:         { fontSize:16, fontWeight:"900", color:C.text },
+  tripMetaItem:   { flexDirection:"row", alignItems:"center", gap:4 },
+  tripMetaTxt:    { fontSize:11, color:C.textSub, fontWeight:"500" },
+  tripStatusPill: { flexDirection:"row", alignItems:"center", gap:4, borderRadius:8, paddingHorizontal:8, paddingVertical:3 },
+  tripStatusTxt:  { fontSize:10, fontWeight:"800" },
+  countPill:      { borderRadius:10, paddingHorizontal:9, paddingVertical:3 },
+  countTxt:       { fontSize:10, fontWeight:"800", color:"#fff" },
 
-  /* ── CARTE RÉSERVATION ── */
-  card:       { backgroundColor:C.white, borderRadius:14, marginBottom:8, borderWidth:1, borderColor:C.border, overflow:"hidden" },
-  cardPending:{ borderColor:C.amberBorder, borderWidth:1.5 },
-  cardTopRow: { flexDirection:"row", alignItems:"center", justifyContent:"space-between", padding:14, paddingBottom:12 },
-  cardRef:    { fontSize:13, fontWeight:"900", color:C.text, letterSpacing:0.4 },
-  statusBadge:{ borderRadius:8, paddingHorizontal:10, paddingVertical:4 },
-  statusTxt:  { fontSize:11, fontWeight:"800" },
-  cardDivider:{ height:1, backgroundColor:C.border },
+  /* Carte réservation */
+  card:       { backgroundColor:C.white, borderRadius:12, marginBottom:8, borderWidth:1, borderColor:C.border, overflow:"hidden" },
+  cardPending:{ borderColor:C.amberBorder },
+  cardTopRow: { flexDirection:"row", alignItems:"center", justifyContent:"space-between", padding:12, paddingBottom:10 },
+  cardRef:    { fontSize:12, fontWeight:"900", color:C.text, letterSpacing:0.5 },
+  statusBadge:{ borderRadius:7, paddingHorizontal:9, paddingVertical:3 },
+  statusTxt:  { fontSize:10, fontWeight:"800" },
+  divider:    { height:1, backgroundColor:C.border },
 
   /* Client */
-  clientRow:    { flexDirection:"row", alignItems:"center", gap:12, padding:14 },
-  clientAvatar: { width:40, height:40, borderRadius:20, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center" },
-  clientAvatarTxt:{ fontSize:17, fontWeight:"900", color:C.teal },
-  clientName:   { fontSize:14, fontWeight:"800", color:C.text },
-  clientPhone:  { fontSize:12, color:C.teal, fontWeight:"600", marginTop:2 },
-  clientNoPhone:{ fontSize:12, color:C.textSub, marginTop:2 },
-  callBtn:      { width:38, height:38, borderRadius:19, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center", borderWidth:1, borderColor:C.tealBorder },
+  clientRow:    { flexDirection:"row", alignItems:"center", gap:10, padding:12 },
+  clientAvatar: { width:36, height:36, borderRadius:18, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center" },
+  clientInitial:{ fontSize:15, fontWeight:"900", color:C.teal },
+  clientName:   { fontSize:13, fontWeight:"800", color:C.text },
+  clientPhone:  { fontSize:11, color:C.teal, fontWeight:"600", marginTop:2 },
+  clientNoPhone:{ fontSize:11, color:C.textSub, marginTop:2 },
+  callBtn:      { width:34, height:34, borderRadius:17, backgroundColor:C.tealSoft, alignItems:"center", justifyContent:"center", borderWidth:1, borderColor:C.tealBorder },
 
-  /* Réservation grid (2×2) */
-  resvGrid:    { flexDirection:"row", padding:14, gap:0 },
-  resvCell:    { flex:1, alignItems:"center" },
-  resvCellSep: { width:1, backgroundColor:C.border, marginVertical:2 },
-  resvLabel:   { fontSize:9, color:C.textSub, fontWeight:"700", textTransform:"uppercase", marginBottom:4, letterSpacing:0.3 },
-  resvVal:     { fontSize:13, fontWeight:"800", color:C.text, textAlign:"center" },
+  /* Réservation grid */
+  resvGrid:  { flexDirection:"row", paddingHorizontal:12, paddingVertical:10 },
+  resvCell:  { flex:1, alignItems:"center" },
+  resvSep:   { width:1, backgroundColor:C.border, marginVertical:4 },
+  resvLabel: { fontSize:9, color:C.textSub, fontWeight:"700", textTransform:"uppercase", marginBottom:3 },
+  resvVal:   { fontSize:12, fontWeight:"800", color:C.text, textAlign:"center" },
 
   /* Bagage */
-  bagRow:      { flexDirection:"row", alignItems:"flex-start", gap:10, padding:14 },
-  bagIcon:     { width:36, height:36, borderRadius:10, alignItems:"center", justifyContent:"center" },
-  bagTitle:    { fontSize:12, fontWeight:"800", color:C.text },
-  bagDesc:     { fontSize:11, color:C.textSub, marginTop:2 },
-  bagStatusPill:{ borderRadius:6, paddingHorizontal:7, paddingVertical:2 },
-  bagStatusTxt: { fontSize:10, fontWeight:"700" },
+  bagRow:        { flexDirection:"row", alignItems:"flex-start", gap:10, padding:12 },
+  bagIcon:       { width:30, height:30, borderRadius:8, backgroundColor:C.purpleSoft, alignItems:"center", justifyContent:"center" },
+  bagTitle:      { fontSize:12, fontWeight:"800", color:C.text },
+  bagDesc:       { fontSize:10, color:C.textSub, marginTop:2 },
+  bagStatusPill: { borderRadius:5, paddingHorizontal:6, paddingVertical:2 },
+  bagStatusTxt:  { fontSize:9, fontWeight:"700" },
 
   /* Actions */
-  actionsBlock: { padding:14, gap:8 },
-  confirmBtn:   { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, backgroundColor:C.green, borderRadius:12, paddingVertical:14 },
-  confirmTxt:   { color:"#fff", fontSize:15, fontWeight:"800" },
-  cancelBtn:    { alignItems:"center", paddingVertical:8 },
-  cancelTxt:    { fontSize:13, color:C.red, fontWeight:"700" },
+  actionsBlock: { padding:12, gap:8 },
+  confirmBtn:   { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, backgroundColor:C.green, borderRadius:11, paddingVertical:13 },
+  confirmTxt:   { color:"#fff", fontSize:14, fontWeight:"800" },
+  cancelBtn:    { alignItems:"center", paddingVertical:6 },
+  cancelTxt:    { fontSize:12, color:C.red, fontWeight:"700" },
 
   /* Statut final */
-  finalStatus:    { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, paddingVertical:10, paddingHorizontal:14, margin:10, borderRadius:10 },
-  finalStatusTxt: { fontSize:12, fontWeight:"700" },
+  finalStatus:    { flexDirection:"row", alignItems:"center", justifyContent:"center", gap:6, margin:10, borderRadius:9, paddingVertical:8 },
+  finalStatusTxt: { fontSize:11, fontWeight:"700" },
 
   /* Modal */
   modalOverlay: { flex:1, backgroundColor:"rgba(0,0,0,0.45)", justifyContent:"flex-end" },
-  modalCard:    { backgroundColor:C.white, borderTopLeftRadius:22, borderTopRightRadius:22, padding:22, gap:16 },
-  modalHeader:  { flexDirection:"row", alignItems:"flex-start", justifyContent:"space-between" },
-  modalTitle:   { fontSize:17, fontWeight:"900", color:C.text },
-  modalSub:     { fontSize:13, color:C.textSub, marginTop:3 },
-  modalInput:   { backgroundColor:C.bg, borderRadius:12, borderWidth:1, borderColor:C.border, padding:14, fontSize:14, color:C.text, minHeight:70, textAlignVertical:"top" },
-  modalCancelBtn:{ flexDirection:"row", alignItems:"center", justifyContent:"center", gap:8, backgroundColor:C.red, borderRadius:12, paddingVertical:14 },
-  modalCancelTxt:{ color:"#fff", fontSize:15, fontWeight:"800" },
-  modalKeepBtn: { alignItems:"center", paddingVertical:10 },
-  modalKeepTxt: { fontSize:14, color:C.textSub, fontWeight:"600" },
+  modalCard:    { backgroundColor:C.white, borderTopLeftRadius:22, borderTopRightRadius:22, padding:20, gap:12 },
+  modalTitle:   { fontSize:16, fontWeight:"900", color:C.text },
+  modalInput:   { backgroundColor:C.bg, borderRadius:11, borderWidth:1, borderColor:C.border, padding:13, fontSize:14, color:C.text, minHeight:65, textAlignVertical:"top" },
 });

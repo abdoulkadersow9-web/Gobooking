@@ -918,12 +918,24 @@ router.get("/online-bookings", async (req, res) => {
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     const agentRows = await db.select().from(agentsTable).where(eq(agentsTable.userId, user.id)).limit(1);
-    const companyId = agentRows[0]?.companyId ?? null;
+    const agentRow  = agentRows[0] ?? null;
+    const companyId = agentRow?.companyId ?? null;
+    const agenceId  = agentRow?.agenceId  ?? null;
 
-    /* Only show mobile/online bookings (not guichet — those are agent-created) */
+    /* Fetch agence info */
+    let agenceInfo: { id: string; name: string; city: string } | null = null;
+    if (agenceId) {
+      const agenceRows = await db.execute(sql`SELECT id, name, city FROM agences WHERE id = ${agenceId} LIMIT 1`);
+      const row = agenceRows.rows[0] as any;
+      if (row) agenceInfo = { id: row.id, name: row.name, city: row.city };
+    }
+    const agenceCity = agenceInfo?.city ?? null;
+
+    /* Only mobile/online bookings */
     const sourceFilter = inArray(bookingsTable.bookingSource, ["mobile", "online"]);
 
-    const bookings = companyId
+    /* Fetch bookings for company (all, then filter by agence city on the trip) */
+    const allBookings = companyId
       ? await db.select().from(bookingsTable)
           .where(and(eq(bookingsTable.companyId, companyId), sourceFilter))
           .orderBy(desc(bookingsTable.createdAt))
@@ -931,12 +943,22 @@ router.get("/online-bookings", async (req, res) => {
           .where(sourceFilter)
           .orderBy(desc(bookingsTable.createdAt));
 
-    /* Batch-load all trip IDs at once to avoid N+1 queries */
-    const tripIds = [...new Set(bookings.map(b => b.tripId).filter(Boolean))] as string[];
-    const trips = tripIds.length > 0
+    /* Batch-load trips */
+    const tripIds = [...new Set(allBookings.map(b => b.tripId).filter(Boolean))] as string[];
+    const trips   = tripIds.length > 0
       ? await db.select().from(tripsTable).where(inArray(tripsTable.id, tripIds))
       : [];
     const tripMap = Object.fromEntries(trips.map(t => [t.id, t]));
+
+    /* If we know the agence city, only show bookings for trips departing from that city */
+    const bookings = agenceCity
+      ? allBookings.filter(b => {
+          const trip = b.tripId ? tripMap[b.tripId] : null;
+          if (!trip) return false;
+          return trip.from?.toLowerCase().includes(agenceCity.toLowerCase()) ||
+                 agenceCity.toLowerCase().includes(trip.from?.toLowerCase() ?? "___");
+        })
+      : allBookings;
 
     const enriched = bookings.map((b) => {
       const trip = b.tripId ? tripMap[b.tripId] ?? null : null;
@@ -971,7 +993,7 @@ router.get("/online-bookings", async (req, res) => {
       };
     });
 
-    res.json(enriched);
+    res.json({ agence: agenceInfo, bookings: enriched });
   } catch (err) {
     console.error("online-bookings error:", err);
     res.status(500).json({ error: "Erreur chargement réservations en ligne" });

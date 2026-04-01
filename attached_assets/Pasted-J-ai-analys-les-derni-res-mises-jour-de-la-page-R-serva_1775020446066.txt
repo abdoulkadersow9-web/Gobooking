@@ -1,0 +1,176 @@
+J’ai analysé les dernières mises à jour de la page “Réservations en ligne”.
+
+Il y a des améliorations visuelles, mais la logique métier GoBooking n’est toujours pas respectée.
+
+La page doit être complètement restructurée selon une logique d’exploitation par agence.
+
+---
+
+🔴 1. PROBLÈME PRINCIPAL
+
+Actuellement :
+
+- aucune gestion par agence
+- aucune séparation claire des flux
+- mélange de toutes les réservations
+- pas de logique opérationnelle
+
+👉 Ce n’est pas un dashboard professionnel.
+
+---
+
+🔴 2. LOGIQUE OBLIGATOIRE : GESTION PAR AGENCE
+
+Les réservations doivent être organisées par agence.
+
+Exemples d’agences à créer :
+
+- Agence Abidjan – Yopougon
+- Agence Abidjan – Treichville
+- Agence Abidjan – Port-Bouët
+- Agence Bouaké
+- Agence Korhogo
+- Agence Ferkessédougou
+
+---
+
+👉 IMPORTANT :
+
+Chaque agence doit afficher UNIQUEMENT ses réservations.
+
+---
+
+🔴 3. STRUCTURE DE LA PAGE (OBLIGATOIRE)
+
+La page doit devenir un dashboard structuré :
+
+---
+
+✅ NIVEAU 1 : SÉLECTEUR D’AGENCE
+
+- Dropdown ou onglets agences
+- possibilité pour un utilisateur d’avoir plusieurs agences
+- changement dynamique des données selon l’agence sélectionnée
+
+---
+
+✅ NIVEAU 2 : FILTRES OPÉRATIONNELS
+
+Filtres obligatoires :
+
+- Réservations EN ATTENTE
+- Réservations CONFIRMÉES
+- Réservations ANNULÉES
+
+ET AUSSI :
+
+- Départs à venir
+- Départs en cours
+- Départs terminés
+
+👉 combinaison agence + statut + type de départ
+
+---
+
+✅ NIVEAU 3 : REGROUPEMENT PAR DÉPART
+
+Les réservations doivent être regroupées par trajet :
+
+Exemple :
+
+Abidjan → Bouaké (07:00)
+
+→ Liste des réservations associées à CE départ uniquement
+
+---
+
+🔴 4. PROBLÈME ACTUEL À CORRIGER
+
+Actuellement :
+
+- une réservation apparaît sans logique de regroupement
+- mélange de trajets différents
+- aucune hiérarchie opérationnelle
+
+👉 C’est inutilisable pour une agence.
+
+---
+
+🔴 5. STRUCTURE D’UNE CARTE (À GARDER MAIS AMÉLIORER)
+
+Chaque réservation doit contenir :
+
+1. ID réservation
+2. Client (nom + téléphone)
+3. Détails :
+   - passagers
+   - sièges
+   - montant
+   - paiement
+4. Bagages (si existant)
+5. Statut
+6. Actions :
+   - Confirmer
+   - Annuler
+
+👉 MAIS dans un cadre structuré par trajet et agence
+
+---
+
+🔴 6. LOGIQUE MÉTIER CRITIQUE
+
+Une agence doit pouvoir :
+
+- voir ses départs
+- voir les réservations liées à ses départs
+- gérer les validations en temps réel
+- filtrer rapidement
+
+👉 Aujourd’hui ce n’est pas possible
+
+---
+
+🔴 7. UX / DESIGN (IMPORTANT)
+
+- réduire le scroll inutile
+- regrouper les informations
+- créer des sections claires :
+  → agence
+  → départ
+  → réservations
+- améliorer lisibilité
+- rendre l’interface propre et professionnelle
+
+---
+
+🔴 8. OBJECTIF FINAL
+
+Créer un vrai dashboard de contrôle d’agence :
+
+👉 clair  
+👉 structuré  
+👉 rapide à lire  
+👉 logique opérationnelle  
+
+---
+
+🔴 9. PRIORITÉ
+
+Merci de :
+
+- intégrer la gestion par agence
+- ajouter les filtres complets
+- regrouper les réservations par départ
+- restructurer toute la page
+
+---
+
+🔴 10. IMPORTANT
+
+On ne doit plus avoir une liste plate de réservations.
+
+👉 On doit avoir une vue métier par agence.
+
+---
+
+Merci de refaire cette page selon cette logique complète.
