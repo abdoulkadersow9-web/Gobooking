@@ -922,20 +922,23 @@ router.get("/online-bookings", async (req, res) => {
     const companyId = agentRow?.companyId ?? null;
     const agenceId  = agentRow?.agenceId  ?? null;
 
-    /* Fetch agence info */
-    let agenceInfo: { id: string; name: string; city: string } | null = null;
+    /* Fetch the agent's own agence (for context / default selection) */
+    let myAgence: { id: string; name: string; city: string } | null = null;
     if (agenceId) {
       const agenceRows = await db.execute(sql`SELECT id, name, city FROM agences WHERE id = ${agenceId} LIMIT 1`);
       const row = agenceRows.rows[0] as any;
-      if (row) agenceInfo = { id: row.id, name: row.name, city: row.city };
+      if (row) myAgence = { id: row.id, name: row.name, city: row.city };
     }
-    const agenceCity = agenceInfo?.city ?? null;
 
-    /* Only mobile/online bookings */
+    /* Fetch ALL agencies of the company for the selector */
+    const allAgences = companyId
+      ? await db.execute(sql`SELECT id, name, city FROM agences WHERE company_id = ${companyId} ORDER BY name ASC`)
+      : { rows: [] };
+    const agencies = (allAgences.rows as any[]).map(r => ({ id: r.id, name: r.name, city: r.city }));
+
+    /* Only mobile/online bookings — all for this company, no city pre-filter */
     const sourceFilter = inArray(bookingsTable.bookingSource, ["mobile", "online"]);
-
-    /* Fetch bookings for company (all, then filter by agence city on the trip) */
-    const allBookings = companyId
+    const allBookings  = companyId
       ? await db.select().from(bookingsTable)
           .where(and(eq(bookingsTable.companyId, companyId), sourceFilter))
           .orderBy(desc(bookingsTable.createdAt))
@@ -950,15 +953,8 @@ router.get("/online-bookings", async (req, res) => {
       : [];
     const tripMap = Object.fromEntries(trips.map(t => [t.id, t]));
 
-    /* If we know the agence city, only show bookings for trips departing from that city */
-    const bookings = agenceCity
-      ? allBookings.filter(b => {
-          const trip = b.tripId ? tripMap[b.tripId] : null;
-          if (!trip) return false;
-          return trip.from?.toLowerCase().includes(agenceCity.toLowerCase()) ||
-                 agenceCity.toLowerCase().includes(trip.from?.toLowerCase() ?? "___");
-        })
-      : allBookings;
+    /* No city pre-filter — frontend does agency filtering via selector */
+    const bookings = allBookings;
 
     const enriched = bookings.map((b) => {
       const trip = b.tripId ? tripMap[b.tripId] ?? null : null;
@@ -993,7 +989,7 @@ router.get("/online-bookings", async (req, res) => {
       };
     });
 
-    res.json({ agence: agenceInfo, bookings: enriched });
+    res.json({ agencies, myAgence, bookings: enriched });
   } catch (err) {
     console.error("online-bookings error:", err);
     res.status(500).json({ error: "Erreur chargement réservations en ligne" });
