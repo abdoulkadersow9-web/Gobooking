@@ -348,10 +348,7 @@ export default function ChefHome() {
                   softBg={C.redSoft}
                   borderColor="#FCA5A5"
                   ctaLabel="Consulter"
-                  onPress={() => router.push({
-                    pathname: "/agent/chef-trips",
-                    params: { tab: "alertes" },
-                  } as never)}
+                  onPress={() => router.push("/agent/chef-trips" as never)}
                 />
               )}
 
@@ -409,10 +406,7 @@ export default function ChefHome() {
             softBg={C.purpleSoft}
             badge={colisAV}
             readonly
-            onPress={() => router.push({
-              pathname: "/agent/chef-trips",
-              params: { tab: "colis" },
-            } as never)}
+            onPress={() => router.push("/agent/chef-trips" as never)}
           />
 
           <View style={s.divider} />

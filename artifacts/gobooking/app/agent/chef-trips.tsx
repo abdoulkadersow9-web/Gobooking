@@ -133,8 +133,10 @@ export default function ChefTrips() {
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [saving,      setSaving]      = useState(false);
-  const [activeTab,   setActiveTab]   = useState<"trips" | "caisses" | "historique">(
-    (params.tab === "caisses" || params.tab === "historique") ? params.tab : "trips"
+  const [activeTab,   setActiveTab]   = useState<"trips" | "caisses" | "historique" | "bordereaux" | "agents">(
+    (["caisses","historique","bordereaux","agents"].includes(params.tab as string))
+      ? (params.tab as any)
+      : "trips"
   );
 
   /* ── Caisses agents ── */
@@ -146,6 +148,14 @@ export default function ChefTrips() {
   const [selectedCaisse, setSelectedCaisse] = useState<any | null>(null);
   const [chefComment,    setChefComment]    = useState("");
   const [caissesFilter,  setCaissesFilter]  = useState<"all" | "sent" | "validated" | "rejected">("all");
+
+  /* ── Bordereaux ── */
+  const [bordereaux,        setBordereaux]        = useState<any[]>([]);
+  const [bordereauxLoading, setBordereauxLoading] = useState(false);
+
+  /* ── Agents de l'agence ── */
+  const [agentsList,        setAgentsList]        = useState<any[]>([]);
+  const [agentsLoading,     setAgentsLoading]     = useState(false);
 
   /* ── Modaux ── */
   const [showForm,     setShowForm]     = useState(false);  // Créer / modifier
@@ -312,7 +322,31 @@ export default function ChefTrips() {
     }
   }, [authToken, user]);
 
-  useEffect(() => { if (activeTab === "caisses") loadCaisses(); }, [activeTab, loadCaisses]);
+  useEffect(() => { if (activeTab === "caisses")    loadCaisses(); }, [activeTab, loadCaisses]);
+
+  const loadBordereaux = useCallback(async () => {
+    if (!authToken) return;
+    setBordereauxLoading(true);
+    try {
+      const data = await apiFetch<any>("/agent/chef/bordereaux", { token: authToken });
+      setBordereaux(data.bordereaux ?? []);
+    } catch (e: any) { console.error("[chef/bordereaux]", e); }
+    finally { setBordereauxLoading(false); }
+  }, [authToken]);
+
+  useEffect(() => { if (activeTab === "bordereaux") loadBordereaux(); }, [activeTab, loadBordereaux]);
+
+  const loadAgents = useCallback(async () => {
+    if (!authToken) return;
+    setAgentsLoading(true);
+    try {
+      const data = await apiFetch<any>("/agent/chef/agents", { token: authToken });
+      setAgentsList(data.agents ?? []);
+    } catch (e: any) { console.error("[chef/agents]", e); }
+    finally { setAgentsLoading(false); }
+  }, [authToken]);
+
+  useEffect(() => { if (activeTab === "agents") loadAgents(); }, [activeTab, loadAgents]);
 
   const handleValidateCaisse = async (decision: "validated" | "rejected") => {
     if (!selectedCaisse || !authToken) return;
@@ -545,35 +579,37 @@ export default function ChefTrips() {
           </Pressable>
         </View>
 
-        {/* Tabs avec icônes */}
-        <View style={s.tabBar}>
+        {/* Tabs scrollable — 5 destinations distinctes */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ paddingHorizontal:12 }} contentContainerStyle={{ gap:8, paddingRight:8 }}>
           {([
-            ["trips",      "calendar",    "Départs"],
-            ["caisses",    "dollar-sign", caissesStats.pending > 0 ? `Caisses (${caissesStats.pending})` : "Caisses"],
-            ["historique", "clock",       "Historique"],
+            ["trips",       "calendar",   "Départs"],
+            ["caisses",     "dollar-sign", caissesStats.pending > 0 ? `Caisses (${caissesStats.pending})` : "Caisses"],
+            ["bordereaux",  "clipboard",  "Bordereaux"],
+            ["agents",      "users",      "Équipe"],
+            ["historique",  "clock",      "Journal"],
           ] as const).map(([key, icon, label]) => (
             <Pressable key={key} style={[s.tab, activeTab === key && s.tabActive]} onPress={() => setActiveTab(key as any)}>
-              <Feather name={icon as any} size={13} color={activeTab === key ? "#fff" : "rgba(255,255,255,0.5)"} />
+              <Feather name={icon as any} size={13} color={activeTab === key ? "#fff" : "rgba(255,255,255,0.55)"} />
               <Text style={[s.tabText, activeTab === key && s.tabTextActive]}>{label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
         {/* Sous-titre contextuel par tab */}
-        <View style={{ paddingHorizontal:16, paddingBottom:8, paddingTop:4 }}>
+        <View style={{ paddingHorizontal:16, paddingBottom:8, paddingTop:6 }}>
           {activeTab === "trips" && (
-            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
-              Programmer, modifier et suivre les départs
-            </Text>
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>Programmer, modifier et suivre les départs</Text>
           )}
           {activeTab === "caisses" && (
-            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
-              Valider ou rejeter les soumissions de caisse de vos agents
-            </Text>
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>Valider ou rejeter les soumissions de caisse de vos agents</Text>
+          )}
+          {activeTab === "bordereaux" && (
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>Bilan financier par départ — recettes, dépenses, net</Text>
+          )}
+          {activeTab === "agents" && (
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>Liste des agents de votre agence et leur activité</Text>
           )}
           {activeTab === "historique" && (
-            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>
-              Journal des modifications — lecture seule
-            </Text>
+            <Text style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:"500" }}>Journal des modifications — lecture seule</Text>
           )}
         </View>
       </LinearGradient>
@@ -1019,6 +1055,122 @@ export default function ChefTrips() {
             )}
           </View>
         )}
+        {/* ──── TAB : BORDEREAUX ──── */}
+        {activeTab === "bordereaux" && (
+          <View style={{ paddingHorizontal:16, paddingTop:16, paddingBottom:24 }}>
+            <Text style={s.sectionTitle}>Bordereaux des 7 derniers jours</Text>
+            {bordereauxLoading ? (
+              <View style={s.emptyState}><ActivityIndicator color={INDIGO2} /></View>
+            ) : bordereaux.length === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="clipboard" size={32} color="#9CA3AF" />
+                <Text style={s.emptyText}>Aucun bordereau disponible.</Text>
+              </View>
+            ) : bordereaux.map((b: any) => {
+              const hasProfit = b.netRevenue >= 0;
+              return (
+                <View key={b.id} style={[s.auditCard, { marginBottom:10 }]}>
+                  <View style={{ flexDirection:"row", alignItems:"center", gap:10, marginBottom:10 }}>
+                    <View style={[s.auditIcon, { backgroundColor: hasProfit ? "#DCFCE7" : "#FEE2E2" }]}>
+                      <Feather name="clipboard" size={15} color={hasProfit ? "#059669" : RED} />
+                    </View>
+                    <View style={{ flex:1 }}>
+                      <Text style={{ fontSize:13, fontWeight:"800", color:"#111827" }}>{b.from} → {b.to}</Text>
+                      <Text style={{ fontSize:11, color:"#6B7280" }}>{b.date} · {b.departureTime} · {b.busName ?? "—"}</Text>
+                    </View>
+                    <View style={{ alignItems:"flex-end" }}>
+                      <Text style={{ fontSize:14, fontWeight:"900", color: hasProfit ? "#059669" : RED }}>
+                        {hasProfit ? "+" : ""}{Math.round(b.netRevenue/1000)}k
+                      </Text>
+                      <Text style={{ fontSize:9, color:"#9CA3AF", fontWeight:"600" }}>NET (FCFA)</Text>
+                    </View>
+                  </View>
+                  {/* Détail recettes/dépenses */}
+                  <View style={{ flexDirection:"row", gap:6 }}>
+                    {[
+                      { l:"Billets",  v:b.ticketRevenue,  c:"#3B82F6" },
+                      { l:"Bagages",  v:b.bagageRevenue,  c:"#10B981" },
+                      { l:"Colis",    v:b.colisRevenue,   c:"#8B5CF6" },
+                      { l:"Carburant",v:b.carburantAmount,c:RED, minus:true },
+                    ].map((r,i) => (
+                      <View key={i} style={{ flex:1, backgroundColor:"#F9FAFB", borderRadius:8, padding:6, alignItems:"center" }}>
+                        <Text style={{ fontSize:10, fontWeight:"800", color: r.c }}>
+                          {r.minus ? "-" : ""}{Math.round(r.v/1000)}k
+                        </Text>
+                        <Text style={{ fontSize:8, color:"#9CA3AF", fontWeight:"600", marginTop:1 }}>{r.l}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  {!b.hasFuel && (
+                    <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginTop:8, backgroundColor:"#FEF2F2", borderRadius:8, paddingHorizontal:10, paddingVertical:6 }}>
+                      <Feather name="zap" size={12} color={RED} />
+                      <Text style={{ fontSize:11, color:RED, fontWeight:"700" }}>Carburant non saisi — net non fiable</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* ──── TAB : ÉQUIPE (agents) ──── */}
+        {activeTab === "agents" && (
+          <View style={{ paddingHorizontal:16, paddingTop:16, paddingBottom:24 }}>
+            <Text style={s.sectionTitle}>Agents de l'agence</Text>
+            {agentsLoading ? (
+              <View style={s.emptyState}><ActivityIndicator color={INDIGO2} /></View>
+            ) : agentsList.length === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="users" size={32} color="#9CA3AF" />
+                <Text style={s.emptyText}>Aucun agent dans cette agence.</Text>
+              </View>
+            ) : agentsList.map((ag: any) => {
+              const roleColors: Record<string, string> = {
+                vente: "#3B82F6", embarquement: "#059669", colis: "#8B5CF6", chef_agence: "#D97706",
+              };
+              const roleLabels: Record<string, string> = {
+                vente: "Vente", embarquement: "Embarquement", colis: "Colis", chef_agence: "Chef",
+              };
+              const clr = roleColors[ag.agent_role] ?? "#6B7280";
+              const hasTrip = !!ag.trip_status && !["arrived","completed","cancelled"].includes(ag.trip_status);
+              return (
+                <View key={ag.id} style={[s.auditCard, { marginBottom:8 }]}>
+                  <View style={{ flexDirection:"row", alignItems:"center", gap:12 }}>
+                    <View style={{ width:42, height:42, borderRadius:21, backgroundColor: clr + "18", alignItems:"center", justifyContent:"center" }}>
+                      <Feather name="user" size={18} color={clr} />
+                    </View>
+                    <View style={{ flex:1 }}>
+                      <Text style={{ fontSize:13, fontWeight:"800", color:"#111827" }}>{ag.name}</Text>
+                      <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginTop:2 }}>
+                        <View style={{ backgroundColor: clr + "18", borderRadius:6, paddingHorizontal:7, paddingVertical:2 }}>
+                          <Text style={{ fontSize:10, fontWeight:"700", color:clr }}>{roleLabels[ag.agent_role] ?? ag.agent_role}</Text>
+                        </View>
+                        <Text style={{ fontSize:11, color:"#9CA3AF" }}>{ag.agent_code}</Text>
+                      </View>
+                    </View>
+                    <View style={{ alignItems:"flex-end" }}>
+                      <View style={{ flexDirection:"row", alignItems:"center", gap:4, backgroundColor: hasTrip ? "#DCFCE7" : "#F3F4F6", borderRadius:8, paddingHorizontal:8, paddingVertical:3 }}>
+                        <View style={{ width:6, height:6, borderRadius:3, backgroundColor: hasTrip ? "#059669" : "#9CA3AF" }} />
+                        <Text style={{ fontSize:10, fontWeight:"700", color: hasTrip ? "#059669" : "#6B7280" }}>
+                          {hasTrip ? "En service" : "Disponible"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  {hasTrip && ag.from_city && (
+                    <View style={{ flexDirection:"row", alignItems:"center", gap:6, marginTop:8, paddingLeft:54 }}>
+                      <Feather name="navigation" size={11} color="#6B7280" />
+                      <Text style={{ fontSize:11, color:"#6B7280" }}>
+                        {ag.from_city} → {ag.to_city} · {ag.departure_time}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
       </ScrollView>
 
       {/* FAB */}
