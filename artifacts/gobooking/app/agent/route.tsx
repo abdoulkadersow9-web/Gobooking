@@ -164,7 +164,7 @@ export default function RouteScreen() {
   useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
 
   useEffect(() => {
-    const tripIdToLoad = assignedTripId ?? activeTrip?.id ?? null;
+    const tripIdToLoad = myDeparture?.id ?? activeTrip?.id ?? null;
     if (!tripIdToLoad) return;
     loadPassengers(tripIdToLoad);
     loadStopData(tripIdToLoad);
@@ -175,7 +175,7 @@ export default function RouteScreen() {
       loadMyDeparture();
     }, 30000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [activeTrip?.id, assignedTripId, loadPassengers, loadMyDeparture]);
+  }, [activeTrip?.id, myDeparture?.id, loadPassengers, loadMyDeparture]);
 
   /* ── Détection automatique des anomalies GPS ── */
   useEffect(() => {
@@ -1195,7 +1195,7 @@ export default function RouteScreen() {
                   </View>
                 </View>
 
-                {!assignedTripId && (
+                {!myDeparture?.id && !activeTrip?.id && (
                   <View style={S.warningBanner}>
                     <Ionicons name="warning-outline" size={20} color="#D97706" />
                     <Text style={{ fontSize: 12, color: "#92400E", flex: 1, lineHeight: 18 }}>
@@ -1267,9 +1267,9 @@ export default function RouteScreen() {
                     </View>
                   </View>
                   <TouchableOpacity
-                    style={[S.submitBtn, (!assignedTripId || manualSaving) && { opacity: 0.5 }]}
+                    style={[S.submitBtn, (!(myDeparture?.id ?? activeTrip?.id) || manualSaving) && { opacity: 0.5 }]}
                     onPress={handleManualBooking}
-                    disabled={!assignedTripId || manualSaving}
+                    disabled={!(myDeparture?.id ?? activeTrip?.id) || manualSaving}
                   >
                     {manualSaving
                       ? <ActivityIndicator size="small" color="#fff" />
