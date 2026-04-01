@@ -1,0 +1,180 @@
+J’ai vérifié attentivement les dernières captures.
+
+Il y a des améliorations, mais la page reste encore très mélangée, pas claire et pas suffisamment professionnelle.
+
+Nous avons maintenant besoin d’une correction finale, propre, fluide et structurée comme un vrai dashboard opérationnel.
+
+⚠️ Important : ne rien casser, garder la logique actuelle, mais tout réorganiser proprement.
+
+---
+
+🔴 1. PROBLÈME PRINCIPAL
+
+Actuellement :
+
+- les réservations sont mélangées
+- les filtres ne sont pas clairement visibles
+- la sélection d’agence est cachée / pas lisible
+- les barres et blocs ne sont pas bien structurés
+- les icônes ne sont pas modernes
+- la lecture est difficile
+
+👉 Un agent ne peut pas travailler rapidement avec cette interface.
+
+---
+
+🔴 2. OBJECTIF FINAL
+
+Créer une page type dashboard professionnel où :
+
+- tout est visible immédiatement
+- aucune confusion
+- aucune recherche compliquée
+- lecture rapide en 2 secondes
+
+---
+
+🔴 3. FILTRES À RENDRE CLAIRS ET VISIBLES
+
+En haut de la page :
+
+- agence (très visible)
+- statut (en attente / confirmé / annulé)
+- état du départ (en route / en gare / à venir)
+
+👉 Les filtres doivent être :
+
+- bien alignés
+- bien espacés
+- bien arrondis (design moderne)
+- toujours visibles (pas cachés)
+
+---
+
+🔴 4. STRUCTURE DES BLOCS (TRÈS IMPORTANT)
+
+Chaque trajet doit être un bloc clair :
+
+HEADER :
+- Abidjan → Korhogo
+- heure
+- date
+- nom du car (ex : Daloa Express 07)
+- statut (EN ROUTE / EN GARE)
+
+CONTENU :
+- liste des passagers
+- infos compactes (siège, prix, statut)
+
+👉 Aucun mélange entre trajets
+
+---
+
+🔴 5. RÉDUCTION DU SCROLL
+
+Actuellement il y a trop de scroll.
+
+À corriger :
+
+- compacter les cartes
+- réduire les espaces inutiles
+- afficher plus d’informations sans descendre
+
+👉 L’agent doit voir plus sans scroller
+
+---
+
+🔴 6. HIÉRARCHIE VISUELLE
+
+- trajet = bloc principal (fort visuellement)
+- passagers = secondaire
+- actions = simples et visibles
+
+👉 Aujourd’hui tout est mélangé visuellement
+
+---
+
+🔴 7. ICÔNES ET DESIGN
+
+- remplacer icônes actuelles (pas modernes)
+- uniformiser les styles
+- améliorer les couleurs (plus propres, plus cohérentes)
+- améliorer les barres (arrondies, nettes)
+
+👉 Interface doit être moderne niveau application premium
+
+---
+
+🔴 8. VISIBILITÉ DES INFORMATIONS
+
+On doit voir clairement :
+
+- agence
+- trajet
+- statut du car
+- statut des réservations
+- nombre de passagers
+
+👉 Rien ne doit être caché
+
+---
+
+🔴 9. FLUIDITÉ
+
+- scroll fluide
+- aucune lourdeur
+- transitions propres
+
+👉 Actuellement ce n’est pas assez fluide
+
+---
+
+🔴 10. PROBLÈME OUVERTURE APPLICATION (CRITIQUE)
+
+Actuellement :
+
+- ouverture lente
+- écran blanc visible
+- logo apparaît lentement
+- rendu non professionnel
+
+👉 À corriger immédiatement :
+
+- logo doit apparaître instantanément
+- pas d’écran blanc visible
+- animation fluide (fade / zoom léger)
+- transition directe vers login
+
+👉 L’ouverture doit être :
+
+✔ instantanée  
+✔ fluide  
+✔ dynamique  
+✔ professionnelle  
+
+---
+
+🔴 11. OBJECTIF FINAL
+
+Nous voulons :
+
+- une page propre
+- un dashboard clair
+- une navigation rapide
+- zéro confusion
+- une application professionnelle prête pour le terrain
+
+---
+
+🔴 12. VALIDATION
+
+Après correction :
+
+merci d’envoyer :
+
+- capture page réservations (version finale)
+- capture ouverture app (logo fluide)
+
+---
+
+Merci de faire cette amélioration finale.
