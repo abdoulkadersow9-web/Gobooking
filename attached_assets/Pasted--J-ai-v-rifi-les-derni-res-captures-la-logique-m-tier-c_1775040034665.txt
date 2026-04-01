@@ -1,0 +1,181 @@
+}
+J’ai vérifié les dernières captures + la logique métier complète du module “Agent Réservation”.
+
+Il y a une amélioration, mais la page ne respecte toujours pas la logique réelle du terrain.
+
+Nous devons maintenant corriger profondément l’organisation, le filtrage et la structure pour obtenir une version finale professionnelle.
+
+⚠️ Important : ne rien casser, garder toute la logique actuelle, mais réorganiser intelligemment.
+
+---
+
+🔴 1. PROBLÈME ACTUEL
+
+Actuellement :
+
+- les réservations sont mélangées
+- les agences ne sont pas clairement visibles
+- le filtrage n’est pas logique
+- l’agent ne comprend pas rapidement quoi traiter
+- la page ne correspond pas au fonctionnement réel des agences
+
+👉 Ce n’est pas exploitable efficacement sur le terrain.
+
+---
+
+🔴 2. LOGIQUE MÉTIER À RESPECTER (TRÈS IMPORTANT)
+
+L’agent réservation doit fonctionner comme ceci :
+
+1. Il voit toutes les agences
+2. Chaque agence affiche un nombre de réservations (badge / alerte)
+3. Il clique sur une agence
+4. Il voit uniquement les réservations de cette agence
+5. Ensuite il voit les départs :
+   - en route
+   - en gare
+   - à venir
+6. Il traite les réservations du départ concerné
+
+👉 Cette logique n’est pas encore respectée visuellement.
+
+---
+
+🔴 3. FILTRAGE PAR AGENCE (À CORRIGER)
+
+Actuellement la sélection agence est cachée et peu lisible.
+
+À corriger :
+
+- rendre la sélection agence très visible (barre claire)
+- afficher les agences sous forme de boutons ou liste propre
+- ajouter badge (nombre de réservations)
+- affichage clair du nom (ex : Abidjan Adjamé, Bouaké, Korhogo)
+
+👉 L’agent doit voir immédiatement où il y a du travail
+
+---
+
+🔴 4. STRUCTURE EN NIVEAUX (OBLIGATOIRE)
+
+La page doit être organisée en 3 niveaux :
+
+NIVEAU 1 :
+👉 AGENCES
+
+NIVEAU 2 :
+👉 DÉPARTS (par agence)
+- Abidjan → Korhogo
+- statut (en route / en gare / à venir)
+- car (ex : Daloa Express 07)
+
+NIVEAU 3 :
+👉 RÉSERVATIONS
+- passagers
+- siège
+- montant
+- statut
+
+👉 Aujourd’hui ces niveaux sont mélangés
+
+---
+
+🔴 5. SYNCHRONISATION AVEC LES AUTRES AGENTS
+
+Quand une réservation est confirmée :
+
+- elle doit apparaître automatiquement :
+  - chez l’agent en route
+  - dans le départ concerné
+  - dans les statistiques de la compagnie
+
+👉 Cette logique doit être visible et claire dans l’interface
+
+---
+
+🔴 6. GESTION DES PLACES
+
+L’agent doit voir :
+
+- places réservées
+- places disponibles
+- réservations en attente
+
+👉 surtout pour les cars EN ROUTE
+
+---
+
+🔴 7. GESTION DES BAGAGES
+
+Si bagage :
+
+- afficher clairement
+- ajouter photo obligatoire
+- visible pour l’agent en route
+
+---
+
+🔴 8. DESIGN & STRUCTURE
+
+À améliorer :
+
+- réduire le scroll
+- compacter les cartes
+- améliorer les alignements
+- uniformiser les icônes
+- rendre les barres modernes (arrondies, propres)
+
+👉 objectif : dashboard clair et fluide
+
+---
+
+🔴 9. FLUIDITÉ
+
+- aucun blocage
+- scroll fluide
+- chargement rapide
+
+---
+
+🔴 10. PROBLÈME OUVERTURE APP (CRITIQUE)
+
+Actuellement :
+
+- ouverture lente
+- écran blanc visible
+- logo s’affiche lentement
+
+👉 À corriger :
+
+- affichage immédiat du logo
+- animation fluide
+- transition directe vers login
+
+👉 ouverture = instantanée + professionnelle
+
+---
+
+🔴 11. OBJECTIF FINAL
+
+Nous voulons :
+
+- une page claire
+- une logique métier respectée
+- un filtrage parfait
+- une navigation rapide
+- une application professionnelle prête terrain
+
+---
+
+🔴 12. VALIDATION
+
+Après correction :
+
+merci d’envoyer :
+
+- capture page agent réservation (finale)
+- capture ouverture app (corrigée)
+
+---
+
+Merci de faire cette amélioration finale complèt
