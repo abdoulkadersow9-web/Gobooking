@@ -1,0 +1,195 @@
+J’ai vérifié à nouveau la page “Réservations en ligne” avec les dernières captures.
+
+La logique métier demandée n’est toujours pas respectée.
+
+---
+
+🔴 1. PROBLÈME GLOBAL
+
+Actuellement :
+
+- les réservations sont mélangées
+- pas de vraie séparation par agence
+- pas de continuité entre agence → départ → en route
+- pas de structuration par bus / départ / statut
+
+👉 Ce n’est pas une logique d’exploitation réelle.
+
+---
+
+🔴 2. LOGIQUE MÉTIER OBLIGATOIRE (À APPLIQUER STRICTEMENT)
+
+Le système doit fonctionner comme suit :
+
+---
+
+✅ ÉTAPE 1 : FILTRAGE PAR AGENCE
+
+- un agent réservation voit TOUTES les réservations
+- MAIS il doit pouvoir filtrer par agence :
+
+Exemple :
+- Abidjan – Adjamé
+- Abidjan – Treichville
+- Abidjan – Port-Bouët
+- Bouaké
+- Korhogo
+- Ferké
+
+👉 Quand on sélectionne une agence :
+→ on voit UNIQUEMENT les réservations liées à cette agence
+
+---
+
+✅ ÉTAPE 2 : FILTRAGE PAR DÉPART
+
+Dans chaque agence :
+
+les réservations doivent être regroupées par départ :
+
+Exemple :
+
+Abidjan → Bouaké (07:00 – Bus X)
+
+→ liste des réservations liées à CE départ uniquement
+
+---
+
+✅ ÉTAPE 3 : FILTRAGE PAR ÉTAT DU DÉPART
+
+Dans chaque agence, il faut séparer :
+
+- Départs À VENIR
+- Départs EN GARE
+- Départs EN ROUTE
+- Départs TERMINÉS
+
+👉 chaque catégorie doit afficher ses réservations correspondantes
+
+---
+
+🔴 3. CONTINUITÉ OBLIGATOIRE (TRÈS IMPORTANT)
+
+Le système doit être dynamique :
+
+- Quand le bus est en gare → réservations visibles côté agence
+- Quand le bus démarre → le départ passe en “EN ROUTE”
+- Les réservations confirmées passent automatiquement côté agent en route
+- L’agent en route peut aussi vendre et gérer
+
+👉 Il doit y avoir une continuité logique entre :
+
+AGENCE → DÉPART → EN ROUTE
+
+---
+
+🔴 4. PROBLÈME ACTUEL
+
+Actuellement :
+
+- les réservations ne suivent pas le cycle
+- aucune séparation claire
+- aucune logique de continuité
+- affichage mélangé
+
+👉 Ce n’est pas exploitable en situation réelle.
+
+---
+
+🔴 5. STRUCTURE ATTENDUE À L’ÉCRAN
+
+Ordre obligatoire :
+
+1. Sélecteur d’agence
+2. Filtres départ (en route / à venir / terminés)
+3. Groupement par trajet (car)
+4. Réservations sous chaque trajet
+
+👉 PAS une liste plate mélangée
+
+---
+
+🔴 6. GESTION DES PLACES ET RÉSERVATIONS
+
+Quand une agence met des places en ligne :
+
+- elle doit voir ses places disponibles
+- voir les réservations associées
+- voir les validations en temps réel
+
+👉 liaison directe entre places ↔ réservations
+
+---
+
+🔴 7. VALIDATION AVEC PREUVE
+
+Quand un client réserve :
+
+- possibilité d’ajouter preuve (photo ticket)
+- cette preuve doit être visible côté agent
+- validation contrôlée par agence
+
+---
+
+🔴 8. PROBLÈME UI ACTUEL
+
+- mélange des blocs
+- absence de hiérarchie métier
+- logique non respectée
+- manque de clarté
+
+---
+
+🔴 9. PROBLÈME LOGO (IMPORTANT)
+
+À l’ouverture de l’application :
+
+- le logo ne s’affiche pas correctement
+- fond blanc mal géré
+- rendu non professionnel
+
+👉 corriger immédiatement :
+- logo visible
+- bonne qualité
+- animation propre si possible
+
+---
+
+🔴 10. DEMANDE
+
+Merci de :
+
+- corriger toute la logique de filtrage (agence + départ + état)
+- appliquer la continuité métier réelle
+- restructurer la page complètement
+- corriger le problème du logo au lancement
+
+---
+
+🔴 11. VALIDATION OBLIGATOIRE
+
+Après correction :
+
+👉 fournir des captures réelles de l’application :
+
+- vue par agence
+- vue départ regroupé
+- vue en route
+- vue terminée
+
+👉 sans cela, la modification ne sera pas validée
+
+---
+
+🎯 OBJECTIF FINAL
+
+Une page de réservation :
+
+- claire
+- structurée
+- filtrée
+- exploitable en temps réel
+
+---
+
+Merci de corriger cela immédiatement.
