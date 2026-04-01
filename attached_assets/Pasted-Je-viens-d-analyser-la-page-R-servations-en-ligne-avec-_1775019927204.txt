@@ -1,0 +1,154 @@
+Je viens d’analyser la page “Réservations en ligne” avec les dernières captures.
+
+Actuellement, la page n’est pas au niveau professionnel attendu et ne respecte pas la logique métier GoBooking.
+
+Merci de reprendre cette page en profondeur selon les points suivants :
+
+---
+
+🔴 1. PROBLÈME GLOBAL
+
+La page est actuellement :
+
+- mal structurée
+- trop chargée visuellement
+- sans hiérarchie claire
+- mélange réservation / trajet / client / colis sans organisation
+
+👉 Résultat : on ne comprend pas rapidement les informations.
+
+---
+
+🔴 2. OBJECTIF
+
+Transformer cette page en une vraie interface professionnelle type :
+
+- application de transport moderne
+- niveau compagnie aérienne / booking / Uber / Trainline
+
+👉 Lecture rapide, claire, logique, hiérarchisée.
+
+---
+
+🔴 3. STRUCTURE OBLIGATOIRE À RESPECTER
+
+Chaque réservation doit être organisée en blocs clairs :
+
+---
+
+✅ BLOC 1 : INFORMATION TRAJET (prioritaire)
+
+- Ville départ → arrivée
+- Date + heure
+- Compagnie / car
+- Statut (en attente / confirmé / annulé)
+
+👉 Ce bloc doit être le plus visible (header)
+
+---
+
+✅ BLOC 2 : CLIENT
+
+- Nom du client
+- Téléphone (action appel rapide)
+- ID réservation (ex: MOBRES001)
+
+---
+
+✅ BLOC 3 : RÉSERVATION
+
+- Nombre de passagers
+- Numéro de siège
+- Montant
+- Mode de paiement
+
+---
+
+✅ BLOC 4 : BAGAGE / COLIS (séparé visuellement)
+
+- Type (colis / bagage)
+- Statut
+- indication claire (pas mélangé avec le reste)
+
+---
+
+✅ BLOC 5 : ACTIONS (TRÈS IMPORTANT)
+
+- Confirmer (bouton principal)
+- Annuler (bouton secondaire)
+
+👉 Toujours visibles, fixes, clairs
+
+---
+
+🔴 4. PROBLÈMES ACTUELS À CORRIGER
+
+- Mélange des informations (client / trajet / paiement)
+- Mauvaise hiérarchie visuelle
+- Trop de blocs imbriqués
+- Lecture difficile
+- Scroll inutile
+- Design non professionnel
+
+---
+
+🔴 5. AMÉLIORATION UX OBLIGATOIRE
+
+- Réduire le scroll
+- Aérer les blocs
+- Ajouter des séparations claires
+- Alignement propre
+- tailles de texte cohérentes
+- couleurs logiques (statut = couleur)
+
+---
+
+🔴 6. LOGIQUE MÉTIER GOBOOKING À RESPECTER
+
+IMPORTANT :
+
+👉 Une réservation = liée à un trajet précis  
+👉 Un trajet = peut contenir plusieurs réservations  
+👉 Chaque réservation doit être indépendante visuellement
+
+---
+
+🔴 7. PRIORITÉ VISUELLE
+
+Ordre de lecture :
+
+1. Trajet
+2. Statut
+3. Client
+4. Paiement
+5. Actions
+
+---
+
+🔴 8. DESIGN
+
+- Design moderne (cards propres)
+- Pas de surcharge
+- Icônes utiles uniquement
+- Style professionnel (pas amateur)
+
+---
+
+🔴 9. DEMANDE
+
+Merci de :
+
+- restructurer complètement la page
+- appliquer cette logique strictement
+- rendre la page claire, lisible et professionnelle
+- éviter tout mélange d’informations
+
+---
+
+🔴 10. OBJECTIF FINAL
+
+👉 Une page que n’importe quel utilisateur comprend en 3 secondes.
+
+---
+
+Merci de refaire cette page proprement selon ces instructions.
