@@ -953,11 +953,45 @@ router.get("/online-bookings", async (req, res) => {
       : [];
     const tripMap = Object.fromEntries(trips.map(t => [t.id, t]));
 
+    /* Batch-load departure agences via trip_agents */
+    const tripAgenceMap: Record<string, { name: string; city: string }> = {};
+    if (tripIds.length > 0) {
+      const tripIdList = tripIds.map(id => `'${id}'`).join(",");
+      const taRows = await db.execute(sql`
+        SELECT DISTINCT ON (trip_id) trip_id, agence_name, agence_city
+        FROM trip_agents WHERE trip_id IN (${sql.raw(tripIdList)})
+        AND agence_name IS NOT NULL ORDER BY trip_id
+      `);
+      for (const r of taRows.rows as any[]) {
+        if (r.trip_id) tripAgenceMap[r.trip_id] = { name: r.agence_name, city: r.agence_city };
+      }
+    }
+
+    /* Batch-load bagage items (photos) for bookings with baggage */
+    const bookingIdsWithBag = allBookings.filter(b => ((b as any).baggageCount ?? 0) > 0).map(b => b.id);
+    const bagItemMap: Record<string, { photoUrl: string | null; type: string | null; description: string | null; status: string | null; price: number }[]> = {};
+    if (bookingIdsWithBag.length > 0) {
+      try {
+        const bidList = bookingIdsWithBag.map(id => `'${id}'`).join(",");
+        const bagRows = await db.execute(sql`
+          SELECT booking_id, photo_url, bagage_type, description, status, price
+          FROM bagage_items WHERE booking_id IN (${sql.raw(bidList)})
+        `);
+        for (const r of bagRows.rows as any[]) {
+          if (!bagItemMap[r.booking_id]) bagItemMap[r.booking_id] = [];
+          bagItemMap[r.booking_id].push({ photoUrl: r.photo_url ?? null, type: r.bagage_type ?? null, description: r.description ?? null, status: r.status ?? null, price: r.price ?? 0 });
+        }
+      } catch (bagErr) {
+        console.error("[online-bookings] bagage_items fetch error (non-blocking):", bagErr);
+      }
+    }
+
     /* No city pre-filter — frontend does agency filtering via selector */
     const bookings = allBookings;
 
     const enriched = bookings.map((b) => {
       const trip = b.tripId ? tripMap[b.tripId] ?? null : null;
+      const tripAgence = trip ? tripAgenceMap[trip.id] ?? null : null;
       return {
         id: b.id,
         bookingRef: b.bookingRef,
@@ -974,6 +1008,7 @@ router.get("/online-bookings", async (req, res) => {
         baggageDescription: (b as any).baggageDescription ?? null,
         bagageStatus: (b as any).bagageStatus ?? null,
         bagagePrice: (b as any).bagagePrice ?? 0,
+        bagageItems: bagItemMap[b.id] ?? [],
         trip: trip ? {
           id: trip.id,
           from: trip.from,
@@ -985,6 +1020,8 @@ router.get("/online-bookings", async (req, res) => {
           guichetSeats: trip.guichetSeats,
           onlineSeats: trip.onlineSeats,
           totalSeats: trip.totalSeats,
+          agenceName: tripAgence?.name ?? null,
+          agenceCity: tripAgence?.city ?? null,
         } : null,
       };
     });

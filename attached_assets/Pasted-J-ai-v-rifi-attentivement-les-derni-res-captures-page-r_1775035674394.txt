@@ -1,0 +1,190 @@
+J’ai vérifié attentivement les dernières captures (page réservations + page login).
+
+Il y a une amélioration visible, mais la page des réservations n’est toujours pas au niveau final attendu.  
+Nous avons besoin maintenant d’une correction finale, propre, professionnelle et totalement structurée.
+
+⚠️ Très important : ne rien casser, rester dans la logique actuelle, mais améliorer fortement.
+
+---
+
+🔴 1. STRUCTURE GLOBALE À FINALISER
+
+Actuellement :
+
+- la page est encore mélangée visuellement
+- les informations ne sont pas suffisamment organisées
+- la lecture n’est pas immédiate
+
+👉 Il faut une structure claire en blocs :
+
+- 1 bloc = 1 trajet (ex : Abidjan → Korhogo)
+- à l’intérieur = toutes les réservations liées à ce trajet
+
+👉 Chaque bloc doit être :
+
+- compact
+- lisible
+- bien séparé
+- fluide à parcourir
+
+---
+
+🔴 2. LOGIQUE MÉTIER À RENDRE VISIBLE (TRÈS IMPORTANT)
+
+Chaque trajet doit afficher clairement :
+
+- numéro du car / référence du départ
+- agence de départ
+- statut du car :
+  - en route
+  - en gare
+  - à venir
+
+👉 Aujourd’hui ce n’est pas assez clair.
+
+👉 L’agent doit comprendre immédiatement :
+
+- quel car est déjà parti
+- quel car est en cours
+- quel car n’est pas encore parti
+
+---
+
+🔴 3. FILTRAGE INTELLIGENT
+
+Il faut améliorer fortement les filtres :
+
+- par agence
+- par statut (en attente / confirmé / annulé)
+- par état du départ (en route / en gare / à venir)
+
+👉 Les filtres doivent être :
+
+- rapides
+- visibles
+- logiques
+
+---
+
+🔴 4. GESTION DES RÉSERVATIONS PAR AGENT
+
+Logique obligatoire :
+
+- une réservation confirmée doit être visible :
+  - par l’agent en route (si le car est en route)
+  - par l’agence concernée (si en gare)
+
+👉 Aujourd’hui cette logique n’est pas claire visuellement.
+
+👉 Il faut :
+
+- afficher clairement où va la réservation
+- éviter tout mélange entre agences et cars
+
+---
+
+🔴 5. INTERACTION AVEC LES PASSAGERS
+
+Il faut permettre :
+
+- cliquer sur un passager → voir ses détails
+- voir clairement :
+  - siège
+  - téléphone
+  - statut
+  - type (mobile / agence)
+
+👉 L’agent doit pouvoir travailler rapidement sans confusion
+
+---
+
+🔴 6. GESTION BAGAGES (IMPORTANT)
+
+Pour chaque réservation avec bagage :
+
+- afficher clairement :
+  - nombre de bagages
+  - statut
+  - 📸 photo du bagage (obligatoire)
+
+👉 L’agent en route doit voir directement :
+
+- la photo
+- les infos du colis
+- pour validation rapide
+
+---
+
+🔴 7. AMÉLIORATION VISUELLE FINALE
+
+À corriger :
+
+- réduire la taille des blocs
+- améliorer alignements
+- rendre l’interface plus légère
+- améliorer lisibilité globale
+
+👉 Objectif :
+
+- lecture en 2 secondes
+- zéro confusion
+- interface moderne niveau professionnel
+
+---
+
+🔴 8. PROBLÈME OUVERTURE APPLICATION (CRITIQUE)
+
+Sur la page login :
+
+- le logo s’affiche bien après chargement
+MAIS
+
+👉 au lancement de l’application :
+
+- le logo s’affiche mal
+- rendu non fluide
+- parfois “Google Booking” apparaît mal
+
+👉 À corriger immédiatement :
+
+- affichage propre du logo dès l’ouverture
+- animation fluide
+- bon centrage
+- bon contraste
+
+👉 L’ouverture doit être :
+
+✔ propre  
+✔ fluide  
+✔ professionnelle  
+✔ sans bug  
+
+👉 100% propre (pas 90%, pas 99%)
+
+---
+
+🔴 9. OBJECTIF FINAL
+
+Nous voulons :
+
+- une page claire
+- une logique métier visible
+- des réservations bien regroupées
+- une navigation fluide
+- zéro mélange
+- une app professionnelle prête à être utilisée en réel
+
+---
+
+🔴 10. VALIDATION
+
+Après correction :
+
+merci d’envoyer les nouvelles captures :
+
+- page réservations (finalisée)
+- ouverture app (logo propre)
+
+---
+
+Merci de faire cette amélioration finale sans casser la logique existante.

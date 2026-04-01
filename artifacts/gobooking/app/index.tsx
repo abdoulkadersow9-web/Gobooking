@@ -300,28 +300,29 @@ const S = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
   },
   logoWrap: {
-    width: 136,
-    height: 136,
-    borderRadius: 68,
-    backgroundColor: "rgba(255,255,255,0.13)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.22)",
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.7)",
     alignItems: "center",
     justifyContent: "center",
-    padding: 14,
+    padding: 12,
     ...(IS_WEB
-      ? { boxShadow: "0 0 0 10px rgba(255,255,255,0.04), 0 0 60px 20px rgba(59,110,234,0.5), 0 8px 32px rgba(0,0,0,0.4)" } as any
+      ? { boxShadow: "0 0 0 12px rgba(255,255,255,0.08), 0 0 60px 20px rgba(59,110,234,0.45), 0 8px 40px rgba(0,0,0,0.35)" } as any
       : {
-          shadowColor: "#ffffff",
+          shadowColor: "#3B6EEA",
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.15,
-          shadowRadius: 24,
+          shadowOpacity: 0.6,
+          shadowRadius: 40,
+          elevation: 20,
         }),
   },
   logo: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
   },
   textBlock: {
     alignItems: "center",
