@@ -675,8 +675,7 @@ export default function RouteScreen() {
                       <View style={[S.camConnIcon, { backgroundColor: "#EFF6FF" }]}>
                         <Ionicons name="qr-code" size={22} color="#2563EB" />
                       </View>
-                      <Text style={S.camConnLabel}>Connecter{"
-"}une caméra</Text>
+                      <Text style={S.camConnLabel}>{"Connecter\nune caméra"}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
