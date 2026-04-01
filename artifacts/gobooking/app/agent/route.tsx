@@ -16,6 +16,8 @@ import { apiFetch, BASE_URL } from "@/utils/api";
 import { useNetworkStatus, isAlreadyScanned, markAsScanned } from "@/utils/offline";
 import { useAgentGps } from "@/utils/useAgentGps";
 import OfflineBanner from "@/components/OfflineBanner";
+import CameraConnectModal from "./CameraConnectModal";
+
 
 const G       = "#059669";
 const G_LIGHT = "#ECFDF5";
@@ -179,8 +181,10 @@ export default function RouteScreen() {
   const scannedRouteRef               = useRef(false);
   const scanPulse                     = useRef(new Animated.Value(1)).current;
 
-  const assignedTripId = user?.tripId ?? null;
-  const assignedBusId  = user?.busId  ?? null;
+  const assignedTripId = (user as any)?.tripId ?? null;
+const assignedBusId  = (user as any)?.busId  ?? null;
+
+  
 
   const gps = useAgentGps(activeTrip?.id ?? null, token);
 
@@ -360,7 +364,8 @@ export default function RouteScreen() {
     scannedRouteRef.current = false;
   };
 
-  useEffect(() => { loadTrips(); loadMyDeparture(); }, []);
+  useEffect(() => { loadTrips(); loadMyDeparture(); }, [loadTrips, loadMyDeparture]);
+
 
   useEffect(() => {
     const tripIdToLoad = myDeparture?.id ?? activeTrip?.id ?? null;
