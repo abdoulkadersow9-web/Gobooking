@@ -1881,16 +1881,40 @@ router.get("/dashboard", async (req, res) => {
     // ── Active trips (en_cours) ───────────────────────────────────────
     const activeTrips = trips
       .filter(t => t.status === "en_cours")
-      .map(t => ({
-        id: t.id,
-        from: t.from,
-        to: t.to,
-        date: t.date,
-        departureTime: t.departureTime,
-        busName: t.busName,
-        status: t.status,
-        totalSeats: t.totalSeats,
-      }));
+      .map(t => {
+        const tripBookings = bookings.filter(b => b.tripId === t.id && b.status !== "cancelled");
+        return {
+          id: t.id,
+          from: t.from,
+          to: t.to,
+          date: t.date,
+          departureTime: t.departureTime,
+          busName: t.busName,
+          status: t.status,
+          totalSeats: t.totalSeats,
+          passengerCount: tripBookings.length,
+        };
+      });
+
+    // ── Trip summary ───────────────────────────────────────────────────
+    const today2 = new Date().toISOString().slice(0, 10);
+    const todayTrips = trips.filter(t => t.date === today2);
+    const scheduledTrips = trips.filter(t => t.status === "scheduled" || t.status === "programmé");
+    const completedTrips = trips.filter(t => t.status === "completed" || t.status === "terminé");
+    const relevantTrips = [...activeTrips, ...scheduledTrips].filter(t => t.totalSeats > 0);
+    const avgFillRate = relevantTrips.length > 0
+      ? Math.round(relevantTrips.reduce((s, t) => {
+          const booked = bookings.filter(b => b.tripId === t.id && b.status !== "cancelled").length;
+          return s + (booked / t.totalSeats);
+        }, 0) / relevantTrips.length * 100)
+      : 0;
+    const tripSummary = {
+      enCours: activeTrips.length,
+      programmes: scheduledTrips.length,
+      termines: completedTrips.length,
+      todayCount: todayTrips.length,
+      avgFillRate,
+    };
 
     // ── Daily data: last 7 days ───────────────────────────────────────
     const today = new Date();
@@ -1925,6 +1949,7 @@ router.get("/dashboard", async (req, res) => {
       revenue: { totalRevenue, bookingRevenue, parcelRevenue },
       activeTrips,
       dailyData,
+      tripSummary,
       summary: {
         totalBuses: buses.length,
         activeBuses: buses.filter(b => b.status === "active").length,

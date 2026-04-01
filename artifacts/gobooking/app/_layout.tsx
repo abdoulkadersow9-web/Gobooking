@@ -198,7 +198,7 @@ function RootLayoutNav() {
         }}
       >
         {/* Root screens — no previous screen exists, swipe-back must be disabled */}
-        <Stack.Screen name="index" options={{ animation: "none", gestureEnabled: false }} />
+        <Stack.Screen name="index" options={{ animation: "fade", animationDuration: 280, gestureEnabled: false }} />
         <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false, animation: "slide_from_bottom", animationDuration: 260, gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ animation: "fade", animationDuration: 180, gestureEnabled: false }} />
       </Stack>

@@ -38,11 +38,16 @@ interface Revenue { totalRevenue: number; bookingRevenue: number; parcelRevenue:
 interface ActiveTrip {
   id: string; from: string; to: string; date: string;
   departureTime: string; busName: string; status: string; totalSeats: number;
+  passengerCount?: number;
 }
 interface DailyPoint { date: string; count: number; revenue: number; parcels: number }
 interface Summary {
   totalBuses: number; activeBuses: number;
   totalTrips: number; activeTripsCount: number;
+}
+interface TripSummary {
+  enCours: number; programmes: number; termines: number;
+  todayCount: number; avgFillRate: number;
 }
 interface DashboardData {
   bookingStats: BookingStats;
@@ -51,6 +56,7 @@ interface DashboardData {
   activeTrips: ActiveTrip[];
   dailyData: DailyPoint[];
   summary: Summary;
+  tripSummary?: TripSummary;
 }
 
 /* ─── Palette ────────────────────────────────────────────────────────── */
@@ -144,16 +150,47 @@ function RevenueCard({ revenue }: { revenue: Revenue }) {
 }
 
 function ActiveTripCard({ trip }: { trip: ActiveTrip }) {
+  const filled = trip.passengerCount ?? 0;
+  const total  = trip.totalSeats > 0 ? trip.totalSeats : 1;
+  const pct    = Math.round((filled / total) * 100);
+  const fillColor = pct >= 80 ? GREEN : pct >= 50 ? AMBER : RED;
   return (
     <View style={ss.tripCard}>
-      <View style={ss.tripDot} />
+      <View style={[ss.tripDot, { backgroundColor: GREEN }]} />
       <View style={ss.tripInfo}>
         <Text style={ss.tripRoute}>{trip.from} → {trip.to}</Text>
         <Text style={ss.tripMeta}>{trip.busName} · {trip.departureTime} · {fmtDate(trip.date)}</Text>
+        {/* Fill rate mini-bar */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+          <View style={{ flex: 1, height: 5, backgroundColor: "#E2E8F0", borderRadius: 3, overflow: "hidden" }}>
+            <View style={{ width: `${pct}%`, height: "100%", backgroundColor: fillColor, borderRadius: 3 }} />
+          </View>
+          <Text style={{ fontSize: 11, fontWeight: "700", color: fillColor }}>{pct}%</Text>
+          <Text style={{ fontSize: 10, color: GRAY }}>{filled}/{trip.totalSeats}</Text>
+        </View>
       </View>
       <View style={ss.tripBadge}>
         <Text style={ss.tripBadgeTxt}>En route</Text>
       </View>
+    </View>
+  );
+}
+
+function TripStrip({ ts }: { ts: TripSummary }) {
+  return (
+    <View style={ss.stripRow}>
+      {[
+        { icon: "navigation",  label: "En cours",   value: ts.enCours,   color: GREEN  },
+        { icon: "clock",       label: "Programmés",  value: ts.programmes, color: BLUE  },
+        { icon: "percent",     label: "Remplissage", value: `${ts.avgFillRate}%`, color: ts.avgFillRate >= 70 ? GREEN : AMBER },
+        { icon: "check-circle",label: "Terminés",   value: ts.termines,  color: GRAY  },
+      ].map(it => (
+        <View key={it.label} style={[ss.stripItem, { borderColor: it.color + "30" }]}>
+          <Feather name={it.icon as any} size={14} color={it.color} />
+          <Text style={[ss.stripVal, { color: it.color }]}>{it.value}</Text>
+          <Text style={ss.stripLbl}>{it.label}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -190,6 +227,7 @@ export default function EntrepriseDashboard() {
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [showAllNav, setShowAllNav] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -267,7 +305,7 @@ export default function EntrepriseDashboard() {
     );
   }
 
-  const { bookingStats, parcelStats, revenue, activeTrips, dailyData, summary } = data;
+  const { bookingStats, parcelStats, revenue, activeTrips, dailyData, summary, tripSummary } = data;
 
   return (
     <View style={ss.flex}>
@@ -327,6 +365,9 @@ export default function EntrepriseDashboard() {
         <View style={ss.section}>
           <RevenueCard revenue={revenue} />
         </View>
+
+        {/* Trip status strip */}
+        {tripSummary && <TripStrip ts={tripSummary} />}
 
         {/* Summary pills */}
         <SummaryPills summary={summary} />
@@ -426,42 +467,60 @@ export default function EntrepriseDashboard() {
         {/* Quick nav */}
         <View style={ss.section}>
           <SectionTitle icon="grid" title="Accès rapide" color={GRAY} />
-          <View style={ss.navGrid}>
-            {[
-              { icon: "calendar",  label: "Trajets",      route: "/entreprise/trajets",        color: BLUE },
-              { icon: "users",     label: "Réservations", route: "/entreprise/reservations",   color: GREEN },
-              { icon: "package",   label: "Colis",        route: "/entreprise/colis",          color: VIOLET },
-              { icon: "map",           label: "Suivi Live",   route: "/entreprise/live-tracking",  color: "#EF4444" },
-              { icon: "alert-octagon", label: "Alertes",      route: "/entreprise/alertes",        color: "#DC2626" },
-              { icon: "bar-chart-2",   label: "Analytics",    route: "/entreprise/analytiques",    color: "#059669" },
-              { icon: "send",          label: "SMS Marketing",route: "/entreprise/sms",            color: "#D97706" },
-              { icon: "zap",           label: "Marketing Auto",route: "/entreprise/marketing",     color: "#7C3AED" },
-              { icon: "home",          label: "Agences",      route: "/entreprise/agences",        color: "#0369A1" },
-              { icon: "user-check",    label: "Agents",       route: "/entreprise/agents",         color: "#059669" },
-              { icon: "git-branch",    label: "Routes",       route: "/entreprise/routes",         color: "#7C3AED" },
-              { icon: "check-square",  label: "Embarquement", route: "/entreprise/embarquement",        color: "#059669" },
-              { icon: "clock",         label: "Histo. colis", route: "/entreprise/colis-historique",    color: "#7C3AED" },
-              { icon: "star",          label: "Avis clients",  route: "/entreprise/avis",           color: "#FBBF24" },
-              { icon: "truck",         label: "Suivi Engins",  route: "/entreprise/bus-suivi",     color: "#22C55E" },
-              { icon: "tool",          label: "Maintenance",   route: "/entreprise/maintenance-bus", color: "#F59E0B" },
-              { icon: "droplet",       label: "Carburant",     route: "/entreprise/carburant",       color: "#16A34A" },
-              { icon: "users",         label: "Affectation",   route: "/entreprise/bus-agents",      color: "#7C3AED" },
-              { icon: "bar-chart-2",   label: "Rentabilité",   route: "/entreprise/rentabilite",     color: "#0891B2" },
-              { icon: "activity",      label: "Comparaison",   route: "/entreprise/comparaison",     color: "#6366F1" },
-              { icon: "settings",      label: "Paramètres",    route: "/entreprise/parametres",     color: AMBER },
-            ].map(it => (
-              <Pressable
-                key={it.route}
-                style={[ss.navCard, { borderColor: it.color + "30" }]}
-                onPress={() => router.push(it.route as any)}
-              >
-                <View style={[ss.navIcon, { backgroundColor: it.color + "18" }]}>
-                  <Feather name={it.icon as any} size={20} color={it.color} />
+          {(() => {
+            const ALL_NAV = [
+              { icon: "calendar",      label: "Trajets",       route: "/entreprise/trajets",            color: BLUE,    primary: true  },
+              { icon: "users",         label: "Réservations",  route: "/entreprise/reservations",       color: GREEN,   primary: true  },
+              { icon: "package",       label: "Colis",         route: "/entreprise/colis",              color: VIOLET,  primary: true  },
+              { icon: "user-check",    label: "Agents",        route: "/entreprise/agents",             color: "#059669", primary: true },
+              { icon: "home",          label: "Agences",       route: "/entreprise/agences",            color: "#0369A1", primary: true },
+              { icon: "bar-chart-2",   label: "Analytics",     route: "/entreprise/analytiques",        color: "#059669", primary: true },
+              { icon: "droplet",       label: "Carburant",     route: "/entreprise/carburant",          color: "#16A34A", primary: true },
+              { icon: "settings",      label: "Paramètres",    route: "/entreprise/parametres",         color: AMBER,   primary: true  },
+              { icon: "map",           label: "Suivi Live",    route: "/entreprise/live-tracking",      color: "#EF4444", primary: false },
+              { icon: "alert-octagon", label: "Alertes",       route: "/entreprise/alertes",            color: "#DC2626", primary: false },
+              { icon: "send",          label: "Marketing SMS", route: "/entreprise/sms",                color: "#D97706", primary: false },
+              { icon: "zap",           label: "Marketing Auto",route: "/entreprise/marketing",          color: "#7C3AED", primary: false },
+              { icon: "git-branch",    label: "Routes",        route: "/entreprise/routes",             color: "#7C3AED", primary: false },
+              { icon: "check-square",  label: "Embarquement",  route: "/entreprise/embarquement",       color: "#059669", primary: false },
+              { icon: "clock",         label: "Histo. colis",  route: "/entreprise/colis-historique",   color: "#7C3AED", primary: false },
+              { icon: "star",          label: "Avis clients",  route: "/entreprise/avis",               color: "#FBBF24", primary: false },
+              { icon: "truck",         label: "Suivi Engins",  route: "/entreprise/bus-suivi",          color: "#22C55E", primary: false },
+              { icon: "tool",          label: "Maintenance",   route: "/entreprise/maintenance-bus",    color: "#F59E0B", primary: false },
+              { icon: "users",         label: "Affectation",   route: "/entreprise/bus-agents",         color: "#7C3AED", primary: false },
+              { icon: "bar-chart-2",   label: "Rentabilité",   route: "/entreprise/rentabilite",        color: "#0891B2", primary: false },
+              { icon: "activity",      label: "Comparaison",   route: "/entreprise/comparaison",        color: "#6366F1", primary: false },
+            ];
+            const shown = showAllNav ? ALL_NAV : ALL_NAV.filter(n => n.primary);
+            const extraCount = ALL_NAV.filter(n => !n.primary).length;
+            return (
+              <>
+                <View style={ss.navGrid}>
+                  {shown.map(it => (
+                    <Pressable
+                      key={it.route}
+                      style={[ss.navCard, { borderColor: it.color + "30" }]}
+                      onPress={() => router.push(it.route as any)}
+                    >
+                      <View style={[ss.navIcon, { backgroundColor: it.color + "18" }]}>
+                        <Feather name={it.icon as any} size={20} color={it.color} />
+                      </View>
+                      <Text style={[ss.navLabel, { color: it.color }]}>{it.label}</Text>
+                    </Pressable>
+                  ))}
                 </View>
-                <Text style={[ss.navLabel, { color: it.color }]}>{it.label}</Text>
-              </Pressable>
-            ))}
-          </View>
+                <Pressable
+                  style={ss.showMoreBtn}
+                  onPress={() => setShowAllNav(v => !v)}
+                >
+                  <Feather name={showAllNav ? "chevron-up" : "chevron-down"} size={14} color={GRAY} />
+                  <Text style={ss.showMoreTxt}>
+                    {showAllNav ? "Réduire" : `Voir ${extraCount} autres fonctions`}
+                  </Text>
+                </Pressable>
+              </>
+            );
+          })()}
         </View>
       </ScrollView>
     </View>
@@ -534,11 +593,19 @@ const ss = StyleSheet.create({
   tripBadge:   { backgroundColor: GREEN_LT, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   tripBadgeTxt:{ fontSize: 11, color: GREEN, fontWeight: "700" },
 
+  /* Trip strip */
+  stripRow:  { flexDirection: "row", gap: 8, marginTop: 14 },
+  stripItem: { flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 10, alignItems: "center", gap: 3, borderWidth: 1.5, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  stripVal:  { fontSize: 18, fontWeight: "900" },
+  stripLbl:  { fontSize: 9, color: GRAY, fontWeight: "600", textAlign: "center" },
+
   /* Quick nav */
   navGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   navCard: { width: "47%", backgroundColor: "#fff", borderRadius: 16, padding: 16, alignItems: "center", gap: 8, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   navIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   navLabel:{ fontSize: 13, fontWeight: "700" },
+  showMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 12, paddingVertical: 10, backgroundColor: "#F1F5F9", borderRadius: 12 },
+  showMoreTxt: { fontSize: 13, fontWeight: "600", color: GRAY },
 
   /* Alertes */
   alertBox:        { marginTop: 14, backgroundColor: "#fff", borderRadius: 16, borderWidth: 1.5, borderColor: "#FECACA", overflow: "hidden", shadowColor: "#DC2626", shadowOpacity: 0.10, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },

@@ -1,0 +1,130 @@
+8421"}
+J’ai vérifié les dernières améliorations.
+
+La synchronisation et l’expérience embarquement sont maintenant très bonnes. C’est validé.
+
+Maintenant on passe à une étape critique pour rendre l’application professionnelle et exploitable en production.
+
+---
+
+🔴 1. PROBLÈME MAJEUR : ÉCRAN D’OUVERTURE (SPLASH)
+
+Actuellement :
+
+- le logo ne s’affiche pas correctement
+- il apparaît puis disparaît
+- il y a des bugs visuels
+- ce n’est pas fluide
+
+👉 Ce n’est pas acceptable pour une application professionnelle.
+
+Je veux un rendu inspiré des grandes apps (Uber, Facebook, etc.) :
+
+- logo parfaitement centré
+- affichage stable (aucun glitch)
+- animation fluide et maîtrisée
+- aucune disparition brutale
+- chargement propre et rapide
+
+👉 L’ouverture doit donner une impression premium immédiatement.
+
+---
+
+🔴 2. DASHBOARD = PRIORITÉ MAXIMALE
+
+Actuellement, les dashboards sont :
+
+- mélangés
+- peu structurés
+- pas professionnels
+- pas alignés avec la logique métier
+
+👉 Ce n’est pas exploitable pour une vraie entreprise.
+
+---
+
+🔴 3. LOGIQUE À APPLIQUER AUX DASHBOARDS
+
+Tout ce qui a été construit côté agents doit remonter dans les dashboards.
+
+Je veux :
+
+### Dashboard entreprise / compagnie :
+
+- nombre de passagers par trajet
+- taux de remplissage des cars
+- trajets en cours / programmés / terminés
+- revenus générés
+- activité des agents
+
+### Dashboard super admin :
+
+- vue globale de toutes les compagnies
+- performance par ville
+- suivi des flux (réservations, colis, embarquement)
+- contrôle total
+
+👉 Chaque donnée doit venir de la logique existante (pas de données fictives)
+
+---
+
+🔴 4. STRUCTURE CLAIRE
+
+Les dashboards doivent être :
+
+- organisés par blocs (cards)
+- lisibles
+- modernes
+- avec des indicateurs visuels (couleurs, statuts)
+
+👉 Exemple :
+
+- Cars en route (vert)
+- Embarquement (violet)
+- Retard / problème (rouge)
+- En attente (orange)
+
+---
+
+🔴 5. EXPÉRIENCE UTILISATEUR
+
+- navigation simple
+- boutons clairs
+- aucune répétition
+- aucune confusion
+
+👉 Supprimer tous les éléments inutiles et doublons
+
+---
+
+🔴 6. OBJECTIF GLOBAL
+
+Je veux une application :
+
+- fluide
+- moderne
+- propre
+- structurée
+- exploitable par une vraie compagnie de transport
+
+---
+
+⚠️ Important :
+
+- ne rien casser dans ce qui fonctionne
+- améliorer sans dégrader
+- rester dans la logique actuelle
+
+---
+
+🎯 PRIORITÉ IMMÉDIATE
+
+1. corriger totalement le splash (logo + fluidité)
+2. restructurer les dashboards (compagnie + admin)
+3. connecter les données réelles aux dashboards
+
+---
+
+Quand c’est prêt, on passe aux tests complets et simulation réelle.
+
+Merci d’avancer rapidement sur ces

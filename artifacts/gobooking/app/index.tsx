@@ -113,16 +113,10 @@ export default function SplashScreen() {
   const doNavigate = useRef(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
-    /* Fast, clean fade-out */
-    Animated.timing(containerOp, {
-      toValue: 0, duration: IS_WEB ? 180 : 260,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: ND,
-    }).start(() => {
-      const u = userRef.current;
-      if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
-      else   router.replace("/(auth)/login");
-    });
+    /* Navigate immediately — Stack's "fade" animation handles the visual transition */
+    const u = userRef.current;
+    if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
+    else   router.replace("/(auth)/login");
   }).current;
 
   const tryNavigate = () => {
