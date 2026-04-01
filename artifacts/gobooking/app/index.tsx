@@ -14,9 +14,13 @@ import {
 import { getDashboardPath, useAuth } from "@/context/AuthContext";
 
 /* ── Constants ────────────────────────────────── */
-const IS_WEB   = Platform.OS === "web";
-const ND       = !IS_WEB;           /* useNativeDriver: true only on native */
-const MIN_SPLASH = IS_WEB ? 1400 : 1800;
+const IS_WEB = Platform.OS === "web";
+const ND     = !IS_WEB;   /* useNativeDriver: true only on native */
+
+/* Web:    HTML pre-splash already shown — React splash is invisible, navigate
+           as soon as auth is resolved (no artificial wait).
+   Native: 1.8s minimum so animations play fully.                             */
+const MIN_SPLASH = IS_WEB ? 0 : 1800;
 
 /* ══════════════════════════════════════════
    NATIVE-ONLY: Ripple ring animation
@@ -65,7 +69,7 @@ function GlowOrb() {
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 0.68, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0.4, duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.4,  duration: 1600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
     loop.start();
@@ -75,7 +79,7 @@ function GlowOrb() {
 }
 
 /* ══════════════════════════════════════════
-   PROGRESS BAR
+   PROGRESS BAR (native only)
 ══════════════════════════════════════════ */
 function ProgressBar({ width }: { width: Animated.AnimatedInterpolation<string | number> }) {
   return (
@@ -91,21 +95,9 @@ function ProgressBar({ width }: { width: Animated.AnimatedInterpolation<string |
 export default function SplashScreen() {
   const { user, isLoading } = useAuth();
 
-  /* ── Shared animations ── */
-  const containerOp = useRef(new Animated.Value(1)).current;
-  const progress    = useRef(new Animated.Value(0)).current;
-
-  /* ── Native-only entry animations ── */
-  const logoScale = useRef(new Animated.Value(IS_WEB ? 1 : 0.5)).current;
-  const logoOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
-  const nameOp    = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
-  const nameY     = useRef(new Animated.Value(IS_WEB ? 0 : 18)).current;
-  const tagOp     = useRef(new Animated.Value(IS_WEB ? 1 : 0)).current;
-  const animStarted = useRef(false);
-
   /* ── Navigation guard ── */
   const navigatedRef = useRef(false);
-  const minDoneRef   = useRef(false);
+  const minDoneRef   = useRef(IS_WEB);   // web: min is 0 → already done
   const authDoneRef  = useRef(false);
   const userRef      = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
@@ -113,7 +105,6 @@ export default function SplashScreen() {
   const doNavigate = useRef(() => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
-    /* Navigate immediately — Stack's "fade" animation handles the visual transition */
     const u = userRef.current;
     if (u) router.replace(getDashboardPath(u.role, u.agentRole) as never);
     else   router.replace("/(auth)/login");
@@ -123,15 +114,21 @@ export default function SplashScreen() {
     if (minDoneRef.current && authDoneRef.current) doNavigate();
   };
 
-  /* Called once image is loaded (native) or immediately (web) */
+  /* ── Native-only entry animations ── */
+  const logoScale = useRef(new Animated.Value(0.5)).current;
+  const logoOp    = useRef(new Animated.Value(0)).current;
+  const nameOp    = useRef(new Animated.Value(0)).current;
+  const nameY     = useRef(new Animated.Value(18)).current;
+  const tagOp     = useRef(new Animated.Value(0)).current;
+  const progress  = useRef(new Animated.Value(0)).current;
+  const animStarted = useRef(false);
+
   const startAnimation = () => {
     if (animStarted.current) return;
     animStarted.current = true;
     Animated.parallel([
-      /* Logo: scale from 0.5 → 1, fade from 0 → 1 */
       Animated.spring(logoScale, { toValue: 1, tension: 80, friction: 9, useNativeDriver: true }),
       Animated.timing(logoOp,    { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-      /* Name: slide up + fade in */
       Animated.sequence([
         Animated.delay(280),
         Animated.parallel([
@@ -139,12 +136,10 @@ export default function SplashScreen() {
           Animated.timing(nameY,  { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
         ]),
       ]),
-      /* Tagline */
       Animated.sequence([
         Animated.delay(480),
         Animated.timing(tagOp, { toValue: 1, duration: 240, useNativeDriver: true }),
       ]),
-      /* Progress bar */
       Animated.sequence([
         Animated.delay(600),
         Animated.timing(progress, {
@@ -157,43 +152,39 @@ export default function SplashScreen() {
   };
 
   useEffect(() => {
-    let frameDelay: ReturnType<typeof setTimeout> | null = null;
-
     if (IS_WEB) {
-      /* Web: everything visible immediately — just animate the progress bar */
-      Animated.timing(progress, {
-        toValue: 0.9, duration: MIN_SPLASH - 400,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }).start();
-    } else {
-      /* Native: start after a brief frame delay to ensure React has rendered */
-      frameDelay = setTimeout(startAnimation, 16);
+      /* Web: HTML pre-splash handles the visual — just check auth and navigate */
+      return;
     }
-
-    const t = setTimeout(() => { minDoneRef.current = true; tryNavigate(); }, MIN_SPLASH);
-    return () => {
-      if (frameDelay) clearTimeout(frameDelay);
-      clearTimeout(t);
-    };
+    /* Native: trigger animations after first frame */
+    const t = setTimeout(startAnimation, 16);
+    const m = setTimeout(() => { minDoneRef.current = true; tryNavigate(); }, MIN_SPLASH);
+    return () => { clearTimeout(t); clearTimeout(m); };
   }, []);
 
-  /* Auth done → complete the bar + navigate */
+  /* Auth done → complete the bar (native) + navigate */
   useEffect(() => {
     if (!isLoading) {
       authDoneRef.current = true;
-      Animated.timing(progress, {
-        toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false,
-      }).start();
+      if (!IS_WEB) {
+        Animated.timing(progress, {
+          toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false,
+        }).start();
+      }
       tryNavigate();
     }
   }, [isLoading, user]);
 
   const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] });
 
+  /* ── Web: render nothing — HTML pre-splash covers everything ── */
+  if (IS_WEB) {
+    return <View style={{ flex: 1, backgroundColor: "#050B28" }} />;
+  }
+
+  /* ── Native: full animated splash ── */
   return (
-    <Animated.View style={[S.container, { opacity: containerOp }]}>
-      {/* Gradient background */}
+    <Animated.View style={S.container}>
       <LinearGradient
         colors={["#0C1B72", "#091250", "#050B28"]}
         locations={[0, 0.5, 1]}
@@ -202,30 +193,14 @@ export default function SplashScreen() {
         end={{ x: 0.75, y: 1 }}
       />
 
-      {/* Native-only decorative elements (skip on web for performance) */}
-      {!IS_WEB && (
-        <>
-          <GlowOrb />
-          <View style={S.ringsWrap} pointerEvents="none">
-            <Ripple delay={0}    size={220} maxOp={0.22} />
-            <Ripple delay={750}  size={350} maxOp={0.14} />
-            <Ripple delay={1500} size={480} maxOp={0.07} />
-          </View>
-        </>
-      )}
+      <GlowOrb />
+      <View style={S.ringsWrap} pointerEvents="none">
+        <Ripple delay={0}    size={220} maxOp={0.22} />
+        <Ripple delay={750}  size={350} maxOp={0.14} />
+        <Ripple delay={1500} size={480} maxOp={0.07} />
+      </View>
 
-      {/* Web-only: animated soft glow behind logo */}
-      {IS_WEB && (
-        <>
-          <View style={S.webGlow} pointerEvents="none" />
-          <View style={S.webGlow2} pointerEvents="none" />
-        </>
-      )}
-
-      {/* Logo */}
-      <Animated.View
-        style={[S.logoWrap, { opacity: logoOp, transform: [{ scale: logoScale }] }]}
-      >
+      <Animated.View style={[S.logoWrap, { opacity: logoOp, transform: [{ scale: logoScale }] }]}>
         <Image
           source={require("../assets/logo.png")}
           style={S.logo}
@@ -234,7 +209,6 @@ export default function SplashScreen() {
         />
       </Animated.View>
 
-      {/* App name + tagline */}
       <View style={S.textBlock}>
         <Animated.Text style={[S.appName, { opacity: nameOp, transform: [{ translateY: nameY }] }]}>
           GoBooking
@@ -244,19 +218,17 @@ export default function SplashScreen() {
         </Animated.Text>
       </View>
 
-      {/* Progress bar */}
       <View style={S.barWrap}>
         <ProgressBar width={barWidth} />
       </View>
 
-      {/* Version */}
       <Text style={S.version}>v2.0 · Côte d'Ivoire</Text>
     </Animated.View>
   );
 }
 
 /* ══════════════════════════════════════════
-   STYLES
+   STYLES (native only)
 ══════════════════════════════════════════ */
 const S = StyleSheet.create({
   container: {
@@ -276,52 +248,26 @@ const S = StyleSheet.create({
     shadowRadius: 100,
     elevation: 0,
   },
-  webGlow: {
-    position: "absolute",
-    width: 360, height: 360, borderRadius: 180,
-    backgroundColor: "rgba(26,62,216,0.22)",
-    top: "50%" as any,
-    left: "50%" as any,
-    marginTop: -180,
-    marginLeft: -180,
-  },
-  webGlow2: {
-    position: "absolute",
-    width: 220, height: 220, borderRadius: 110,
-    backgroundColor: "rgba(91,141,239,0.14)",
-    top: "50%" as any,
-    left: "50%" as any,
-    marginTop: -110,
-    marginLeft: -110,
-  },
   ringsWrap: {
     position: "absolute",
     width: 500, height: 500,
     alignItems: "center", justifyContent: "center",
   },
   logoWrap: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 140, height: 140, borderRadius: 70,
     backgroundColor: "rgba(255,255,255,0.92)",
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.7)",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "center", justifyContent: "center",
     padding: 12,
-    ...(IS_WEB
-      ? { boxShadow: "0 0 0 12px rgba(255,255,255,0.08), 0 0 60px 20px rgba(59,110,234,0.45), 0 8px 40px rgba(0,0,0,0.35)" } as any
-      : {
-          shadowColor: "#3B6EEA",
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.6,
-          shadowRadius: 40,
-          elevation: 20,
-        }),
+    shadowColor: "#3B6EEA",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 40,
+    elevation: 20,
   },
   logo: {
-    width: 110,
-    height: 110,
+    width: 110, height: 110,
     borderRadius: 55,
   },
   textBlock: {
@@ -329,17 +275,11 @@ const S = StyleSheet.create({
     gap: 7,
   },
   appName: {
-    fontSize: 42,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    letterSpacing: -1.2,
-    ...(IS_WEB
-      ? { textShadow: "0 0 32px rgba(91,141,239,0.85)" } as any
-      : {
-          textShadowColor: "rgba(91,141,239,0.7)",
-          textShadowOffset: { width: 0, height: 0 },
-          textShadowRadius: 24,
-        }),
+    fontSize: 42, fontWeight: "800",
+    color: "#FFFFFF", letterSpacing: -1.2,
+    textShadowColor: "rgba(91,141,239,0.7)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 24,
   },
   tagline: {
     fontSize: 14,
@@ -350,12 +290,11 @@ const S = StyleSheet.create({
   },
   barWrap: {
     position: "absolute",
-    bottom: IS_WEB ? 80 : 120,
+    bottom: 120,
     alignItems: "center",
   },
   barTrack: {
-    width: 148,
-    height: 3,
+    width: 148, height: 3,
     borderRadius: 2,
     backgroundColor: "rgba(255,255,255,0.10)",
     overflow: "hidden",
@@ -371,7 +310,7 @@ const S = StyleSheet.create({
   },
   version: {
     position: "absolute",
-    bottom: IS_WEB ? 28 : 52,
+    bottom: 52,
     fontSize: 11,
     color: "rgba(255,255,255,0.25)",
     letterSpacing: 0.8,
