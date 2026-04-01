@@ -953,6 +953,44 @@ router.get("/online-bookings", async (req, res) => {
       : [];
     const tripMap = Object.fromEntries(trips.map(t => [t.id, t]));
 
+    /* ── Batch-load SEAT COUNTS (all channels) per trip ────────────────
+       This gives us real availability: totalSeats - totalConfirmed
+       For en-route trips all remaining seats are available online.
+    ─────────────────────────────────────────────────────────────────── */
+    interface TripSeatCounts {
+      totalConfirmed: number; totalPending: number;
+      onlineConfirmed: number; onlinePending: number;
+    }
+    const tripSeatMap: Record<string, TripSeatCounts> = {};
+    if (tripIds.length > 0) {
+      try {
+        const tripIdList = tripIds.map(id => `'${id}'`).join(",");
+        const seatRows = await db.execute(sql`
+          SELECT
+            trip_id,
+            COUNT(*) FILTER (WHERE status IN ('confirmed','boarded'))                                              AS total_confirmed,
+            COUNT(*) FILTER (WHERE status = 'pending')                                                            AS total_pending,
+            COUNT(*) FILTER (WHERE status IN ('confirmed','boarded') AND booking_source IN ('mobile','online'))   AS online_confirmed,
+            COUNT(*) FILTER (WHERE status = 'pending'               AND booking_source IN ('mobile','online'))   AS online_pending
+          FROM bookings
+          WHERE trip_id IN (${sql.raw(tripIdList)})
+          GROUP BY trip_id
+        `);
+        for (const r of seatRows.rows as any[]) {
+          if (r.trip_id) {
+            tripSeatMap[r.trip_id] = {
+              totalConfirmed:  Number(r.total_confirmed)  || 0,
+              totalPending:    Number(r.total_pending)    || 0,
+              onlineConfirmed: Number(r.online_confirmed) || 0,
+              onlinePending:   Number(r.online_pending)   || 0,
+            };
+          }
+        }
+      } catch (seatErr) {
+        console.error("[online-bookings] seat-counts fetch error (non-blocking):", seatErr);
+      }
+    }
+
     /* Batch-load departure agences via trip_agents */
     const tripAgenceMap: Record<string, { name: string; city: string }> = {};
     if (tripIds.length > 0) {
@@ -1009,20 +1047,42 @@ router.get("/online-bookings", async (req, res) => {
         bagageStatus: (b as any).bagageStatus ?? null,
         bagagePrice: (b as any).bagagePrice ?? 0,
         bagageItems: bagItemMap[b.id] ?? [],
-        trip: trip ? {
-          id: trip.id,
-          from: trip.from,
-          to: trip.to,
-          date: trip.date,
-          departureTime: trip.departureTime,
-          busName: trip.busName,
-          status: trip.status,
-          guichetSeats: trip.guichetSeats,
-          onlineSeats: trip.onlineSeats,
-          totalSeats: trip.totalSeats,
-          agenceName: tripAgence?.name ?? null,
-          agenceCity: tripAgence?.city ?? null,
-        } : null,
+        trip: trip ? (() => {
+          const sc        = tripSeatMap[trip.id] ?? { totalConfirmed:0, totalPending:0, onlineConfirmed:0, onlinePending:0 };
+          const total     = Number(trip.totalSeats)   || 0;
+          const gQuota    = Number(trip.guichetSeats) || 0;
+          const oQuota    = Number(trip.onlineSeats)  || 0;
+          const isEnRoute = trip.status === "en_route" || trip.status === "in_progress" || trip.status === "boarding";
+          /* Available seats:
+             - En route/boarding: all remaining seats usable online (no channel split)
+             - Scheduled: use online quota minus online confirmed */
+          const totalAvailable   = Math.max(0, total - sc.totalConfirmed);
+          const onlineAvailable  = isEnRoute
+            ? totalAvailable                                   // all remaining → online
+            : Math.max(0, oQuota - sc.onlineConfirmed);       // just online quota
+          return {
+            id:             trip.id,
+            from:           trip.from,
+            to:             trip.to,
+            date:           trip.date,
+            departureTime:  trip.departureTime,
+            busName:        trip.busName,
+            status:         trip.status,
+            guichetSeats:   gQuota,
+            onlineSeats:    oQuota,
+            totalSeats:     total,
+            /* Real-time seat data (all channels) */
+            totalConfirmed:  sc.totalConfirmed,
+            totalPending:    sc.totalPending,
+            onlineConfirmed: sc.onlineConfirmed,
+            onlinePending:   sc.onlinePending,
+            totalAvailable,       // = totalSeats - totalConfirmed
+            onlineAvailable,      // depends on status (see above)
+            isEnRoute,            // flag for frontend to show "all seats online" indicator
+            agenceName:     tripAgence?.name ?? null,
+            agenceCity:     tripAgence?.city ?? null,
+          };
+        })() : null,
       };
     });
 

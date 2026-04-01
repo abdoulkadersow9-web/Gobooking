@@ -49,6 +49,11 @@ interface TripInfo {
   id:string; from:string; to:string; date:string;
   departureTime:string; busName:string; status?:string;
   guichetSeats:number; onlineSeats:number; totalSeats:number;
+  /* Real-time seat data enriched by API */
+  totalConfirmed?:number;  totalPending?:number;
+  onlineConfirmed?:number; onlinePending?:number;
+  totalAvailable?:number;  onlineAvailable?:number;
+  isEnRoute?:boolean;
   agenceName?:string|null; agenceCity?:string|null;
 }
 
@@ -468,11 +473,12 @@ export default function AgentReservation(){
             const gConf = group.bks.filter(b=>b.status==="confirmed"||b.status==="boarded").length;
             const gCan  = group.bks.filter(b=>b.status==="cancelled").length;
 
-            /* Places disponibles */
-            const totalSeats  = trip?.totalSeats   ?? 0;
-            const onlineSold  = trip?.onlineSeats  ?? 0;
-            const guichetSold = trip?.guichetSeats ?? 0;
-            const available   = totalSeats - onlineSold - guichetSold;
+            /* Places disponibles — utilise les vraies données de l'API */
+            const totalSeats       = trip?.totalSeats      ?? 0;
+            const totalConfirmed   = trip?.totalConfirmed  ?? 0;
+            const onlineAvailable  = trip?.onlineAvailable ?? 0;
+            const totalAvailable   = trip?.totalAvailable  ?? (totalSeats - totalConfirmed);
+            const enRoute          = trip?.isEnRoute       ?? false;
 
             return (
               <View key={group.key} style={[s.tripCard, gPend>0&&s.tripCardPend]}>
@@ -516,14 +522,25 @@ export default function AgentReservation(){
 
                     {/* Ligne 3 : COMPTEURS */}
                     <View style={s.th3}>
-                      {/* Places */}
+                      {/* Places — données temps réel */}
                       {totalSeats>0&&(
                         <View style={s.thCountBox}>
                           <Feather name="users" size={9} color={C.sub}/>
                           <Text style={s.thCountTxt}>
-                            {onlineSold+guichetSold}/{totalSeats} places
-                            {available>0&&<Text style={{color:C.green}}> · {available} libres</Text>}
+                            {totalConfirmed}/{totalSeats} places
+                            {enRoute
+                              ? <Text style={{color:C.green}}> · {totalAvailable} libres (tous canaux)</Text>
+                              : onlineAvailable>0
+                                ? <Text style={{color:C.teal}}> · {onlineAvailable} en ligne</Text>
+                                : <Text style={{color:C.red}}> · Complet</Text>
+                            }
                           </Text>
+                        </View>
+                      )}
+                      {/* Badge "En route → toutes places online" */}
+                      {enRoute&&totalAvailable>0&&(
+                        <View style={[s.thCnt,{backgroundColor:"rgba(5,150,105,0.12)",borderColor:"rgba(5,150,105,0.3)"}]}>
+                          <Text style={[s.thCntTxt,{color:C.green}]}>🌐 En ligne</Text>
                         </View>
                       )}
                       <View style={{flex:1}}/>

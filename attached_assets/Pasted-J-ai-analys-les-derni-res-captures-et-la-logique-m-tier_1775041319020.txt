@@ -1,0 +1,171 @@
+J’ai analysé les dernières captures et la logique métier complète.
+
+Il y a une amélioration visible, mais le système ne respecte toujours pas la logique réelle de fonctionnement des places, des agences et des réservations.
+
+⚠️ Ceci est un point CRITIQUE à corriger immédiatement.
+
+Merci de ne rien casser, mais de corriger la logique et la synchronisation.
+
+---
+
+🔴 1. PROBLÈME MAJEUR ACTUEL
+
+Actuellement :
+
+- les places ne sont pas bien synchronisées entre guichet et en ligne
+- les informations des départs ne sont pas unifiées
+- les agences ne sont pas connectées entre elles correctement
+- les réservations en cours de route ne sont pas gérées automatiquement
+
+👉 Cela casse complètement la logique métier du transport réel.
+
+---
+
+🔴 2. LOGIQUE DES PLACES (OBLIGATOIRE)
+
+Exemple :
+
+- Car = 63 places
+- 40 guichet + 23 en ligne
+
+👉 AVANT DÉPART :
+- chaque canal vend ses places
+
+👉 APRÈS DÉPART (EN ROUTE) :
+⚠️ TOUTES LES PLACES RESTANTES DOIVENT DEVENIR DISPONIBLES EN LIGNE
+
+- plus de séparation guichet / en ligne
+- toutes les places libres doivent être visibles et réservables en ligne
+
+👉 actuellement ce comportement n’est pas respecté
+
+---
+
+🔴 3. SYNCHRONISATION TEMPS RÉEL (CRITIQUE)
+
+Quand une réservation est confirmée :
+
+- elle doit être immédiatement visible :
+  - dans le départ concerné
+  - chez l’agent en route
+  - dans toutes les agences du trajet
+
+👉 aucune latence, aucune duplication, aucun conflit
+
+---
+
+🔴 4. VISIBILITÉ COMPLÈTE DU DÉPART
+
+Quand un agent ouvre un départ :
+
+il doit voir :
+
+- la liste complète des passagers
+- les places occupées (guichet + en ligne)
+- les places libres
+- les réservations en attente
+- les confirmations
+
+👉 actuellement ce n’est pas clair ni complet
+
+---
+
+🔴 5. PARTAGE ENTRE AGENCES (TRÈS IMPORTANT)
+
+Quand le car quitte une agence :
+
+- les informations doivent être automatiquement envoyées aux agences suivantes
+
+Exemple :
+
+Abidjan → Bouaké → Korhogo
+
+👉 Bouaké doit déjà voir :
+
+- les places restantes
+- les réservations en ligne
+- les passagers qui vont descendre
+- les nouvelles réservations possibles
+
+👉 tout doit être automatique et synchronisé
+
+---
+
+🔴 6. VENTE EN COURS DE ROUTE
+
+Quand le car est en route :
+
+- les places libres doivent être visibles en ligne
+- les réservations en ligne doivent être confirmées par l’agent réservation
+- automatiquement envoyées à l’agent en route
+
+👉 ce flux doit être fluide et instantané
+
+---
+
+🔴 7. AUCUNE DUPLICATION
+
+À corriger :
+
+- aucun siège en double
+- aucun ticket en double
+- aucun conflit de réservation
+
+👉 système unique et fiable
+
+---
+
+🔴 8. STRUCTURE DU DASHBOARD
+
+La page doit être organisée clairement :
+
+1. AGENCES
+2. DÉPARTS
+3. PASSAGERS / RÉSERVATIONS
+
+👉 actuellement encore partiellement mélangé
+
+---
+
+🔴 9. OBJECTIF FINAL
+
+Nous voulons :
+
+- un système synchronisé en temps réel
+- une logique parfaite des places
+- une communication automatique entre agences
+- une visibilité complète pour chaque agent
+- une interface claire et professionnelle
+
+---
+
+🔴 10. OUVERTURE APPLICATION (LOGO)
+
+Problème actuel :
+
+- logo lent à apparaître
+- ouverture non fluide
+
+À corriger :
+
+- affichage immédiat du logo au lancement
+- animation fluide
+- aucune latence
+
+👉 ouverture rapide, moderne et professionnelle
+
+---
+
+🔴 11. VALIDATION
+
+Après correction :
+
+merci d’envoyer :
+
+- capture du flux complet (agence → départ → passagers)
+- test réservation en cours de route
+- test synchronisation entre agences
+
+---
+
+Merci de corriger ce point en priorité, c’est le cœur du système GoBooking
